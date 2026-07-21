@@ -74,7 +74,13 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
     }
   }
 
-  if (req.path === '/api/health' || req.path.startsWith('/api/auth/')) return next();
+  // Only API routes are session-gated — static assets and the SPA shell must load so the
+  // login page itself can render. /api/agent/* authenticates with its own static token
+  // (see routes/agent.ts), not a session.
+  if (!req.path.startsWith('/api/')) return next();
+  if (req.path === '/api/health' || req.path.startsWith('/api/auth/') || req.path.startsWith('/api/agent/')) {
+    return next();
+  }
   if (!req.user) return res.status(401).json({ error: 'Not signed in' });
   if (req.user.role === 'SIGNAGE' && req.method !== 'GET') {
     return res.status(403).json({ error: 'Signage accounts are view-only' });

@@ -138,6 +138,25 @@ model Session {
   @@index([userId])
 }
 
+/// A physical print job: one PDF destined for one tray. status is one of:
+/// QUEUED (waiting for dispatch/agent), CLAIMED (agent picked it up), SENT (sent to the
+/// printer or completed dry-run), DONE (agent confirmed), FAILED, CANCELLED.
+model PrintJob {
+  id        String   @id @default(cuid())
+  jobId     String
+  labelType String
+  tray      String
+  fileName  String
+  method    String
+  status    String   @default("QUEUED")
+  error     String?
+  pages     Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+}
+
 model Plot {
   id           String   @id @default(cuid())
   jobId        String

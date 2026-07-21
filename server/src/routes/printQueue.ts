@@ -1,24 +1,19 @@
 import { Router } from 'express';
-import path from 'path';
-import fs from 'fs';
-import { PDFDocument } from 'pdf-lib';
 import { prisma, logActivity } from '../db';
-import { uploadDir } from './jobs';
-import { MAX_COPIES_WITHOUT_OVERRIDE, PRINTER_TRAY_MAP } from '../constants';
-import {
-  buildCableLabelsPdf,
-  buildFixtureLabelsPdf,
-  buildPalLabelsPdf,
-  buildRackLabelsPdf,
-  buildTrussSpikePositionPdf,
-  buildTrussSpikeSacnPdf,
-  buildTrussSpikeTipPdf,
-} from '../pdf/labelRenderers';
+import { MAX_COPIES_WITHOUT_OVERRIDE } from '../constants';
+import { buildCombinedPdf, collectConfirmedContent } from '../printing/buildLabelPdfs';
+import { createPrintJobs } from '../printing/printJobService';
+import { getPrinterSettings } from '../printing/printerSettings';
 
 export const printQueueRouter = Router();
 
-printQueueRouter.get('/:jobId/printer-config', (_req, res) => {
-  res.json({ printer: 'Develop ineo+ 3320i', trayMap: PRINTER_TRAY_MAP });
+printQueueRouter.get('/:jobId/printer-config', async (_req, res) => {
+  const settings = await getPrinterSettings();
+  const trayMap: Record<string, string> = {};
+  for (const [labelType, trayKey] of Object.entries(settings.typeToTray)) {
+    trayMap[labelType] = settings.trays[trayKey]?.label ?? trayKey;
+  }
+  res.json({ printer: settings.agent.printerName, trayMap, method: settings.method });
 });
 
 printQueueRouter.post('/:jobId/print-queue/build', async (req, res) => {
@@ -131,57 +126,31 @@ printQueueRouter.post('/:jobId/print-queue/confirm', async (req, res) => {
 
 printQueueRouter.get('/:jobId/print-queue/pdf', async (req, res) => {
   const { jobId } = req.params;
-  const [job, confirmed, adHoc] = await Promise.all([
-    prisma.job.findUnique({ where: { id: jobId } }),
-    prisma.printQueueItem.findMany({ where: { jobId, status: 'CONFIRMED' } }),
-    prisma.adHocLabel.findMany({ where: { jobId } }),
-  ]);
-
-  if (confirmed.length === 0 && adHoc.length === 0) {
+  const byType = await collectConfirmedContent(jobId);
+  const total = Object.values(byType).reduce((n, items) => n + items.length, 0);
+  if (total === 0) {
     return res.status(400).json({ error: 'Nothing confirmed to print yet' });
   }
 
-  const byType: Record<string, unknown[]> = {};
-  const expand = (labelType: string, content: unknown, quantity: number) => {
-    byType[labelType] = byType[labelType] ?? [];
-    for (let i = 0; i < quantity; i++) byType[labelType].push(content);
-  };
-  for (const item of confirmed) {
-    expand(item.labelType, JSON.parse(item.contentJson), item.quantity);
-  }
-  for (const item of adHoc) {
-    expand(item.labelType, JSON.parse(item.contentJson), item.quantity);
-  }
-
-  const doc = await PDFDocument.create();
-  if (byType.FIXTURE) await buildFixtureLabelsPdf(doc, byType.FIXTURE as never);
-  if (byType.TRUSS_SPIKE_POSITION) await buildTrussSpikePositionPdf(doc, byType.TRUSS_SPIKE_POSITION as never);
-  if (byType.TRUSS_SPIKE_TIP) await buildTrussSpikeTipPdf(doc, byType.TRUSS_SPIKE_TIP as never);
-  if (byType.TRUSS_SPIKE_SACN) await buildTrussSpikeSacnPdf(doc, byType.TRUSS_SPIKE_SACN as never);
-  if (byType.CABLE) await buildCableLabelsPdf(doc, byType.CABLE as never);
-  if (byType.PAL) {
-    let logo: { bytes: Uint8Array; kind: 'png' | 'jpg' } | undefined;
-    if (job?.logoPath) {
-      const ext = path.extname(job.logoPath).toLowerCase();
-      const kind = ext === '.png' ? 'png' : ext === '.jpg' || ext === '.jpeg' ? 'jpg' : null;
-      const filePath = path.join(uploadDir, job.logoPath);
-      if (kind && fs.existsSync(filePath)) {
-        logo = { bytes: fs.readFileSync(filePath), kind };
-      }
-    }
-    await buildPalLabelsPdf(doc, byType.PAL as never, logo);
-  }
-  if (byType.RACK) await buildRackLabelsPdf(doc, byType.RACK as never);
-
-  const bytes = await doc.save();
+  const pdf = await buildCombinedPdf(jobId, byType);
 
   await prisma.printQueueItem.updateMany({
     where: { jobId, status: 'CONFIRMED' },
     data: { status: 'PRINTED' },
   });
-  await logActivity('print_queue.pdf_generated', `${confirmed.length + adHoc.length} label entries`, jobId, req.user?.id);
+  await logActivity('print_queue.pdf_generated', `${total} label entries`, jobId, req.user?.id);
 
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `attachment; filename="job-${jobId}-labels.pdf"`);
-  res.send(Buffer.from(bytes));
+  res.send(pdf);
+});
+
+/** Sends everything confirmed to the printer as tray-routed print jobs (one per label type). */
+printQueueRouter.post('/:jobId/print-queue/send', async (req, res) => {
+  try {
+    const jobs = await createPrintJobs(req.params.jobId, req.user?.id);
+    res.json({ printJobs: jobs });
+  } catch (err) {
+    res.status(400).json({ error: (err as Error).message });
+  }
 });

@@ -1,0 +1,11 @@
+services:
+  elexprep:
+    build: .
+    container_name: elexprep
+    restart: unless-stopped
+    ports:
+      - "4000:4000"
+    volumes:
+      # Database, logos, plots, and generated print-job PDFs all live here —
+      # back this folder up and the whole app state comes with it.
+      - ./data:/data

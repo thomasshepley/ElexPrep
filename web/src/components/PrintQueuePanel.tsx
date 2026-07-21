@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { api, type PrintQueueItem, type AdHocLabel } from '../api/client';
+import { Link } from 'react-router-dom';
+import { api, type PrintQueueItem, type AdHocLabel, type PrintJob, type PrintMethod } from '../api/client';
 
 function summarize(labelType: string, content: Record<string, unknown>): string {
   switch (labelType) {
@@ -27,6 +28,8 @@ export default function PrintQueuePanel({ jobId }: { jobId: string }) {
   const [adHoc, setAdHoc] = useState<AdHocLabel[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [trayMap, setTrayMap] = useState<Record<string, string>>({});
+  const [method, setMethod] = useState<PrintMethod>('DRY_RUN');
+  const [printJobs, setPrintJobs] = useState<PrintJob[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -37,9 +40,15 @@ export default function PrintQueuePanel({ jobId }: { jobId: string }) {
       setSelected(new Set(queue.filter((q) => q.status === 'PENDING').map((q) => q.id)));
     });
 
+  const refreshPrintJobs = () => api.printJobs.list(jobId).then(setPrintJobs);
+
   useEffect(() => {
     refresh();
-    api.printQueue.printerConfig(jobId).then((c) => setTrayMap(c.trayMap));
+    refreshPrintJobs();
+    api.printQueue.printerConfig(jobId).then((c) => {
+      setTrayMap(c.trayMap);
+      setMethod(c.method);
+    });
   }, [jobId]);
 
   const build = async () => {
@@ -71,21 +80,45 @@ export default function PrintQueuePanel({ jobId }: { jobId: string }) {
     });
   };
 
-  const confirmAndPrint = async (override = false) => {
-    setBusy(true);
-    setError(null);
+  const confirmSelected = async (override = false): Promise<boolean> => {
+    const ids = [...selected];
+    if (!ids.length) return true;
     try {
-      const ids = [...selected];
-      if (ids.length) await api.printQueue.confirm(jobId, ids, override);
-      window.location.href = api.printQueue.pdfUrl(jobId);
-      setTimeout(refresh, 1500);
+      await api.printQueue.confirm(jobId, ids, override);
+      return true;
     } catch (e) {
       const msg = (e as Error).message;
       if (msg.includes('safety cap') && !override) {
-        if (confirm(`${msg}\n\nPrint anyway?`)) await confirmAndPrint(true);
-      } else {
-        setError(msg);
+        if (confirm(`${msg}\n\nPrint anyway?`)) return confirmSelected(true);
+        return false;
       }
+      setError(msg);
+      return false;
+    }
+  };
+
+  const confirmAndDownload = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      if (!(await confirmSelected())) return;
+      window.location.href = api.printQueue.pdfUrl(jobId);
+      setTimeout(refresh, 1500);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const confirmAndSend = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      if (!(await confirmSelected())) return;
+      await api.printQueue.send(jobId);
+      await refresh();
+      await refreshPrintJobs();
+    } catch (e) {
+      setError((e as Error).message);
     } finally {
       setBusy(false);
     }
@@ -97,14 +130,13 @@ export default function PrintQueuePanel({ jobId }: { jobId: string }) {
   return (
     <div>
       <div className="panel">
-        <h3>Printer routing — {trayMap && 'Develop ineo+ 3320i'}</h3>
+        <h3>Printer routing</h3>
         <p className="muted">
           {Object.entries(trayMap).map(([type, tray]) => `${type}: ${tray}`).join(' · ')}
         </p>
         <p className="muted">
-          Real tray selection needs to run on the office machine with the printer driver installed —
-          this preview and PDF generation works anywhere; wiring it to the physical printer is a
-          later phase (see README).
+          Delivery method: <strong>{method === 'DRY_RUN' ? 'Dry run (no printing)' : method === 'DIRECT_9100' ? 'Direct network (port 9100)' : 'Windows agent'}</strong>
+          {' — '}configure in <Link to="/settings/printer">Printer Settings</Link>.
         </p>
       </div>
 
@@ -172,12 +204,77 @@ export default function PrintQueuePanel({ jobId }: { jobId: string }) {
 
         {error && <p className="error">{error}</p>}
 
-        <div style={{ marginTop: '1rem' }}>
-          <button onClick={() => confirmAndPrint(false)} disabled={busy || (pendingItems.length === 0 && adHoc.length === 0)}>
-            Confirm selected &amp; generate print PDF
+        <div className="row" style={{ marginTop: '1rem' }}>
+          <button onClick={confirmAndSend} disabled={busy || (pendingItems.length === 0 && adHoc.length === 0)}>
+            Confirm &amp; send to printer
+          </button>
+          <button
+            className="secondary"
+            onClick={confirmAndDownload}
+            disabled={busy || (pendingItems.length === 0 && adHoc.length === 0)}
+          >
+            Confirm &amp; download PDF
           </button>
         </div>
       </div>
+
+      {printJobs.length > 0 && (
+        <div className="panel">
+          <div className="row" style={{ justifyContent: 'space-between' }}>
+            <h3>Print jobs</h3>
+            <button className="secondary" onClick={refreshPrintJobs}>
+              Refresh
+            </button>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Type</th>
+                <th>Tray</th>
+                <th>Pages</th>
+                <th>Method</th>
+                <th>Status</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {printJobs.map((pj) => (
+                <tr key={pj.id}>
+                  <td>{pj.labelType}</td>
+                  <td>{trayMap[pj.labelType] ?? pj.tray}</td>
+                  <td>{pj.pages}</td>
+                  <td className="muted">{pj.method}</td>
+                  <td>
+                    {pj.status}
+                    {pj.error && <div className="error">{pj.error}</div>}
+                  </td>
+                  <td className="row">
+                    <a href={api.printJobs.pdfUrl(pj.id)} target="_blank" rel="noreferrer">
+                      PDF
+                    </a>
+                    {(pj.status === 'FAILED' || pj.status === 'CANCELLED') && (
+                      <button
+                        className="secondary"
+                        onClick={() => api.printJobs.retry(pj.id).then(refreshPrintJobs)}
+                      >
+                        Retry
+                      </button>
+                    )}
+                    {pj.status === 'QUEUED' && (
+                      <button
+                        className="secondary"
+                        onClick={() => api.printJobs.cancel(pj.id).then(refreshPrintJobs)}
+                      >
+                        Cancel
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {confirmedOrPrinted.length > 0 && (
         <div className="panel">

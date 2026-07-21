@@ -110,6 +110,29 @@ export interface Plot {
   createdAt: string;
 }
 
+export type PrintMethod = 'DRY_RUN' | 'DIRECT_9100' | 'AGENT';
+export type TrayKey = 'TRAY1' | 'TRAY2' | 'BYPASS';
+
+export interface PrinterSettings {
+  method: PrintMethod;
+  direct: { host: string; port: number };
+  agent: { printerName: string; token: string };
+  trays: Record<TrayKey, { label: string; pjl: string; bin: string }>;
+  typeToTray: Record<string, TrayKey>;
+}
+
+export interface PrintJob {
+  id: string;
+  jobId: string;
+  labelType: string;
+  tray: string;
+  method: string;
+  status: 'QUEUED' | 'CLAIMED' | 'SENT' | 'DONE' | 'FAILED' | 'CANCELLED';
+  error: string | null;
+  pages: number;
+  createdAt: string;
+}
+
 export const api = {
   auth: {
     status: () => request<{ needsSetup: boolean }>('/auth/status'),
@@ -221,8 +244,29 @@ export const api = {
         body: JSON.stringify({ ids, override }),
       }),
     pdfUrl: (jobId: string) => `${BASE}/jobs/${jobId}/print-queue/pdf`,
+    send: (jobId: string) =>
+      request<{ printJobs: PrintJob[] }>(`/jobs/${jobId}/print-queue/send`, { method: 'POST' }),
     printerConfig: (jobId: string) =>
-      request<{ printer: string; trayMap: Record<string, string> }>(`/jobs/${jobId}/printer-config`),
+      request<{ printer: string; trayMap: Record<string, string>; method: PrintMethod }>(
+        `/jobs/${jobId}/printer-config`
+      ),
+  },
+  printJobs: {
+    list: (jobId?: string) => request<PrintJob[]>(`/print-jobs${jobId ? `?jobId=${jobId}` : ''}`),
+    pdfUrl: (id: string) => `${BASE}/print-jobs/${id}/pdf`,
+    retry: (id: string) => request<PrintJob>(`/print-jobs/${id}/retry`, { method: 'POST' }),
+    cancel: (id: string) => request<PrintJob>(`/print-jobs/${id}/cancel`, { method: 'POST' }),
+  },
+  printerSettings: {
+    get: () => request<PrinterSettings>('/printer-settings'),
+    put: (settings: PrinterSettings) =>
+      request<PrinterSettings>('/printer-settings', { method: 'PUT', body: JSON.stringify(settings) }),
+    regenerateToken: () => request<PrinterSettings>('/printer-settings/regenerate-token', { method: 'POST' }),
+    testConnection: (host?: string, port?: number) =>
+      request<{ ok: boolean; message?: string }>('/printer-settings/test-connection', {
+        method: 'POST',
+        body: JSON.stringify({ host, port }),
+      }),
   },
   activity: {
     list: (jobId?: string) => request<ActivityLogEntry[]>(`/activity${jobId ? `?jobId=${jobId}` : ''}`),

@@ -12,6 +12,7 @@ import FixtureTypeRulesPage from './pages/FixtureTypeRulesPage'
 import ImportMappingPage from './pages/ImportMappingPage'
 import UsersPage from './pages/UsersPage'
 import PreferencesPage from './pages/PreferencesPage'
+import PrinterSettingsPage from './pages/PrinterSettingsPage'
 import ActivityLogPage from './pages/ActivityLogPage'
 
 createRoot(document.getElementById('root')!).render(
@@ -27,6 +28,7 @@ createRoot(document.getElementById('root')!).render(
             <Route path="settings/fixture-types" element={<FixtureTypeRulesPage />} />
             <Route path="settings/import-mapping" element={<ImportMappingPage />} />
             <Route path="settings/users" element={<UsersPage />} />
+            <Route path="settings/printer" element={<PrinterSettingsPage />} />
             <Route path="settings/preferences" element={<PreferencesPage />} />
             <Route path="activity" element={<ActivityLogPage />} />
           </Route>

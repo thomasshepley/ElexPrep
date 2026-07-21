@@ -4,7 +4,9 @@ import path from 'path';
 import fs from 'fs';
 import { prisma, logActivity } from '../db';
 
-const plotsDir = path.join(__dirname, '..', '..', 'uploads', 'plots');
+import { uploadDir } from './jobs';
+
+const plotsDir = path.join(uploadDir, 'plots');
 fs.mkdirSync(plotsDir, { recursive: true });
 
 const upload = multer({

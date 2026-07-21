@@ -43,18 +43,27 @@ everything else in the original feature list is scoped for later phases (see bel
   job, it shows the job name, logo, and case list grouped by fixture type, auto-refreshing
   every minute. SIGNAGE logins land here automatically and can't navigate elsewhere.
 
+- **Printer connection** with three delivery methods (Printer Settings, admin-only):
+  - *Dry run* (default): print jobs are created and tracked without touching hardware — safe
+    for testing and Docker.
+  - *Direct network (port 9100)*: the server streams PJL-wrapped PDF straight to the
+    printer's IP with `MEDIASOURCE` tray selection — no Windows machine involved.
+  - *Windows agent*: `agent/elexprep-print-agent.mjs` runs on the office machine with the
+    ineo+ 3320i driver and prints via SumatraPDF with `bin=` tray selection — see
+    `agent/README.md`.
+  "Confirm & send to printer" splits the confirmed queue into one print job per label type,
+  routed to its tray (PAL → Tray 1, Fixture/Truss/Spike → Tray 2, Cable/Other → Bypass, all
+  configurable), with per-job status, retry, and cancel. "Confirm & download PDF" still
+  produces the combined manual-print PDF.
+- **Docker deployment** — single container (API + UI + SQLite), one `data/` volume for all
+  state; see `DEPLOY.md` for setup and a full pre-release test checklist.
+
 ## What's deliberately deferred
 
 - Current RMS integration (linking a job to an opportunity, pulling pick lists, change alerts) —
   the job record has a placeholder field for the opportunity ID only.
-- Real printer/tray automation. The app generates correct, print-ready PDFs and shows the tray
-  each label type should use (Tray 1 = PAL, Tray 2 = Fixture/Truss/Spike, Bypass = Cable/Other,
-  per the Develop ineo+ 3320i setup) — but actually pushing a PDF to a specific tray needs to run
-  on the Windows machine with the driver installed. The cleanest path is a small Windows-side
-  helper (e.g. a .NET `PrintDocument` call setting `PaperSource` from the tray name, or
-  SumatraPDF's `-print-to`/`-print-settings` if the driver exposes bin selection through it) that
-  this server calls out to once it's running on-site. That's a separate, hardware-specific piece
-  of work best done against the real printer.
+- Live tray-value calibration against the physical ineo+ 3320i (PJL MEDIASOURCE values and
+  SumatraPDF bin names are configurable in Printer Settings but need confirming on-site).
 - A GitHub Pages remote-drafting companion site.
 
 ## Repo layout

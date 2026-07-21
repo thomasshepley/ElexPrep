@@ -1,4 +1,6 @@
 import 'dotenv/config';
+import path from 'path';
+import fs from 'fs';
 import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
@@ -13,6 +15,8 @@ import { casesRouter } from './routes/cases';
 import { adHocLabelsRouter } from './routes/adHocLabels';
 import { printQueueRouter } from './routes/printQueue';
 import { plotsRouter } from './routes/plots';
+import { printJobsRouter, printerSettingsRouter } from './routes/printJobs';
+import { agentRouter } from './routes/agent';
 import { activityRouter } from './routes/activity';
 
 const app = express();
@@ -33,9 +37,23 @@ app.use('/api/jobs', casesRouter);
 app.use('/api/jobs', adHocLabelsRouter);
 app.use('/api/jobs', printQueueRouter);
 app.use('/api/jobs', plotsRouter);
+app.use('/api/print-jobs', printJobsRouter);
+app.use('/api/printer-settings', printerSettingsRouter);
+app.use('/api/agent', agentRouter);
 app.use('/api/activity', activityRouter);
 
+// In production (Docker) the server also serves the built web app; in dev the Vite dev
+// server proxies /api here instead. WEB_DIST can point anywhere; default is web/dist.
+const webDist = process.env.WEB_DIST
+  ? path.resolve(process.env.WEB_DIST)
+  : path.join(__dirname, '..', '..', 'web', 'dist');
+if (fs.existsSync(path.join(webDist, 'index.html'))) {
+  app.use(express.static(webDist));
+  app.get(/^(?!\/api\/).*/, (_req, res) => res.sendFile(path.join(webDist, 'index.html')));
+  console.log(`Serving web UI from ${webDist}`);
+}
+
 const port = Number(process.env.PORT ?? 4000);
-app.listen(port, () => {
+app.listen(port, '0.0.0.0', () => {
   console.log(`ElexPrep server listening on http://localhost:${port}`);
 });
