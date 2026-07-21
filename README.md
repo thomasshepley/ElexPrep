@@ -104,8 +104,12 @@ integration, printer control, and prep-bay digital signage.
 - **Hardening**: unhandled errors (a bad ID in a URL, a duplicate name, etc.) return a
   proper JSON error response instead of hanging the request — Prisma's "not found" and
   "already exists" cases map to 404/409 specifically. The login endpoint is rate-limited
-  (20 attempts / 15 min per IP) against password guessing, and the session cookie's
-  `secure` flag is configurable via `COOKIE_SECURE` for HTTPS deployments.
+  (20 attempts / 15 min per IP) against password guessing, the session cookie's `secure`
+  flag is configurable via `COOKIE_SECURE` for HTTPS deployments, passwords require a
+  minimum length, uploads are capped and type-checked (job logo: 10MB/images only, plot
+  PDF: 100MB/PDF only), and baseline security headers (via `helmet`) are set on every
+  response — CSP and HSTS are deliberately left off (see `server/src/index.ts`) since they
+  assume a same-origin/HTTPS setup this app doesn't force on you by default.
 
 ## What's deliberately deferred
 

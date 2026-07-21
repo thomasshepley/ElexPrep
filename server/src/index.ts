@@ -6,6 +6,7 @@ import 'express-async-errors';
 import { Prisma } from '@prisma/client';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
+import helmet from 'helmet';
 import multer from 'multer';
 import { authMiddleware } from './auth';
 import { authRouter } from './routes/auth';
@@ -27,6 +28,13 @@ import { locationColorRulesRouter } from './routes/locationColorRules';
 import { seedDefaultLocationColorsIfEmpty } from './pdf/locationColors';
 
 const app = express();
+// CSP is left off: the SPA and its PDF previews/native viewers are all served same-origin
+// with no external resources, so the main risk it guards against doesn't apply here, and a
+// misconfigured policy is more likely to break a page (iframe/PDF embeds) than help.
+// HSTS is left off too: the default deployment here is plain HTTP on a LAN/home box (see
+// DEPLOY.md), and HSTS over plain HTTP just teaches the browser to refuse to reconnect.
+// A TLS-terminating reverse proxy (Caddy/nginx/Traefik) is the right place to add it.
+app.use(helmet({ contentSecurityPolicy: false, hsts: false }));
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json({ limit: '10mb' }));
 app.use(cookieParser());
