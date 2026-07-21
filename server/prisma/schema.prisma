@@ -1,0 +1,106 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Job {
+  id          String   @id @default(cuid())
+  name        String
+  venue       String?
+  logoPath    String?
+  currentRmsOpportunityId String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  fixtures       Fixture[]
+  caseGroups     CaseGroupRecord[]
+  adHocLabels    AdHocLabel[]
+  printQueueItems PrintQueueItem[]
+}
+
+model FixtureTypeRule {
+  id                 String   @id @default(cuid())
+  name               String   @unique
+  unitsPerCase       Int      @default(1)
+  caseLabelOverride  String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+model Fixture {
+  id            String  @id @default(cuid())
+  jobId         String
+  job           Job     @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  address       Int
+  fixtureType   String
+  mainUniverse  Int?
+  mainAddress   Int?
+  pixUniverse   Int?
+  pixAddress    Int?
+  mode          String?
+  location      String?
+  ipAddress     String?
+  subnetMask    String?
+  notes         String?
+  rawJson       String?
+
+  @@index([jobId])
+}
+
+/// A generated case grouping (e.g. "AstraBlade 201 + 202"). Regenerated whenever the
+/// packing algorithm re-runs for a job; addressesJson holds the member fixture addresses.
+model CaseGroupRecord {
+  id            String  @id @default(cuid())
+  jobId         String
+  job           Job     @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  fixtureType   String
+  label         String
+  location      String?
+  addressesJson String
+
+  @@index([jobId])
+}
+
+/// labelType is one of: FIXTURE, TRUSS_SPIKE_POSITION, TRUSS_SPIKE_TIP, TRUSS_SPIKE_SACN,
+/// CABLE, PAL, RACK (see @elexprep/shared LabelType). SQLite has no native enum type, so
+/// this is validated at the application layer instead of the database layer.
+/// Manually-added labels that don't come from the patch (personal Peli cases, generic
+/// equipment cases like "Hazer" or "Powercube", spare cable labels, etc).
+model AdHocLabel {
+  id          String    @id @default(cuid())
+  jobId       String
+  job         Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  labelType   String
+  contentJson String
+  quantity    Int       @default(1)
+  createdAt   DateTime  @default(now())
+}
+
+/// status is one of: PENDING, CONFIRMED, PRINTED (see @elexprep/shared PrintQueueStatus).
+model PrintQueueItem {
+  id          String   @id @default(cuid())
+  jobId       String
+  job         Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  labelType   String
+  sourceType  String
+  sourceId    String?
+  contentJson String
+  quantity    Int      @default(1)
+  status      String   @default("PENDING")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([jobId])
+}
+
+model ActivityLogEntry {
+  id        String   @id @default(cuid())
+  jobId     String?
+  action    String
+  detail    String?
+  createdAt DateTime @default(now())
+}
