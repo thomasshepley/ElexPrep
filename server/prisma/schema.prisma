@@ -23,6 +23,13 @@ model Job {
   /// Set by the sync poller when the linked opportunity's updated_at moves forward;
   /// cleared (set to null) when a viewer acknowledges it. Null = no outstanding alert.
   rmsAlertAt               DateTime?
+  /// Last-synced opportunity items (id/name/quantity), kept purely so the next sync can diff
+  /// against it to detect what changed — not shown directly, see rmsItemsDiffJson.
+  rmsItemsSnapshotJson     String?
+  /// The most recently computed added/removed/quantity-changed diff versus the previous
+  /// snapshot, for the signage full-screen change alert. Null = no outstanding items alert.
+  rmsItemsDiffJson         String?
+  rmsItemsDiffAt           DateTime?
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -32,6 +39,24 @@ model Job {
   adHocLabels    AdHocLabel[]
   printQueueItems PrintQueueItem[]
   plots          Plot[]
+  locationColorRules LocationColorRule[]
+  pickListItemStatuses PickListItemStatus[]
+}
+
+/// Tracks each Current RMS opportunity item's local crew-prep state ("pulled"/"booked out")
+/// for a job's signage pick list — independent of whatever Current RMS's own line-item status
+/// says, since that's ElexPrep's own added value for prep-bay tracking. Keyed on the job plus
+/// the CRMS item's stable id so a sync refresh doesn't reset progress crew has already ticked off.
+model PickListItemStatus {
+  id        String   @id @default(cuid())
+  jobId     String
+  job       Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  rmsItemId Int
+  prepped   Boolean  @default(false)
+  updatedAt DateTime @updatedAt
+
+  @@unique([jobId, rmsItemId])
+  @@index([jobId])
 }
 
 model FixtureTypeRule {
@@ -45,13 +70,21 @@ model FixtureTypeRule {
 
 /// Maps a stage location string (as it appears in the patch/ad hoc "location" field) to a
 /// hex color for the PAL label's location bar. Matched case-insensitively; a location with
-/// no rule falls back to a neutral default color at render time.
+/// no rule falls back to a neutral default color at render time. jobId null = a global
+/// default rule; jobId set = a per-job override/addition (for jobs whose patch uses location
+/// names that don't match the house defaults) that takes precedence for that job only.
+/// Uniqueness of (jobId, location) is enforced at the application layer rather than a DB
+/// constraint, since SQLite/Prisma's composite unique treats every NULL jobId as distinct.
 model LocationColorRule {
   id        String   @id @default(cuid())
-  location  String   @unique
+  jobId     String?
+  job       Job?     @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  location  String
   color     String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([jobId])
 }
 
 model Fixture {

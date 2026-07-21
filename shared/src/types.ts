@@ -44,8 +44,10 @@ export const PATCH_FIELD_KEYS = [
   'fixtureType',
   'mainUniverse',
   'mainAddress',
+  'mainUniverseAddress',
   'pixUniverse',
   'pixAddress',
+  'pixUniverseAddress',
   'mode',
   'location',
   'ipAddress',
@@ -60,11 +62,34 @@ export const PATCH_FIELD_LABELS: Record<PatchFieldKey, string> = {
   fixtureType: 'Fixture Type',
   mainUniverse: 'Main Universe',
   mainAddress: 'Main DMX Address',
+  mainUniverseAddress: 'Main Universe.Address (combined, e.g. "3.109")',
   pixUniverse: 'Pixel-map Universe',
   pixAddress: 'Pixel-map DMX Address',
+  pixUniverseAddress: 'Pixel-map Universe.Address (combined)',
   mode: 'Mode / Personality',
   location: 'Stage Location',
   ipAddress: 'sACN IP Address',
   subnetMask: 'Subnet Mask',
   notes: 'Notes',
+};
+
+/**
+ * Common column-name synonyms seen in real patch exports (e.g. CAST Wysiwyg's patch report:
+ * "Spot" for address, "Patch" for a combined universe.address, "Position" for stage location),
+ * used to auto-guess a column mapping from a sample file's headers.
+ */
+export const PATCH_FIELD_SYNONYMS: Record<PatchFieldKey, string[]> = {
+  address: ['address', 'spot', 'unit', 'unitnumber', 'fixturenumber', 'id'],
+  fixtureType: ['fixturetype', 'type', 'fixture'],
+  mainUniverse: ['mainuniverse', 'universe'],
+  mainAddress: ['mainaddress', 'maindmxaddress', 'dmxaddress'],
+  mainUniverseAddress: ['patch', 'universeaddress', 'mainpatch'],
+  pixUniverse: ['pixuniverse', 'pixelmapuniverse'],
+  pixAddress: ['pixaddress', 'pixelmapaddress'],
+  pixUniverseAddress: ['pixpatch', 'pixelpatch'],
+  mode: ['mode', 'personality', 'fixtureoptions', 'channels'],
+  location: ['location', 'stagelocation', 'position'],
+  ipAddress: ['ipaddress', 'sacnip'],
+  subnetMask: ['subnetmask', 'subnet'],
+  notes: ['notes', 'data'],
 };

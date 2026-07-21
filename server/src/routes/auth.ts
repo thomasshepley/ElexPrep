@@ -10,6 +10,7 @@ import {
   toAuthedUser,
   verifyPassword,
 } from '../auth';
+import { authedUserWithPermissions } from '../permissions';
 
 export const authRouter = Router();
 
@@ -58,7 +59,7 @@ authRouter.post('/setup', async (req, res) => {
   const session = await createSession(user.id);
   res.cookie(SESSION_COOKIE, session.id, { ...COOKIE_OPTS, expires: session.expiresAt });
   await logActivity('auth.setup', `Initial admin ${username} created`, undefined, user.id);
-  res.status(201).json(toAuthedUser(user));
+  res.status(201).json(await authedUserWithPermissions(toAuthedUser(user)));
 });
 
 authRouter.post('/login', loginLimiter, async (req, res) => {
@@ -71,7 +72,7 @@ authRouter.post('/login', loginLimiter, async (req, res) => {
   const session = await createSession(user.id);
   res.cookie(SESSION_COOKIE, session.id, { ...COOKIE_OPTS, expires: session.expiresAt });
   await logActivity('auth.login', username, undefined, user.id);
-  res.json(toAuthedUser(user));
+  res.json(await authedUserWithPermissions(toAuthedUser(user)));
 });
 
 authRouter.post('/logout', async (req, res) => {
@@ -81,9 +82,9 @@ authRouter.post('/logout', async (req, res) => {
   res.status(204).end();
 });
 
-authRouter.get('/me', (req, res) => {
+authRouter.get('/me', async (req, res) => {
   if (!req.user) return res.status(401).json({ error: 'Not signed in' });
-  res.json(req.user);
+  res.json(await authedUserWithPermissions(req.user));
 });
 
 authRouter.put('/me', async (req, res) => {
@@ -105,5 +106,5 @@ authRouter.put('/me', async (req, res) => {
   }
 
   const updated = await prisma.user.update({ where: { id: req.user.id }, data });
-  res.json(toAuthedUser(updated));
+  res.json(await authedUserWithPermissions(toAuthedUser(updated)));
 });

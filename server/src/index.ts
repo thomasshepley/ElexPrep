@@ -24,7 +24,8 @@ import { agentRouter } from './routes/agent';
 import { activityRouter } from './routes/activity';
 import { currentRmsRouter, jobCurrentRmsRouter } from './routes/currentRms';
 import { restartCurrentRmsPolling } from './currentRms/sync';
-import { locationColorRulesRouter } from './routes/locationColorRules';
+import { locationColorRulesRouter, jobLocationColorRulesRouter } from './routes/locationColorRules';
+import { permissionsRouter } from './routes/permissions';
 import { seedDefaultLocationColorsIfEmpty } from './pdf/locationColors';
 import { prisma } from './db';
 
@@ -55,11 +56,13 @@ app.use('/api/jobs', adHocLabelsRouter);
 app.use('/api/jobs', printQueueRouter);
 app.use('/api/jobs', plotsRouter);
 app.use('/api/jobs', jobCurrentRmsRouter);
+app.use('/api/jobs', jobLocationColorRulesRouter);
 app.use('/api/current-rms', currentRmsRouter);
 app.use('/api/print-jobs', printJobsRouter);
 app.use('/api/printer-settings', printerSettingsRouter);
 app.use('/api/agent', agentRouter);
 app.use('/api/activity', activityRouter);
+app.use('/api/permissions', permissionsRouter);
 
 // In production (Docker) the server also serves the built web app; in dev the Vite dev
 // server proxies /api here instead. WEB_DIST can point anywhere; default is web/dist.

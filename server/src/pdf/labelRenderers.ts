@@ -7,7 +7,7 @@ import {
   PAL_SHEET,
   RACK_SHEET,
 } from '@elexprep/shared';
-import { CellRectPt, centerText, drawCellOutline, inPt, renderSheets } from './pdfBuilder';
+import { CellRectPt, centerText, drawCellOutline, drawImageCover, inPt, renderSheets } from './pdfBuilder';
 import {
   contrastingTextIsWhite,
   hexToRgbFractions,
@@ -149,13 +149,9 @@ function drawPalCell(
   };
   drawCellOutline(page, logoRect);
   if (logoImage) {
-    const fit = logoImage.scaleToFit(logoRect.wPt - 8, logoRect.hPt - 8);
-    page.drawImage(logoImage, {
-      x: logoRect.xPt + (logoRect.wPt - fit.width) / 2,
-      y: logoRect.yPt + (logoRect.hPt - fit.height) / 2,
-      width: fit.width,
-      height: fit.height,
-    });
+    // Cover-fit (not contain): the project image spans the full banner width edge to edge,
+    // as per the PAL template, rather than being letterboxed with margins on either side.
+    drawImageCover(page, logoImage, logoRect);
   } else {
     centerText(page, 'LOGO', regular, 10, logoRect, logoRect.hPt / 2 - inPt(0.05), rgb(0.6, 0.6, 0.6));
   }

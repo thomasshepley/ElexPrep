@@ -1,7 +1,15 @@
 import { useEffect, useState } from 'react';
 import Papa from 'papaparse';
-import { PATCH_FIELD_KEYS, PATCH_FIELD_LABELS, type PatchFieldKey } from '@elexprep/shared';
+import {
+  PATCH_FIELD_KEYS,
+  PATCH_FIELD_LABELS,
+  PATCH_FIELD_SYNONYMS,
+  findHeaderRowIndex,
+  type PatchFieldKey,
+} from '@elexprep/shared';
 import { api } from '../api/client';
+
+const normalizeHeader = (h: string) => h.toLowerCase().replace(/[^a-z]/g, '');
 
 /**
  * The patch export format is normally identical between jobs, so the CSV column mapping
@@ -20,19 +28,29 @@ export default function ImportMappingPage() {
   }, []);
 
   const onSampleFile = (file: File) => {
-    Papa.parse(file, {
-      header: true,
-      preview: 1,
+    // Real patch exports (e.g. Wysiwyg's patch report) often have a few title/metadata rows
+    // before the actual column header row, so the header can't just be assumed to be row 1.
+    Papa.parse<string[]>(file, {
+      preview: 40,
       complete: (res) => {
-        const headers = res.meta.fields ?? [];
+        const rows = res.data as string[][];
+        const headerRowIndex = findHeaderRowIndex(rows);
+        const headers = (rows[headerRowIndex] ?? []).map((h) => (h ?? '').trim()).filter(Boolean);
         setSampleHeaders(headers);
-        // Auto-guess unmapped fields from the sample's headers.
+        // Auto-guess unmapped fields from the sample's headers, using known synonyms for
+        // common patch-export column names (e.g. "Spot" for address, "Patch" for a combined
+        // universe.address, "Position" for stage location) as well as an exact key match.
         setMapping((m) => {
           const next = { ...m };
+          const used = new Set(Object.values(next));
           for (const key of PATCH_FIELD_KEYS) {
             if (next[key]) continue;
-            const match = headers.find((h) => h.toLowerCase().replace(/[^a-z]/g, '') === key.toLowerCase());
-            if (match) next[key] = match;
+            const candidates = [key.toLowerCase(), ...PATCH_FIELD_SYNONYMS[key]];
+            const match = headers.find((h) => !used.has(h) && candidates.includes(normalizeHeader(h)));
+            if (match) {
+              next[key] = match;
+              used.add(match);
+            }
           }
           return next;
         });

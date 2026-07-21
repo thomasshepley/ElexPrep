@@ -61,10 +61,16 @@ export function toAuthedUser(u: {
   return { id: u.id, username: u.username, displayName: u.displayName, role: u.role as Role, prefs };
 }
 
+// The one deliberate, narrow write exception for the otherwise read-only SIGNAGE role: prep
+// crew tick items off directly on the prep-bay TV as they pull them. Everything else SIGNAGE
+// touches stays GET-only.
+const SIGNAGE_WRITE_ALLOWLIST = [/^\/api\/jobs\/[^/]+\/current-rms\/pick-list\/[^/]+\/prepped$/];
+
 /**
  * Resolves the session cookie to req.user, then gates every /api route except health
- * and the auth endpoints themselves. SIGNAGE accounts are read-only: any non-GET
- * request from one is rejected, so a compromised prep-bay TV login can't mutate data.
+ * and the auth endpoints themselves. SIGNAGE accounts are read-only (aside from the one
+ * allowlisted exception above): any other non-GET request from one is rejected, so a
+ * compromised prep-bay TV login can't mutate anything else.
  */
 export async function authMiddleware(req: Request, res: Response, next: NextFunction) {
   const token = req.cookies?.[SESSION_COOKIE];
@@ -84,7 +90,8 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
   }
   if (!req.user) return res.status(401).json({ error: 'Not signed in' });
   if (req.user.role === 'SIGNAGE' && req.method !== 'GET') {
-    return res.status(403).json({ error: 'Signage accounts are view-only' });
+    const allowed = SIGNAGE_WRITE_ALLOWLIST.some((re) => re.test(req.path));
+    if (!allowed) return res.status(403).json({ error: 'Signage accounts are view-only' });
   }
   next();
 }

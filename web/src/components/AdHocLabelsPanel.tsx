@@ -12,24 +12,6 @@ const TYPE_LABELS: Record<AdHocType, string> = {
   RACK: 'Rack label',
 };
 
-function summarize(labelType: string, content: Record<string, unknown>): string {
-  switch (labelType) {
-    case 'TRUSS_SPIKE_POSITION':
-      return String(content.address ?? '');
-    case 'TRUSS_SPIKE_TIP':
-      return String(content.text ?? 'DO NOT TIP');
-    case 'TRUSS_SPIKE_SACN':
-      return `${content.ipAddress ?? ''} / ${content.subnetMask ?? '255.0.0.0'}`;
-    case 'CABLE':
-      return `${content.text ?? ''}${content.isDmx ? ' (DMX, narrow)' : ''}`;
-    case 'PAL':
-      return `${content.location ?? ''} — ${content.title ?? ''} ${content.subtitle ?? ''}`;
-    case 'RACK':
-      return `${content.title ?? ''} ${content.subtitle ?? ''}`;
-    default:
-      return JSON.stringify(content);
-  }
-}
 
 export default function AdHocLabelsPanel({ jobId }: { jobId: string }) {
   const [items, setItems] = useState<AdHocLabel[]>([]);
@@ -72,6 +54,13 @@ export default function AdHocLabelsPanel({ jobId }: { jobId: string }) {
     refresh();
   };
 
+  const updateContentField = async (item: AdHocLabel, key: string, rawValue: string | boolean) => {
+    const value = key === 'address' ? Number(rawValue) : rawValue;
+    const content = { ...item.content, [key]: value };
+    await api.adHocLabels.update(jobId, item.id, { content });
+    refresh();
+  };
+
   const field = (key: string, placeholder: string) => (
     <input
       placeholder={placeholder}
@@ -79,6 +68,63 @@ export default function AdHocLabelsPanel({ jobId }: { jobId: string }) {
       onChange={(e) => setFields((f) => ({ ...f, [key]: e.target.value }))}
     />
   );
+
+  const editableField = (item: AdHocLabel, key: string, placeholder: string, width: number, type: 'text' | 'number' = 'text') => (
+    <input
+      type={type}
+      placeholder={placeholder}
+      defaultValue={String(item.content[key] ?? '')}
+      style={{ width }}
+      onBlur={(e) => updateContentField(item, key, e.target.value)}
+    />
+  );
+
+  const renderEditableContent = (item: AdHocLabel) => {
+    switch (item.labelType) {
+      case 'TRUSS_SPIKE_POSITION':
+        return editableField(item, 'address', 'Position number', 90, 'number');
+      case 'TRUSS_SPIKE_TIP':
+        return editableField(item, 'text', 'Text (default: DO NOT TIP)', 180);
+      case 'TRUSS_SPIKE_SACN':
+        return (
+          <div className="row" style={{ gap: '0.4rem' }}>
+            {editableField(item, 'ipAddress', 'IP address', 130)}
+            {editableField(item, 'subnetMask', 'Subnet mask', 130)}
+          </div>
+        );
+      case 'CABLE':
+        return (
+          <div className="row" style={{ gap: '0.4rem' }}>
+            {editableField(item, 'text', 'Cable/circuit text', 160)}
+            <label className="row" style={{ gap: '0.3rem' }}>
+              <input
+                type="checkbox"
+                defaultChecked={Boolean(item.content.isDmx)}
+                onChange={(e) => updateContentField(item, 'isDmx', e.target.checked)}
+              />
+              DMX
+            </label>
+          </div>
+        );
+      case 'PAL':
+        return (
+          <div className="row" style={{ gap: '0.4rem' }}>
+            {editableField(item, 'location', 'Location', 110)}
+            {editableField(item, 'title', 'Title', 150)}
+            {editableField(item, 'subtitle', 'Subtitle', 110)}
+          </div>
+        );
+      case 'RACK':
+        return (
+          <div className="row" style={{ gap: '0.4rem' }}>
+            {editableField(item, 'title', 'Title', 150)}
+            {editableField(item, 'subtitle', 'Subtitle', 150)}
+          </div>
+        );
+      default:
+        return JSON.stringify(item.content);
+    }
+  };
 
   return (
     <div className="panel">
@@ -138,38 +184,43 @@ export default function AdHocLabelsPanel({ jobId }: { jobId: string }) {
       </form>
 
       {items.length > 0 && (
-        <table style={{ marginTop: '1rem' }}>
-          <thead>
-            <tr>
-              <th>Type</th>
-              <th>Content</th>
-              <th>Qty</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((i) => (
-              <tr key={i.id}>
-                <td>{i.labelType}</td>
-                <td>{summarize(i.labelType, i.content)}</td>
-                <td>
-                  <input
-                    type="number"
-                    min={1}
-                    defaultValue={i.quantity}
-                    style={{ width: 60 }}
-                    onBlur={(e) => updateQuantity(i.id, Number(e.target.value))}
-                  />
-                </td>
-                <td>
-                  <button className="secondary" onClick={() => remove(i.id)}>
-                    Remove
-                  </button>
-                </td>
+        <>
+          <p className="muted" style={{ marginTop: '1rem' }}>
+            Every field is editable in place (click and type, saves on blur).
+          </p>
+          <table>
+            <thead>
+              <tr>
+                <th>Type</th>
+                <th>Content</th>
+                <th>Qty</th>
+                <th></th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {items.map((i) => (
+                <tr key={i.id}>
+                  <td>{TYPE_LABELS[i.labelType as AdHocType] ?? i.labelType}</td>
+                  <td>{renderEditableContent(i)}</td>
+                  <td>
+                    <input
+                      type="number"
+                      min={1}
+                      defaultValue={i.quantity}
+                      style={{ width: 60 }}
+                      onBlur={(e) => updateQuantity(i.id, Number(e.target.value))}
+                    />
+                  </td>
+                  <td>
+                    <button className="secondary" onClick={() => remove(i.id)}>
+                      Remove
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </>
       )}
     </div>
   );

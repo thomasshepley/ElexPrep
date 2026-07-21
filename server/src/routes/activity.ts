@@ -1,10 +1,10 @@
 import { Router } from 'express';
 import { prisma } from '../db';
-import { requireRole } from '../auth';
+import { requirePermission } from '../permissions';
 
 export const activityRouter = Router();
 
-activityRouter.get('/', requireRole('ADMIN'), async (req, res) => {
+activityRouter.get('/', requirePermission('viewActivityLog'), async (req, res) => {
   const jobId = typeof req.query.jobId === 'string' ? req.query.jobId : undefined;
   const entries = await prisma.activityLogEntry.findMany({
     where: jobId ? { jobId } : undefined,

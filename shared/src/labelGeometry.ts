@@ -81,9 +81,13 @@ export interface PalCellLayout {
   content: CellGeometry;
 }
 
-/** Sub-regions inside a single PAL cell, relative to that cell's own top-left origin. */
+/**
+ * Sub-regions inside a single PAL cell, relative to that cell's own top-left origin. The logo
+ * banner spans the full cell width edge-to-edge (w matches PAL_SHEET's reference cell width,
+ * which the renderer scales proportionally for the slightly-wider right-column cells).
+ */
 export const PAL_CELL_LAYOUT: PalCellLayout = {
-  logo: { x: 0.41, y: 0, w: 4.48, h: 0.70 },
+  logo: { x: 0, y: 0, w: 5.30, h: 0.70 },
   locationBar: { x: 0, y: 0.72, w: 5.30, h: 0.67 },
   content: { x: 0, y: 1.40, w: 5.30, h: 2.12 },
 };
