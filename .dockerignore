@@ -1,0 +1,12 @@
+node_modules
+**/node_modules
+**/dist
+server/uploads
+server/prisma/dev.db*
+server/.env
+data
+.git
+agent
+docs
+*.md
+!README.md

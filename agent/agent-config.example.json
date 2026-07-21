@@ -1,0 +1,7 @@
+{
+  "serverUrl": "http://localhost:4000",
+  "agentToken": "paste the token from ElexPrep → Printer Settings",
+  "sumatraPath": "C:\\Program Files\\SumatraPDF\\SumatraPDF.exe",
+  "pollSeconds": 5,
+  "printTimeoutSeconds": 120
+}
