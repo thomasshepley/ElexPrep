@@ -68,7 +68,27 @@ jobsRouter.put('/:id', async (req, res) => {
 });
 
 jobsRouter.delete('/:id', requireRole('ADMIN'), async (req, res) => {
-  await prisma.job.delete({ where: { id: req.params.id } });
+  const jobId = req.params.id;
+  const [job, plots, printJobs] = await Promise.all([
+    prisma.job.findUnique({ where: { id: jobId } }),
+    prisma.plot.findMany({ where: { jobId } }),
+    prisma.printJob.findMany({ where: { jobId } }),
+  ]);
+  if (!job) return res.status(404).json({ error: 'not found' });
+
+  // PrintJob has no FK relation to Job (its rows persist as print history independent of the
+  // job existing), so it isn't covered by cascade delete and needs cleaning up explicitly.
+  await prisma.printJob.deleteMany({ where: { jobId } });
+  await prisma.job.delete({ where: { id: jobId } }); // cascades fixtures/cases/adhoc/queue/plots
+
+  const filesToRemove = [
+    ...(job.logoPath ? [path.join(uploadDir, job.logoPath)] : []),
+    ...plots.map((p) => path.join(uploadDir, 'plots', p.fileName)),
+    ...printJobs.map((pj) => path.join(uploadDir, 'print-jobs', pj.fileName)),
+  ];
+  await Promise.all(filesToRemove.map((f) => fs.promises.unlink(f).catch(() => {})));
+
+  await logActivity('job.delete', job.name, undefined, req.user?.id);
   res.status(204).end();
 });
 

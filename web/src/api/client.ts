@@ -260,10 +260,19 @@ export const api = {
         body: JSON.stringify(mapping ? { mapping, rows } : { rows }),
       }),
     fixtures: (jobId: string) => request<Fixture[]>(`/jobs/${jobId}/fixtures`),
+    updateFixture: (jobId: string, id: string, data: Partial<Omit<Fixture, 'id'>>) =>
+      request<Fixture>(`/jobs/${jobId}/fixtures/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    removeFixture: (jobId: string, id: string) =>
+      request<void>(`/jobs/${jobId}/fixtures/${id}`, { method: 'DELETE' }),
   },
   cases: {
     generate: (jobId: string) => request<{ generated: number }>(`/jobs/${jobId}/cases/generate`, { method: 'POST' }),
     list: (jobId: string) => request<CaseGroup[]>(`/jobs/${jobId}/cases`),
+    create: (jobId: string, data: { fixtureType: string; label: string; location?: string; addresses?: number[] }) =>
+      request<CaseGroup>(`/jobs/${jobId}/cases`, { method: 'POST', body: JSON.stringify(data) }),
+    update: (jobId: string, id: string, data: Partial<{ fixtureType: string; label: string; location: string }>) =>
+      request<CaseGroup>(`/jobs/${jobId}/cases/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    remove: (jobId: string, id: string) => request<void>(`/jobs/${jobId}/cases/${id}`, { method: 'DELETE' }),
   },
   adHocLabels: {
     list: (jobId: string) => request<AdHocLabel[]>(`/jobs/${jobId}/adhoc-labels`),

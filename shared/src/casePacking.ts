@@ -46,7 +46,9 @@ export function packFixturesIntoCases(
       const chunk = sorted.slice(i, i + unitsPerCase);
       const addresses = chunk.map((f) => f.address);
       groups.push({
-        fixtureType,
+        // caseLabelOverride lets a shorter/friendlier name print on the case label than the
+        // patch's fixture type string (e.g. "Astra" instead of "AstraBlade Pixel Tube Mk2").
+        fixtureType: rule?.caseLabelOverride || fixtureType,
         addresses,
         label: formatCaseLabel(addresses, unitsPerCase),
         location: chunk[0]?.location ?? null,

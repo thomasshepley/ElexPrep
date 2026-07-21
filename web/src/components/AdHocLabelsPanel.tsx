@@ -66,6 +66,12 @@ export default function AdHocLabelsPanel({ jobId }: { jobId: string }) {
     refresh();
   };
 
+  const updateQuantity = async (id: string, quantity: number) => {
+    if (!Number.isFinite(quantity) || quantity < 1) return;
+    await api.adHocLabels.update(jobId, id, { quantity });
+    refresh();
+  };
+
   const field = (key: string, placeholder: string) => (
     <input
       placeholder={placeholder}
@@ -146,7 +152,15 @@ export default function AdHocLabelsPanel({ jobId }: { jobId: string }) {
               <tr key={i.id}>
                 <td>{i.labelType}</td>
                 <td>{summarize(i.labelType, i.content)}</td>
-                <td>{i.quantity}</td>
+                <td>
+                  <input
+                    type="number"
+                    min={1}
+                    defaultValue={i.quantity}
+                    style={{ width: 60 }}
+                    onBlur={(e) => updateQuantity(i.id, Number(e.target.value))}
+                  />
+                </td>
                 <td>
                   <button className="secondary" onClick={() => remove(i.id)}>
                     Remove
