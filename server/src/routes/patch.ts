@@ -16,7 +16,15 @@ patchRouter.post('/:jobId/patch/preview', upload.single('file'), async (req, res
     return res.status(400).json({ error: 'Could not parse CSV', details: parsed.errors.slice(0, 5) });
   }
   const headers = parsed.meta.fields ?? [];
-  res.json({ headers, rows: parsed.data, fieldKeys: PATCH_FIELD_KEYS });
+  const saved = await prisma.appSetting.findUnique({ where: { key: 'patchMapping' } });
+  const savedMapping = saved ? (JSON.parse(saved.valueJson) as Partial<Record<PatchFieldKey, string>>) : null;
+  // Report which mapped columns are missing from this file so the UI can warn before import.
+  const missingColumns = savedMapping
+    ? Object.entries(savedMapping)
+        .filter(([, col]) => col && !headers.includes(col))
+        .map(([field, col]) => ({ field, column: col as string }))
+    : [];
+  res.json({ headers, rows: parsed.data, fieldKeys: PATCH_FIELD_KEYS, savedMapping, missingColumns });
 });
 
 function toInt(v: string | undefined | null): number | null {
@@ -28,15 +36,24 @@ function toInt(v: string | undefined | null): number | null {
 patchRouter.post('/:jobId/patch/import', async (req, res) => {
   const { jobId } = req.params;
   const { mapping, rows } = req.body ?? {};
-  if (!mapping || !Array.isArray(rows)) {
-    return res.status(400).json({ error: 'mapping and rows are required' });
+  if (!Array.isArray(rows)) {
+    return res.status(400).json({ error: 'rows are required' });
   }
   const job = await prisma.job.findUnique({ where: { id: jobId } });
   if (!job) return res.status(404).json({ error: 'job not found' });
 
-  const m = mapping as Partial<Record<PatchFieldKey, string>>;
-  if (!m.address || !m.fixtureType) {
-    return res.status(400).json({ error: 'address and fixtureType must be mapped' });
+  // Column mapping is configured once in Settings; an explicit mapping in the request
+  // overrides it for one-off imports with a different layout.
+  let m = mapping as Partial<Record<PatchFieldKey, string>> | undefined;
+  if (!m) {
+    const saved = await prisma.appSetting.findUnique({ where: { key: 'patchMapping' } });
+    if (saved) m = JSON.parse(saved.valueJson);
+  }
+  if (!m || !m.address || !m.fixtureType) {
+    return res.status(400).json({
+      error:
+        'No column mapping available — set the CSV column mapping in Settings → Import Mapping (address and fixture type are required)',
+    });
   }
 
   const fixtures: RawFixtureInput[] = [];
@@ -81,7 +98,7 @@ patchRouter.post('/:jobId/patch/import', async (req, res) => {
     }),
   ]);
 
-  await logActivity('patch.import', `${fixtures.length} fixtures`, jobId);
+  await logActivity('patch.import', `${fixtures.length} fixtures`, jobId, req.user?.id);
   res.json({ imported: fixtures.length });
 });
 

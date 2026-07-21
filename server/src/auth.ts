@@ -1,0 +1,92 @@
+import crypto from 'crypto';
+import bcrypt from 'bcryptjs';
+import { NextFunction, Request, Response } from 'express';
+import { prisma } from './db';
+
+export type Role = 'ADMIN' | 'USER' | 'SIGNAGE';
+
+export interface AuthedUser {
+  id: string;
+  username: string;
+  displayName: string;
+  role: Role;
+  prefs: Record<string, unknown>;
+}
+
+declare global {
+  // eslint-disable-next-line @typescript-eslint/no-namespace
+  namespace Express {
+    interface Request {
+      user?: AuthedUser;
+    }
+  }
+}
+
+export const SESSION_COOKIE = 'elexprep_session';
+const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+
+export function hashPassword(password: string): string {
+  return bcrypt.hashSync(password, 10);
+}
+
+export function verifyPassword(password: string, hash: string): boolean {
+  return bcrypt.compareSync(password, hash);
+}
+
+export async function createSession(userId: string): Promise<{ id: string; expiresAt: Date }> {
+  const id = crypto.randomBytes(32).toString('hex');
+  const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
+  await prisma.session.create({ data: { id, userId, expiresAt } });
+  return { id, expiresAt };
+}
+
+export async function destroySession(id: string) {
+  await prisma.session.deleteMany({ where: { id } });
+}
+
+export function toAuthedUser(u: {
+  id: string;
+  username: string;
+  displayName: string;
+  role: string;
+  prefsJson: string;
+}): AuthedUser {
+  let prefs: Record<string, unknown> = {};
+  try {
+    prefs = JSON.parse(u.prefsJson);
+  } catch {
+    // corrupted prefs shouldn't lock the account out
+  }
+  return { id: u.id, username: u.username, displayName: u.displayName, role: u.role as Role, prefs };
+}
+
+/**
+ * Resolves the session cookie to req.user, then gates every /api route except health
+ * and the auth endpoints themselves. SIGNAGE accounts are read-only: any non-GET
+ * request from one is rejected, so a compromised prep-bay TV login can't mutate data.
+ */
+export async function authMiddleware(req: Request, res: Response, next: NextFunction) {
+  const token = req.cookies?.[SESSION_COOKIE];
+  if (token) {
+    const session = await prisma.session.findUnique({ where: { id: token }, include: { user: true } });
+    if (session && session.expiresAt > new Date()) {
+      req.user = toAuthedUser(session.user);
+    }
+  }
+
+  if (req.path === '/api/health' || req.path.startsWith('/api/auth/')) return next();
+  if (!req.user) return res.status(401).json({ error: 'Not signed in' });
+  if (req.user.role === 'SIGNAGE' && req.method !== 'GET') {
+    return res.status(403).json({ error: 'Signage accounts are view-only' });
+  }
+  next();
+}
+
+export function requireRole(...roles: Role[]) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    if (!req.user || !roles.includes(req.user.role)) {
+      return res.status(403).json({ error: 'Insufficient permissions' });
+    }
+    next();
+  };
+}

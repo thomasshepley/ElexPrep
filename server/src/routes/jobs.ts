@@ -29,7 +29,7 @@ jobsRouter.post('/', async (req, res) => {
     return res.status(400).json({ error: 'name is required' });
   }
   const job = await prisma.job.create({ data: { name, venue: venue ?? null } });
-  await logActivity('job.create', name, job.id);
+  await logActivity('job.create', name, job.id, req.user?.id);
   res.status(201).json(job);
 });
 
@@ -63,7 +63,7 @@ jobsRouter.post('/:id/logo', upload.single('logo'), async (req, res) => {
     where: { id: req.params.id },
     data: { logoPath: req.file.filename },
   });
-  await logActivity('job.logo_upload', req.file.originalname, job.id);
+  await logActivity('job.logo_upload', req.file.originalname, job.id, req.user?.id);
   res.json(job);
 });
 

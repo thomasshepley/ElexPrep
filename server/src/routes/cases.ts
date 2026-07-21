@@ -32,7 +32,7 @@ casesRouter.post('/:jobId/cases/generate', async (req, res) => {
     }),
   ]);
 
-  await logActivity('cases.generate', `${groups.length} cases`, jobId);
+  await logActivity('cases.generate', `${groups.length} cases`, jobId, req.user?.id);
   res.json({ generated: groups.length });
 });
 

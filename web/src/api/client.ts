@@ -1,16 +1,32 @@
 const BASE = '/api';
 
+export class ApiError extends Error {
+  status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.status = status;
+  }
+}
+
+/** Registered by AuthProvider so a 401 from any call bounces the app to the login screen. */
+let onUnauthorized: (() => void) | null = null;
+export function setUnauthorizedHandler(handler: (() => void) | null) {
+  onUnauthorized = handler;
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     ...init,
+    credentials: 'same-origin',
     headers:
       init?.body && !(init.body instanceof FormData)
         ? { 'Content-Type': 'application/json', ...init.headers }
         : init?.headers,
   });
   if (!res.ok) {
+    if (res.status === 401 && !path.startsWith('/auth/')) onUnauthorized?.();
     const body = await res.json().catch(() => ({}));
-    throw new Error(body.error ?? `Request failed: ${res.status}`);
+    throw new ApiError(body.error ?? `Request failed: ${res.status}`, res.status);
   }
   if (res.status === 204) return undefined as T;
   return res.json();
@@ -74,9 +90,65 @@ export interface ActivityLogEntry {
   action: string;
   detail: string | null;
   createdAt: string;
+  userName?: string | null;
+}
+
+export type Role = 'ADMIN' | 'USER' | 'SIGNAGE';
+
+export interface AuthedUser {
+  id: string;
+  username: string;
+  displayName: string;
+  role: Role;
+  prefs: Record<string, unknown>;
+}
+
+export interface Plot {
+  id: string;
+  jobId: string;
+  originalName: string;
+  createdAt: string;
 }
 
 export const api = {
+  auth: {
+    status: () => request<{ needsSetup: boolean }>('/auth/status'),
+    setup: (data: { username: string; password: string; displayName?: string }) =>
+      request<AuthedUser>('/auth/setup', { method: 'POST', body: JSON.stringify(data) }),
+    login: (data: { username: string; password: string }) =>
+      request<AuthedUser>('/auth/login', { method: 'POST', body: JSON.stringify(data) }),
+    logout: () => request<void>('/auth/logout', { method: 'POST' }),
+    me: () => request<AuthedUser>('/auth/me'),
+    updateMe: (data: {
+      displayName?: string;
+      password?: string;
+      currentPassword?: string;
+      prefs?: Record<string, unknown>;
+    }) => request<AuthedUser>('/auth/me', { method: 'PUT', body: JSON.stringify(data) }),
+  },
+  users: {
+    list: () => request<AuthedUser[]>('/users'),
+    create: (data: { username: string; password: string; displayName?: string; role?: Role }) =>
+      request<AuthedUser>('/users', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: string, data: Partial<{ displayName: string; role: Role; password: string }>) =>
+      request<AuthedUser>(`/users/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    remove: (id: string) => request<void>(`/users/${id}`, { method: 'DELETE' }),
+  },
+  settings: {
+    get: <T>(key: string) => request<{ key: string; value: T | null }>(`/settings/${key}`),
+    put: <T>(key: string, value: T) =>
+      request<{ key: string; value: T }>(`/settings/${key}`, { method: 'PUT', body: JSON.stringify({ value }) }),
+  },
+  plots: {
+    list: (jobId: string) => request<Plot[]>(`/jobs/${jobId}/plots`),
+    upload: async (jobId: string, file: File) => {
+      const form = new FormData();
+      form.append('plot', file);
+      return request<Plot>(`/jobs/${jobId}/plots`, { method: 'POST', body: form });
+    },
+    fileUrl: (jobId: string, id: string) => `${BASE}/jobs/${jobId}/plots/${id}/file`,
+    remove: (jobId: string, id: string) => request<void>(`/jobs/${jobId}/plots/${id}`, { method: 'DELETE' }),
+  },
   jobs: {
     list: () => request<Job[]>('/jobs'),
     get: (id: string) => request<Job>(`/jobs/${id}`),
@@ -104,15 +176,18 @@ export const api = {
     preview: async (jobId: string, file: File) => {
       const form = new FormData();
       form.append('file', file);
-      return request<{ headers: string[]; rows: Record<string, string>[]; fieldKeys: string[] }>(
-        `/jobs/${jobId}/patch/preview`,
-        { method: 'POST', body: form }
-      );
+      return request<{
+        headers: string[];
+        rows: Record<string, string>[];
+        fieldKeys: string[];
+        savedMapping: Record<string, string> | null;
+        missingColumns: { field: string; column: string }[];
+      }>(`/jobs/${jobId}/patch/preview`, { method: 'POST', body: form });
     },
-    import: (jobId: string, mapping: Record<string, string>, rows: Record<string, string>[]) =>
+    import: (jobId: string, rows: Record<string, string>[], mapping?: Record<string, string>) =>
       request<{ imported: number }>(`/jobs/${jobId}/patch/import`, {
         method: 'POST',
-        body: JSON.stringify({ mapping, rows }),
+        body: JSON.stringify(mapping ? { mapping, rows } : { rows }),
       }),
     fixtures: (jobId: string) => request<Fixture[]>(`/jobs/${jobId}/fixtures`),
   },

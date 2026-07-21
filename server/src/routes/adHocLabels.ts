@@ -19,7 +19,7 @@ adHocLabelsRouter.post('/:jobId/adhoc-labels', async (req, res) => {
       quantity: Number.isFinite(quantity) ? quantity : 1,
     },
   });
-  await logActivity('adhoc_label.create', labelType, req.params.jobId);
+  await logActivity('adhoc_label.create', labelType, req.params.jobId, req.user?.id);
   res.status(201).json({ ...item, content: JSON.parse(item.contentJson) });
 });
 

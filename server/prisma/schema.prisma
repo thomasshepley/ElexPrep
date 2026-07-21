@@ -20,6 +20,7 @@ model Job {
   caseGroups     CaseGroupRecord[]
   adHocLabels    AdHocLabel[]
   printQueueItems PrintQueueItem[]
+  plots          Plot[]
 }
 
 model FixtureTypeRule {
@@ -100,7 +101,50 @@ model PrintQueueItem {
 model ActivityLogEntry {
   id        String   @id @default(cuid())
   jobId     String?
+  userId    String?
   action    String
   detail    String?
   createdAt DateTime @default(now())
+}
+
+/// Free-form key/value app settings, e.g. key "patchMapping" holding the saved CSV
+/// column mapping so imports don't re-prompt for it every time.
+model AppSetting {
+  key       String   @id
+  valueJson String
+  updatedAt DateTime @updatedAt
+}
+
+/// role is one of: ADMIN, USER, SIGNAGE (signage = read-only login for prep bay TVs).
+model User {
+  id           String    @id @default(cuid())
+  username     String    @unique
+  displayName  String
+  passwordHash String
+  role         String    @default("USER")
+  prefsJson    String    @default("{}")
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  sessions     Session[]
+}
+
+model Session {
+  id        String   @id
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model Plot {
+  id           String   @id @default(cuid())
+  jobId        String
+  job          Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  fileName     String
+  originalName String
+  createdAt    DateTime @default(now())
+
+  @@index([jobId])
 }

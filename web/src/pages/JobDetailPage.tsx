@@ -5,8 +5,9 @@ import PatchImportPanel from '../components/PatchImportPanel';
 import CasesPanel from '../components/CasesPanel';
 import AdHocLabelsPanel from '../components/AdHocLabelsPanel';
 import PrintQueuePanel from '../components/PrintQueuePanel';
+import PlotsPanel from '../components/PlotsPanel';
 
-const TABS = ['Patch Import', 'Cases', 'Ad Hoc Labels', 'Print Queue', 'Job Settings'] as const;
+const TABS = ['Patch Import', 'Cases', 'Ad Hoc Labels', 'Print Queue', 'Plots', 'Job Settings'] as const;
 type Tab = (typeof TABS)[number];
 
 export default function JobDetailPage() {
@@ -37,6 +38,7 @@ export default function JobDetailPage() {
       {tab === 'Cases' && <CasesPanel jobId={jobId} />}
       {tab === 'Ad Hoc Labels' && <AdHocLabelsPanel jobId={jobId} />}
       {tab === 'Print Queue' && <PrintQueuePanel jobId={jobId} />}
+      {tab === 'Plots' && <PlotsPanel jobId={jobId} />}
       {tab === 'Job Settings' && job && <JobSettingsPanel job={job} onUpdate={setJob} />}
     </div>
   );

@@ -1,11 +1,13 @@
 import { useState } from 'react';
-import { PATCH_FIELD_KEYS, PATCH_FIELD_LABELS, type PatchFieldKey } from '@elexprep/shared';
+import { Link } from 'react-router-dom';
+import { PATCH_FIELD_LABELS, type PatchFieldKey } from '@elexprep/shared';
 import { api, type Fixture } from '../api/client';
 
 export default function PatchImportPanel({ jobId }: { jobId: string }) {
-  const [headers, setHeaders] = useState<string[]>([]);
   const [rows, setRows] = useState<Record<string, string>[]>([]);
-  const [mapping, setMapping] = useState<Partial<Record<PatchFieldKey, string>>>({});
+  const [savedMapping, setSavedMapping] = useState<Record<string, string> | null>(null);
+  const [missingColumns, setMissingColumns] = useState<{ field: string; column: string }[]>([]);
+  const [fileName, setFileName] = useState<string | null>(null);
   const [fixtures, setFixtures] = useState<Fixture[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -16,14 +18,10 @@ export default function PatchImportPanel({ jobId }: { jobId: string }) {
     setError(null);
     try {
       const res = await api.patch.preview(jobId, file);
-      setHeaders(res.headers);
       setRows(res.rows);
-      const guess: Partial<Record<PatchFieldKey, string>> = {};
-      for (const key of PATCH_FIELD_KEYS) {
-        const match = res.headers.find((h) => h.toLowerCase().replace(/[^a-z]/g, '') === key.toLowerCase());
-        if (match) guess[key] = match;
-      }
-      setMapping(guess);
+      setSavedMapping(res.savedMapping);
+      setMissingColumns(res.missingColumns);
+      setFileName(file.name);
     } catch (e) {
       setError((e as Error).message);
     }
@@ -33,10 +31,10 @@ export default function PatchImportPanel({ jobId }: { jobId: string }) {
     setBusy(true);
     setError(null);
     try {
-      const res = await api.patch.import(jobId, mapping as Record<string, string>, rows);
+      const res = await api.patch.import(jobId, rows);
       await loadFixtures();
-      setHeaders([]);
       setRows([]);
+      setFileName(null);
       alert(`Imported ${res.imported} fixtures`);
     } catch (e) {
       setError((e as Error).message);
@@ -45,10 +43,20 @@ export default function PatchImportPanel({ jobId }: { jobId: string }) {
     }
   };
 
+  const mappingOk = savedMapping && savedMapping.address && savedMapping.fixtureType;
+  const requiredMissing = missingColumns.some(
+    (m) => m.field === 'address' || m.field === 'fixtureType'
+  );
+
   return (
     <div>
       <div className="panel">
-        <h3>1. Upload Wysiwyg patch CSV</h3>
+        <h3>Upload Wysiwyg patch CSV</h3>
+        <p className="muted">
+          Columns are mapped using the saved layout from{' '}
+          <Link to="/settings/import-mapping">Settings → Import Mapping</Link> — no need to remap
+          each time.
+        </p>
         <input
           type="file"
           accept=".csv"
@@ -57,43 +65,59 @@ export default function PatchImportPanel({ jobId }: { jobId: string }) {
         {error && <p className="error">{error}</p>}
       </div>
 
-      {headers.length > 0 && (
+      {fileName && (
         <div className="panel">
-          <h3>2. Map columns</h3>
-          <p className="muted">{rows.length} rows found. Address and Fixture Type are required.</p>
-          <table>
-            <thead>
-              <tr>
-                <th>Field</th>
-                <th>CSV column</th>
-              </tr>
-            </thead>
-            <tbody>
-              {PATCH_FIELD_KEYS.map((key) => (
-                <tr key={key}>
-                  <td>{PATCH_FIELD_LABELS[key]}</td>
-                  <td>
-                    <select
-                      value={mapping[key] ?? ''}
-                      onChange={(e) => setMapping((m) => ({ ...m, [key]: e.target.value || undefined }))}
-                    >
-                      <option value="">— not mapped —</option>
-                      {headers.map((h) => (
-                        <option key={h} value={h}>
-                          {h}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <div style={{ marginTop: '0.75rem' }}>
-            <button onClick={doImport} disabled={busy || !mapping.address || !mapping.fixtureType}>
-              Import {rows.length} fixtures
-            </button>
-          </div>
+          <h3>Ready to import — {fileName}</h3>
+          <p className="muted">{rows.length} rows found.</p>
+
+          {!mappingOk && (
+            <p className="error">
+              No saved column mapping yet — set it up in{' '}
+              <Link to="/settings/import-mapping">Settings → Import Mapping</Link> first.
+            </p>
+          )}
+
+          {mappingOk && (
+            <>
+              <table style={{ maxWidth: 480 }}>
+                <thead>
+                  <tr>
+                    <th>Field</th>
+                    <th>CSV column</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {Object.entries(savedMapping).map(([field, column]) => (
+                    <tr key={field}>
+                      <td>{PATCH_FIELD_LABELS[field as PatchFieldKey] ?? field}</td>
+                      <td>
+                        {column}
+                        {missingColumns.some((m) => m.field === field) && (
+                          <span className="error"> — not in this file</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {requiredMissing && (
+                <p className="error">
+                  This file is missing the mapped Address/Fixture Type columns — check the file or
+                  update the mapping in Settings.
+                </p>
+              )}
+              {!requiredMissing && missingColumns.length > 0 && (
+                <p className="muted">
+                  Optional mapped columns missing from this file will import as blank.
+                </p>
+              )}
+              <div style={{ marginTop: '0.75rem' }}>
+                <button onClick={doImport} disabled={busy || requiredMissing}>
+                  Import {rows.length} fixtures
+                </button>
+              </div>
+            </>
+          )}
         </div>
       )}
 

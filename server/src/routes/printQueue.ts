@@ -77,7 +77,7 @@ printQueueRouter.post('/:jobId/print-queue/build', async (req, res) => {
     }
   }
 
-  await logActivity('print_queue.build', `${created.length} items`, jobId);
+  await logActivity('print_queue.build', `${created.length} items`, jobId, req.user?.id);
   res.json({ created: created.length });
 });
 
@@ -125,7 +125,7 @@ printQueueRouter.post('/:jobId/print-queue/confirm', async (req, res) => {
     });
   }
   await prisma.printQueueItem.updateMany({ where: { id: { in: ids } }, data: { status: 'CONFIRMED' } });
-  await logActivity('print_queue.confirm', `${ids.length} items`, req.params.jobId);
+  await logActivity('print_queue.confirm', `${ids.length} items`, req.params.jobId, req.user?.id);
   res.json({ confirmed: ids.length });
 });
 
@@ -179,7 +179,7 @@ printQueueRouter.get('/:jobId/print-queue/pdf', async (req, res) => {
     where: { jobId, status: 'CONFIRMED' },
     data: { status: 'PRINTED' },
   });
-  await logActivity('print_queue.pdf_generated', `${confirmed.length + adHoc.length} label entries`, jobId);
+  await logActivity('print_queue.pdf_generated', `${confirmed.length + adHoc.length} label entries`, jobId, req.user?.id);
 
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `attachment; filename="job-${jobId}-labels.pdf"`);

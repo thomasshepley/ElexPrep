@@ -20,7 +20,7 @@ fixtureTypeRulesRouter.post('/', async (req, res) => {
       caseLabelOverride: caseLabelOverride ?? null,
     },
   });
-  await logActivity('fixture_type_rule.create', `${name} (${rule.unitsPerCase}/case)`);
+  await logActivity('fixture_type_rule.create', `${name} (${rule.unitsPerCase}/case)`, undefined, req.user?.id);
   res.status(201).json(rule);
 });
 

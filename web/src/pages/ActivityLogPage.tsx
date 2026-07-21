@@ -15,6 +15,7 @@ export default function ActivityLogPage() {
         <thead>
           <tr>
             <th>When</th>
+            <th>Who</th>
             <th>Action</th>
             <th>Detail</th>
           </tr>
@@ -23,6 +24,7 @@ export default function ActivityLogPage() {
           {entries.map((e) => (
             <tr key={e.id}>
               <td className="muted">{new Date(e.createdAt).toLocaleString()}</td>
+              <td>{e.userName ?? <span className="muted">—</span>}</td>
               <td>{e.action}</td>
               <td>{e.detail}</td>
             </tr>

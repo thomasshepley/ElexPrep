@@ -9,8 +9,9 @@ everything else in the original feature list is scoped for later phases (see bel
 
 ## What's built (phase 1)
 
-- **CSV patch import** with a column-mapping wizard (no fixed Wysiwyg export format assumed —
-  you map whatever columns your export has onto address/type/universe/address/mode/etc).
+- **CSV patch import** using a column mapping configured once in Settings → Import Mapping
+  (the export format is normally identical between jobs, so imports don't re-prompt; upload a
+  sample CSV on the settings page to pick columns from a list).
 - **Case-packing algorithm**: groups fixtures into cases by a configurable "units per case" rule
   per fixture type, matching Elex's existing convention — pairs join as `"201 + 202"`, full
   groups of 3+ collapse to a range `"401 - 403"`, and a short leftover case fills the gap with
@@ -30,17 +31,22 @@ everything else in the original feature list is scoped for later phases (see bel
   requires explicit override before a big batch is confirmed.
 - **Job logo upload**, shown on PAL labels and stored per job.
 - **Case-packing rules and printer tray routing** as basic settings/reference screens.
-- **Activity log** (append-only) for import/generate/confirm/print actions.
+- **Activity log** (append-only, admin-only) with user attribution for import/generate/confirm/
+  print/login/user-management actions.
+- **Accounts & permissions**: cookie-session login, first-run admin setup, three roles —
+  ADMIN (everything incl. user management + activity log), USER (normal prep work), SIGNAGE
+  (view-only login for prep-bay TVs; the API rejects any write from it). Per-user display
+  name/password management under My Preferences.
+- **Plot CAD PDFs**: upload per job, listed with an inline browser viewer (native PDF iframe),
+  delete; PDF-only, 100 MB cap.
+- **Prep-bay signage view** (`/signage`): chromeless fullscreen page for TV screens — pick a
+  job, it shows the job name, logo, and case list grouped by fixture type, auto-refreshing
+  every minute. SIGNAGE logins land here automatically and can't navigate elsewhere.
 
 ## What's deliberately deferred
 
-Per the scope agreed for phase 1, these are **not** built yet:
-
-- Accounts, login, and the full permissions system (digital-signage user, per-user prefs, etc.)
 - Current RMS integration (linking a job to an opportunity, pulling pick lists, change alerts) —
   the job record has a placeholder field for the opportunity ID only.
-- Plot CAD PDF upload/viewer for jobs.
-- Prep-bay digital signage view.
 - Real printer/tray automation. The app generates correct, print-ready PDFs and shows the tray
   each label type should use (Tray 1 = PAL, Tray 2 = Fixture/Truss/Spike, Bypass = Cable/Other,
   per the Develop ineo+ 3320i setup) — but actually pushing a PDF to a specific tray needs to run
