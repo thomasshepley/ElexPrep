@@ -136,6 +136,13 @@ integration, printer control, and prep-bay digital signage.
     /opportunities/{opportunity_id}/opportunity_items` — rather than a guessed flat
     `/opportunity_items?q[...]` filter (which 404s on a real account); "Booked Out" reads
     Current RMS's own opportunity-item status codes (`20` = Booked Out) directly.
+  - The opportunities list sync also now matches Current RMS's documented behavior exactly:
+    `GET /opportunities` caps at 25 per page (the general API-wide 100/page rule doesn't
+    apply to this specific endpoint — requesting more would have silently truncated pages
+    and made the sync stop after the first one on any account with more than 25
+    opportunities), sorting uses the real Ransack `q[s][]=updated_at desc` syntax instead of
+    a bare `sort` param, and `filtermode=all` is passed explicitly rather than relying on
+    whatever this endpoint defaults to when it's omitted.
 - **Hardening**: unhandled errors (a bad ID in a URL, a duplicate name, etc.) return a
   proper JSON error response instead of hanging the request — Prisma's "not found" and
   "already exists" cases map to 404/409 specifically. The login endpoint is rate-limited
