@@ -8,6 +8,12 @@ import {
   RACK_SHEET,
 } from '@elexprep/shared';
 import { CellRectPt, centerText, drawCellOutline, inPt, renderSheets } from './pdfBuilder';
+import {
+  contrastingTextIsWhite,
+  hexToRgbFractions,
+  LocationColorMap,
+  resolveLocationColor,
+} from './locationColors';
 
 export interface FixtureLabelContent {
   address: number;
@@ -129,6 +135,7 @@ function drawPalCell(
   item: PalLabelContent,
   bold: PDFFont,
   regular: PDFFont,
+  locationColors: LocationColorMap,
   logoImage?: PDFImage
 ) {
   const scaleX = cell.wPt / inPt(PAL_SHEET.cells[0].w);
@@ -160,8 +167,11 @@ function drawPalCell(
     wPt: cell.wPt,
     hPt: inPt(bar.h) * scaleX,
   };
-  page.drawRectangle({ x: barRect.xPt, y: barRect.yPt, width: barRect.wPt, height: barRect.hPt, color: rgb(0.1, 0.1, 0.1) });
-  centerText(page, item.location ?? '', bold, 20, barRect, barRect.hPt / 2 - inPt(0.11), rgb(1, 1, 1));
+  const barColorHex = resolveLocationColor(locationColors, item.location);
+  const { r, g, b } = hexToRgbFractions(barColorHex);
+  const textColor = contrastingTextIsWhite(barColorHex) ? rgb(1, 1, 1) : rgb(0, 0, 0);
+  page.drawRectangle({ x: barRect.xPt, y: barRect.yPt, width: barRect.wPt, height: barRect.hPt, color: rgb(r, g, b) });
+  centerText(page, item.location ?? '', bold, 20, barRect, barRect.hPt / 2 - inPt(0.11), textColor);
 
   const content = PAL_CELL_LAYOUT.content;
   const contentRect: CellRectPt = {
@@ -179,12 +189,14 @@ function drawPalCell(
 export async function buildPalLabelsPdf(
   doc: PDFDocument,
   items: PalLabelContent[],
-  logo?: { bytes: Uint8Array; kind: 'png' | 'jpg' }
+  logo?: { bytes: Uint8Array; kind: 'png' | 'jpg' },
+  locationColors?: LocationColorMap
 ) {
   const { bold, regular } = await fonts(doc);
   const logoImage = logo ? await (logo.kind === 'png' ? doc.embedPng(logo.bytes) : doc.embedJpg(logo.bytes)) : undefined;
+  const colors = locationColors ?? new Map();
   await renderSheets(doc, PAL_SHEET, items, (page, cell, item) => {
-    drawPalCell(page, cell, item, bold, regular, logoImage);
+    drawPalCell(page, cell, item, bold, regular, colors, logoImage);
   });
 }
 

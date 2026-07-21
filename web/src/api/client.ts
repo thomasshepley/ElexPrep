@@ -50,6 +50,12 @@ export interface FixtureTypeRule {
   caseLabelOverride: string | null;
 }
 
+export interface LocationColorRule {
+  id: string;
+  location: string;
+  color: string;
+}
+
 export interface Fixture {
   id: string;
   address: number;
@@ -227,6 +233,14 @@ export const api = {
       request<FixtureTypeRule>(`/fixture-type-rules/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     remove: (id: string) => request<void>(`/fixture-type-rules/${id}`, { method: 'DELETE' }),
   },
+  locationColorRules: {
+    list: () => request<LocationColorRule[]>('/location-color-rules'),
+    create: (data: { location: string; color: string }) =>
+      request<LocationColorRule>('/location-color-rules', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: string, data: Partial<{ location: string; color: string }>) =>
+      request<LocationColorRule>(`/location-color-rules/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    remove: (id: string) => request<void>(`/location-color-rules/${id}`, { method: 'DELETE' }),
+  },
   patch: {
     preview: async (jobId: string, file: File) => {
       const form = new FormData();
@@ -276,6 +290,7 @@ export const api = {
         body: JSON.stringify({ ids, override }),
       }),
     pdfUrl: (jobId: string) => `${BASE}/jobs/${jobId}/print-queue/pdf`,
+    previewUrl: (jobId: string) => `${BASE}/jobs/${jobId}/print-queue/preview.pdf`,
     send: (jobId: string) =>
       request<{ printJobs: PrintJob[] }>(`/jobs/${jobId}/print-queue/send`, { method: 'POST' }),
     printerConfig: (jobId: string) =>

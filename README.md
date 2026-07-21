@@ -23,8 +23,17 @@ everything else in the original feature list is scoped for later phases (see bel
   - Truss/Spike labels (position number, "DO NOT TIP", sACN node IP/subnet) — 3 sub-types
     sharing one physical sheet layout
   - Cable labels, including the DMX variant narrowed by 1/3 with a cut line
-  - PAL case labels (job logo, stage location bar, case content/address range)
+  - PAL case labels (job logo, color-coded stage location bar, case content/address range)
   - Rack labels (placeholder layout — no template was supplied for these yet)
+- **Location colors** (Settings → Location Colors): maps a stage location string (Floor,
+  Downstage, Mid Stage, Upstage, SR Dimmers, or any others you add) to a color for the PAL
+  label's location bar, seeded on first run with Elex's house colors (green/red/orange/
+  yellow/purple). Text color auto-switches black/white for contrast against whatever color
+  is picked. A location with no rule prints with the original neutral dark bar.
+- **Visual print preview**: the Print Queue tab embeds the actual generated PDF (not a
+  mockup) in the browser — same layout, colors, and logo the real print will have — that
+  refreshes as you build the queue, edit quantities, or add ad hoc labels, before you commit
+  to either confirm action.
 - **Print preview & queue**: build labels from the current patch/cases, add ad hoc one-off labels
   (personal Peli cases, generic equipment, spare cable runs...), edit quantities, remove items,
   select what to confirm, then generate a combined print-ready PDF. A per-label copy cap (10)

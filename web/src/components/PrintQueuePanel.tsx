@@ -32,12 +32,14 @@ export default function PrintQueuePanel({ jobId }: { jobId: string }) {
   const [printJobs, setPrintJobs] = useState<PrintJob[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [previewVersion, setPreviewVersion] = useState(0);
 
   const refresh = () =>
     api.printQueue.list(jobId).then(({ queue, adHoc }) => {
       setQueue(queue);
       setAdHoc(adHoc);
       setSelected(new Set(queue.filter((q) => q.status === 'PENDING').map((q) => q.id)));
+      setPreviewVersion((v) => v + 1);
     });
 
   const refreshPrintJobs = () => api.printJobs.list(jobId).then(setPrintJobs);
@@ -142,7 +144,7 @@ export default function PrintQueuePanel({ jobId }: { jobId: string }) {
 
       <div className="panel">
         <div className="row" style={{ justifyContent: 'space-between' }}>
-          <h3>Print preview</h3>
+          <h3>Print queue</h3>
           <button onClick={build} disabled={busy}>
             Build from patch + cases
           </button>
@@ -217,6 +219,34 @@ export default function PrintQueuePanel({ jobId }: { jobId: string }) {
           </button>
         </div>
       </div>
+
+      {(pendingItems.length > 0 || adHoc.length > 0) && (
+        <div className="panel">
+          <div className="row" style={{ justifyContent: 'space-between' }}>
+            <h3>Visual preview</h3>
+            <button className="secondary" onClick={() => setPreviewVersion((v) => v + 1)}>
+              Refresh preview
+            </button>
+          </div>
+          <p className="muted">
+            This is the actual PDF that will be produced — same layout, colors, and logo as the
+            real print, generated live from what's queued above (nothing here is confirmed or
+            sent by viewing it).
+          </p>
+          <iframe
+            key={previewVersion}
+            title="Print preview"
+            src={`${api.printQueue.previewUrl(jobId)}?v=${previewVersion}`}
+            style={{
+              width: '100%',
+              height: '70vh',
+              border: '1px solid var(--border)',
+              borderRadius: 6,
+              background: '#fff',
+            }}
+          />
+        </div>
+      )}
 
       {printJobs.length > 0 && (
         <div className="panel">

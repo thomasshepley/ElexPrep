@@ -19,6 +19,7 @@ function App() {
         <nav>
           <NavLink to="/" end>Jobs</NavLink>
           <NavLink to="/settings/fixture-types">Case Rules</NavLink>
+          <NavLink to="/settings/location-colors">Location Colors</NavLink>
           <NavLink to="/settings/import-mapping">Import Mapping</NavLink>
           {user.role === 'ADMIN' && <NavLink to="/settings/printer">Printer</NavLink>}
           {user.role === 'ADMIN' && <NavLink to="/settings/current-rms">Current RMS</NavLink>}

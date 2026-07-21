@@ -20,6 +20,8 @@ import { agentRouter } from './routes/agent';
 import { activityRouter } from './routes/activity';
 import { currentRmsRouter, jobCurrentRmsRouter } from './routes/currentRms';
 import { restartCurrentRmsPolling } from './currentRms/sync';
+import { locationColorRulesRouter } from './routes/locationColorRules';
+import { seedDefaultLocationColorsIfEmpty } from './pdf/locationColors';
 
 const app = express();
 app.use(cors({ origin: true, credentials: true }));
@@ -34,6 +36,7 @@ app.use('/api/users', usersRouter);
 app.use('/api/settings', settingsRouter);
 app.use('/api/jobs', jobsRouter);
 app.use('/api/fixture-type-rules', fixtureTypeRulesRouter);
+app.use('/api/location-color-rules', locationColorRulesRouter);
 app.use('/api/jobs', patchRouter);
 app.use('/api/jobs', casesRouter);
 app.use('/api/jobs', adHocLabelsRouter);
@@ -63,3 +66,4 @@ app.listen(port, '0.0.0.0', () => {
 });
 
 restartCurrentRmsPolling().catch((err) => console.error('Could not start Current RMS polling:', err));
+seedDefaultLocationColorsIfEmpty().catch((err) => console.error('Could not seed location colors:', err));
