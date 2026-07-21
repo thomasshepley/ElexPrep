@@ -3,7 +3,7 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import { prisma, logActivity } from '../db';
-import { requireRole } from '../auth';
+import { requirePermission, loadRolePermissions } from '../permissions';
 
 const uploadDir = process.env.UPLOADS_DIR
   ? path.resolve(process.env.UPLOADS_DIR)
@@ -33,9 +33,9 @@ jobsRouter.get('/', async (req, res) => {
   res.json(jobs);
 });
 
-// Job lifecycle (create/publish/delete) is an admin activity — USER/SIGNAGE operate on
-// jobs an admin has already published, per the same pattern as printer/user settings.
-jobsRouter.post('/', requireRole('ADMIN'), async (req, res) => {
+// Job lifecycle (create/publish/delete) defaults to admin-only, same as printer/user
+// settings, but each is individually delegatable to USER via Settings -> Permissions.
+jobsRouter.post('/', requirePermission('createJobs'), async (req, res) => {
   const { name, venue } = req.body ?? {};
   if (!name || typeof name !== 'string') {
     return res.status(400).json({ error: 'name is required' });
@@ -55,7 +55,10 @@ jobsRouter.get('/:id', async (req, res) => {
 jobsRouter.put('/:id', async (req, res) => {
   const { name, venue, isPublic } = req.body ?? {};
   if (isPublic !== undefined && req.user?.role !== 'ADMIN') {
-    return res.status(403).json({ error: 'Only admins can change a job\'s public visibility' });
+    const perms = req.user?.role === 'USER' ? await loadRolePermissions() : null;
+    if (!perms?.publishJobs) {
+      return res.status(403).json({ error: "Insufficient permissions to change a job's public visibility" });
+    }
   }
   const job = await prisma.job.update({
     where: { id: req.params.id },
@@ -69,7 +72,7 @@ jobsRouter.put('/:id', async (req, res) => {
   res.json(job);
 });
 
-jobsRouter.delete('/:id', requireRole('ADMIN'), async (req, res) => {
+jobsRouter.delete('/:id', requirePermission('deleteJobs'), async (req, res) => {
   const jobId = req.params.id;
   const [job, plots, printJobs] = await Promise.all([
     prisma.job.findUnique({ where: { id: jobId } }),

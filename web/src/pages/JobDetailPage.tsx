@@ -8,6 +8,7 @@ import AdHocLabelsPanel from '../components/AdHocLabelsPanel';
 import PrintQueuePanel from '../components/PrintQueuePanel';
 import PlotsPanel from '../components/PlotsPanel';
 import CurrentRmsPanel from '../components/CurrentRmsPanel';
+import JobLocationColorsPanel from '../components/JobLocationColorsPanel';
 
 const TABS = ['Patch Import', 'Cases', 'Ad Hoc Labels', 'Print Queue', 'Plots', 'Current RMS', 'Job Settings'] as const;
 type Tab = (typeof TABS)[number];
@@ -51,6 +52,7 @@ export default function JobDetailPage() {
 function JobSettingsPanel({ job, onUpdate }: { job: Job; onUpdate: (j: Job) => void }) {
   const { user } = useAuth();
   const isAdmin = user?.role === 'ADMIN';
+  const canPublish = isAdmin || Boolean(user?.permissions?.publishJobs);
   const [name, setName] = useState(job.name);
   const [venue, setVenue] = useState(job.venue ?? '');
   const [logoBusy, setLogoBusy] = useState(false);
@@ -95,7 +97,7 @@ function JobSettingsPanel({ job, onUpdate }: { job: Job; onUpdate: (j: Job) => v
 
       <div style={{ marginTop: '1.25rem' }}>
         <h4>Visibility</h4>
-        {isAdmin ? (
+        {canPublish ? (
           <>
             <label className="row" style={{ gap: '0.4rem' }}>
               <input type="checkbox" checked={job.isPublic} onChange={togglePublic} />
@@ -118,6 +120,10 @@ function JobSettingsPanel({ job, onUpdate }: { job: Job; onUpdate: (j: Job) => v
           disabled={logoBusy}
           onChange={(e) => e.target.files?.[0] && uploadLogo(e.target.files[0])}
         />
+      </div>
+
+      <div style={{ marginTop: '1.25rem' }}>
+        <JobLocationColorsPanel jobId={job.id} />
       </div>
     </div>
   );

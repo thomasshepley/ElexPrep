@@ -5,6 +5,7 @@ import { useAuth } from '../auth/AuthContext';
 export default function CurrentRmsPanel({ jobId }: { jobId: string }) {
   const { user } = useAuth();
   const isAdmin = user?.role === 'ADMIN';
+  const canLink = isAdmin || Boolean(user?.permissions?.linkCurrentRms);
   const [linked, setLinked] = useState<boolean | null>(null);
   const [opportunity, setOpportunity] = useState<CurrentRmsOpportunity | undefined>();
   const [rmsAlertAt, setRmsAlertAt] = useState<string | null>(null);
@@ -83,7 +84,7 @@ export default function CurrentRmsPanel({ jobId }: { jobId: string }) {
       {!linked && (
         <div className="panel">
           <h3>Not linked to Current RMS</h3>
-          {isAdmin ? (
+          {canLink ? (
             <>
               <p className="muted">
                 Link this job to an opportunity by its numeric Current RMS ID (find it in{' '}
@@ -113,7 +114,7 @@ export default function CurrentRmsPanel({ jobId }: { jobId: string }) {
         <div className="panel">
           <div className="row" style={{ justifyContent: 'space-between' }}>
             <h3>{opportunity?.subject ?? 'Linked opportunity'}</h3>
-            {isAdmin && (
+            {canLink && (
               <button className="secondary" onClick={unlink}>
                 Unlink
               </button>
@@ -162,13 +163,30 @@ export default function CurrentRmsPanel({ jobId }: { jobId: string }) {
                   <tr>
                     <th>Item</th>
                     <th>Qty</th>
+                    <th>Current RMS status</th>
+                    <th>Prepped</th>
                   </tr>
                 </thead>
                 <tbody>
                   {items.map((i) => (
                     <tr key={i.id}>
-                      <td>{i.product_name ?? i.name ?? i.description ?? `#${i.id}`}</td>
+                      <td>{i.name ?? i.product_name ?? i.description ?? `#${i.id}`}</td>
                       <td>{i.quantity ?? ''}</td>
+                      <td>
+                        <span
+                          style={{
+                            fontSize: '0.85rem',
+                            fontWeight: 600,
+                            padding: '0.15rem 0.5rem',
+                            borderRadius: 999,
+                            background: i.bookedOut ? '#1FA34C' : '#555',
+                            color: '#fff',
+                          }}
+                        >
+                          {i.status_name ?? (i.bookedOut ? 'Booked out' : 'Not booked out')}
+                        </span>
+                      </td>
+                      <td>{i.prepped ? '✓' : ''}</td>
                     </tr>
                   ))}
                 </tbody>

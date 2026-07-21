@@ -6,6 +6,8 @@ import { useAuth } from '../auth/AuthContext';
 export default function JobsListPage() {
   const { user } = useAuth();
   const isAdmin = user?.role === 'ADMIN';
+  const canCreate = isAdmin || Boolean(user?.permissions?.createJobs);
+  const canDelete = isAdmin || Boolean(user?.permissions?.deleteJobs);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [name, setName] = useState('');
   const [venue, setVenue] = useState('');
@@ -50,7 +52,7 @@ export default function JobsListPage() {
   return (
     <div>
       <h1>Jobs</h1>
-      {isAdmin && (
+      {canCreate && (
         <div className="panel">
           <h3>New job</h3>
           <p className="muted">
@@ -76,7 +78,7 @@ export default function JobsListPage() {
       )}
 
       <div>
-        {jobs.length === 0 && <p className="muted">No jobs yet{isAdmin ? ' — create one above.' : '.'}</p>}
+        {jobs.length === 0 && <p className="muted">No jobs yet{canCreate ? ' — create one above.' : '.'}</p>}
         {jobs.length > 0 && filtered.length === 0 && <p className="muted">No jobs match "{search}".</p>}
         {filtered.map((job) => (
           <div
@@ -90,7 +92,7 @@ export default function JobsListPage() {
               {isAdmin && !job.isPublic && <span className="muted"> (private)</span>}
               {job.rmsAlertAt && <span className="error"> • RMS changed</span>}
             </Link>
-            {isAdmin && (
+            {canDelete && (
               <button className="secondary" onClick={(e) => removeJob(job, e)}>
                 Delete
               </button>

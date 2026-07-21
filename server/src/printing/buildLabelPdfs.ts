@@ -97,7 +97,7 @@ export async function buildPdfPerType(
   jobId: string,
   byType: LabelContentByType
 ): Promise<{ labelType: string; pdf: Buffer; pages: number }[]> {
-  const locationColors = await loadLocationColorMap();
+  const locationColors = await loadLocationColorMap(jobId);
   const out: { labelType: string; pdf: Buffer; pages: number }[] = [];
   for (const [labelType, items] of Object.entries(byType)) {
     if (items.length === 0) continue;
@@ -112,7 +112,7 @@ export async function buildPdfPerType(
 
 /** All types combined into a single PDF — used for both the manual download and the live preview. */
 export async function buildCombinedPdf(jobId: string, byType: LabelContentByType): Promise<Buffer> {
-  const locationColors = await loadLocationColorMap();
+  const locationColors = await loadLocationColorMap(jobId);
   const doc = await PDFDocument.create();
   for (const [labelType, items] of Object.entries(byType)) {
     if (items.length === 0) continue;

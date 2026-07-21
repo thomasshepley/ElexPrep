@@ -8,7 +8,15 @@ integration, printer control, and prep-bay digital signage.
 
 - **CSV patch import** using a column mapping configured once in Settings → Import Mapping
   (the export format is normally identical between jobs, so imports don't re-prompt; upload a
-  sample CSV on the settings page to pick columns from a list).
+  sample CSV on the settings page to pick columns from a list). Handles real Wysiwyg-style
+  patch reports, not just clean flat CSVs: the real header row is auto-detected past any
+  title/metadata preamble rows (image filename, job name, version, blank rows) and past
+  "Type: X" sub-group marker rows mixed in with the data — verified against a real
+  export (`Spot,Patch,Type,Position,Fixture Options,# Data,Unit`). A combined
+  `"universe.address"` patch column (e.g. `"3.109"`) can be mapped as one field and is split
+  automatically instead of requiring separate universe/address columns. Common column-name
+  synonyms (Spot→address, Patch→universe.address, Position→location, ...) are auto-guessed
+  from a sample file.
 - **Case-packing algorithm**: groups fixtures into cases by a configurable "units per case" rule
   per fixture type, matching Elex's existing convention — pairs join as `"201 + 202"`, full
   groups of 3+ collapse to a range `"401 - 403"`, and a short leftover case fills the gap with
@@ -27,6 +35,13 @@ integration, printer control, and prep-bay digital signage.
   label's location bar, seeded on first run with Elex's house colors (green/red/orange/
   yellow/purple). Text color auto-switches black/white for contrast against whatever color
   is picked. A location with no rule prints with the original neutral dark bar.
+  - **Per-job overrides** (Job Settings tab, on each job): jobs whose patch uses location
+    names that don't match the house defaults (e.g. a Wysiwyg export with "Cube North",
+    "Entrance Arch Top", "Stage Structure" instead of Floor/Downstage/...) can define their
+    own bar colors without touching the shared defaults — a job-specific rule wins over a
+    global one of the same name for that job only.
+- **PAL label project image**: spans the full width of the top banner edge-to-edge (cover-fit
+  with clipping, not letterboxed with margins), matching the physical template.
 - **Visual print preview**: the Print Queue tab embeds the actual generated PDF (not a
   mockup) in the browser — same layout, colors, and logo the real print will have — that
   refreshes as you build the queue, edit quantities, or add ad hoc labels, before you commit
@@ -44,27 +59,43 @@ integration, printer control, and prep-bay digital signage.
     ones. Regenerating from the patch (destructive) warns first if it would wipe out manual
     edits or additions.
   - Fixture type rules: name and case label override edit inline.
-  - Ad hoc labels: quantity edits inline.
+  - Ad hoc labels: every content field edits inline (not just quantity) — location/title/
+    subtitle for PAL, IP/subnet for sACN nodes, text for cable/tip labels, etc., matching
+    whichever fields that label type uses.
   - Location colors: color edits inline via a color picker.
 - **Jobs list**: search by name/venue, admin-only delete (cleans up the job's fixtures, cases,
   plots, print-job history, and every uploaded file — logo, plot PDFs, print-job PDFs — so
   nothing is left orphaned on disk or in the database).
 - **Job logo upload**, shown on PAL labels and stored per job.
 - **Settings area**: Case Rules, Location Colors, Import Mapping, Printer, Current RMS,
-  Users, and Activity Log all live under one **Settings** nav entry with its own sub-tabs,
-  instead of cluttering the main nav.
+  Users, Permissions, and Activity Log all live under one **Settings** nav entry with its own
+  sub-tabs, instead of cluttering the main nav.
 - **Activity log** (Settings → Activity Log, admin-only): user attribution plus which job
   each action belongs to (linked, with a graceful "(deleted job)" fallback), search, and a
   per-job filter, for import/generate/confirm/print/login/user-management actions.
 - **Accounts & permissions**: cookie-session login, first-run admin setup, three roles —
-  ADMIN (everything incl. user management + activity log), USER (normal prep work), SIGNAGE
-  (view-only login for prep-bay TVs; the API rejects any write from it). Per-user display
-  name/password management under My Preferences.
+  ADMIN (everything), USER (normal prep work), SIGNAGE (view-only login for prep-bay TVs; the
+  API rejects any write from it except ticking a pick-list item's prepped checkbox, see
+  below). Per-user display name/password management under My Preferences.
+  - **Granular permissions** (Settings → Permissions, admin-only): a handful of capabilities
+    that default to ADMIN-only can be individually delegated to the USER role — creating
+    jobs, deleting jobs, publishing/unpublishing jobs, viewing the activity log, and linking
+    a job to a Current RMS opportunity. Everything is off until an admin turns it on, so
+    introducing this never silently changes existing behavior.
 - **Plot CAD PDFs**: upload per job, listed with an inline browser viewer (native PDF iframe),
   delete; PDF-only, 100 MB cap.
-- **Prep-bay signage view** (`/signage`): chromeless fullscreen page for TV screens — pick a
-  job, it shows the job name, logo, and case list grouped by fixture type, auto-refreshing
-  every minute. SIGNAGE logins land here automatically and can't navigate elsewhere.
+- **Prep-bay signage view** (`/signage`) — purely for prep, per job:
+  - If the job is linked to Current RMS, shows its live **pick list** (opportunity items)
+    instead of the local case list: each row shows the item, quantity, and Current RMS's own
+    "Booked Out" status (read straight from its documented opportunity-item status codes),
+    plus an ElexPrep-side **prepped** checkbox crew tap directly on the TV as they pull each
+    item — the one deliberate, narrow exception to SIGNAGE's read-only rule. If not linked,
+    falls back to the local case list grouped by fixture type (previous behavior).
+  - **Change alerts**: when the sync poller detects the linked opportunity's pick list
+    actually changed (not just any field — specifically added/removed/quantity-changed
+    items), the screen flashes a full-screen, GitHub-diff-style alert — red for what was
+    removed, green for what was added, orange for quantity changes — until dismissed.
+  - SIGNAGE logins land here automatically and can't navigate elsewhere.
 
 - **Printer connection** with three delivery methods (Printer Settings, admin-only):
   - *Dry run* (default): print jobs are created and tracked without touching hardware — safe
@@ -89,18 +120,22 @@ integration, printer control, and prep-bay digital signage.
     Settings) for USER/SIGNAGE to see it. Job lifecycle (create/delete/publish) is
     admin-only, same as printer/user settings — USER operates on what's been published.
   - A job's **Current RMS tab** shows the linked opportunity's status/dates/customer, a
-    live-fetched **pick list** ("opportunity items" in Current RMS's terms), and a manual
-    link/unlink control.
+    live-fetched **pick list** ("opportunity items" in Current RMS's terms) with each item's
+    quantity, Current RMS status, and ElexPrep prepped state, and a manual link/unlink
+    control. The richer pick-list view (with the full-screen change alert) lives on the
+    **signage screen** — see above.
   - **Change alerts**: the poller compares each synced opportunity's `updated_at` against
     what was cached before; if a linked job's opportunity actually changed, the job gets a
-    dismissible alert badge (Jobs list, job tabs) and an activity log entry. This uses
-    polling rather than Current RMS's webhooks, deliberately — webhooks need your server to
-    be publicly reachable, which a home PC or office box behind NAT usually isn't; polling
-    works over an outbound-only connection regardless of network setup.
-  - Current RMS's exact field names for opportunities/opportunity items aren't fully
-    published; extraction follows their documented conventions and degrades gracefully
-    (raw API responses are always cached alongside the parsed fields), but is worth a
-    sanity check against your real account after entering the API key.
+    dismissible alert badge (Jobs list, job tabs) and an activity log entry. If the pick list
+    itself changed (not just some other field), it additionally raises the signage
+    full-screen diff alert. This uses polling rather than Current RMS's webhooks,
+    deliberately — webhooks need your server to be publicly reachable, which a home PC or
+    office box behind NAT usually isn't; polling works over an outbound-only connection
+    regardless of network setup.
+  - The pick-list endpoint is the real, documented one — `GET
+    /opportunities/{opportunity_id}/opportunity_items` — rather than a guessed flat
+    `/opportunity_items?q[...]` filter (which 404s on a real account); "Booked Out" reads
+    Current RMS's own opportunity-item status codes (`20` = Booked Out) directly.
 - **Hardening**: unhandled errors (a bad ID in a URL, a duplicate name, etc.) return a
   proper JSON error response instead of hanging the request — Prisma's "not found" and
   "already exists" cases map to 404/409 specifically. The login endpoint is rate-limited
@@ -150,10 +185,11 @@ Swapping SQLite for Postgres later is just an env var change (`DATABASE_URL`) pl
 `prisma migrate deploy` — nothing in the app code is SQLite-specific (enums are stored as plain
 strings for SQLite compatibility and validated at the application layer).
 
-Run `npm test` from the repo root for the automated test suite (currently unit tests for the
-case-packing algorithm — the core business logic in `shared/src/casePacking.ts`); most other
-verification in this project has been manual (curl + Playwright) rather than an exhaustive
-automated suite.
+Run `npm test` from the repo root for the automated test suite — unit tests for the core
+business logic in `shared/src`: case-packing (`casePacking.ts`), CSV header-row detection and
+combined universe.address parsing (`csvHeader.ts`), and the pick-list change diff
+(`pickListDiff.ts`). Most other verification in this project has been manual (curl +
+Playwright) rather than an exhaustive automated suite.
 
 ## Label geometry
 

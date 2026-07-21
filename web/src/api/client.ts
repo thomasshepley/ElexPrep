@@ -1,3 +1,5 @@
+import type { PickListDiff } from '@elexprep/shared';
+
 const BASE = '/api';
 
 export class ApiError extends Error {
@@ -104,12 +106,15 @@ export interface ActivityLogEntry {
 
 export type Role = 'ADMIN' | 'USER' | 'SIGNAGE';
 
+export type PermissionKey = 'createJobs' | 'deleteJobs' | 'publishJobs' | 'viewActivityLog' | 'linkCurrentRms';
+
 export interface AuthedUser {
   id: string;
   username: string;
   displayName: string;
   role: Role;
   prefs: Record<string, unknown>;
+  permissions?: Record<PermissionKey, boolean>;
 }
 
 export interface Plot {
@@ -169,6 +174,9 @@ export interface CurrentRmsPickItem {
   product_name?: string;
   description?: string;
   quantity?: number;
+  status_name?: string;
+  prepped?: boolean;
+  bookedOut?: boolean;
   [key: string]: unknown;
 }
 
@@ -195,6 +203,17 @@ export const api = {
     update: (id: string, data: Partial<{ displayName: string; role: Role; password: string }>) =>
       request<AuthedUser>(`/users/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     remove: (id: string) => request<void>(`/users/${id}`, { method: 'DELETE' }),
+  },
+  permissions: {
+    get: () =>
+      request<{ permissions: Record<PermissionKey, boolean>; keys: PermissionKey[]; labels: Record<PermissionKey, string> }>(
+        '/permissions'
+      ),
+    update: (permissions: Partial<Record<PermissionKey, boolean>>) =>
+      request<{ permissions: Record<PermissionKey, boolean> }>('/permissions', {
+        method: 'PUT',
+        body: JSON.stringify({ permissions }),
+      }),
   },
   settings: {
     get: <T>(key: string) => request<{ key: string; value: T | null }>(`/settings/${key}`),
@@ -241,6 +260,15 @@ export const api = {
     update: (id: string, data: Partial<{ location: string; color: string }>) =>
       request<LocationColorRule>(`/location-color-rules/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     remove: (id: string) => request<void>(`/location-color-rules/${id}`, { method: 'DELETE' }),
+  },
+  jobLocationColorRules: {
+    list: (jobId: string) => request<LocationColorRule[]>(`/jobs/${jobId}/location-colors`),
+    create: (jobId: string, data: { location: string; color: string }) =>
+      request<LocationColorRule>(`/jobs/${jobId}/location-colors`, { method: 'POST', body: JSON.stringify(data) }),
+    update: (jobId: string, id: string, data: Partial<{ location: string; color: string }>) =>
+      request<LocationColorRule>(`/jobs/${jobId}/location-colors/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    remove: (jobId: string, id: string) =>
+      request<void>(`/jobs/${jobId}/location-colors/${id}`, { method: 'DELETE' }),
   },
   patch: {
     preview: async (jobId: string, file: File) => {
@@ -349,6 +377,15 @@ export const api = {
         `/jobs/${jobId}/current-rms`
       ),
     pickList: (jobId: string) => request<{ items: CurrentRmsPickItem[] }>(`/jobs/${jobId}/current-rms/pick-list`),
+    setPrepped: (jobId: string, itemId: number, prepped: boolean) =>
+      request<{ prepped: boolean }>(`/jobs/${jobId}/current-rms/pick-list/${itemId}/prepped`, {
+        method: 'PUT',
+        body: JSON.stringify({ prepped }),
+      }),
+    itemsDiff: (jobId: string) =>
+      request<{ diff: PickListDiff | null; diffAt: string | null }>(`/jobs/${jobId}/current-rms/items-diff`),
+    acknowledgeItemsDiff: (jobId: string) =>
+      request<{ diff: null }>(`/jobs/${jobId}/current-rms/items-diff/acknowledge`, { method: 'POST' }),
     link: (jobId: string, rmsId: number) =>
       request<Job>(`/jobs/${jobId}/current-rms/link`, { method: 'POST', body: JSON.stringify({ rmsId }) }),
     unlink: (jobId: string) => request<Job>(`/jobs/${jobId}/current-rms/unlink`, { method: 'POST' }),

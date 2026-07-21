@@ -1,4 +1,15 @@
-import { PDFDocument, PDFFont, PDFPage, rgb } from 'pdf-lib';
+import {
+  PDFDocument,
+  PDFFont,
+  PDFImage,
+  PDFPage,
+  rgb,
+  clip,
+  endPath,
+  popGraphicsState,
+  pushGraphicsState,
+  rectangle,
+} from 'pdf-lib';
 import { CellGeometry, SheetGeometry } from '@elexprep/shared';
 
 export const PT_PER_IN = 72;
@@ -34,6 +45,29 @@ export function centerText(
   const x = cell.xPt + cell.wPt / 2 - width / 2;
   const y = cell.yPt + yOffsetPt;
   page.drawText(text, { x, y, size, font, color });
+}
+
+/**
+ * Draws an image to completely cover a rect edge-to-edge (like CSS `object-fit: cover`):
+ * scales up to fill both dimensions, preserving aspect ratio, and clips the overflow rather
+ * than letterboxing — so a banner-style image slot never shows gaps on the sides regardless
+ * of the source image's own aspect ratio.
+ */
+export function drawImageCover(page: PDFPage, image: PDFImage, rect: CellRectPt) {
+  const scale = Math.max(rect.wPt / image.width, rect.hPt / image.height);
+  const drawWidth = image.width * scale;
+  const drawHeight = image.height * scale;
+  const x = rect.xPt - (drawWidth - rect.wPt) / 2;
+  const y = rect.yPt - (drawHeight - rect.hPt) / 2;
+
+  page.pushOperators(
+    pushGraphicsState(),
+    rectangle(rect.xPt, rect.yPt, rect.wPt, rect.hPt),
+    clip(),
+    endPath()
+  );
+  page.drawImage(image, { x, y, width: drawWidth, height: drawHeight });
+  page.pushOperators(popGraphicsState());
 }
 
 export function drawCellOutline(page: PDFPage, cell: CellRectPt) {

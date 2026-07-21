@@ -1,21 +1,43 @@
 import { Router } from 'express';
 import Papa from 'papaparse';
 import multer from 'multer';
-import { PATCH_FIELD_KEYS, PatchFieldKey, RawFixtureInput } from '@elexprep/shared';
+import { PATCH_FIELD_KEYS, PatchFieldKey, RawFixtureInput, findHeaderRowIndex, splitUniverseAddress } from '@elexprep/shared';
 import { prisma, logActivity } from '../db';
 
 const upload = multer({ storage: multer.memoryStorage() });
 
 export const patchRouter = Router();
 
+/**
+ * Real patch exports (e.g. CAST Wysiwyg's patch report) often have a few title/metadata rows
+ * before the real column header row, plus blank rows and "Type: X" sub-group marker rows mixed
+ * in with the data further down — so the header row can't just be assumed to be row 1.
+ */
+function parseWysiwygCsv(text: string): { headers: string[]; rows: Record<string, string>[] } {
+  const raw = Papa.parse<string[]>(text, { skipEmptyLines: false });
+  const allRows = raw.data as string[][];
+  const headerRowIndex = findHeaderRowIndex(allRows);
+  const headerRow = (allRows[headerRowIndex] ?? []).map((h) => (h ?? '').trim());
+  const rows = allRows
+    .slice(headerRowIndex + 1)
+    .filter((r) => r.some((c) => (c ?? '').trim() !== ''))
+    .map((r) => {
+      const obj: Record<string, string> = {};
+      headerRow.forEach((h, i) => {
+        if (h) obj[h] = (r[i] ?? '').trim();
+      });
+      return obj;
+    });
+  return { headers: headerRow.filter(Boolean), rows };
+}
+
 patchRouter.post('/:jobId/patch/preview', upload.single('file'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'CSV file is required' });
   const text = req.file.buffer.toString('utf-8');
-  const parsed = Papa.parse<Record<string, string>>(text, { header: true, skipEmptyLines: true });
-  if (parsed.errors.length) {
-    return res.status(400).json({ error: 'Could not parse CSV', details: parsed.errors.slice(0, 5) });
+  const { headers, rows } = parseWysiwygCsv(text);
+  if (headers.length === 0) {
+    return res.status(400).json({ error: 'Could not find a header row in this CSV' });
   }
-  const headers = parsed.meta.fields ?? [];
   const saved = await prisma.appSetting.findUnique({ where: { key: 'patchMapping' } });
   const savedMapping = saved ? (JSON.parse(saved.valueJson) as Partial<Record<PatchFieldKey, string>>) : null;
   // Report which mapped columns are missing from this file so the UI can warn before import.
@@ -24,7 +46,7 @@ patchRouter.post('/:jobId/patch/preview', upload.single('file'), async (req, res
         .filter(([, col]) => col && !headers.includes(col))
         .map(([field, col]) => ({ field, column: col as string }))
     : [];
-  res.json({ headers, rows: parsed.data, fieldKeys: PATCH_FIELD_KEYS, savedMapping, missingColumns });
+  res.json({ headers, rows, fieldKeys: PATCH_FIELD_KEYS, savedMapping, missingColumns });
 });
 
 function toInt(v: string | undefined | null): number | null {
@@ -61,13 +83,18 @@ patchRouter.post('/:jobId/patch/import', async (req, res) => {
     const address = toInt(row[m.address]);
     const fixtureType = (row[m.fixtureType] ?? '').trim();
     if (address === null || !fixtureType) continue;
+    // Some patch software (e.g. Wysiwyg) exports a single "universe.address" column instead
+    // of two separate ones — split it when that mapping is used, otherwise fall back to the
+    // separately-mapped universe/address columns.
+    const mainSplit = m.mainUniverseAddress ? splitUniverseAddress(row[m.mainUniverseAddress]) : null;
+    const pixSplit = m.pixUniverseAddress ? splitUniverseAddress(row[m.pixUniverseAddress]) : null;
     fixtures.push({
       address,
       fixtureType,
-      mainUniverse: m.mainUniverse ? toInt(row[m.mainUniverse]) : null,
-      mainAddress: m.mainAddress ? toInt(row[m.mainAddress]) : null,
-      pixUniverse: m.pixUniverse ? toInt(row[m.pixUniverse]) : null,
-      pixAddress: m.pixAddress ? toInt(row[m.pixAddress]) : null,
+      mainUniverse: mainSplit ? mainSplit.universe : m.mainUniverse ? toInt(row[m.mainUniverse]) : null,
+      mainAddress: mainSplit ? mainSplit.address : m.mainAddress ? toInt(row[m.mainAddress]) : null,
+      pixUniverse: pixSplit ? pixSplit.universe : m.pixUniverse ? toInt(row[m.pixUniverse]) : null,
+      pixAddress: pixSplit ? pixSplit.address : m.pixAddress ? toInt(row[m.pixAddress]) : null,
       mode: m.mode ? row[m.mode] ?? null : null,
       location: m.location ? row[m.location] ?? null : null,
       ipAddress: m.ipAddress ? row[m.ipAddress] ?? null : null,

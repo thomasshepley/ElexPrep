@@ -17,6 +17,7 @@ import PreferencesPage from './pages/PreferencesPage'
 import PrinterSettingsPage from './pages/PrinterSettingsPage'
 import CurrentRmsSettingsPage from './pages/CurrentRmsSettingsPage'
 import ActivityLogPage from './pages/ActivityLogPage'
+import PermissionsPage from './pages/PermissionsPage'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -34,6 +35,7 @@ createRoot(document.getElementById('root')!).render(
               <Route path="location-colors" element={<LocationColorsPage />} />
               <Route path="import-mapping" element={<ImportMappingPage />} />
               <Route path="users" element={<UsersPage />} />
+              <Route path="permissions" element={<PermissionsPage />} />
               <Route path="printer" element={<PrinterSettingsPage />} />
               <Route path="current-rms" element={<CurrentRmsSettingsPage />} />
               <Route path="activity" element={<ActivityLogPage />} />

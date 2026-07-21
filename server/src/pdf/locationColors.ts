@@ -13,7 +13,7 @@ export const DEFAULT_LOCATION_COLOR_RULES: { location: string; color: string }[]
 
 /** Seeds the five house-standard colors on first run only — never overwrites existing rules. */
 export async function seedDefaultLocationColorsIfEmpty() {
-  const count = await prisma.locationColorRule.count();
+  const count = await prisma.locationColorRule.count({ where: { jobId: null } });
   if (count > 0) return;
   await prisma.locationColorRule.createMany({
     data: DEFAULT_LOCATION_COLOR_RULES,
@@ -22,9 +22,20 @@ export async function seedDefaultLocationColorsIfEmpty() {
 
 export type LocationColorMap = Map<string, string>;
 
-export async function loadLocationColorMap(): Promise<LocationColorMap> {
-  const rules = await prisma.locationColorRule.findMany();
-  return new Map(rules.map((r) => [r.location.toLowerCase().trim(), r.color]));
+/**
+ * Loads the global default color rules plus, when jobId is given, that job's own overrides
+ * layered on top — so a job with unique location names (e.g. "Cube North", "Entrance Arch
+ * Top") can define its own bar colors without touching the shared defaults, and can even
+ * override a global location name (e.g. "Floor") for just that job.
+ */
+export async function loadLocationColorMap(jobId?: string | null): Promise<LocationColorMap> {
+  const [globalRules, jobRules] = await Promise.all([
+    prisma.locationColorRule.findMany({ where: { jobId: null } }),
+    jobId ? prisma.locationColorRule.findMany({ where: { jobId } }) : Promise.resolve([]),
+  ]);
+  const map: LocationColorMap = new Map(globalRules.map((r) => [r.location.toLowerCase().trim(), r.color]));
+  for (const r of jobRules) map.set(r.location.toLowerCase().trim(), r.color);
+  return map;
 }
 
 export function resolveLocationColor(map: LocationColorMap, location: string | null | undefined): string {

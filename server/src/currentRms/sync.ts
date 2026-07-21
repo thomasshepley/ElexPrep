@@ -1,7 +1,21 @@
 import { prisma, logActivity } from '../db';
 import { getCurrentRmsConfig, saveCurrentRmsConfig, CurrentRmsConfig } from './config';
-import { fetchAllOpportunities, fetchMember, RawOpportunity } from './client';
+import { fetchAllOpportunities, fetchMember, fetchOpportunityItems, RawOpportunity } from './client';
+import { diffPickListItems, pickListDiffIsEmpty, type PickListItemSnapshot } from '@elexprep/shared';
 import type { CurrentRmsOpportunity } from '@prisma/client';
+
+/** Builds the comparable pick-list snapshot for a job's linked opportunity, for diffing. */
+export async function fetchPickListSnapshot(
+  config: Pick<CurrentRmsConfig, 'subdomain' | 'apiKey'>,
+  rmsId: number
+): Promise<PickListItemSnapshot[]> {
+  const items = await fetchOpportunityItems(config, rmsId);
+  return items.map((i) => ({
+    id: i.id,
+    name: i.name || i.product_name || `Item #${i.id}`,
+    quantity: i.quantity ?? 1,
+  }));
+}
 
 function toDate(value: string | undefined): Date | null {
   if (!value) return null;
@@ -124,7 +138,28 @@ export async function runCurrentRmsSync(): Promise<SyncResult> {
           where: { currentRmsOpportunityId: String(raw.id) },
         });
         for (const job of linked) {
-          await prisma.job.update({ where: { id: job.id }, data: { rmsAlertAt: new Date() } });
+          const data: Record<string, unknown> = { rmsAlertAt: new Date() };
+          try {
+            const snapshot = await fetchPickListSnapshot(config, raw.id);
+            const prevSnapshot: PickListItemSnapshot[] = job.rmsItemsSnapshotJson
+              ? JSON.parse(job.rmsItemsSnapshotJson)
+              : [];
+            data.rmsItemsSnapshotJson = JSON.stringify(snapshot);
+            // Only flash a diff once there's an actual prior snapshot to compare against —
+            // otherwise linking a job (or the first-ever sync after linking) would look like
+            // every item on the pick list was just "added".
+            if (prevSnapshot.length > 0) {
+              const diff = diffPickListItems(prevSnapshot, snapshot);
+              if (!pickListDiffIsEmpty(diff)) {
+                data.rmsItemsDiffJson = JSON.stringify(diff);
+                data.rmsItemsDiffAt = new Date();
+              }
+            }
+          } catch (err) {
+            // A pick-list fetch failure shouldn't block the general "opportunity changed" alert.
+            console.error(`Could not diff pick list for opportunity ${raw.id}:`, (err as Error).message);
+          }
+          await prisma.job.update({ where: { id: job.id }, data });
           await logActivity('current_rms.opportunity_changed', extractSubject(raw), job.id);
           alertsRaised++;
         }

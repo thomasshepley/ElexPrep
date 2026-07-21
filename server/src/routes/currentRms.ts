@@ -1,9 +1,15 @@
 import { Router } from 'express';
 import { prisma, logActivity } from '../db';
 import { requireRole } from '../auth';
+import { requirePermission } from '../permissions';
 import { DEFAULT_CURRENT_RMS_CONFIG, getCurrentRmsConfig, saveCurrentRmsConfig, toPublicConfig } from '../currentRms/config';
 import { testCurrentRmsConnection, fetchOpportunityItems } from '../currentRms/client';
-import { runCurrentRmsSync, restartCurrentRmsPolling, resolveAndCacheMemberName } from '../currentRms/sync';
+import {
+  runCurrentRmsSync,
+  restartCurrentRmsPolling,
+  resolveAndCacheMemberName,
+  fetchPickListSnapshot,
+} from '../currentRms/sync';
 
 export const currentRmsRouter = Router();
 
@@ -124,28 +130,95 @@ jobCurrentRmsRouter.get('/:jobId/current-rms/pick-list', async (req, res) => {
   const config = await getCurrentRmsConfig();
   if (!config.enabled) return res.status(400).json({ error: 'Current RMS integration is disabled' });
   try {
-    const items = await fetchOpportunityItems(config, Number(job.currentRmsOpportunityId));
-    res.json({ items });
+    const [items, statuses] = await Promise.all([
+      fetchOpportunityItems(config, Number(job.currentRmsOpportunityId)),
+      prisma.pickListItemStatus.findMany({ where: { jobId: job.id } }),
+    ]);
+    const preppedById = new Map(statuses.map((s) => [s.rmsItemId, s.prepped]));
+    res.json({
+      items: items.map((i) => ({
+        ...i,
+        prepped: preppedById.get(i.id) ?? false,
+        // Current RMS's own opportunity-item status: 20 = "Booked Out" (physically out on
+        // hire) — this is CRMS's system of record, separate from ElexPrep's own `prepped`
+        // crew checklist above, which tracks warehouse prep independent of when someone
+        // updates CRMS itself.
+        bookedOut: typeof i.status === 'number' && i.status >= 20,
+      })),
+    });
   } catch (err) {
     res.status(502).json({ error: (err as Error).message });
   }
 });
 
-jobCurrentRmsRouter.post('/:jobId/current-rms/link', requireRole('ADMIN'), async (req, res) => {
-  const { rmsId } = req.body ?? {};
-  if (!rmsId) return res.status(400).json({ error: 'rmsId is required' });
+/** Crew ticks an item off (or back on) as they physically pull it — ElexPrep's own tracking,
+ * independent of whatever Current RMS's own line-item status says. */
+jobCurrentRmsRouter.put('/:jobId/current-rms/pick-list/:itemId/prepped', async (req, res) => {
+  const { prepped } = req.body ?? {};
+  if (typeof prepped !== 'boolean') return res.status(400).json({ error: 'prepped must be a boolean' });
+  const rmsItemId = Number(req.params.itemId);
+  const status = await prisma.pickListItemStatus.upsert({
+    where: { jobId_rmsItemId: { jobId: req.params.jobId, rmsItemId } },
+    create: { jobId: req.params.jobId, rmsItemId, prepped },
+    update: { prepped },
+  });
+  res.json(status);
+});
+
+/** The signage screen polls this for the GitHub-diff-style full-screen change alert. */
+jobCurrentRmsRouter.get('/:jobId/current-rms/items-diff', async (req, res) => {
+  const job = await prisma.job.findUnique({ where: { id: req.params.jobId } });
+  if (!job) return res.status(404).json({ error: 'not found' });
+  res.json({
+    diff: job.rmsItemsDiffJson ? JSON.parse(job.rmsItemsDiffJson) : null,
+    diffAt: job.rmsItemsDiffAt,
+  });
+});
+
+jobCurrentRmsRouter.post('/:jobId/current-rms/items-diff/acknowledge', async (req, res) => {
   const job = await prisma.job.update({
     where: { id: req.params.jobId },
-    data: { currentRmsOpportunityId: String(rmsId), rmsAlertAt: null },
+    data: { rmsItemsDiffJson: null, rmsItemsDiffAt: null },
+  });
+  res.json({ diff: null, diffAt: job.rmsItemsDiffAt });
+});
+
+jobCurrentRmsRouter.post('/:jobId/current-rms/link', requirePermission('linkCurrentRms'), async (req, res) => {
+  const { rmsId } = req.body ?? {};
+  if (!rmsId) return res.status(400).json({ error: 'rmsId is required' });
+  // Establish the pick-list baseline right away, so the first real change afterwards has
+  // something to diff against instead of looking like every item was just "added".
+  let snapshotJson: string | null = null;
+  try {
+    const config = await getCurrentRmsConfig();
+    if (config.enabled) snapshotJson = JSON.stringify(await fetchPickListSnapshot(config, Number(rmsId)));
+  } catch {
+    // Not fatal — the link itself still succeeds; the next sync will establish it instead.
+  }
+  const job = await prisma.job.update({
+    where: { id: req.params.jobId },
+    data: {
+      currentRmsOpportunityId: String(rmsId),
+      rmsAlertAt: null,
+      rmsItemsSnapshotJson: snapshotJson,
+      rmsItemsDiffJson: null,
+      rmsItemsDiffAt: null,
+    },
   });
   await logActivity('current_rms.link', String(rmsId), job.id, req.user?.id);
   res.json(job);
 });
 
-jobCurrentRmsRouter.post('/:jobId/current-rms/unlink', requireRole('ADMIN'), async (req, res) => {
+jobCurrentRmsRouter.post('/:jobId/current-rms/unlink', requirePermission('linkCurrentRms'), async (req, res) => {
   const job = await prisma.job.update({
     where: { id: req.params.jobId },
-    data: { currentRmsOpportunityId: null, rmsAlertAt: null },
+    data: {
+      currentRmsOpportunityId: null,
+      rmsAlertAt: null,
+      rmsItemsSnapshotJson: null,
+      rmsItemsDiffJson: null,
+      rmsItemsDiffAt: null,
+    },
   });
   await logActivity('current_rms.unlink', undefined, job.id, req.user?.id);
   res.json(job);

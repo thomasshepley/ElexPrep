@@ -168,26 +168,48 @@ export async function fetchMember(
 
 export interface RawOpportunityItem {
   id: number;
+  opportunity_id?: number;
+  item_id?: number;
+  item_type?: string;
   name?: string;
   product_name?: string;
   description?: string;
   quantity?: number;
+  // Current RMS's own line-item status (e.g. 5 = "Reserved") — informational only; ElexPrep
+  // tracks its own crew-facing prepped/pulled checkbox independently of this (see signage).
+  status?: number;
+  status_name?: string;
   [key: string]: unknown;
 }
 
+interface OpportunityItemsPage {
+  opportunity_items?: RawOpportunityItem[];
+  meta?: { total_count?: number; total_pages?: number };
+}
+
+const MAX_ITEM_PAGES = 20; // hard cap so a misbehaving API can't loop forever
+
 /**
- * Line items for an opportunity — Current RMS calls these "opportunity items". The exact
- * collection endpoint/filter isn't published in full detail; this follows the documented
- * Ransack-style filtering convention (q[opportunity_id_eq]) used elsewhere in the API.
- * Verify field names against a real response once linked — raw data is preserved either way.
+ * Line items for an opportunity — Current RMS calls these "opportunity items". Per Current
+ * RMS's own API reference, these are nested under the opportunity rather than a flat
+ * filterable collection: GET /opportunities/{opportunity_id}/opportunity_items, paginated at
+ * up to 100 per page like the rest of the API.
  */
 export async function fetchOpportunityItems(
   config: Pick<CurrentRmsConfig, 'subdomain' | 'apiKey'>,
   rmsId: number
 ): Promise<RawOpportunityItem[]> {
-  const body = (await request(config, '/opportunity_items', {
-    'q[opportunity_id_eq]': rmsId,
-    per_page: 200,
-  })) as { opportunity_items?: RawOpportunityItem[] };
-  return body.opportunity_items ?? [];
+  const perPage = 100;
+  const all: RawOpportunityItem[] = [];
+  for (let page = 1; page <= MAX_ITEM_PAGES; page++) {
+    const body = (await request(config, `/opportunities/${rmsId}/opportunity_items`, {
+      page,
+      per_page: perPage,
+    })) as OpportunityItemsPage;
+    const items = body.opportunity_items ?? [];
+    all.push(...items);
+    const totalPages = body.meta?.total_pages;
+    if (items.length < perPage || (totalPages !== undefined && page >= totalPages)) break;
+  }
+  return all;
 }

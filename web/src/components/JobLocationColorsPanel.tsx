@@ -1,0 +1,122 @@
+import { useEffect, useState } from 'react';
+import { api, type LocationColorRule } from '../api/client';
+
+function contrastingText(hex: string): string {
+  const clean = hex.replace('#', '');
+  if (clean.length !== 6) return '#fff';
+  const r = parseInt(clean.slice(0, 2), 16) / 255;
+  const g = parseInt(clean.slice(2, 4), 16) / 255;
+  const b = parseInt(clean.slice(4, 6), 16) / 255;
+  const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  return luminance < 0.55 ? '#fff' : '#000';
+}
+
+/**
+ * Per-job location color overrides — for jobs whose patch uses stage location names that
+ * don't match the house defaults in Settings -> Location Colors (e.g. "Cube North", "Entrance
+ * Arch Top" instead of "Floor"/"Downstage"/etc). A rule added here only affects this job's PAL
+ * labels, and takes precedence over a global rule of the same name if one exists.
+ */
+export default function JobLocationColorsPanel({ jobId }: { jobId: string }) {
+  const [rules, setRules] = useState<LocationColorRule[]>([]);
+  const [location, setLocation] = useState('');
+  const [color, setColor] = useState('#1FA34C');
+  const [error, setError] = useState<string | null>(null);
+
+  const refresh = () => api.jobLocationColorRules.list(jobId).then(setRules).catch((e) => setError(e.message));
+
+  useEffect(() => {
+    refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jobId]);
+
+  const create = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    try {
+      await api.jobLocationColorRules.create(jobId, { location, color });
+      setLocation('');
+      refresh();
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  };
+
+  const updateColor = async (rule: LocationColorRule, value: string) => {
+    await api.jobLocationColorRules.update(jobId, rule.id, { color: value });
+    refresh();
+  };
+
+  const remove = async (id: string) => {
+    await api.jobLocationColorRules.remove(jobId, id);
+    refresh();
+  };
+
+  return (
+    <div>
+      <h4>Location colors (this job only)</h4>
+      <p className="muted">
+        Overrides/adds to the global defaults in{' '}
+        <a href="/settings/location-colors" target="_blank" rel="noreferrer">
+          Settings → Location Colors
+        </a>{' '}
+        for jobs whose patch uses different location names — match the location exactly as it
+        appears in this job's patch (case-insensitive).
+      </p>
+      <form className="row" onSubmit={create}>
+        <input
+          placeholder="Location (e.g. Cube North)"
+          value={location}
+          onChange={(e) => setLocation(e.target.value)}
+          required
+        />
+        <input type="color" value={color} onChange={(e) => setColor(e.target.value)} />
+        <button type="submit">Add override</button>
+      </form>
+      {error && <p className="error">{error}</p>}
+
+      {rules.length > 0 && (
+        <table style={{ marginTop: '0.75rem' }}>
+          <thead>
+            <tr>
+              <th>Location</th>
+              <th>Color</th>
+              <th>Preview</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {rules.map((r) => (
+              <tr key={r.id}>
+                <td>{r.location}</td>
+                <td>
+                  <input type="color" value={r.color} onChange={(e) => updateColor(r, e.target.value)} />
+                </td>
+                <td>
+                  <span
+                    style={{
+                      display: 'inline-block',
+                      padding: '0.25rem 0.75rem',
+                      borderRadius: 4,
+                      background: r.color,
+                      color: contrastingText(r.color),
+                      fontWeight: 600,
+                    }}
+                  >
+                    {r.location}
+                  </span>
+                </td>
+                <td>
+                  <button type="button" className="secondary" onClick={() => remove(r.id)}>
+                    Delete
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      {rules.length === 0 && <p className="muted">No overrides yet for this job.</p>}
+    </div>
+  );
+}
