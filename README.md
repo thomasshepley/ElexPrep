@@ -57,14 +57,35 @@ everything else in the original feature list is scoped for later phases (see bel
   produces the combined manual-print PDF.
 - **Docker deployment** — single container (API + UI + SQLite), one `data/` volume for all
   state; see `DEPLOY.md` for setup and a full pre-release test checklist.
+- **Current RMS integration** (Settings → Current RMS, admin-only):
+  - Configure your subdomain + API key, test the connection, and sync — opportunities are
+    cached locally (fast browsing, stays under Current RMS's 60-req/60s rate limit) and
+    refreshed automatically on a configurable poll interval.
+  - **Visibility model, exactly as requested**: only ADMIN can browse the raw opportunity
+    list. Importing one creates a private Job; an admin then marks it **Public** (Job
+    Settings) for USER/SIGNAGE to see it. Job lifecycle (create/delete/publish) is
+    admin-only, same as printer/user settings — USER operates on what's been published.
+  - A job's **Current RMS tab** shows the linked opportunity's status/dates/customer, a
+    live-fetched **pick list** ("opportunity items" in Current RMS's terms), and a manual
+    link/unlink control.
+  - **Change alerts**: the poller compares each synced opportunity's `updated_at` against
+    what was cached before; if a linked job's opportunity actually changed, the job gets a
+    dismissible alert badge (Jobs list, job tabs) and an activity log entry. This uses
+    polling rather than Current RMS's webhooks, deliberately — webhooks need your server to
+    be publicly reachable, which a home PC or office box behind NAT usually isn't; polling
+    works over an outbound-only connection regardless of network setup.
+  - Current RMS's exact field names for opportunities/opportunity items aren't fully
+    published; extraction follows their documented conventions and degrades gracefully
+    (raw API responses are always cached alongside the parsed fields), but is worth a
+    sanity check against your real account after entering the API key.
 
 ## What's deliberately deferred
 
-- Current RMS integration (linking a job to an opportunity, pulling pick lists, change alerts) —
-  the job record has a placeholder field for the opportunity ID only.
 - Live tray-value calibration against the physical ineo+ 3320i (PJL MEDIASOURCE values and
   SumatraPDF bin names are configurable in Printer Settings but need confirming on-site).
 - A GitHub Pages remote-drafting companion site.
+- Current RMS webhooks (inbound push notifications) as an alternative/supplement to polling,
+  for setups where the server is genuinely internet-reachable.
 
 ## Repo layout
 
