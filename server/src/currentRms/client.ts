@@ -67,11 +67,18 @@ export interface RawOpportunity {
   id: number;
   subject?: string;
   name?: string;
-  status?: string;
-  state?: string;
+  // Verified against a real account: status/state are integer codes with the human label
+  // in a sibling *_name field (e.g. status: 1, status_name: "Provisional").
+  status?: number;
+  status_name?: string;
+  state?: number;
+  state_name?: string;
   starts_at?: string;
   ends_at?: string;
   updated_at?: string;
+  member_id?: number | null;
+  // Not present on a real account's list/show response (only member_id is) — kept in case
+  // a future API version or an `include`-style param ever embeds it.
   member?: { name?: string; business_name?: string } | null;
   [key: string]: unknown;
 }
@@ -127,6 +134,32 @@ export async function fetchOpportunity(
   try {
     const body = (await request(config, `/opportunities/${rmsId}`)) as { opportunity?: RawOpportunity };
     return body.opportunity ?? null;
+  } catch (err) {
+    if (err instanceof CurrentRmsError && err.status === 404) return null;
+    throw err;
+  }
+}
+
+export interface RawMember {
+  id: number;
+  name?: string;
+  business_name?: string;
+  [key: string]: unknown;
+}
+
+/**
+ * Looked up on demand (e.g. when importing an opportunity as a job) rather than during bulk
+ * sync — the opportunities list only returns `member_id`, not an embedded record, and
+ * resolving every one during a sync of hundreds of opportunities would burn through the
+ * 60-req/60s rate limit for little benefit.
+ */
+export async function fetchMember(
+  config: Pick<CurrentRmsConfig, 'subdomain' | 'apiKey'>,
+  memberId: number
+): Promise<RawMember | null> {
+  try {
+    const body = (await request(config, `/members/${memberId}`)) as { member?: RawMember };
+    return body.member ?? null;
   } catch (err) {
     if (err instanceof CurrentRmsError && err.status === 404) return null;
     throw err;
