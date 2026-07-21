@@ -18,13 +18,7 @@ function App() {
         <div className="brand">ElexPrep</div>
         <nav>
           <NavLink to="/" end>Jobs</NavLink>
-          <NavLink to="/settings/fixture-types">Case Rules</NavLink>
-          <NavLink to="/settings/location-colors">Location Colors</NavLink>
-          <NavLink to="/settings/import-mapping">Import Mapping</NavLink>
-          {user.role === 'ADMIN' && <NavLink to="/settings/printer">Printer</NavLink>}
-          {user.role === 'ADMIN' && <NavLink to="/settings/current-rms">Current RMS</NavLink>}
-          {user.role === 'ADMIN' && <NavLink to="/settings/users">Users</NavLink>}
-          {user.role === 'ADMIN' && <NavLink to="/activity">Activity Log</NavLink>}
+          <NavLink to="/settings">Settings</NavLink>
           <NavLink to="/signage">Signage</NavLink>
         </nav>
         <div className="header-user">

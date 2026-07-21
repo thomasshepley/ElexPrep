@@ -39,9 +39,12 @@ everything else in the original feature list is scoped for later phases (see bel
   select what to confirm, then generate a combined print-ready PDF. A per-label copy cap (10)
   requires explicit override before a big batch is confirmed.
 - **Job logo upload**, shown on PAL labels and stored per job.
-- **Case-packing rules and printer tray routing** as basic settings/reference screens.
-- **Activity log** (append-only, admin-only) with user attribution for import/generate/confirm/
-  print/login/user-management actions.
+- **Settings area**: Case Rules, Location Colors, Import Mapping, Printer, Current RMS,
+  Users, and Activity Log all live under one **Settings** nav entry with its own sub-tabs,
+  instead of cluttering the main nav.
+- **Activity log** (Settings → Activity Log, admin-only): user attribution plus which job
+  each action belongs to (linked, with a graceful "(deleted job)" fallback), search, and a
+  per-job filter, for import/generate/confirm/print/login/user-management actions.
 - **Accounts & permissions**: cookie-session login, first-run admin setup, three roles —
   ADMIN (everything incl. user management + activity log), USER (normal prep work), SIGNAGE
   (view-only login for prep-bay TVs; the API rejects any write from it). Per-user display
