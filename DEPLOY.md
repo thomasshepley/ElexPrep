@@ -103,7 +103,9 @@ with a full batch.
 - **Ports**: change the left side of `4000:4000` in `docker-compose.yml` to expose a
   different port (e.g. `80:4000`).
 - **HTTPS**: for LAN-only office use, plain HTTP is usually fine; if you expose it wider,
-  put Caddy/nginx/Traefik in front.
+  put Caddy/nginx/Traefik in front and set `COOKIE_SECURE=true` in the environment so the
+  session cookie is only sent over TLS. Leave it `false` (the default) for plain HTTP —
+  a secure cookie is silently dropped by the browser otherwise, which breaks login.
 - **Backups**: stop the container (`docker compose stop`), copy `data/`, start it again —
   or just copy `data/` live; SQLite single-writer usage here makes that low-risk.
 - **Without Docker**: `npm install && npm run build` then
