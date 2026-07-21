@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { prisma, logActivity } from '../db';
-import { hashPassword, requireRole, toAuthedUser } from '../auth';
+import { MIN_PASSWORD_LENGTH, hashPassword, requireRole, toAuthedUser } from '../auth';
 
 export const usersRouter = Router();
 
@@ -14,6 +14,9 @@ usersRouter.get('/', async (_req, res) => {
 usersRouter.post('/', async (req, res) => {
   const { username, password, displayName, role } = req.body ?? {};
   if (!username || !password) return res.status(400).json({ error: 'username and password are required' });
+  if (password.length < MIN_PASSWORD_LENGTH) {
+    return res.status(400).json({ error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters` });
+  }
   if (role && !['ADMIN', 'USER', 'SIGNAGE'].includes(role)) {
     return res.status(400).json({ error: 'role must be ADMIN, USER, or SIGNAGE' });
   }
@@ -38,6 +41,9 @@ usersRouter.put('/:id', async (req, res) => {
   }
   if (role && role !== 'ADMIN' && req.params.id === req.user!.id) {
     return res.status(400).json({ error: 'You cannot remove your own admin role' });
+  }
+  if (password !== undefined && password.length < MIN_PASSWORD_LENGTH) {
+    return res.status(400).json({ error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters` });
   }
   const user = await prisma.user.update({
     where: { id: req.params.id },

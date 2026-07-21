@@ -17,6 +17,8 @@ const upload = multer({
       cb(null, `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`);
     },
   }),
+  fileFilter: (_req, file, cb) => cb(null, file.mimetype.startsWith('image/')),
+  limits: { fileSize: 10 * 1024 * 1024 },
 });
 
 export const jobsRouter = Router();
