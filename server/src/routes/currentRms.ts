@@ -3,7 +3,7 @@ import { prisma, logActivity } from '../db';
 import { requireRole } from '../auth';
 import { DEFAULT_CURRENT_RMS_CONFIG, getCurrentRmsConfig, saveCurrentRmsConfig, toPublicConfig } from '../currentRms/config';
 import { testCurrentRmsConnection, fetchOpportunityItems } from '../currentRms/client';
-import { runCurrentRmsSync, restartCurrentRmsPolling } from '../currentRms/sync';
+import { runCurrentRmsSync, restartCurrentRmsPolling, resolveAndCacheMemberName } from '../currentRms/sync';
 
 export const currentRmsRouter = Router();
 
@@ -79,10 +79,12 @@ currentRmsRouter.post('/opportunities/:rmsId/import', async (req, res) => {
   const existingJob = await prisma.job.findFirst({ where: { currentRmsOpportunityId: String(rmsId) } });
   if (existingJob) return res.status(409).json({ error: 'A job is already linked to this opportunity', job: existingJob });
 
+  const venue = await resolveAndCacheMemberName(await getCurrentRmsConfig(), opp);
+
   const job = await prisma.job.create({
     data: {
       name: opp.subject,
-      venue: opp.memberName,
+      venue,
       currentRmsOpportunityId: String(rmsId),
     },
   });
@@ -109,6 +111,10 @@ jobCurrentRmsRouter.get('/:jobId/current-rms', async (req, res) => {
   const opp = await prisma.currentRmsOpportunity.findUnique({
     where: { rmsId: Number(job.currentRmsOpportunityId) },
   });
+  if (opp && !opp.memberName) {
+    const memberName = await resolveAndCacheMemberName(await getCurrentRmsConfig(), opp);
+    if (memberName) opp.memberName = memberName;
+  }
   res.json({ linked: true, opportunity: opp, rmsAlertAt: job.rmsAlertAt });
 });
 

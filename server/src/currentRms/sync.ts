@@ -1,6 +1,7 @@
 import { prisma, logActivity } from '../db';
-import { getCurrentRmsConfig, saveCurrentRmsConfig } from './config';
-import { fetchAllOpportunities, RawOpportunity } from './client';
+import { getCurrentRmsConfig, saveCurrentRmsConfig, CurrentRmsConfig } from './config';
+import { fetchAllOpportunities, fetchMember, RawOpportunity } from './client';
+import type { CurrentRmsOpportunity } from '@prisma/client';
 
 function toDate(value: string | undefined): Date | null {
   if (!value) return null;
@@ -12,10 +13,47 @@ function extractSubject(raw: RawOpportunity): string {
   return raw.subject || raw.name || `Opportunity #${raw.id}`;
 }
 
+/**
+ * Current RMS's list endpoint returns status/state as integer codes (e.g. `status: 1`) with
+ * the human label in a sibling `*_name` field (`status_name: "Provisional"`) — verified
+ * against a real account. Prefer the name; fall back to stringifying the code if it's ever
+ * missing, since the column is a plain string and a raw number would fail to save.
+ */
+function extractStatus(raw: RawOpportunity): string | null {
+  const value = raw.status_name ?? raw.state_name ?? raw.status ?? raw.state;
+  return value === null || value === undefined ? null : String(value);
+}
+
+/**
+ * The opportunities list endpoint doesn't embed the customer record (just `member_id`) on
+ * a real account, so this is usually null from sync alone — see fetchOpportunityMemberName
+ * for the richer single-opportunity lookup used when importing one as a job.
+ */
 function extractMemberName(raw: RawOpportunity): string | null {
   const member = raw.member;
   if (!member) return null;
   return member.business_name || member.name || null;
+}
+
+/**
+ * The opportunities list endpoint only returns `member_id` on a real account, not an
+ * embedded customer record, so `memberName` is usually null straight out of sync. This
+ * resolves it with one extra request the first time an opportunity is actually looked at
+ * (imported, or its job's Current RMS tab opened) and caches the result so it's free after.
+ */
+export async function resolveAndCacheMemberName(
+  config: Pick<CurrentRmsConfig, 'subdomain' | 'apiKey'>,
+  opp: CurrentRmsOpportunity
+): Promise<string | null> {
+  if (opp.memberName) return opp.memberName;
+  const raw = JSON.parse(opp.rawJson) as { member_id?: number | null };
+  if (!raw.member_id) return null;
+  const member = await fetchMember(config, raw.member_id).catch(() => null);
+  const name = member?.business_name || member?.name || null;
+  if (name) {
+    await prisma.currentRmsOpportunity.update({ where: { id: opp.id }, data: { memberName: name } });
+  }
+  return name;
 }
 
 let syncing = false;
@@ -63,7 +101,7 @@ export async function runCurrentRmsSync(): Promise<SyncResult> {
         create: {
           rmsId: raw.id,
           subject: extractSubject(raw),
-          status: raw.status ?? raw.state ?? null,
+          status: extractStatus(raw),
           memberName: extractMemberName(raw),
           startsAt: toDate(raw.starts_at),
           endsAt: toDate(raw.ends_at),
@@ -72,7 +110,7 @@ export async function runCurrentRmsSync(): Promise<SyncResult> {
         },
         update: {
           subject: extractSubject(raw),
-          status: raw.status ?? raw.state ?? null,
+          status: extractStatus(raw),
           memberName: extractMemberName(raw),
           startsAt: toDate(raw.starts_at),
           endsAt: toDate(raw.ends_at),
