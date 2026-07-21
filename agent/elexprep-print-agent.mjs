@@ -21,7 +21,14 @@ if (!existsSync(configPath)) {
   console.error('Copy agent-config.example.json to agent-config.json and fill it in.');
   process.exit(1);
 }
-const config = JSON.parse(readFileSync(configPath, 'utf-8'));
+let config;
+try {
+  config = JSON.parse(readFileSync(configPath, 'utf-8'));
+} catch (err) {
+  console.error(`Could not parse ${configPath} as JSON: ${err.message}`);
+  console.error('Check for a stray trailing comma or missing quote and try again.');
+  process.exit(1);
+}
 
 const SERVER_URL = (config.serverUrl ?? '').replace(/\/+$/, '');
 const TOKEN = config.agentToken ?? '';
@@ -31,6 +38,11 @@ const PRINT_TIMEOUT_MS = (config.printTimeoutSeconds ?? 120) * 1000;
 
 if (!SERVER_URL || !TOKEN) {
   console.error('serverUrl and agentToken must be set in agent-config.json');
+  process.exit(1);
+}
+if (!existsSync(SUMATRA)) {
+  console.error(`SumatraPDF not found at: ${SUMATRA}`);
+  console.error('Install it from https://www.sumatrapdfreader.org, or set the correct path as "sumatraPath" in agent-config.json.');
   process.exit(1);
 }
 
@@ -84,6 +96,12 @@ function printPdf(pdfPath, printerName, bin) {
 
 async function handleJob(job) {
   log(`Printing job ${job.id}: ${job.labelType} (${job.pages}p) → ${job.printerName} bin=${job.bin || 'default'}`);
+  if (!job.printerName) {
+    const msg = 'No Windows printer name configured in ElexPrep → Printer Settings';
+    log(`Job ${job.id} FAILED: ${msg}`);
+    await reportComplete(job.id, false, msg);
+    return;
+  }
   const dir = mkdtempSync(join(tmpdir(), 'elexprep-'));
   const pdfPath = join(dir, `${job.id}.pdf`);
   try {
@@ -99,19 +117,30 @@ async function handleJob(job) {
   }
 }
 
+let stopping = false;
+process.on('SIGINT', () => {
+  log('Stopping (Ctrl+C) — finishing the current job, if any, then exiting...');
+  stopping = true;
+});
+process.on('SIGTERM', () => {
+  stopping = true;
+});
+
 async function main() {
   log(`ElexPrep print agent started — server ${SERVER_URL}, polling every ${POLL_MS / 1000}s`);
-  for (;;) {
+  while (!stopping) {
     try {
       let job;
-      while ((job = await claimJob())) {
+      while (!stopping && (job = await claimJob())) {
         await handleJob(job);
       }
     } catch (err) {
       log(`Poll error: ${err.message}`);
     }
+    if (stopping) break;
     await new Promise((r) => setTimeout(r, POLL_MS));
   }
+  log('Stopped.');
 }
 
 main();
