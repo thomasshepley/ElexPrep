@@ -109,3 +109,45 @@ patchRouter.get('/:jobId/fixtures', async (req, res) => {
   });
   res.json(fixtures);
 });
+
+const FIXTURE_EDITABLE_FIELDS = [
+  'address',
+  'fixtureType',
+  'mainUniverse',
+  'mainAddress',
+  'pixUniverse',
+  'pixAddress',
+  'mode',
+  'location',
+] as const;
+
+patchRouter.put('/:jobId/fixtures/:id', async (req, res) => {
+  const data: Record<string, unknown> = {};
+  for (const field of FIXTURE_EDITABLE_FIELDS) {
+    if (req.body?.[field] === undefined) continue;
+    const value = req.body[field];
+    if (field === 'address') {
+      const n = Number(value);
+      if (value === '' || value === null || !Number.isFinite(n)) {
+        return res.status(400).json({ error: 'address is required and must be a number' });
+      }
+      data.address = n;
+    } else if (['mainUniverse', 'mainAddress', 'pixUniverse', 'pixAddress'].includes(field)) {
+      data[field] = value === '' || value === null ? null : Number(value);
+    } else if (field === 'fixtureType') {
+      if (!value || !String(value).trim()) {
+        return res.status(400).json({ error: 'fixtureType is required' });
+      }
+      data.fixtureType = value;
+    } else {
+      data[field] = value === '' ? null : value;
+    }
+  }
+  const fixture = await prisma.fixture.update({ where: { id: req.params.id }, data });
+  res.json(fixture);
+});
+
+patchRouter.delete('/:jobId/fixtures/:id', async (req, res) => {
+  await prisma.fixture.delete({ where: { id: req.params.id } });
+  res.status(204).end();
+});

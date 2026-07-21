@@ -26,8 +26,13 @@ export default function FixtureTypeRulesPage() {
     }
   };
 
-  const updateUnits = async (rule: FixtureTypeRule, value: number) => {
-    await api.fixtureTypeRules.update(rule.id, { unitsPerCase: value });
+  const update = async (
+    rule: FixtureTypeRule,
+    field: 'name' | 'unitsPerCase' | 'caseLabelOverride',
+    value: string | number
+  ) => {
+    if (value === (rule[field] ?? '')) return;
+    await api.fixtureTypeRules.update(rule.id, { [field]: value });
     refresh();
   };
 
@@ -42,7 +47,8 @@ export default function FixtureTypeRulesPage() {
       <p className="muted">
         Defines how many units of each fixture type go in a case, e.g. AstraBlade in pairs
         (201 + 202, 203 + 204…), Reflecta in threes (401 - 403), Viper Profile one per case.
-        A fixture type with no rule here defaults to one unit per case.
+        A fixture type with no rule here defaults to one unit per case. Every field below is
+        editable in place (click and type, saves on blur).
       </p>
       <div className="panel">
         <h3>Add rule</h3>
@@ -66,20 +72,30 @@ export default function FixtureTypeRulesPage() {
           <tr>
             <th>Fixture type</th>
             <th>Units per case</th>
+            <th>Case label override</th>
             <th></th>
           </tr>
         </thead>
         <tbody>
           {rules.map((r) => (
             <tr key={r.id}>
-              <td>{r.name}</td>
+              <td>
+                <input defaultValue={r.name} onBlur={(e) => update(r, 'name', e.target.value)} />
+              </td>
               <td>
                 <input
                   type="number"
                   min={1}
                   defaultValue={r.unitsPerCase}
                   style={{ width: 70 }}
-                  onBlur={(e) => updateUnits(r, Number(e.target.value))}
+                  onBlur={(e) => update(r, 'unitsPerCase', Number(e.target.value))}
+                />
+              </td>
+              <td>
+                <input
+                  placeholder="(uses fixture type)"
+                  defaultValue={r.caseLabelOverride ?? ''}
+                  onBlur={(e) => update(r, 'caseLabelOverride', e.target.value)}
                 />
               </td>
               <td>

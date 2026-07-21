@@ -14,6 +14,25 @@ export default function PatchImportPanel({ jobId }: { jobId: string }) {
 
   const loadFixtures = () => api.patch.fixtures(jobId).then(setFixtures);
 
+  const updateFixture = async (f: Fixture, field: keyof Fixture, rawValue: string) => {
+    const isNumeric = ['address', 'mainUniverse', 'mainAddress', 'pixUniverse', 'pixAddress'].includes(field);
+    const value = isNumeric ? (rawValue === '' ? null : Number(rawValue)) : rawValue || null;
+    if (value === (f[field] ?? null)) return;
+    try {
+      await api.patch.updateFixture(jobId, f.id, { [field]: value } as Partial<Fixture>);
+      loadFixtures();
+    } catch (e) {
+      alert((e as Error).message);
+      loadFixtures();
+    }
+  };
+
+  const removeFixture = async (id: string) => {
+    if (!confirm('Delete this fixture?')) return;
+    await api.patch.removeFixture(jobId, id);
+    loadFixtures();
+  };
+
   const onFile = async (file: File) => {
     setError(null);
     try {
@@ -131,30 +150,96 @@ export default function PatchImportPanel({ jobId }: { jobId: string }) {
         {!fixtures && <p className="muted">Not loaded yet.</p>}
         {fixtures && fixtures.length === 0 && <p className="muted">No fixtures imported yet.</p>}
         {fixtures && fixtures.length > 0 && (
-          <table>
-            <thead>
-              <tr>
-                <th>Address</th>
-                <th>Type</th>
-                <th>Main</th>
-                <th>Pix</th>
-                <th>Mode</th>
-                <th>Location</th>
-              </tr>
-            </thead>
-            <tbody>
-              {fixtures.map((f) => (
-                <tr key={f.id}>
-                  <td>{f.address}</td>
-                  <td>{f.fixtureType}</td>
-                  <td>{f.mainUniverse != null ? `Uni ${f.mainUniverse} / ${f.mainAddress}` : ''}</td>
-                  <td>{f.pixUniverse != null ? `Uni ${f.pixUniverse} / ${f.pixAddress}` : ''}</td>
-                  <td>{f.mode}</td>
-                  <td>{f.location}</td>
+          <>
+            <p className="muted">Every field is editable in place (click and type, saves on blur).</p>
+            <table>
+              <thead>
+                <tr>
+                  <th>Address</th>
+                  <th>Type</th>
+                  <th>Main Uni</th>
+                  <th>Main Addr</th>
+                  <th>Pix Uni</th>
+                  <th>Pix Addr</th>
+                  <th>Mode</th>
+                  <th>Location</th>
+                  <th></th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {fixtures.map((f) => (
+                  <tr key={f.id}>
+                    <td>
+                      <input
+                        type="number"
+                        defaultValue={f.address}
+                        style={{ width: 60 }}
+                        onBlur={(e) => updateFixture(f, 'address', e.target.value)}
+                      />
+                    </td>
+                    <td>
+                      <input
+                        defaultValue={f.fixtureType}
+                        style={{ width: 120 }}
+                        onBlur={(e) => updateFixture(f, 'fixtureType', e.target.value)}
+                      />
+                    </td>
+                    <td>
+                      <input
+                        type="number"
+                        defaultValue={f.mainUniverse ?? ''}
+                        style={{ width: 55 }}
+                        onBlur={(e) => updateFixture(f, 'mainUniverse', e.target.value)}
+                      />
+                    </td>
+                    <td>
+                      <input
+                        type="number"
+                        defaultValue={f.mainAddress ?? ''}
+                        style={{ width: 55 }}
+                        onBlur={(e) => updateFixture(f, 'mainAddress', e.target.value)}
+                      />
+                    </td>
+                    <td>
+                      <input
+                        type="number"
+                        defaultValue={f.pixUniverse ?? ''}
+                        style={{ width: 55 }}
+                        onBlur={(e) => updateFixture(f, 'pixUniverse', e.target.value)}
+                      />
+                    </td>
+                    <td>
+                      <input
+                        type="number"
+                        defaultValue={f.pixAddress ?? ''}
+                        style={{ width: 55 }}
+                        onBlur={(e) => updateFixture(f, 'pixAddress', e.target.value)}
+                      />
+                    </td>
+                    <td>
+                      <input
+                        defaultValue={f.mode ?? ''}
+                        style={{ width: 100 }}
+                        onBlur={(e) => updateFixture(f, 'mode', e.target.value)}
+                      />
+                    </td>
+                    <td>
+                      <input
+                        defaultValue={f.location ?? ''}
+                        style={{ width: 90 }}
+                        onBlur={(e) => updateFixture(f, 'location', e.target.value)}
+                      />
+                    </td>
+                    <td>
+                      <button className="secondary" onClick={() => removeFixture(f.id)}>
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </>
         )}
       </div>
     </div>
