@@ -9,6 +9,7 @@ import SignagePage from './pages/SignagePage'
 import JobsListPage from './pages/JobsListPage'
 import JobDetailPage from './pages/JobDetailPage'
 import FixtureTypeRulesPage from './pages/FixtureTypeRulesPage'
+import LocationColorsPage from './pages/LocationColorsPage'
 import ImportMappingPage from './pages/ImportMappingPage'
 import UsersPage from './pages/UsersPage'
 import PreferencesPage from './pages/PreferencesPage'
@@ -27,6 +28,7 @@ createRoot(document.getElementById('root')!).render(
             <Route index element={<JobsListPage />} />
             <Route path="jobs/:jobId" element={<JobDetailPage />} />
             <Route path="settings/fixture-types" element={<FixtureTypeRulesPage />} />
+            <Route path="settings/location-colors" element={<LocationColorsPage />} />
             <Route path="settings/import-mapping" element={<ImportMappingPage />} />
             <Route path="settings/users" element={<UsersPage />} />
             <Route path="settings/printer" element={<PrinterSettingsPage />} />

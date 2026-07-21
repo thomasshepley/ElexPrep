@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { prisma, logActivity } from '../db';
 import { MAX_COPIES_WITHOUT_OVERRIDE } from '../constants';
-import { buildCombinedPdf, collectConfirmedContent } from '../printing/buildLabelPdfs';
+import { buildCombinedPdf, collectConfirmedContent, collectPendingContent } from '../printing/buildLabelPdfs';
 import { createPrintJobs } from '../printing/printJobService';
 import { getPrinterSettings } from '../printing/printerSettings';
 
@@ -86,6 +86,25 @@ printQueueRouter.get('/:jobId/print-queue', async (req, res) => {
     queue: queue.map((q) => ({ ...q, content: JSON.parse(q.contentJson) })),
     adHoc: adHoc.map((a) => ({ ...a, content: JSON.parse(a.contentJson) })),
   });
+});
+
+/**
+ * Renders the current PENDING queue + ad hoc labels — i.e. exactly what "Confirm & send to
+ * printer" / "Confirm & download PDF" are about to act on — as an actual PDF, so the browser
+ * shows the real print output (colors, logo, layout) rather than a text summary. Read-only:
+ * no status changes, safe to hit on every edit.
+ */
+printQueueRouter.get('/:jobId/print-queue/preview.pdf', async (req, res) => {
+  const { jobId } = req.params;
+  const byType = await collectPendingContent(jobId);
+  const total = Object.values(byType).reduce((n, items) => n + items.length, 0);
+  if (total === 0) {
+    return res.status(400).json({ error: 'Nothing queued to preview yet' });
+  }
+  const pdf = await buildCombinedPdf(jobId, byType);
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', 'inline; filename="preview.pdf"');
+  res.send(pdf);
 });
 
 printQueueRouter.put('/:jobId/print-queue/:id', async (req, res) => {
