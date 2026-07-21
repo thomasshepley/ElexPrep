@@ -38,5 +38,8 @@ ENV PORT=4000
 VOLUME /data
 EXPOSE 4000
 
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+  CMD node -e "fetch('http://localhost:4000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+
 WORKDIR /app/server
 CMD ["sh", "-c", "npx prisma migrate deploy && node dist/index.js"]

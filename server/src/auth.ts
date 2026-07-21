@@ -24,6 +24,7 @@ declare global {
 
 export const SESSION_COOKIE = 'elexprep_session';
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+export const MIN_PASSWORD_LENGTH = 8;
 
 export function hashPassword(password: string): string {
   return bcrypt.hashSync(password, 10);

@@ -6,6 +6,7 @@ import 'express-async-errors';
 import { Prisma } from '@prisma/client';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
+import multer from 'multer';
 import { authMiddleware } from './auth';
 import { authRouter } from './routes/auth';
 import { usersRouter } from './routes/users';
@@ -69,6 +70,10 @@ app.use((err: unknown, req: Request, res: Response, _next: NextFunction) => {
   if (err instanceof Prisma.PrismaClientKnownRequestError) {
     if (err.code === 'P2025') return res.status(404).json({ error: 'Not found' });
     if (err.code === 'P2002') return res.status(409).json({ error: 'Already exists' });
+  }
+  if (err instanceof multer.MulterError) {
+    if (err.code === 'LIMIT_FILE_SIZE') return res.status(413).json({ error: 'File is too large' });
+    return res.status(400).json({ error: err.message });
   }
   console.error(`Unhandled error on ${req.method} ${req.path}:`, err);
   res.status(500).json({ error: 'Internal server error' });

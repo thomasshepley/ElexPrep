@@ -146,6 +146,11 @@ Swapping SQLite for Postgres later is just an env var change (`DATABASE_URL`) pl
 `prisma migrate deploy` — nothing in the app code is SQLite-specific (enums are stored as plain
 strings for SQLite compatibility and validated at the application layer).
 
+Run `npm test` from the repo root for the automated test suite (currently unit tests for the
+case-packing algorithm — the core business logic in `shared/src/casePacking.ts`); most other
+verification in this project has been manual (curl + Playwright) rather than an exhaustive
+automated suite.
+
 ## Label geometry
 
 `shared/src/labelGeometry.ts` holds the physical sheet layouts (page size, cell positions/sizes)

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import { prisma, logActivity } from '../db';
 import {
+  MIN_PASSWORD_LENGTH,
   SESSION_COOKIE,
   createSession,
   destroySession,
@@ -43,6 +44,9 @@ authRouter.post('/setup', async (req, res) => {
   if (userCount > 0) return res.status(403).json({ error: 'Setup already completed' });
   const { username, password, displayName } = req.body ?? {};
   if (!username || !password) return res.status(400).json({ error: 'username and password are required' });
+  if (password.length < MIN_PASSWORD_LENGTH) {
+    return res.status(400).json({ error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters` });
+  }
   const user = await prisma.user.create({
     data: {
       username,
@@ -90,6 +94,9 @@ authRouter.put('/me', async (req, res) => {
   if (displayName !== undefined) data.displayName = displayName;
   if (prefs !== undefined) data.prefsJson = JSON.stringify(prefs);
   if (password !== undefined) {
+    if (password.length < MIN_PASSWORD_LENGTH) {
+      return res.status(400).json({ error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters` });
+    }
     const user = await prisma.user.findUnique({ where: { id: req.user.id } });
     if (!user || !currentPassword || !verifyPassword(currentPassword, user.passwordHash)) {
       return res.status(403).json({ error: 'Current password is incorrect' });
