@@ -5,6 +5,9 @@ services:
     restart: unless-stopped
     ports:
       - "4000:4000"
+    # environment:
+    #   Only needed if you put a TLS-terminating reverse proxy in front of this container.
+    #   - COOKIE_SECURE=true
     volumes:
       # Database, logos, plots, and generated print-job PDFs all live here —
       # back this folder up and the whole app state comes with it.

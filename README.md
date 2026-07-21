@@ -1,13 +1,10 @@
 # ElexPrep
 
 A prep portal for Elex Lighting: turns a Wysiwyg patch CSV into printed labels (fixture,
-truss/spike, cable, PAL case, rack), and is the planned home for job/plot management, Current
-RMS integration, and prep-bay digital signage.
+truss/spike, cable, PAL case, rack), and is the home for job/plot management, Current RMS
+integration, printer control, and prep-bay digital signage.
 
-This is **phase 1** of a multi-phase build. Phase 1 delivers the core label engine end-to-end;
-everything else in the original feature list is scoped for later phases (see below).
-
-## What's built (phase 1)
+## What's built
 
 - **CSV patch import** using a column mapping configured once in Settings → Import Mapping
   (the export format is normally identical between jobs, so imports don't re-prompt; upload a
@@ -38,6 +35,20 @@ everything else in the original feature list is scoped for later phases (see bel
   (personal Peli cases, generic equipment, spare cable runs...), edit quantities, remove items,
   select what to confirm, then generate a combined print-ready PDF. A per-label copy cap (10)
   requires explicit override before a big batch is confirmed.
+- **Everything is editable in place, everywhere** — no page requires deleting and re-adding a
+  row to fix a typo:
+  - Imported fixtures: every column (address, type, universes/addresses, mode, location),
+    plus per-row delete, straight in the Patch Import table.
+  - Cases: fixture type/label/location edit inline, delete individual rows, or add a manual
+    case (e.g. a spare/hand case that didn't come from the patch) alongside the generated
+    ones. Regenerating from the patch (destructive) warns first if it would wipe out manual
+    edits or additions.
+  - Fixture type rules: name and case label override edit inline.
+  - Ad hoc labels: quantity edits inline.
+  - Location colors: color edits inline via a color picker.
+- **Jobs list**: search by name/venue, admin-only delete (cleans up the job's fixtures, cases,
+  plots, print-job history, and every uploaded file — logo, plot PDFs, print-job PDFs — so
+  nothing is left orphaned on disk or in the database).
 - **Job logo upload**, shown on PAL labels and stored per job.
 - **Settings area**: Case Rules, Location Colors, Import Mapping, Printer, Current RMS,
   Users, and Activity Log all live under one **Settings** nav entry with its own sub-tabs,
@@ -90,6 +101,11 @@ everything else in the original feature list is scoped for later phases (see bel
     published; extraction follows their documented conventions and degrades gracefully
     (raw API responses are always cached alongside the parsed fields), but is worth a
     sanity check against your real account after entering the API key.
+- **Hardening**: unhandled errors (a bad ID in a URL, a duplicate name, etc.) return a
+  proper JSON error response instead of hanging the request — Prisma's "not found" and
+  "already exists" cases map to 404/409 specifically. The login endpoint is rate-limited
+  (20 attempts / 15 min per IP) against password guessing, and the session cookie's
+  `secure` flag is configurable via `COOKIE_SECURE` for HTTPS deployments.
 
 ## What's deliberately deferred
 
@@ -98,6 +114,8 @@ everything else in the original feature list is scoped for later phases (see bel
 - A GitHub Pages remote-drafting companion site.
 - Current RMS webhooks (inbound push notifications) as an alternative/supplement to polling,
   for setups where the server is genuinely internet-reachable.
+- Rack labels use a placeholder layout — no physical template was supplied for these yet, so
+  the geometry hasn't been measured against a real one like the other four label types.
 
 ## Repo layout
 

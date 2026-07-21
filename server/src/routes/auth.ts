@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import rateLimit from 'express-rate-limit';
 import { prisma, logActivity } from '../db';
 import {
   SESSION_COOKIE,
@@ -11,7 +12,25 @@ import {
 
 export const authRouter = Router();
 
-const COOKIE_OPTS = { httpOnly: true, sameSite: 'lax' as const, path: '/' };
+// COOKIE_SECURE opts in for HTTPS deployments; left off by default since a common
+// deployment here is a LAN/home box over plain HTTP, where a secure cookie would silently
+// never get set by the browser.
+const COOKIE_OPTS = {
+  httpOnly: true,
+  sameSite: 'lax' as const,
+  path: '/',
+  secure: process.env.COOKIE_SECURE === 'true',
+};
+
+// Slows down password-guessing without needing external state (per-process, resets on
+// restart) — generous enough not to lock out someone who just mistypes a few times.
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many attempts — wait a while and try again' },
+});
 
 authRouter.get('/status', async (_req, res) => {
   const userCount = await prisma.user.count();
@@ -38,7 +57,7 @@ authRouter.post('/setup', async (req, res) => {
   res.status(201).json(toAuthedUser(user));
 });
 
-authRouter.post('/login', async (req, res) => {
+authRouter.post('/login', loginLimiter, async (req, res) => {
   const { username, password } = req.body ?? {};
   if (!username || !password) return res.status(400).json({ error: 'username and password are required' });
   const user = await prisma.user.findUnique({ where: { username } });

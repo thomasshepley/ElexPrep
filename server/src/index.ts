@@ -1,7 +1,9 @@
 import 'dotenv/config';
 import path from 'path';
 import fs from 'fs';
-import express from 'express';
+import express, { NextFunction, Request, Response } from 'express';
+import 'express-async-errors';
+import { Prisma } from '@prisma/client';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import { authMiddleware } from './auth';
@@ -59,6 +61,18 @@ if (fs.existsSync(path.join(webDist, 'index.html'))) {
   app.get(/^(?!\/api\/).*/, (_req, res) => res.sendFile(path.join(webDist, 'index.html')));
   console.log(`Serving web UI from ${webDist}`);
 }
+
+// Catches errors thrown/rejected anywhere in a route (express-async-errors forwards them
+// here instead of the default Express 4 behavior of hanging the request). Prisma's known
+// error codes get a proper status instead of a generic 500.
+app.use((err: unknown, req: Request, res: Response, _next: NextFunction) => {
+  if (err instanceof Prisma.PrismaClientKnownRequestError) {
+    if (err.code === 'P2025') return res.status(404).json({ error: 'Not found' });
+    if (err.code === 'P2002') return res.status(409).json({ error: 'Already exists' });
+  }
+  console.error(`Unhandled error on ${req.method} ${req.path}:`, err);
+  res.status(500).json({ error: 'Internal server error' });
+});
 
 const port = Number(process.env.PORT ?? 4000);
 app.listen(port, '0.0.0.0', () => {
