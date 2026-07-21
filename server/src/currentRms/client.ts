@@ -92,6 +92,13 @@ export async function testCurrentRmsConnection(config: Pick<CurrentRmsConfig, 's
   await request(config, '/opportunities', { per_page: 1 });
 }
 
+// GET /opportunities' own documented cap is 25 (lower than the general 100/page rule
+// elsewhere in the API — "this endpoint can return a lot of data"). Requesting more than the
+// endpoint honors would silently truncate each page while our pagination-termination check
+// (items.length < perPage) still compared against the larger requested value, so it would
+// stop after the very first page and quietly miss anything beyond the first 25.
+const OPPORTUNITIES_PER_PAGE = 25;
+
 /** A single page of opportunities, most-recently-updated first. */
 export async function fetchOpportunitiesPage(
   config: Pick<CurrentRmsConfig, 'subdomain' | 'apiKey'>,
@@ -99,8 +106,13 @@ export async function fetchOpportunitiesPage(
 ): Promise<OpportunitiesPage> {
   const params: Record<string, string | number | undefined> = {
     page: opts.page,
-    per_page: opts.perPage ?? 50,
-    sort: 'updated_at desc',
+    per_page: opts.perPage ?? OPPORTUNITIES_PER_PAGE,
+    // Explicit rather than relying on whatever this endpoint defaults to when omitted — we
+    // want every opportunity cached (including completed/cancelled ones still worth
+    // browsing), not just whatever a narrower default filtermode would return.
+    filtermode: 'all',
+    // Current RMS uses Ransack-style sort params (q[s][]=field direction), not a bare `sort`.
+    'q[s][]': 'updated_at desc',
   };
   if (opts.updatedSince) params['q[updated_at_gteq]'] = opts.updatedSince;
   const body = (await request(config, '/opportunities', params)) as OpportunitiesPage;
@@ -114,7 +126,7 @@ export async function fetchAllOpportunities(
   config: Pick<CurrentRmsConfig, 'subdomain' | 'apiKey'>,
   opts: { updatedSince?: string; onPage?: (page: RawOpportunity[], pageNum: number) => void } = {}
 ): Promise<RawOpportunity[]> {
-  const perPage = 50;
+  const perPage = OPPORTUNITIES_PER_PAGE;
   const all: RawOpportunity[] = [];
   for (let page = 1; page <= MAX_SYNC_PAGES; page++) {
     const result = await fetchOpportunitiesPage(config, { page, perPage, updatedSince: opts.updatedSince });
