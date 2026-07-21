@@ -16,7 +16,14 @@ model Job {
   name        String
   venue       String?
   logoPath    String?
-  currentRmsOpportunityId String?
+  /// Visible to USER/SIGNAGE roles only when true; ADMIN always sees every job.
+  isPublic    Boolean  @default(false)
+
+  currentRmsOpportunityId  String?
+  /// Set by the sync poller when the linked opportunity's updated_at moves forward;
+  /// cleared (set to null) when a viewer acknowledges it. Null = no outstanding alert.
+  rmsAlertAt               DateTime?
+
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -170,4 +177,25 @@ model Plot {
   createdAt    DateTime @default(now())
 
   @@index([jobId])
+}
+
+/// Local cache of Current RMS opportunities, refreshed by the poller (or a manual sync).
+/// Kept separate from Job so browsing/searching all opportunities never has to hit the
+/// live API, and stays fast under Current RMS's 60-req/60s rate limit. rawJson holds the
+/// full API response for a given opportunity — field extraction below is a best-effort
+/// read of the documented conventions, to be verified against a real account once linked;
+/// raw data is never discarded even if a specific field turns out to be named differently.
+model CurrentRmsOpportunity {
+  id           String    @id @default(cuid())
+  rmsId        Int       @unique
+  subject      String
+  status       String?
+  memberName   String?
+  startsAt     DateTime?
+  endsAt       DateTime?
+  rmsUpdatedAt DateTime?
+  rawJson      String
+  syncedAt     DateTime  @updatedAt
+
+  @@index([rmsId])
 }

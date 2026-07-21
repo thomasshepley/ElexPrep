@@ -18,6 +18,8 @@ import { plotsRouter } from './routes/plots';
 import { printJobsRouter, printerSettingsRouter } from './routes/printJobs';
 import { agentRouter } from './routes/agent';
 import { activityRouter } from './routes/activity';
+import { currentRmsRouter, jobCurrentRmsRouter } from './routes/currentRms';
+import { restartCurrentRmsPolling } from './currentRms/sync';
 
 const app = express();
 app.use(cors({ origin: true, credentials: true }));
@@ -37,6 +39,8 @@ app.use('/api/jobs', casesRouter);
 app.use('/api/jobs', adHocLabelsRouter);
 app.use('/api/jobs', printQueueRouter);
 app.use('/api/jobs', plotsRouter);
+app.use('/api/jobs', jobCurrentRmsRouter);
+app.use('/api/current-rms', currentRmsRouter);
 app.use('/api/print-jobs', printJobsRouter);
 app.use('/api/printer-settings', printerSettingsRouter);
 app.use('/api/agent', agentRouter);
@@ -57,3 +61,5 @@ const port = Number(process.env.PORT ?? 4000);
 app.listen(port, '0.0.0.0', () => {
   console.log(`ElexPrep server listening on http://localhost:${port}`);
 });
+
+restartCurrentRmsPolling().catch((err) => console.error('Could not start Current RMS polling:', err));

@@ -50,6 +50,13 @@ the printer firing:
 9. **Signage** — visit `/signage` (or log in as the SIGNAGE user, which is forced there),
    pick the job, and check it on a TV-sized window.
 10. **Activity Log** (admin) — confirm actions are attributed to the right users.
+11. **Settings → Current RMS** (admin) — enter your subdomain + API key, *Test connection*,
+    then *Sync now*. Confirm opportunities appear in the list, *Import as job* creates a
+    private job, and the USER account can't see it until you tick **Public** in that job's
+    Job Settings tab. Open the job's **Current RMS** tab and *Load pick list* to confirm it
+    matches what's in Current RMS. Field names are a best-effort match to Current RMS's
+    documented conventions — if the pick list or a summary field looks off against your
+    real account, flag it and it's a quick fix.
 
 When all of that passes, the release is steady everywhere except the physical print path.
 

@@ -37,7 +37,9 @@ export interface Job {
   name: string;
   venue: string | null;
   logoPath: string | null;
+  isPublic: boolean;
   currentRmsOpportunityId: string | null;
+  rmsAlertAt: string | null;
   createdAt: string;
 }
 
@@ -133,6 +135,36 @@ export interface PrintJob {
   createdAt: string;
 }
 
+export interface CurrentRmsConfig {
+  enabled: boolean;
+  subdomain: string;
+  hasApiKey: boolean;
+  pollMinutes: number;
+  lastSyncedAt: string | null;
+  lastSyncError: string | null;
+}
+
+export interface CurrentRmsOpportunity {
+  id: string;
+  rmsId: number;
+  subject: string;
+  status: string | null;
+  memberName: string | null;
+  startsAt: string | null;
+  endsAt: string | null;
+  rmsUpdatedAt: string | null;
+  syncedAt: string;
+}
+
+export interface CurrentRmsPickItem {
+  id: number;
+  name?: string;
+  product_name?: string;
+  description?: string;
+  quantity?: number;
+  [key: string]: unknown;
+}
+
 export const api = {
   auth: {
     status: () => request<{ needsSetup: boolean }>('/auth/status'),
@@ -177,7 +209,7 @@ export const api = {
     get: (id: string) => request<Job>(`/jobs/${id}`),
     create: (data: { name: string; venue?: string }) =>
       request<Job>('/jobs', { method: 'POST', body: JSON.stringify(data) }),
-    update: (id: string, data: Partial<Pick<Job, 'name' | 'venue' | 'currentRmsOpportunityId'>>) =>
+    update: (id: string, data: Partial<Pick<Job, 'name' | 'venue' | 'isPublic'>>) =>
       request<Job>(`/jobs/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     remove: (id: string) => request<void>(`/jobs/${id}`, { method: 'DELETE' }),
     uploadLogo: async (id: string, file: File) => {
@@ -270,5 +302,31 @@ export const api = {
   },
   activity: {
     list: (jobId?: string) => request<ActivityLogEntry[]>(`/activity${jobId ? `?jobId=${jobId}` : ''}`),
+  },
+  currentRms: {
+    getConfig: () => request<CurrentRmsConfig>('/current-rms/config'),
+    updateConfig: (data: Partial<{ enabled: boolean; subdomain: string; apiKey: string; pollMinutes: number }>) =>
+      request<CurrentRmsConfig>('/current-rms/config', { method: 'PUT', body: JSON.stringify(data) }),
+    testConnection: (subdomain?: string, apiKey?: string) =>
+      request<{ ok: boolean; message?: string }>('/current-rms/test-connection', {
+        method: 'POST',
+        body: JSON.stringify({ subdomain, apiKey }),
+      }),
+    sync: () => request<{ pulled: number; alertsRaised: number; error: string | null }>('/current-rms/sync', { method: 'POST' }),
+    listOpportunities: (q?: string) =>
+      request<CurrentRmsOpportunity[]>(`/current-rms/opportunities${q ? `?q=${encodeURIComponent(q)}` : ''}`),
+    importOpportunity: (rmsId: number) =>
+      request<Job>(`/current-rms/opportunities/${rmsId}/import`, { method: 'POST' }),
+  },
+  jobCurrentRms: {
+    get: (jobId: string) =>
+      request<{ linked: boolean; opportunity?: CurrentRmsOpportunity; rmsAlertAt?: string | null }>(
+        `/jobs/${jobId}/current-rms`
+      ),
+    pickList: (jobId: string) => request<{ items: CurrentRmsPickItem[] }>(`/jobs/${jobId}/current-rms/pick-list`),
+    link: (jobId: string, rmsId: number) =>
+      request<Job>(`/jobs/${jobId}/current-rms/link`, { method: 'POST', body: JSON.stringify({ rmsId }) }),
+    unlink: (jobId: string) => request<Job>(`/jobs/${jobId}/current-rms/unlink`, { method: 'POST' }),
+    acknowledge: (jobId: string) => request<Job>(`/jobs/${jobId}/current-rms/acknowledge`, { method: 'POST' }),
   },
 };
