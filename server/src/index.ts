@@ -26,6 +26,7 @@ import { currentRmsRouter, jobCurrentRmsRouter } from './routes/currentRms';
 import { restartCurrentRmsPolling } from './currentRms/sync';
 import { locationColorRulesRouter } from './routes/locationColorRules';
 import { seedDefaultLocationColorsIfEmpty } from './pdf/locationColors';
+import { prisma } from './db';
 
 const app = express();
 // CSP is left off: the SPA and its PDF previews/native viewers are all served same-origin
@@ -88,9 +89,20 @@ app.use((err: unknown, req: Request, res: Response, _next: NextFunction) => {
 });
 
 const port = Number(process.env.PORT ?? 4000);
-app.listen(port, '0.0.0.0', () => {
+const server = app.listen(port, '0.0.0.0', () => {
   console.log(`ElexPrep server listening on http://localhost:${port}`);
 });
+
+// docker compose stop/restart sends SIGTERM: stop accepting new connections and close the
+// Prisma connection cleanly instead of letting the process die mid-request.
+function shutdown(signal: string) {
+  console.log(`${signal} received, shutting down`);
+  server.close(() => {
+    prisma.$disconnect().finally(() => process.exit(0));
+  });
+}
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
 
 restartCurrentRmsPolling().catch((err) => console.error('Could not start Current RMS polling:', err));
 seedDefaultLocationColorsIfEmpty().catch((err) => console.error('Could not seed location colors:', err));

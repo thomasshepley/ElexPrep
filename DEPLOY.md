@@ -107,7 +107,9 @@ with a full batch.
   session cookie is only sent over TLS. Leave it `false` (the default) for plain HTTP —
   a secure cookie is silently dropped by the browser otherwise, which breaks login.
 - **Backups**: stop the container (`docker compose stop`), copy `data/`, start it again —
-  or just copy `data/` live; SQLite single-writer usage here makes that low-risk.
+  or just copy `data/` live; SQLite single-writer usage here makes that low-risk. The server
+  handles `docker compose stop`/`restart` (`SIGTERM`) by closing its DB connection cleanly
+  before exiting, rather than being killed mid-request.
 - **Without Docker**: `npm install && npm run build` then
   `cd server && npx prisma migrate deploy && node dist/index.js` — the server serves the
   built web UI itself; set `DATABASE_URL`, `UPLOADS_DIR`, and optionally `PORT`.
