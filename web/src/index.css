@@ -122,15 +122,19 @@ th, td {
   border-bottom: 1px solid var(--border);
 }
 
-.tabs button {
+.tabs button,
+.tabs a {
   background: transparent;
   color: var(--text-dim);
   border-radius: 0;
   border-bottom: 2px solid transparent;
   padding: 0.5rem 0.9rem;
+  text-decoration: none;
+  cursor: pointer;
 }
 
-.tabs button.active {
+.tabs button.active,
+.tabs a.active {
   color: var(--text);
   border-bottom-color: var(--accent);
 }

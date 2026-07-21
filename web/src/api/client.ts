@@ -99,6 +99,7 @@ export interface ActivityLogEntry {
   detail: string | null;
   createdAt: string;
   userName?: string | null;
+  jobName?: string | null;
 }
 
 export type Role = 'ADMIN' | 'USER' | 'SIGNAGE';
