@@ -1,5 +1,9 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  // node:22-alpine ships OpenSSL 3.x only (no libssl.so.1.1) — without an explicit target
+  // here, Prisma's engine defaults to the OpenSSL 1.1 build and crashes at runtime with a
+  // non-JSON "Error loading shared library libssl.so.1.1" instead of a clean error.
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
 }
 
 datasource db {

@@ -79,6 +79,18 @@ When ready, go to **Printer Settings** (admin) and switch from Dry run to one of
 Either way, do the first live test with a single one-page job per tray before trusting it
 with a full batch.
 
+## Troubleshooting
+
+- **Container starts but logs show `Prisma failed to detect the libssl/openssl version` /
+  `Could not parse schema engine response`** — you're on an older image built before this
+  was fixed. Force a full rebuild so the fixed `Dockerfile` and `schema.prisma` are used:
+
+  ```bash
+  docker compose down
+  docker compose build --no-cache
+  docker compose up -d
+  ```
+
 ## Notes
 
 - **Ports**: change the left side of `4000:4000` in `docker-compose.yml` to expose a

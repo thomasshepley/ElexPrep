@@ -2,6 +2,8 @@
 # Build:  docker compose build     Run:  docker compose up -d     (see DEPLOY.md)
 
 FROM node:22-alpine AS build
+# Prisma's query/schema engines need OpenSSL present at both generate-time and runtime.
+RUN apk add --no-cache openssl
 WORKDIR /app
 COPY package.json package-lock.json ./
 COPY shared/package.json shared/
@@ -16,6 +18,7 @@ RUN npm run build --workspace @elexprep/shared \
  && npm run build --workspace @elexprep/web
 
 FROM node:22-alpine
+RUN apk add --no-cache openssl
 WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=build /app/package.json /app/package-lock.json ./
@@ -36,4 +39,4 @@ VOLUME /data
 EXPOSE 4000
 
 WORKDIR /app/server
-CMD npx prisma migrate deploy && node dist/index.js
+CMD ["sh", "-c", "npx prisma migrate deploy && node dist/index.js"]
