@@ -74,7 +74,7 @@ export async function renderLabelType(
 ): Promise<void> {
   switch (labelType) {
     case 'FIXTURE':
-      return buildFixtureLabelsPdf(doc, items as never);
+      return buildFixtureLabelsPdf(doc, items as never, locationColors);
     case 'TRUSS_SPIKE_POSITION':
       return buildTrussSpikePositionPdf(doc, items as never, locationColors);
     case 'TRUSS_SPIKE_TIP':
@@ -86,7 +86,7 @@ export async function renderLabelType(
     case 'PAL':
       return buildPalLabelsPdf(doc, items as never, await loadJobLogo(jobId), locationColors);
     case 'RACK':
-      return buildRackLabelsPdf(doc, items as never);
+      return buildRackLabelsPdf(doc, items as never, locationColors);
     default:
       throw new Error(`Unknown label type: ${labelType}`);
   }

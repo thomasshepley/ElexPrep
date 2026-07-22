@@ -90,7 +90,7 @@ function LabelSection({
       content = { ipAddress: fields.ipAddress, subnetMask: fields.subnetMask || '255.0.0.0', location: fields.location };
     if (labelType === 'CABLE') content = { text: fields.text, isDmx, location: fields.location };
     if (labelType === 'PAL') content = { location: fields.location, title: fields.title, subtitle: fields.subtitle };
-    if (labelType === 'RACK') content = { title: fields.title, subtitle: fields.subtitle };
+    if (labelType === 'RACK') content = { title: fields.title, subtitle: fields.subtitle, location: fields.location };
 
     try {
       await api.adHocLabels.create(jobId, { labelType, content, quantity });
@@ -191,6 +191,7 @@ function LabelSection({
           <div className="row" style={{ gap: '0.4rem' }}>
             {editableField(item, 'title', 'Title', 150)}
             {editableField(item, 'subtitle', 'Subtitle', 150)}
+            {editableField(item, 'location', 'Location', 110)}
           </div>
         );
       default:
@@ -253,6 +254,7 @@ function LabelSection({
           <>
             {field('title', 'Title')}
             {field('subtitle', 'Subtitle (optional)')}
+            {field('location', 'Location (e.g. FOH, Floor)')}
           </>
         )}
 
