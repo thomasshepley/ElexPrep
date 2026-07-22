@@ -4,13 +4,13 @@ import { api, type Job } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import PatchImportPanel from '../components/PatchImportPanel';
 import CasesPanel from '../components/CasesPanel';
-import AdHocLabelsPanel from '../components/AdHocLabelsPanel';
+import LabelsPanel from '../components/LabelsPanel';
 import PrintQueuePanel from '../components/PrintQueuePanel';
 import PlotsPanel from '../components/PlotsPanel';
 import CurrentRmsPanel from '../components/CurrentRmsPanel';
 import JobLocationColorsPanel from '../components/JobLocationColorsPanel';
 
-const TABS = ['Patch Import', 'Cases', 'Ad Hoc Labels', 'Print Queue', 'Plots', 'Current RMS', 'Job Settings'] as const;
+const TABS = ['Patch Import', 'Cases', 'Labels', 'Print Queue', 'Plots', 'Current RMS', 'Job Settings'] as const;
 type Tab = (typeof TABS)[number];
 
 export default function JobDetailPage() {
@@ -40,7 +40,7 @@ export default function JobDetailPage() {
 
       {tab === 'Patch Import' && <PatchImportPanel jobId={jobId} />}
       {tab === 'Cases' && <CasesPanel jobId={jobId} />}
-      {tab === 'Ad Hoc Labels' && <AdHocLabelsPanel jobId={jobId} />}
+      {tab === 'Labels' && <LabelsPanel jobId={jobId} />}
       {tab === 'Print Queue' && <PrintQueuePanel jobId={jobId} />}
       {tab === 'Plots' && <PlotsPanel jobId={jobId} />}
       {tab === 'Current RMS' && <CurrentRmsPanel jobId={jobId} />}

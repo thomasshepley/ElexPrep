@@ -12,22 +12,77 @@ const TYPE_LABELS: Record<AdHocType, string> = {
   RACK: 'Rack label',
 };
 
-
-export default function AdHocLabelsPanel({ jobId }: { jobId: string }) {
+/**
+ * One-off/ad hoc labels for a job, grouped into the same 3 sections crew think in when they
+ * print label sheets: PAL cases, cable runs, and the truss/spike + rack labels that share the
+ * same physical die-cut stock as fixture labels.
+ */
+export default function LabelsPanel({ jobId }: { jobId: string }) {
   const [items, setItems] = useState<AdHocLabel[]>([]);
-  const [labelType, setLabelType] = useState<AdHocType>('PAL');
-  const [quantity, setQuantity] = useState(1);
-  const [fields, setFields] = useState<Record<string, string>>({});
-  const [isDmx, setIsDmx] = useState(false);
 
   const refresh = () => api.adHocLabels.list(jobId).then(setItems);
 
   useEffect(() => {
     refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [jobId]);
+
+  return (
+    <div>
+      <LabelSection
+        jobId={jobId}
+        title="PAL"
+        description="Generic PAL case labels — personal Peli cases, one-off equipment cases."
+        types={['PAL']}
+        items={items}
+        onChanged={refresh}
+      />
+      <LabelSection
+        jobId={jobId}
+        title="Cables"
+        description="Cable and circuit run labels, including narrow DMX labels with a fold/cut line."
+        types={['CABLE']}
+        items={items}
+        onChanged={refresh}
+      />
+      <LabelSection
+        jobId={jobId}
+        title="Truss Spikes and Fixture Labels"
+        description="Truss/spike position, tip warning and sACN node labels, plus rack labels — all print on the same die-cut sheet stock as fixture labels."
+        types={['TRUSS_SPIKE_POSITION', 'TRUSS_SPIKE_TIP', 'TRUSS_SPIKE_SACN', 'RACK']}
+        items={items}
+        onChanged={refresh}
+      />
+    </div>
+  );
+}
+
+function LabelSection({
+  jobId,
+  title,
+  description,
+  types,
+  items,
+  onChanged,
+}: {
+  jobId: string;
+  title: string;
+  description: string;
+  types: AdHocType[];
+  items: AdHocLabel[];
+  onChanged: () => void;
+}) {
+  const [labelType, setLabelType] = useState<AdHocType>(types[0]);
+  const [quantity, setQuantity] = useState(1);
+  const [fields, setFields] = useState<Record<string, string>>({});
+  const [isDmx, setIsDmx] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const sectionItems = items.filter((i) => types.includes(i.labelType as AdHocType));
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
     let content: Record<string, unknown> = {};
     if (labelType === 'TRUSS_SPIKE_POSITION') content = { address: Number(fields.address), location: fields.location };
     if (labelType === 'TRUSS_SPIKE_TIP') content = { text: fields.text || 'DO NOT TIP', location: fields.location };
@@ -37,29 +92,33 @@ export default function AdHocLabelsPanel({ jobId }: { jobId: string }) {
     if (labelType === 'PAL') content = { location: fields.location, title: fields.title, subtitle: fields.subtitle };
     if (labelType === 'RACK') content = { title: fields.title, subtitle: fields.subtitle };
 
-    await api.adHocLabels.create(jobId, { labelType, content, quantity });
-    setFields({});
-    setQuantity(1);
-    setIsDmx(false);
-    refresh();
+    try {
+      await api.adHocLabels.create(jobId, { labelType, content, quantity });
+      setFields({});
+      setQuantity(1);
+      setIsDmx(false);
+      onChanged();
+    } catch (err) {
+      setError((err as Error).message);
+    }
   };
 
   const remove = async (id: string) => {
     await api.adHocLabels.remove(jobId, id);
-    refresh();
+    onChanged();
   };
 
   const updateQuantity = async (id: string, quantity: number) => {
     if (!Number.isFinite(quantity) || quantity < 1) return;
     await api.adHocLabels.update(jobId, id, { quantity });
-    refresh();
+    onChanged();
   };
 
   const updateContentField = async (item: AdHocLabel, key: string, rawValue: string | boolean) => {
     const value = key === 'address' ? Number(rawValue) : rawValue;
     const content = { ...item.content, [key]: value };
     await api.adHocLabels.update(jobId, item.id, { content });
-    refresh();
+    onChanged();
   };
 
   const field = (key: string, placeholder: string) => (
@@ -141,19 +200,18 @@ export default function AdHocLabelsPanel({ jobId }: { jobId: string }) {
 
   return (
     <div className="panel">
-      <h3>Ad hoc / one-off labels</h3>
-      <p className="muted">
-        For anything that isn't in the patch — personal Peli cases, generic equipment cases,
-        cable runs, spike tip warnings, network node labels, rack labels.
-      </p>
+      <h3>{title}</h3>
+      <p className="muted">{description}</p>
       <form className="row" onSubmit={submit}>
-        <select value={labelType} onChange={(e) => setLabelType(e.target.value as AdHocType)}>
-          {Object.entries(TYPE_LABELS).map(([value, label]) => (
-            <option key={value} value={value}>
-              {label}
-            </option>
-          ))}
-        </select>
+        {types.length > 1 && (
+          <select value={labelType} onChange={(e) => setLabelType(e.target.value as AdHocType)}>
+            {types.map((t) => (
+              <option key={t} value={t}>
+                {TYPE_LABELS[t]}
+              </option>
+            ))}
+          </select>
+        )}
 
         {labelType === 'TRUSS_SPIKE_POSITION' && (
           <>
@@ -207,8 +265,9 @@ export default function AdHocLabelsPanel({ jobId }: { jobId: string }) {
         />
         <button type="submit">Add label</button>
       </form>
+      {error && <p className="error">{error}</p>}
 
-      {items.length > 0 && (
+      {sectionItems.length > 0 && (
         <>
           <p className="muted" style={{ marginTop: '1rem' }}>
             Every field is editable in place (click and type, saves on blur).
@@ -223,7 +282,7 @@ export default function AdHocLabelsPanel({ jobId }: { jobId: string }) {
               </tr>
             </thead>
             <tbody>
-              {items.map((i) => (
+              {sectionItems.map((i) => (
                 <tr key={i.id}>
                   <td>{TYPE_LABELS[i.labelType as AdHocType] ?? i.labelType}</td>
                   <td>{renderEditableContent(i)}</td>
@@ -247,6 +306,7 @@ export default function AdHocLabelsPanel({ jobId }: { jobId: string }) {
           </table>
         </>
       )}
+      {sectionItems.length === 0 && <p className="muted">No labels yet in this section.</p>}
     </div>
   );
 }

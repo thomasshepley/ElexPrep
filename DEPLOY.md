@@ -39,7 +39,7 @@ the printer firing:
 4. **Create a job**, upload a logo in Job Settings, and import a patch CSV — it should
    import with no mapping questions asked.
 5. **Cases tab** — generate; check the groupings ("201 + 202", "401 - 403", "+ Spare").
-6. **Ad Hoc Labels** — add a cable label (tick DMX to see the narrow/cut-line variant), a
+6. **Labels tab** — add a cable label (tick DMX to see the narrow/cut-line variant), a
    personal Peli case PAL label, etc.
 7. **Print Queue** — build from patch + cases, adjust quantities, then:
    - *Confirm & download PDF* → check every page against real label stock in a PDF viewer.
