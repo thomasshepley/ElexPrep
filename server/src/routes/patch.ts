@@ -148,6 +148,30 @@ const FIXTURE_EDITABLE_FIELDS = [
   'location',
 ] as const;
 
+/**
+ * Bulk endpoints must be registered before the /:id routes below — Express matches routes in
+ * registration order, and a literal "bulk" segment would otherwise be swallowed by :id.
+ */
+patchRouter.put('/:jobId/fixtures/bulk', async (req, res) => {
+  const { ids, location } = req.body ?? {};
+  if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ error: 'ids array is required' });
+  if (typeof location !== 'string') return res.status(400).json({ error: 'location is required' });
+  const result = await prisma.fixture.updateMany({
+    where: { id: { in: ids }, jobId: req.params.jobId },
+    data: { location: location.trim() === '' ? null : location },
+  });
+  await logActivity('patch.bulk_update', `${result.count} fixtures -> location "${location}"`, req.params.jobId, req.user?.id);
+  res.json({ updated: result.count });
+});
+
+patchRouter.delete('/:jobId/fixtures/bulk', async (req, res) => {
+  const { ids } = req.body ?? {};
+  if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ error: 'ids array is required' });
+  const result = await prisma.fixture.deleteMany({ where: { id: { in: ids }, jobId: req.params.jobId } });
+  await logActivity('patch.bulk_delete', `${result.count} fixtures`, req.params.jobId, req.user?.id);
+  res.json({ deleted: result.count });
+});
+
 patchRouter.put('/:jobId/fixtures/:id', async (req, res) => {
   const data: Record<string, unknown> = {};
   for (const field of FIXTURE_EDITABLE_FIELDS) {

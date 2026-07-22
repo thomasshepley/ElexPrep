@@ -164,16 +164,29 @@ function PickListView({
   if (!items) return <p className="muted" style={{ fontSize: '1.4rem' }}>Loading pick list…</p>;
   if (items.length === 0) return <p className="muted" style={{ fontSize: '1.4rem' }}>No items on this opportunity yet.</p>;
 
-  const preppedCount = items.filter((i) => i.prepped).length;
+  // Group rows are Current RMS's own section headings (e.g. "Lighting - Moving Lights"),
+  // not real items to pick — shown as titles, excluded from the prepped count.
+  const pickable = items.filter((i) => !i.isGroup);
+  const preppedCount = pickable.filter((i) => i.prepped).length;
 
   return (
     <div>
       <p className="muted" style={{ fontSize: '1.2rem', marginBottom: '1rem' }}>
-        {preppedCount} / {items.length} prepped — tap a row as you pull it
+        {preppedCount} / {pickable.length} prepped — tap a row as you pull it
       </p>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
         {items.map((item) => {
           const name = item.name || item.product_name || item.description || `Item #${item.id}`;
+          if (item.isGroup) {
+            return (
+              <h3
+                key={item.id}
+                style={{ fontSize: '1.4rem', margin: '1rem 0 0', paddingBottom: '0.3rem', borderBottom: '2px solid currentColor' }}
+              >
+                {name}
+              </h3>
+            );
+          }
           return (
             <button
               key={item.id}

@@ -1,4 +1,5 @@
 import {
+  Color,
   PDFDocument,
   PDFFont,
   PDFImage,
@@ -11,6 +12,7 @@ import {
   rectangle,
 } from 'pdf-lib';
 import { CellGeometry, SheetGeometry } from '@elexprep/shared';
+import { hexToRgbFractions, ResolvedLocationColor } from './locationColors';
 
 export const PT_PER_IN = 72;
 export const inPt = (inches: number) => inches * PT_PER_IN;
@@ -39,12 +41,57 @@ export function centerText(
   size: number,
   cell: CellRectPt,
   yOffsetPt: number,
-  color = rgb(0, 0, 0)
+  color = rgb(0, 0, 0),
+  outlineColor?: Color
 ) {
   const width = font.widthOfTextAtSize(text, size);
   const x = cell.xPt + cell.wPt / 2 - width / 2;
   const y = cell.yPt + yOffsetPt;
+  // A striped background alternates two colors, so a single flat text color can vanish against
+  // whichever stripe matches it — an outline (drawn as offset copies behind the real text)
+  // keeps it legible against either stripe.
+  if (outlineColor) {
+    const offset = 1;
+    for (const [dx, dy] of [
+      [-offset, -offset],
+      [0, -offset],
+      [offset, -offset],
+      [-offset, 0],
+      [offset, 0],
+      [-offset, offset],
+      [0, offset],
+      [offset, offset],
+    ]) {
+      page.drawText(text, { x: x + dx, y: y + dy, size, font, color: outlineColor });
+    }
+  }
   page.drawText(text, { x, y, size, font, color });
+}
+
+/**
+ * Shrinks font size to fit `text` within `maxWidthPt` at `startSize`, down to `minSize`. If it
+ * still doesn't fit at the minimum size (e.g. "Maverick Storm 1 Flex Hybrid"), trailing words
+ * are dropped one at a time until what's left fits — so long fixture type names shorten to
+ * something like "Maverick Storm 1" rather than overlapping or running off the label.
+ */
+export function fitTextToWidth(
+  font: PDFFont,
+  text: string,
+  startSize: number,
+  maxWidthPt: number,
+  minSize = 14
+): { text: string; size: number } {
+  let size = startSize;
+  while (size > minSize && font.widthOfTextAtSize(text, size) > maxWidthPt) size -= 1;
+  if (font.widthOfTextAtSize(text, size) <= maxWidthPt) return { text, size };
+
+  const words = text.split(' ');
+  while (words.length > 1) {
+    words.pop();
+    const candidate = words.join(' ');
+    if (font.widthOfTextAtSize(candidate, size) <= maxWidthPt) return { text: candidate, size };
+  }
+  return { text: words[0] ?? text, size };
 }
 
 /**
@@ -67,6 +114,42 @@ export function drawImageCover(page: PDFPage, image: PDFImage, rect: CellRectPt)
     endPath()
   );
   page.drawImage(image, { x, y, width: drawWidth, height: drawHeight });
+  page.pushOperators(popGraphicsState());
+}
+
+/**
+ * Fills a rect with a resolved location color — a plain solid fill, or classic 45-degree
+ * hazard-tape stripes (e.g. red/white for Spare, yellow/black for Rigging) when the rule
+ * says so.
+ */
+export function drawLocationFill(page: PDFPage, rect: CellRectPt, resolved: ResolvedLocationColor) {
+  if (resolved.pattern === 'DIAGONAL_STRIPES' && resolved.secondaryColor) {
+    drawDiagonalStripeFill(page, rect, resolved.color, resolved.secondaryColor);
+    return;
+  }
+  const { r, g, b } = hexToRgbFractions(resolved.color);
+  page.drawRectangle({ x: rect.xPt, y: rect.yPt, width: rect.wPt, height: rect.hPt, color: rgb(r, g, b) });
+}
+
+function drawDiagonalStripeFill(page: PDFPage, rect: CellRectPt, colorAHex: string, colorBHex: string) {
+  const a = hexToRgbFractions(colorAHex);
+  const b = hexToRgbFractions(colorBHex);
+  page.drawRectangle({ x: rect.xPt, y: rect.yPt, width: rect.wPt, height: rect.hPt, color: rgb(a.r, a.g, a.b) });
+
+  // Clip to the rect so the diagonal lines (drawn as thick 45-degree strokes) never bleed
+  // past its edges, then lay color B stripes at a fixed period over the color A base.
+  page.pushOperators(pushGraphicsState(), rectangle(rect.xPt, rect.yPt, rect.wPt, rect.hPt), clip(), endPath());
+  const stripeWidth = inPt(0.14);
+  const period = stripeWidth * 2;
+  for (let offset = -rect.hPt - stripeWidth; offset <= rect.wPt + stripeWidth; offset += period) {
+    const x0 = rect.xPt + offset;
+    page.drawLine({
+      start: { x: x0, y: rect.yPt },
+      end: { x: x0 + rect.hPt, y: rect.yPt + rect.hPt },
+      thickness: stripeWidth,
+      color: rgb(b.r, b.g, b.b),
+    });
+  }
   page.pushOperators(popGraphicsState());
 }
 

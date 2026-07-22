@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { api, type LocationColorRule } from '../api/client';
+import { api, type LocationColorPattern, type LocationColorRule } from '../api/client';
 
 function contrastingText(hex: string): string {
   const clean = hex.replace('#', '');
@@ -9,6 +9,14 @@ function contrastingText(hex: string): string {
   const b = parseInt(clean.slice(4, 6), 16) / 255;
   const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
   return luminance < 0.55 ? '#fff' : '#000';
+}
+
+/** CSS approximation of the PDF's diagonal hazard stripes, for the in-browser preview swatch. */
+function swatchBackground(rule: Pick<LocationColorRule, 'color' | 'pattern' | 'secondaryColor'>): string {
+  if (rule.pattern === 'DIAGONAL_STRIPES' && rule.secondaryColor) {
+    return `repeating-linear-gradient(45deg, ${rule.color}, ${rule.color} 10px, ${rule.secondaryColor} 10px, ${rule.secondaryColor} 20px)`;
+  }
+  return rule.color;
 }
 
 /**
@@ -21,6 +29,8 @@ export default function JobLocationColorsPanel({ jobId }: { jobId: string }) {
   const [rules, setRules] = useState<LocationColorRule[]>([]);
   const [location, setLocation] = useState('');
   const [color, setColor] = useState('#1FA34C');
+  const [pattern, setPattern] = useState<LocationColorPattern>('SOLID');
+  const [secondaryColor, setSecondaryColor] = useState('#FFFFFF');
   const [error, setError] = useState<string | null>(null);
 
   const refresh = () => api.jobLocationColorRules.list(jobId).then(setRules).catch((e) => setError(e.message));
@@ -34,8 +44,14 @@ export default function JobLocationColorsPanel({ jobId }: { jobId: string }) {
     e.preventDefault();
     setError(null);
     try {
-      await api.jobLocationColorRules.create(jobId, { location, color });
+      await api.jobLocationColorRules.create(jobId, {
+        location,
+        color,
+        pattern,
+        ...(pattern === 'DIAGONAL_STRIPES' ? { secondaryColor } : {}),
+      });
       setLocation('');
+      setPattern('SOLID');
       refresh();
     } catch (err) {
       setError((err as Error).message);
@@ -44,6 +60,19 @@ export default function JobLocationColorsPanel({ jobId }: { jobId: string }) {
 
   const updateColor = async (rule: LocationColorRule, value: string) => {
     await api.jobLocationColorRules.update(jobId, rule.id, { color: value });
+    refresh();
+  };
+
+  const updatePattern = async (rule: LocationColorRule, value: LocationColorPattern) => {
+    await api.jobLocationColorRules.update(jobId, rule.id, {
+      pattern: value,
+      secondaryColor: value === 'DIAGONAL_STRIPES' ? rule.secondaryColor ?? '#FFFFFF' : null,
+    });
+    refresh();
+  };
+
+  const updateSecondaryColor = async (rule: LocationColorRule, value: string) => {
+    await api.jobLocationColorRules.update(jobId, rule.id, { secondaryColor: value });
     refresh();
   };
 
@@ -71,6 +100,13 @@ export default function JobLocationColorsPanel({ jobId }: { jobId: string }) {
           required
         />
         <input type="color" value={color} onChange={(e) => setColor(e.target.value)} />
+        <select value={pattern} onChange={(e) => setPattern(e.target.value as LocationColorPattern)}>
+          <option value="SOLID">Solid</option>
+          <option value="DIAGONAL_STRIPES">Diagonal stripes (hazard)</option>
+        </select>
+        {pattern === 'DIAGONAL_STRIPES' && (
+          <input type="color" value={secondaryColor} onChange={(e) => setSecondaryColor(e.target.value)} title="Second stripe color" />
+        )}
         <button type="submit">Add override</button>
       </form>
       {error && <p className="error">{error}</p>}
@@ -81,6 +117,7 @@ export default function JobLocationColorsPanel({ jobId }: { jobId: string }) {
             <tr>
               <th>Location</th>
               <th>Color</th>
+              <th>Pattern</th>
               <th>Preview</th>
               <th></th>
             </tr>
@@ -89,8 +126,22 @@ export default function JobLocationColorsPanel({ jobId }: { jobId: string }) {
             {rules.map((r) => (
               <tr key={r.id}>
                 <td>{r.location}</td>
-                <td>
+                <td className="row" style={{ gap: '0.3rem' }}>
                   <input type="color" value={r.color} onChange={(e) => updateColor(r, e.target.value)} />
+                  {r.pattern === 'DIAGONAL_STRIPES' && (
+                    <input
+                      type="color"
+                      value={r.secondaryColor ?? '#FFFFFF'}
+                      title="Second stripe color"
+                      onChange={(e) => updateSecondaryColor(r, e.target.value)}
+                    />
+                  )}
+                </td>
+                <td>
+                  <select value={r.pattern} onChange={(e) => updatePattern(r, e.target.value as LocationColorPattern)}>
+                    <option value="SOLID">Solid</option>
+                    <option value="DIAGONAL_STRIPES">Diagonal stripes</option>
+                  </select>
                 </td>
                 <td>
                   <span
@@ -98,7 +149,7 @@ export default function JobLocationColorsPanel({ jobId }: { jobId: string }) {
                       display: 'inline-block',
                       padding: '0.25rem 0.75rem',
                       borderRadius: 4,
-                      background: r.color,
+                      background: swatchBackground(r),
                       color: contrastingText(r.color),
                       fontWeight: 600,
                     }}

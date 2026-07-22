@@ -3,7 +3,7 @@ import { prisma, logActivity } from '../db';
 import { requireRole } from '../auth';
 import { requirePermission } from '../permissions';
 import { DEFAULT_CURRENT_RMS_CONFIG, getCurrentRmsConfig, saveCurrentRmsConfig, toPublicConfig } from '../currentRms/config';
-import { testCurrentRmsConnection, fetchOpportunityItems } from '../currentRms/client';
+import { testCurrentRmsConnection, fetchOpportunityItems, GROUP_ITEM_TYPE } from '../currentRms/client';
 import {
   runCurrentRmsSync,
   restartCurrentRmsPolling,
@@ -144,6 +144,9 @@ jobCurrentRmsRouter.get('/:jobId/current-rms/pick-list', async (req, res) => {
         // crew checklist above, which tracks warehouse prep independent of when someone
         // updates CRMS itself.
         bookedOut: typeof i.status === 'number' && i.status >= 20,
+        // A Group row is a section heading in Current RMS's own quote/order layout (e.g.
+        // "Lighting - Moving Lights"), not a real item to pick.
+        isGroup: i.opportunity_item_type === GROUP_ITEM_TYPE,
       })),
     });
   } catch (err) {

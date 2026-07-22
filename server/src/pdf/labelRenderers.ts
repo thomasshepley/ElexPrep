@@ -6,14 +6,10 @@ import {
   PAL_CELL_LAYOUT,
   PAL_SHEET,
   RACK_SHEET,
+  TRUSS_SPIKE_SHEET,
 } from '@elexprep/shared';
-import { CellRectPt, centerText, drawCellOutline, drawImageCover, inPt, renderSheets } from './pdfBuilder';
-import {
-  contrastingTextIsWhite,
-  hexToRgbFractions,
-  LocationColorMap,
-  resolveLocationColor,
-} from './locationColors';
+import { CellRectPt, centerText, drawCellOutline, drawImageCover, drawLocationFill, fitTextToWidth, inPt, renderSheets } from './pdfBuilder';
+import { contrastingTextIsWhite, LocationColorMap, resolveLocationColor, ResolvedLocationColor } from './locationColors';
 
 export interface FixtureLabelContent {
   address: number;
@@ -26,20 +22,24 @@ export interface FixtureLabelContent {
 
 export interface TrussSpikePositionContent {
   address: number;
+  location?: string;
 }
 
 export interface TrussSpikeTipContent {
   text?: string;
+  location?: string;
 }
 
 export interface TrussSpikeSacnContent {
   ipAddress: string;
   subnetMask?: string;
+  location?: string;
 }
 
 export interface CableLabelContent {
   text: string;
   isDmx?: boolean;
+  location?: string;
 }
 
 export interface PalLabelContent {
@@ -58,6 +58,29 @@ async function fonts(doc: PDFDocument) {
     bold: await doc.embedFont(StandardFonts.HelveticaBold),
     regular: await doc.embedFont(StandardFonts.Helvetica),
   };
+}
+
+/**
+ * Picks a legible text fill color for a resolved location color, plus an outline color when
+ * the background is diagonal stripes — a flat fill alone can vanish against whichever stripe
+ * happens to match it, so striped backgrounds get an outlined (fill + halo) text treatment.
+ */
+function textColorsFor(resolved: ResolvedLocationColor): { fill: ReturnType<typeof rgb>; outline?: ReturnType<typeof rgb> } {
+  const isWhite = contrastingTextIsWhite(resolved.color);
+  const fill = isWhite ? rgb(1, 1, 1) : rgb(0, 0, 0);
+  if (resolved.pattern !== 'DIAGONAL_STRIPES') return { fill };
+  return { fill, outline: isWhite ? rgb(0, 0, 0) : rgb(1, 1, 1) };
+}
+
+/**
+ * Fills an entire label cell with its resolved location color (Cable and Truss/Spike labels
+ * are "full colour" rather than just carrying a colored bar like PAL) and returns the text
+ * colors to draw with.
+ */
+function fillCellByLocation(page: PDFPage, cell: CellRectPt, locationColors: LocationColorMap, location: string | undefined) {
+  const resolved = resolveLocationColor(locationColors, location);
+  drawLocationFill(page, cell, resolved);
+  return textColorsFor(resolved);
 }
 
 export async function buildFixtureLabelsPdf(doc: PDFDocument, items: FixtureLabelContent[]) {
@@ -81,27 +104,30 @@ export async function buildFixtureLabelsPdf(doc: PDFDocument, items: FixtureLabe
   });
 }
 
-export async function buildTrussSpikePositionPdf(doc: PDFDocument, items: TrussSpikePositionContent[]) {
+export async function buildTrussSpikePositionPdf(doc: PDFDocument, items: TrussSpikePositionContent[], locationColors: LocationColorMap = new Map()) {
   const { bold } = await fonts(doc);
-  await renderSheets(doc, GRID_18_SHEET, items, (page, cell, item) => {
-    centerText(page, String(item.address), bold, 54, cell, cell.hPt / 2 - inPt(0.18));
+  await renderSheets(doc, TRUSS_SPIKE_SHEET, items, (page, cell, item) => {
+    const { fill, outline } = fillCellByLocation(page, cell, locationColors, item.location);
+    centerText(page, String(item.address), bold, 54, cell, cell.hPt / 2 - inPt(0.18), fill, outline);
   });
 }
 
-export async function buildTrussSpikeTipPdf(doc: PDFDocument, items: TrussSpikeTipContent[]) {
+export async function buildTrussSpikeTipPdf(doc: PDFDocument, items: TrussSpikeTipContent[], locationColors: LocationColorMap = new Map()) {
   const { bold } = await fonts(doc);
-  await renderSheets(doc, GRID_18_SHEET, items, (page, cell, item) => {
-    const text = item.text ?? 'DO NOT TIP';
-    centerText(page, text, bold, 22, cell, cell.hPt / 2 - inPt(0.12));
+  await renderSheets(doc, TRUSS_SPIKE_SHEET, items, (page, cell, item) => {
+    const { fill, outline } = fillCellByLocation(page, cell, locationColors, item.location);
+    const fit = fitTextToWidth(bold, item.text ?? 'DO NOT TIP', 22, cell.wPt - inPt(0.3));
+    centerText(page, fit.text, bold, fit.size, cell, cell.hPt / 2 - inPt(0.12), fill, outline);
   });
 }
 
-export async function buildTrussSpikeSacnPdf(doc: PDFDocument, items: TrussSpikeSacnContent[]) {
+export async function buildTrussSpikeSacnPdf(doc: PDFDocument, items: TrussSpikeSacnContent[], locationColors: LocationColorMap = new Map()) {
   const { bold, regular } = await fonts(doc);
-  await renderSheets(doc, GRID_18_SHEET, items, (page, cell, item) => {
-    centerText(page, 'sACN Fixture', bold, 16, cell, cell.hPt - inPt(0.5));
-    centerText(page, `IP Address: ${item.ipAddress}`, regular, 12, cell, cell.hPt / 2 - inPt(0.05));
-    centerText(page, `Subnet Mask: ${item.subnetMask ?? '255.0.0.0'}`, regular, 12, cell, cell.hPt / 2 - inPt(0.3));
+  await renderSheets(doc, TRUSS_SPIKE_SHEET, items, (page, cell, item) => {
+    const { fill, outline } = fillCellByLocation(page, cell, locationColors, item.location);
+    centerText(page, 'sACN Fixture', bold, 16, cell, cell.hPt - inPt(0.5), fill, outline);
+    centerText(page, `IP Address: ${item.ipAddress}`, regular, 12, cell, cell.hPt / 2 - inPt(0.05), fill, outline);
+    centerText(page, `Subnet Mask: ${item.subnetMask ?? '255.0.0.0'}`, regular, 12, cell, cell.hPt / 2 - inPt(0.3), fill, outline);
   });
 }
 
@@ -110,12 +136,14 @@ export async function buildTrussSpikeSacnPdf(doc: PDFDocument, items: TrussSpike
  * to the left 2/3 of the strip and a dashed cut line marks where the blank 1/3 begins, so it
  * can be trimmed or folded back on itself.
  */
-export async function buildCableLabelsPdf(doc: PDFDocument, items: CableLabelContent[]) {
+export async function buildCableLabelsPdf(doc: PDFDocument, items: CableLabelContent[], locationColors: LocationColorMap = new Map()) {
   const { bold } = await fonts(doc);
   await renderSheets(doc, CABLE_SHEET, items, (page, cell, item) => {
+    const { fill, outline } = fillCellByLocation(page, cell, locationColors, item.location);
     const usableWidthPt = item.isDmx ? cell.wPt * DMX_CABLE_WIDTH_FACTOR : cell.wPt;
     const textCell: CellRectPt = { ...cell, wPt: usableWidthPt };
-    centerText(page, item.text, bold, 26, textCell, cell.hPt / 2 - inPt(0.12));
+    const fit = fitTextToWidth(bold, item.text, 26, usableWidthPt - inPt(0.2));
+    centerText(page, fit.text, bold, fit.size, textCell, cell.hPt / 2 - inPt(0.12), fill, outline);
     if (item.isDmx) {
       const cutX = cell.xPt + usableWidthPt;
       page.drawLine({
@@ -163,11 +191,10 @@ function drawPalCell(
     wPt: cell.wPt,
     hPt: inPt(bar.h) * scaleX,
   };
-  const barColorHex = resolveLocationColor(locationColors, item.location);
-  const { r, g, b } = hexToRgbFractions(barColorHex);
-  const textColor = contrastingTextIsWhite(barColorHex) ? rgb(1, 1, 1) : rgb(0, 0, 0);
-  page.drawRectangle({ x: barRect.xPt, y: barRect.yPt, width: barRect.wPt, height: barRect.hPt, color: rgb(r, g, b) });
-  centerText(page, item.location ?? '', bold, 20, barRect, barRect.hPt / 2 - inPt(0.11), textColor);
+  const barColor = resolveLocationColor(locationColors, item.location);
+  const { fill: barTextFill, outline: barTextOutline } = textColorsFor(barColor);
+  drawLocationFill(page, barRect, barColor);
+  centerText(page, item.location ?? '', bold, 20, barRect, barRect.hPt / 2 - inPt(0.11), barTextFill, barTextOutline);
 
   const content = PAL_CELL_LAYOUT.content;
   const contentRect: CellRectPt = {
@@ -176,9 +203,14 @@ function drawPalCell(
     wPt: cell.wPt,
     hPt: inPt(content.h) * scaleX,
   };
-  centerText(page, item.title, bold, 30, contentRect, contentRect.hPt - inPt(0.55));
+  // Fixture type names can run long (e.g. "Maverick Storm 1 Flex Hybrid") — shrink to fit
+  // the cell width first, then shorten by dropping trailing words if it still won't fit.
+  const textMaxWidthPt = contentRect.wPt - inPt(0.3);
+  const title = fitTextToWidth(bold, item.title, 30, textMaxWidthPt);
+  centerText(page, title.text, bold, title.size, contentRect, contentRect.hPt - inPt(0.55));
   if (item.subtitle) {
-    centerText(page, item.subtitle, bold, 30, contentRect, contentRect.hPt - inPt(1.15));
+    const subtitle = fitTextToWidth(bold, item.subtitle, 30, textMaxWidthPt);
+    centerText(page, subtitle.text, bold, subtitle.size, contentRect, contentRect.hPt - inPt(1.15));
   }
 }
 
@@ -199,9 +231,12 @@ export async function buildPalLabelsPdf(
 export async function buildRackLabelsPdf(doc: PDFDocument, items: RackLabelContent[]) {
   const { bold, regular } = await fonts(doc);
   await renderSheets(doc, RACK_SHEET, items, (page, cell, item) => {
-    centerText(page, item.title, bold, 22, cell, cell.hPt / 2 + inPt(0.15));
+    const maxWidthPt = cell.wPt - inPt(0.3);
+    const title = fitTextToWidth(bold, item.title, 22, maxWidthPt);
+    centerText(page, title.text, bold, title.size, cell, cell.hPt / 2 + inPt(0.15));
     if (item.subtitle) {
-      centerText(page, item.subtitle, regular, 13, cell, cell.hPt / 2 - inPt(0.25));
+      const subtitle = fitTextToWidth(regular, item.subtitle, 13, maxWidthPt);
+      centerText(page, subtitle.text, regular, subtitle.size, cell, cell.hPt / 2 - inPt(0.25));
     }
   });
 }

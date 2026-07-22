@@ -168,27 +168,35 @@ export default function CurrentRmsPanel({ jobId }: { jobId: string }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {items.map((i) => (
-                    <tr key={i.id}>
-                      <td>{i.name ?? i.product_name ?? i.description ?? `#${i.id}`}</td>
-                      <td>{i.quantity ?? ''}</td>
-                      <td>
-                        <span
-                          style={{
-                            fontSize: '0.85rem',
-                            fontWeight: 600,
-                            padding: '0.15rem 0.5rem',
-                            borderRadius: 999,
-                            background: i.bookedOut ? '#1FA34C' : '#555',
-                            color: '#fff',
-                          }}
-                        >
-                          {i.status_name ?? (i.bookedOut ? 'Booked out' : 'Not booked out')}
-                        </span>
-                      </td>
-                      <td>{i.prepped ? '✓' : ''}</td>
-                    </tr>
-                  ))}
+                  {items.map((i) =>
+                    i.isGroup ? (
+                      <tr key={i.id}>
+                        <td colSpan={4} style={{ fontWeight: 700, paddingTop: '0.75rem' }}>
+                          {i.name ?? i.product_name ?? i.description ?? `#${i.id}`}
+                        </td>
+                      </tr>
+                    ) : (
+                      <tr key={i.id}>
+                        <td>{i.name ?? i.product_name ?? i.description ?? `#${i.id}`}</td>
+                        <td>{i.quantity ?? ''}</td>
+                        <td>
+                          <span
+                            style={{
+                              fontSize: '0.85rem',
+                              fontWeight: 600,
+                              padding: '0.15rem 0.5rem',
+                              borderRadius: 999,
+                              background: i.bookedOut ? '#1FA34C' : '#555',
+                              color: '#fff',
+                            }}
+                          >
+                            {i.status_name ?? (i.bookedOut ? 'Booked out' : 'Not booked out')}
+                          </span>
+                        </td>
+                        <td>{i.prepped ? '✓' : ''}</td>
+                      </tr>
+                    )
+                  )}
                 </tbody>
               </table>
             )}

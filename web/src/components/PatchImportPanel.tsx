@@ -11,8 +11,38 @@ export default function PatchImportPanel({ jobId }: { jobId: string }) {
   const [fixtures, setFixtures] = useState<Fixture[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkLocation, setBulkLocation] = useState('');
 
   const loadFixtures = () => api.patch.fixtures(jobId).then(setFixtures);
+
+  const toggleSelected = (id: string) => {
+    setSelected((s) => {
+      const next = new Set(s);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (!fixtures) return;
+    setSelected((s) => (s.size === fixtures.length ? new Set() : new Set(fixtures.map((f) => f.id))));
+  };
+
+  const bulkSetLocation = async () => {
+    await api.patch.bulkSetLocation(jobId, [...selected], bulkLocation);
+    setBulkLocation('');
+    setSelected(new Set());
+    loadFixtures();
+  };
+
+  const bulkDelete = async () => {
+    if (!confirm(`Delete ${selected.size} selected fixtures?`)) return;
+    await api.patch.bulkRemoveFixtures(jobId, [...selected]);
+    setSelected(new Set());
+    loadFixtures();
+  };
 
   const updateFixture = async (f: Fixture, field: keyof Fixture, rawValue: string) => {
     const isNumeric = ['address', 'mainUniverse', 'mainAddress', 'pixUniverse', 'pixAddress'].includes(field);
@@ -30,6 +60,11 @@ export default function PatchImportPanel({ jobId }: { jobId: string }) {
   const removeFixture = async (id: string) => {
     if (!confirm('Delete this fixture?')) return;
     await api.patch.removeFixture(jobId, id);
+    setSelected((s) => {
+      const next = new Set(s);
+      next.delete(id);
+      return next;
+    });
     loadFixtures();
   };
 
@@ -152,9 +187,34 @@ export default function PatchImportPanel({ jobId }: { jobId: string }) {
         {fixtures && fixtures.length > 0 && (
           <>
             <p className="muted">Every field is editable in place (click and type, saves on blur).</p>
+            {selected.size > 0 && (
+              <div className="row panel" style={{ background: 'rgba(255,255,255,0.04)', alignItems: 'center', gap: '0.6rem' }}>
+                <strong>{selected.size} selected</strong>
+                <input
+                  placeholder="Set location to…"
+                  value={bulkLocation}
+                  onChange={(e) => setBulkLocation(e.target.value)}
+                  style={{ width: 160 }}
+                />
+                <button onClick={bulkSetLocation}>Set location</button>
+                <button className="secondary" onClick={bulkDelete}>
+                  Delete selected
+                </button>
+                <button className="secondary" onClick={() => setSelected(new Set())}>
+                  Clear selection
+                </button>
+              </div>
+            )}
             <table>
               <thead>
                 <tr>
+                  <th>
+                    <input
+                      type="checkbox"
+                      checked={selected.size === fixtures.length && fixtures.length > 0}
+                      onChange={toggleSelectAll}
+                    />
+                  </th>
                   <th>Address</th>
                   <th>Type</th>
                   <th>Main Uni</th>
@@ -169,6 +229,9 @@ export default function PatchImportPanel({ jobId }: { jobId: string }) {
               <tbody>
                 {fixtures.map((f) => (
                   <tr key={f.id}>
+                    <td>
+                      <input type="checkbox" checked={selected.has(f.id)} onChange={() => toggleSelected(f.id)} />
+                    </td>
                     <td>
                       <input
                         type="number"
