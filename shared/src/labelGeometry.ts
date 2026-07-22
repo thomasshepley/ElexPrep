@@ -38,12 +38,24 @@ function buildGridCells(cols: number[], rows: number[], w: number, h: number): C
   return cells;
 }
 
-/** Shared by Fixture labels and Truss/Spike labels — both use the same 3x6 die-cut A4 stock. */
+/** Used by Fixture labels — 3x6 die-cut A4 stock, all 6 rows. */
 export const GRID_18_SHEET: SheetGeometry = {
   pageWidthIn: 8.27,
   pageHeightIn: 11.69,
   landscape: false,
   cells: buildGridCells(FIXTURE_GRID_COLS, FIXTURE_GRID_ROWS, FIXTURE_CELL_W, FIXTURE_CELL_H),
+};
+
+/**
+ * Truss/Spike labels use the same physical die-cut stock as Fixture labels, but the printer
+ * being used for them cuts off the bottom row in practice — so these sheets stop at 5 rows
+ * (15 cells) rather than 6.
+ */
+export const TRUSS_SPIKE_SHEET: SheetGeometry = {
+  pageWidthIn: 8.27,
+  pageHeightIn: 11.69,
+  landscape: false,
+  cells: buildGridCells(FIXTURE_GRID_COLS, FIXTURE_GRID_ROWS.slice(0, -1), FIXTURE_CELL_W, FIXTURE_CELL_H),
 };
 
 /** Cable label stock: single column of contiguous strips, each name printed twice (wrap-round flag). */

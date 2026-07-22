@@ -29,10 +29,11 @@ export default function AdHocLabelsPanel({ jobId }: { jobId: string }) {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     let content: Record<string, unknown> = {};
-    if (labelType === 'TRUSS_SPIKE_POSITION') content = { address: Number(fields.address) };
-    if (labelType === 'TRUSS_SPIKE_TIP') content = { text: fields.text || 'DO NOT TIP' };
-    if (labelType === 'TRUSS_SPIKE_SACN') content = { ipAddress: fields.ipAddress, subnetMask: fields.subnetMask || '255.0.0.0' };
-    if (labelType === 'CABLE') content = { text: fields.text, isDmx };
+    if (labelType === 'TRUSS_SPIKE_POSITION') content = { address: Number(fields.address), location: fields.location };
+    if (labelType === 'TRUSS_SPIKE_TIP') content = { text: fields.text || 'DO NOT TIP', location: fields.location };
+    if (labelType === 'TRUSS_SPIKE_SACN')
+      content = { ipAddress: fields.ipAddress, subnetMask: fields.subnetMask || '255.0.0.0', location: fields.location };
+    if (labelType === 'CABLE') content = { text: fields.text, isDmx, location: fields.location };
     if (labelType === 'PAL') content = { location: fields.location, title: fields.title, subtitle: fields.subtitle };
     if (labelType === 'RACK') content = { title: fields.title, subtitle: fields.subtitle };
 
@@ -82,20 +83,32 @@ export default function AdHocLabelsPanel({ jobId }: { jobId: string }) {
   const renderEditableContent = (item: AdHocLabel) => {
     switch (item.labelType) {
       case 'TRUSS_SPIKE_POSITION':
-        return editableField(item, 'address', 'Position number', 90, 'number');
+        return (
+          <div className="row" style={{ gap: '0.4rem' }}>
+            {editableField(item, 'address', 'Position number', 90, 'number')}
+            {editableField(item, 'location', 'Location', 110)}
+          </div>
+        );
       case 'TRUSS_SPIKE_TIP':
-        return editableField(item, 'text', 'Text (default: DO NOT TIP)', 180);
+        return (
+          <div className="row" style={{ gap: '0.4rem' }}>
+            {editableField(item, 'text', 'Text (default: DO NOT TIP)', 180)}
+            {editableField(item, 'location', 'Location', 110)}
+          </div>
+        );
       case 'TRUSS_SPIKE_SACN':
         return (
           <div className="row" style={{ gap: '0.4rem' }}>
             {editableField(item, 'ipAddress', 'IP address', 130)}
             {editableField(item, 'subnetMask', 'Subnet mask', 130)}
+            {editableField(item, 'location', 'Location', 110)}
           </div>
         );
       case 'CABLE':
         return (
           <div className="row" style={{ gap: '0.4rem' }}>
             {editableField(item, 'text', 'Cable/circuit text', 160)}
+            {editableField(item, 'location', 'Location', 110)}
             <label className="row" style={{ gap: '0.3rem' }}>
               <input
                 type="checkbox"
@@ -142,17 +155,29 @@ export default function AdHocLabelsPanel({ jobId }: { jobId: string }) {
           ))}
         </select>
 
-        {labelType === 'TRUSS_SPIKE_POSITION' && field('address', 'Position number')}
-        {labelType === 'TRUSS_SPIKE_TIP' && field('text', 'Text (default: DO NOT TIP)')}
+        {labelType === 'TRUSS_SPIKE_POSITION' && (
+          <>
+            {field('address', 'Position number')}
+            {field('location', 'Location (e.g. FOH, Floor)')}
+          </>
+        )}
+        {labelType === 'TRUSS_SPIKE_TIP' && (
+          <>
+            {field('text', 'Text (default: DO NOT TIP)')}
+            {field('location', 'Location (e.g. FOH, Floor)')}
+          </>
+        )}
         {labelType === 'TRUSS_SPIKE_SACN' && (
           <>
             {field('ipAddress', 'IP address')}
             {field('subnetMask', 'Subnet mask (default 255.0.0.0)')}
+            {field('location', 'Location (e.g. FOH, Floor)')}
           </>
         )}
         {labelType === 'CABLE' && (
           <>
             {field('text', 'Cable/circuit text')}
+            {field('location', 'Location (e.g. FOH, Floor)')}
             <label className="row" style={{ gap: '0.3rem' }}>
               <input type="checkbox" checked={isDmx} onChange={(e) => setIsDmx(e.target.checked)} />
               DMX (narrow + cut line)

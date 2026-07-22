@@ -191,8 +191,15 @@ export interface RawOpportunityItem {
   // tracks its own crew-facing prepped/pulled checkbox independently of this (see signage).
   status?: number;
   status_name?: string;
+  // 0 = Group (a section heading, e.g. "Lighting - Moving Lights" — not a pickable item),
+  // 1 = Principal, 2 = Accessory. Per Current RMS's own API reference.
+  opportunity_item_type?: number;
+  opportunity_item_type_name?: string;
   [key: string]: unknown;
 }
+
+/** Current RMS's own opportunity_item_type code for a section-heading row, not a real item. */
+export const GROUP_ITEM_TYPE = 0;
 
 interface OpportunityItemsPage {
   opportunity_items?: RawOpportunityItem[];

@@ -76,13 +76,13 @@ export async function renderLabelType(
     case 'FIXTURE':
       return buildFixtureLabelsPdf(doc, items as never);
     case 'TRUSS_SPIKE_POSITION':
-      return buildTrussSpikePositionPdf(doc, items as never);
+      return buildTrussSpikePositionPdf(doc, items as never, locationColors);
     case 'TRUSS_SPIKE_TIP':
-      return buildTrussSpikeTipPdf(doc, items as never);
+      return buildTrussSpikeTipPdf(doc, items as never, locationColors);
     case 'TRUSS_SPIKE_SACN':
-      return buildTrussSpikeSacnPdf(doc, items as never);
+      return buildTrussSpikeSacnPdf(doc, items as never, locationColors);
     case 'CABLE':
-      return buildCableLabelsPdf(doc, items as never);
+      return buildCableLabelsPdf(doc, items as never, locationColors);
     case 'PAL':
       return buildPalLabelsPdf(doc, items as never, await loadJobLogo(jobId), locationColors);
     case 'RACK':

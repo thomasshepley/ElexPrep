@@ -1,20 +1,27 @@
 import { prisma, logActivity } from '../db';
 import { getCurrentRmsConfig, saveCurrentRmsConfig, CurrentRmsConfig } from './config';
-import { fetchAllOpportunities, fetchMember, fetchOpportunityItems, RawOpportunity } from './client';
+import { fetchAllOpportunities, fetchMember, fetchOpportunityItems, GROUP_ITEM_TYPE, RawOpportunity } from './client';
 import { diffPickListItems, pickListDiffIsEmpty, type PickListItemSnapshot } from '@elexprep/shared';
 import type { CurrentRmsOpportunity } from '@prisma/client';
 
-/** Builds the comparable pick-list snapshot for a job's linked opportunity, for diffing. */
+/**
+ * Builds the comparable pick-list snapshot for a job's linked opportunity, for diffing.
+ * Excludes Group rows (section headings like "Lighting - Moving Lights") — they aren't real
+ * pickable items, and their "quantity" is meaningless, so they shouldn't show up as additions/
+ * removals/changes in the signage diff alert.
+ */
 export async function fetchPickListSnapshot(
   config: Pick<CurrentRmsConfig, 'subdomain' | 'apiKey'>,
   rmsId: number
 ): Promise<PickListItemSnapshot[]> {
   const items = await fetchOpportunityItems(config, rmsId);
-  return items.map((i) => ({
-    id: i.id,
-    name: i.name || i.product_name || `Item #${i.id}`,
-    quantity: i.quantity ?? 1,
-  }));
+  return items
+    .filter((i) => i.opportunity_item_type !== GROUP_ITEM_TYPE)
+    .map((i) => ({
+      id: i.id,
+      name: i.name || i.product_name || `Item #${i.id}`,
+      quantity: i.quantity ?? 1,
+    }));
 }
 
 function toDate(value: string | undefined): Date | null {

@@ -177,6 +177,8 @@ export interface CurrentRmsPickItem {
   status_name?: string;
   prepped?: boolean;
   bookedOut?: boolean;
+  /** A Current RMS section-heading row (e.g. "Lighting - Moving Lights"), not a real item. */
+  isGroup?: boolean;
   [key: string]: unknown;
 }
 

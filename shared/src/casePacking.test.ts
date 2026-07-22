@@ -25,6 +25,11 @@ test('formatCaseLabel: short leftover case fills the gap with Spare', () => {
   assert.equal(formatCaseLabel([601, 602], 4), '601 + 602 + Spare + Spare');
 });
 
+test('formatCaseLabel: a partial case with 3+ real addresses still collapses to a range', () => {
+  assert.equal(formatCaseLabel([201, 202, 203, 204], 6), '201 - 204 + Spare + Spare');
+  assert.equal(formatCaseLabel([201, 202, 203], 8), '201 - 203 + Spare + Spare + Spare + Spare + Spare');
+});
+
 test('packFixturesIntoCases: groups by fixture type and chunks by unitsPerCase', () => {
   const fixtures = [
     fixture(201, 'AstraBlade'),

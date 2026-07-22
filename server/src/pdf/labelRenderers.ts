@@ -6,6 +6,7 @@ import {
   PAL_CELL_LAYOUT,
   PAL_SHEET,
   RACK_SHEET,
+  TRUSS_SPIKE_SHEET,
 } from '@elexprep/shared';
 import { CellRectPt, centerText, drawCellOutline, drawImageCover, inPt, renderSheets } from './pdfBuilder';
 import {
@@ -26,20 +27,24 @@ export interface FixtureLabelContent {
 
 export interface TrussSpikePositionContent {
   address: number;
+  location?: string;
 }
 
 export interface TrussSpikeTipContent {
   text?: string;
+  location?: string;
 }
 
 export interface TrussSpikeSacnContent {
   ipAddress: string;
   subnetMask?: string;
+  location?: string;
 }
 
 export interface CableLabelContent {
   text: string;
   isDmx?: boolean;
+  location?: string;
 }
 
 export interface PalLabelContent {
@@ -58,6 +63,18 @@ async function fonts(doc: PDFDocument) {
     bold: await doc.embedFont(StandardFonts.HelveticaBold),
     regular: await doc.embedFont(StandardFonts.Helvetica),
   };
+}
+
+/**
+ * Fills an entire label cell with its resolved location color (Cable and Truss/Spike labels
+ * are "full colour" rather than just carrying a colored bar like PAL) and returns the text
+ * color that stays legible against it.
+ */
+function fillCellByLocation(page: PDFPage, cell: CellRectPt, locationColors: LocationColorMap, location: string | undefined) {
+  const colorHex = resolveLocationColor(locationColors, location);
+  const { r, g, b } = hexToRgbFractions(colorHex);
+  page.drawRectangle({ x: cell.xPt, y: cell.yPt, width: cell.wPt, height: cell.hPt, color: rgb(r, g, b) });
+  return contrastingTextIsWhite(colorHex) ? rgb(1, 1, 1) : rgb(0, 0, 0);
 }
 
 export async function buildFixtureLabelsPdf(doc: PDFDocument, items: FixtureLabelContent[]) {
@@ -81,27 +98,30 @@ export async function buildFixtureLabelsPdf(doc: PDFDocument, items: FixtureLabe
   });
 }
 
-export async function buildTrussSpikePositionPdf(doc: PDFDocument, items: TrussSpikePositionContent[]) {
+export async function buildTrussSpikePositionPdf(doc: PDFDocument, items: TrussSpikePositionContent[], locationColors: LocationColorMap = new Map()) {
   const { bold } = await fonts(doc);
-  await renderSheets(doc, GRID_18_SHEET, items, (page, cell, item) => {
-    centerText(page, String(item.address), bold, 54, cell, cell.hPt / 2 - inPt(0.18));
+  await renderSheets(doc, TRUSS_SPIKE_SHEET, items, (page, cell, item) => {
+    const textColor = fillCellByLocation(page, cell, locationColors, item.location);
+    centerText(page, String(item.address), bold, 54, cell, cell.hPt / 2 - inPt(0.18), textColor);
   });
 }
 
-export async function buildTrussSpikeTipPdf(doc: PDFDocument, items: TrussSpikeTipContent[]) {
+export async function buildTrussSpikeTipPdf(doc: PDFDocument, items: TrussSpikeTipContent[], locationColors: LocationColorMap = new Map()) {
   const { bold } = await fonts(doc);
-  await renderSheets(doc, GRID_18_SHEET, items, (page, cell, item) => {
+  await renderSheets(doc, TRUSS_SPIKE_SHEET, items, (page, cell, item) => {
+    const textColor = fillCellByLocation(page, cell, locationColors, item.location);
     const text = item.text ?? 'DO NOT TIP';
-    centerText(page, text, bold, 22, cell, cell.hPt / 2 - inPt(0.12));
+    centerText(page, text, bold, 22, cell, cell.hPt / 2 - inPt(0.12), textColor);
   });
 }
 
-export async function buildTrussSpikeSacnPdf(doc: PDFDocument, items: TrussSpikeSacnContent[]) {
+export async function buildTrussSpikeSacnPdf(doc: PDFDocument, items: TrussSpikeSacnContent[], locationColors: LocationColorMap = new Map()) {
   const { bold, regular } = await fonts(doc);
-  await renderSheets(doc, GRID_18_SHEET, items, (page, cell, item) => {
-    centerText(page, 'sACN Fixture', bold, 16, cell, cell.hPt - inPt(0.5));
-    centerText(page, `IP Address: ${item.ipAddress}`, regular, 12, cell, cell.hPt / 2 - inPt(0.05));
-    centerText(page, `Subnet Mask: ${item.subnetMask ?? '255.0.0.0'}`, regular, 12, cell, cell.hPt / 2 - inPt(0.3));
+  await renderSheets(doc, TRUSS_SPIKE_SHEET, items, (page, cell, item) => {
+    const textColor = fillCellByLocation(page, cell, locationColors, item.location);
+    centerText(page, 'sACN Fixture', bold, 16, cell, cell.hPt - inPt(0.5), textColor);
+    centerText(page, `IP Address: ${item.ipAddress}`, regular, 12, cell, cell.hPt / 2 - inPt(0.05), textColor);
+    centerText(page, `Subnet Mask: ${item.subnetMask ?? '255.0.0.0'}`, regular, 12, cell, cell.hPt / 2 - inPt(0.3), textColor);
   });
 }
 
@@ -110,12 +130,13 @@ export async function buildTrussSpikeSacnPdf(doc: PDFDocument, items: TrussSpike
  * to the left 2/3 of the strip and a dashed cut line marks where the blank 1/3 begins, so it
  * can be trimmed or folded back on itself.
  */
-export async function buildCableLabelsPdf(doc: PDFDocument, items: CableLabelContent[]) {
+export async function buildCableLabelsPdf(doc: PDFDocument, items: CableLabelContent[], locationColors: LocationColorMap = new Map()) {
   const { bold } = await fonts(doc);
   await renderSheets(doc, CABLE_SHEET, items, (page, cell, item) => {
+    const textColor = fillCellByLocation(page, cell, locationColors, item.location);
     const usableWidthPt = item.isDmx ? cell.wPt * DMX_CABLE_WIDTH_FACTOR : cell.wPt;
     const textCell: CellRectPt = { ...cell, wPt: usableWidthPt };
-    centerText(page, item.text, bold, 26, textCell, cell.hPt / 2 - inPt(0.12));
+    centerText(page, item.text, bold, 26, textCell, cell.hPt / 2 - inPt(0.12), textColor);
     if (item.isDmx) {
       const cutX = cell.xPt + usableWidthPt;
       page.drawLine({
