@@ -43,6 +43,7 @@ printQueueRouter.post('/:jobId/print-queue/build', async (req, res) => {
             pixUniverse: f.pixUniverse,
             pixAddress: f.pixAddress,
             mode: f.mode,
+            location: f.location,
           }),
           quantity: 1,
         },

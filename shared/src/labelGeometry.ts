@@ -38,7 +38,8 @@ function buildGridCells(cols: number[], rows: number[], w: number, h: number): C
   return cells;
 }
 
-/** Used by Fixture labels — 3x6 die-cut A4 stock, all 6 rows. */
+/** 3x6 die-cut A4 stock, all 6 rows — kept only as the source grid for the placeholder Rack
+ * layout below (no real Rack template has been supplied yet). */
 export const GRID_18_SHEET: SheetGeometry = {
   pageWidthIn: 8.27,
   pageHeightIn: 11.69,
@@ -47,11 +48,11 @@ export const GRID_18_SHEET: SheetGeometry = {
 };
 
 /**
- * Truss/Spike labels use the same physical die-cut stock as Fixture labels, but the printer
- * being used for them cuts off the bottom row in practice — so these sheets stop at 5 rows
- * (15 cells) rather than 6.
+ * Fixture and Truss/Spike labels share the exact same physical die-cut stock, printed on the
+ * same printer — which cuts off the bottom row in practice for both, so these sheets stop at
+ * 5 rows (15 cells) rather than 6.
  */
-export const TRUSS_SPIKE_SHEET: SheetGeometry = {
+export const FIXTURE_TRUSS_SPIKE_SHEET: SheetGeometry = {
   pageWidthIn: 8.27,
   pageHeightIn: 11.69,
   landscape: false,

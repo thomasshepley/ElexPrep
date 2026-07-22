@@ -2,11 +2,10 @@ import { PDFDocument, PDFFont, PDFImage, PDFPage, StandardFonts, rgb } from 'pdf
 import {
   CABLE_SHEET,
   DMX_CABLE_WIDTH_FACTOR,
-  GRID_18_SHEET,
+  FIXTURE_TRUSS_SPIKE_SHEET,
   PAL_CELL_LAYOUT,
   PAL_SHEET,
   RACK_SHEET,
-  TRUSS_SPIKE_SHEET,
 } from '@elexprep/shared';
 import { CellRectPt, centerText, drawCellOutline, drawImageCover, drawLocationFill, fitTextToWidth, inPt, renderSheets } from './pdfBuilder';
 import { contrastingTextIsWhite, LocationColorMap, resolveLocationColor, ResolvedLocationColor } from './locationColors';
@@ -18,6 +17,7 @@ export interface FixtureLabelContent {
   pixUniverse?: number | null;
   pixAddress?: number | null;
   mode?: string | null;
+  location?: string | null;
 }
 
 export interface TrussSpikePositionContent {
@@ -51,6 +51,7 @@ export interface PalLabelContent {
 export interface RackLabelContent {
   title: string;
   subtitle?: string;
+  location?: string;
 }
 
 async function fonts(doc: PDFDocument) {
@@ -83,30 +84,31 @@ function fillCellByLocation(page: PDFPage, cell: CellRectPt, locationColors: Loc
   return textColorsFor(resolved);
 }
 
-export async function buildFixtureLabelsPdf(doc: PDFDocument, items: FixtureLabelContent[]) {
+export async function buildFixtureLabelsPdf(doc: PDFDocument, items: FixtureLabelContent[], locationColors: LocationColorMap = new Map()) {
   const { bold, regular } = await fonts(doc);
-  await renderSheets(doc, GRID_18_SHEET, items, (page, cell, item) => {
-    centerText(page, String(item.address), bold, 34, cell, cell.hPt - inPt(0.62));
+  await renderSheets(doc, FIXTURE_TRUSS_SPIKE_SHEET, items, (page, cell, item) => {
+    const { fill, outline } = fillCellByLocation(page, cell, locationColors, item.location ?? undefined);
+    centerText(page, String(item.address), bold, 34, cell, cell.hPt - inPt(0.62), fill, outline);
     let line = 1;
     const lineH = inPt(0.24);
     const topY = cell.hPt - inPt(0.78);
     if (item.mainUniverse != null && item.mainAddress != null) {
-      centerText(page, `Main: Uni: ${item.mainUniverse} Add: ${item.mainAddress}`, regular, 11, cell, topY - lineH * line);
+      centerText(page, `Main: Uni: ${item.mainUniverse} Add: ${item.mainAddress}`, regular, 11, cell, topY - lineH * line, fill, outline);
       line++;
     }
     if (item.pixUniverse != null && item.pixAddress != null) {
-      centerText(page, `Pix: Uni: ${item.pixUniverse} Add: ${item.pixAddress}`, regular, 11, cell, topY - lineH * line);
+      centerText(page, `Pix: Uni: ${item.pixUniverse} Add: ${item.pixAddress}`, regular, 11, cell, topY - lineH * line, fill, outline);
       line++;
     }
     if (item.mode) {
-      centerText(page, `Mode: ${item.mode}`, regular, 11, cell, topY - lineH * line);
+      centerText(page, `Mode: ${item.mode}`, regular, 11, cell, topY - lineH * line, fill, outline);
     }
   });
 }
 
 export async function buildTrussSpikePositionPdf(doc: PDFDocument, items: TrussSpikePositionContent[], locationColors: LocationColorMap = new Map()) {
   const { bold } = await fonts(doc);
-  await renderSheets(doc, TRUSS_SPIKE_SHEET, items, (page, cell, item) => {
+  await renderSheets(doc, FIXTURE_TRUSS_SPIKE_SHEET, items, (page, cell, item) => {
     const { fill, outline } = fillCellByLocation(page, cell, locationColors, item.location);
     centerText(page, String(item.address), bold, 54, cell, cell.hPt / 2 - inPt(0.18), fill, outline);
   });
@@ -114,7 +116,7 @@ export async function buildTrussSpikePositionPdf(doc: PDFDocument, items: TrussS
 
 export async function buildTrussSpikeTipPdf(doc: PDFDocument, items: TrussSpikeTipContent[], locationColors: LocationColorMap = new Map()) {
   const { bold } = await fonts(doc);
-  await renderSheets(doc, TRUSS_SPIKE_SHEET, items, (page, cell, item) => {
+  await renderSheets(doc, FIXTURE_TRUSS_SPIKE_SHEET, items, (page, cell, item) => {
     const { fill, outline } = fillCellByLocation(page, cell, locationColors, item.location);
     const fit = fitTextToWidth(bold, item.text ?? 'DO NOT TIP', 22, cell.wPt - inPt(0.3));
     centerText(page, fit.text, bold, fit.size, cell, cell.hPt / 2 - inPt(0.12), fill, outline);
@@ -123,7 +125,7 @@ export async function buildTrussSpikeTipPdf(doc: PDFDocument, items: TrussSpikeT
 
 export async function buildTrussSpikeSacnPdf(doc: PDFDocument, items: TrussSpikeSacnContent[], locationColors: LocationColorMap = new Map()) {
   const { bold, regular } = await fonts(doc);
-  await renderSheets(doc, TRUSS_SPIKE_SHEET, items, (page, cell, item) => {
+  await renderSheets(doc, FIXTURE_TRUSS_SPIKE_SHEET, items, (page, cell, item) => {
     const { fill, outline } = fillCellByLocation(page, cell, locationColors, item.location);
     centerText(page, 'sACN Fixture', bold, 16, cell, cell.hPt - inPt(0.5), fill, outline);
     centerText(page, `IP Address: ${item.ipAddress}`, regular, 12, cell, cell.hPt / 2 - inPt(0.05), fill, outline);
@@ -228,15 +230,16 @@ export async function buildPalLabelsPdf(
   });
 }
 
-export async function buildRackLabelsPdf(doc: PDFDocument, items: RackLabelContent[]) {
+export async function buildRackLabelsPdf(doc: PDFDocument, items: RackLabelContent[], locationColors: LocationColorMap = new Map()) {
   const { bold, regular } = await fonts(doc);
   await renderSheets(doc, RACK_SHEET, items, (page, cell, item) => {
+    const { fill, outline } = fillCellByLocation(page, cell, locationColors, item.location);
     const maxWidthPt = cell.wPt - inPt(0.3);
     const title = fitTextToWidth(bold, item.title, 22, maxWidthPt);
-    centerText(page, title.text, bold, title.size, cell, cell.hPt / 2 + inPt(0.15));
+    centerText(page, title.text, bold, title.size, cell, cell.hPt / 2 + inPt(0.15), fill, outline);
     if (item.subtitle) {
       const subtitle = fitTextToWidth(regular, item.subtitle, 13, maxWidthPt);
-      centerText(page, subtitle.text, regular, subtitle.size, cell, cell.hPt / 2 - inPt(0.25));
+      centerText(page, subtitle.text, regular, subtitle.size, cell, cell.hPt / 2 - inPt(0.25), fill, outline);
     }
   });
 }
