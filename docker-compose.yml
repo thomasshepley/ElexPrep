@@ -6,9 +6,31 @@ services:
     ports:
       - "4000:4000"
     # environment:
-    #   Only needed if you put a TLS-terminating reverse proxy in front of this container.
+    #   Only set COOKIE_SECURE=true if EVERY login will go through the https:// tunnel
+    #   hostname from now on, including on-site (e.g. prep-bay signage TVs switched to the
+    #   tunnel URL instead of a plain http://<lan-ip>:4000 address) — a Secure-flagged
+    #   cookie is dropped by the browser on any plain-HTTP request, which would break login
+    #   for whichever access path doesn't use HTTPS. Leaving this false (the default) still
+    #   works correctly over the HTTPS tunnel; it just doesn't add that extra hardening.
     #   - COOKIE_SECURE=true
     volumes:
       # Database, logos, plots, and generated print-job PDFs all live here —
       # back this folder up and the whole app state comes with it.
       - ./data:/data
+
+  # Cloudflare Tunnel: exposes the app at your chosen hostname (set up in the Zero Trust
+  # dashboard under Networks -> Tunnels) without opening any port on your router. Only
+  # needed if you're using the permanent named-tunnel setup — remove this service (and
+  # keep the "cloudflared tunnel --url ..." command instead) if you just want the quick,
+  # temporary trycloudflare.com URL for testing.
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: elexprep-cloudflared
+    restart: unless-stopped
+    command: tunnel run
+    environment:
+      # Paste the tunnel token from Zero Trust -> Networks -> Tunnels -> (your tunnel) ->
+      # "Install connector" step. Keep this out of version control (see the note below).
+      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
+    depends_on:
+      - elexprep
