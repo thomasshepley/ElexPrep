@@ -8,7 +8,7 @@ import {
   RACK_SHEET,
   TRUSS_SPIKE_SHEET,
 } from '@elexprep/shared';
-import { CellRectPt, centerText, drawCellOutline, drawImageCover, inPt, renderSheets } from './pdfBuilder';
+import { CellRectPt, centerText, drawCellOutline, drawImageCover, fitTextToWidth, inPt, renderSheets } from './pdfBuilder';
 import {
   contrastingTextIsWhite,
   hexToRgbFractions,
@@ -110,8 +110,8 @@ export async function buildTrussSpikeTipPdf(doc: PDFDocument, items: TrussSpikeT
   const { bold } = await fonts(doc);
   await renderSheets(doc, TRUSS_SPIKE_SHEET, items, (page, cell, item) => {
     const textColor = fillCellByLocation(page, cell, locationColors, item.location);
-    const text = item.text ?? 'DO NOT TIP';
-    centerText(page, text, bold, 22, cell, cell.hPt / 2 - inPt(0.12), textColor);
+    const fit = fitTextToWidth(bold, item.text ?? 'DO NOT TIP', 22, cell.wPt - inPt(0.3));
+    centerText(page, fit.text, bold, fit.size, cell, cell.hPt / 2 - inPt(0.12), textColor);
   });
 }
 
@@ -136,7 +136,8 @@ export async function buildCableLabelsPdf(doc: PDFDocument, items: CableLabelCon
     const textColor = fillCellByLocation(page, cell, locationColors, item.location);
     const usableWidthPt = item.isDmx ? cell.wPt * DMX_CABLE_WIDTH_FACTOR : cell.wPt;
     const textCell: CellRectPt = { ...cell, wPt: usableWidthPt };
-    centerText(page, item.text, bold, 26, textCell, cell.hPt / 2 - inPt(0.12), textColor);
+    const fit = fitTextToWidth(bold, item.text, 26, usableWidthPt - inPt(0.2));
+    centerText(page, fit.text, bold, fit.size, textCell, cell.hPt / 2 - inPt(0.12), textColor);
     if (item.isDmx) {
       const cutX = cell.xPt + usableWidthPt;
       page.drawLine({
@@ -197,9 +198,14 @@ function drawPalCell(
     wPt: cell.wPt,
     hPt: inPt(content.h) * scaleX,
   };
-  centerText(page, item.title, bold, 30, contentRect, contentRect.hPt - inPt(0.55));
+  // Fixture type names can run long (e.g. "Maverick Storm 1 Flex Hybrid") — shrink to fit
+  // the cell width first, then shorten by dropping trailing words if it still won't fit.
+  const textMaxWidthPt = contentRect.wPt - inPt(0.3);
+  const title = fitTextToWidth(bold, item.title, 30, textMaxWidthPt);
+  centerText(page, title.text, bold, title.size, contentRect, contentRect.hPt - inPt(0.55));
   if (item.subtitle) {
-    centerText(page, item.subtitle, bold, 30, contentRect, contentRect.hPt - inPt(1.15));
+    const subtitle = fitTextToWidth(bold, item.subtitle, 30, textMaxWidthPt);
+    centerText(page, subtitle.text, bold, subtitle.size, contentRect, contentRect.hPt - inPt(1.15));
   }
 }
 
@@ -220,9 +226,12 @@ export async function buildPalLabelsPdf(
 export async function buildRackLabelsPdf(doc: PDFDocument, items: RackLabelContent[]) {
   const { bold, regular } = await fonts(doc);
   await renderSheets(doc, RACK_SHEET, items, (page, cell, item) => {
-    centerText(page, item.title, bold, 22, cell, cell.hPt / 2 + inPt(0.15));
+    const maxWidthPt = cell.wPt - inPt(0.3);
+    const title = fitTextToWidth(bold, item.title, 22, maxWidthPt);
+    centerText(page, title.text, bold, title.size, cell, cell.hPt / 2 + inPt(0.15));
     if (item.subtitle) {
-      centerText(page, item.subtitle, regular, 13, cell, cell.hPt / 2 - inPt(0.25));
+      const subtitle = fitTextToWidth(regular, item.subtitle, 13, maxWidthPt);
+      centerText(page, subtitle.text, regular, subtitle.size, cell, cell.hPt / 2 - inPt(0.25));
     }
   });
 }

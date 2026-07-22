@@ -48,6 +48,32 @@ export function centerText(
 }
 
 /**
+ * Shrinks font size to fit `text` within `maxWidthPt` at `startSize`, down to `minSize`. If it
+ * still doesn't fit at the minimum size (e.g. "Maverick Storm 1 Flex Hybrid"), trailing words
+ * are dropped one at a time until what's left fits — so long fixture type names shorten to
+ * something like "Maverick Storm 1" rather than overlapping or running off the label.
+ */
+export function fitTextToWidth(
+  font: PDFFont,
+  text: string,
+  startSize: number,
+  maxWidthPt: number,
+  minSize = 14
+): { text: string; size: number } {
+  let size = startSize;
+  while (size > minSize && font.widthOfTextAtSize(text, size) > maxWidthPt) size -= 1;
+  if (font.widthOfTextAtSize(text, size) <= maxWidthPt) return { text, size };
+
+  const words = text.split(' ');
+  while (words.length > 1) {
+    words.pop();
+    const candidate = words.join(' ');
+    if (font.widthOfTextAtSize(candidate, size) <= maxWidthPt) return { text: candidate, size };
+  }
+  return { text: words[0] ?? text, size };
+}
+
+/**
  * Draws an image to completely cover a rect edge-to-edge (like CSS `object-fit: cover`):
  * scales up to fill both dimensions, preserving aspect ratio, and clips the overflow rather
  * than letterboxing — so a banner-style image slot never shows gaps on the sides regardless
