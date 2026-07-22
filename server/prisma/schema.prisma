@@ -81,6 +81,10 @@ model LocationColorRule {
   job       Job?     @relation(fields: [jobId], references: [id], onDelete: Cascade)
   location  String
   color     String
+  /// "SOLID" (default) or "DIAGONAL_STRIPES" for hazard-tape-style locations (e.g. Spare, Rigging).
+  pattern        String  @default("SOLID")
+  /// Second stripe color, only used when pattern is DIAGONAL_STRIPES.
+  secondaryColor String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

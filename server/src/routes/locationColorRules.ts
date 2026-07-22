@@ -5,6 +5,7 @@ export const locationColorRulesRouter = Router();
 export const jobLocationColorRulesRouter = Router();
 
 const HEX_COLOR_RE = /^#[0-9a-fA-F]{6}$/;
+const PATTERNS = ['SOLID', 'DIAGONAL_STRIPES'];
 
 /**
  * Prisma/SQLite can't do a case-insensitive equality filter directly, so this checks the
@@ -13,6 +14,23 @@ const HEX_COLOR_RE = /^#[0-9a-fA-F]{6}$/;
 async function assertNoDuplicate(jobId: string | null, location: string, excludeId?: string) {
   const all = await prisma.locationColorRule.findMany({ where: { jobId } });
   return all.find((r) => r.location.toLowerCase().trim() === location.toLowerCase().trim() && r.id !== excludeId);
+}
+
+/**
+ * Validates the optional pattern/secondaryColor pair: a DIAGONAL_STRIPES rule needs a valid
+ * secondary hex color (the second stripe); a SOLID rule ignores/clears it.
+ */
+function validatePattern(body: Record<string, unknown>): { error: string } | { pattern?: string; secondaryColor?: string | null } {
+  if (body.pattern === undefined && body.secondaryColor === undefined) return {};
+  const pattern = typeof body.pattern === 'string' ? body.pattern : 'SOLID';
+  if (!PATTERNS.includes(pattern)) return { error: 'pattern must be SOLID or DIAGONAL_STRIPES' };
+  if (pattern === 'DIAGONAL_STRIPES') {
+    if (!body.secondaryColor || !HEX_COLOR_RE.test(body.secondaryColor as string)) {
+      return { error: 'secondaryColor must be a hex value like #FFFFFF when pattern is DIAGONAL_STRIPES' };
+    }
+    return { pattern, secondaryColor: body.secondaryColor as string };
+  }
+  return { pattern, secondaryColor: null };
 }
 
 // Global default rules (jobId = null) — these are the house-wide fallbacks every job starts with.
@@ -29,10 +47,12 @@ locationColorRulesRouter.post('/', async (req, res) => {
   if (!color || !HEX_COLOR_RE.test(color)) {
     return res.status(400).json({ error: 'color must be a hex value like #1FA34C' });
   }
+  const patternFields = validatePattern(req.body ?? {});
+  if ('error' in patternFields) return res.status(400).json({ error: patternFields.error });
   if (await assertNoDuplicate(null, location)) {
     return res.status(409).json({ error: 'A rule for this location already exists' });
   }
-  const rule = await prisma.locationColorRule.create({ data: { location, color, jobId: null } });
+  const rule = await prisma.locationColorRule.create({ data: { location, color, jobId: null, ...patternFields } });
   await logActivity('location_color_rule.create', `${location} = ${color}`, undefined, req.user?.id);
   res.status(201).json(rule);
 });
@@ -42,6 +62,8 @@ locationColorRulesRouter.put('/:id', async (req, res) => {
   if (color !== undefined && !HEX_COLOR_RE.test(color)) {
     return res.status(400).json({ error: 'color must be a hex value like #1FA34C' });
   }
+  const patternFields = validatePattern(req.body ?? {});
+  if ('error' in patternFields) return res.status(400).json({ error: patternFields.error });
   if (location !== undefined && (await assertNoDuplicate(null, location, req.params.id))) {
     return res.status(409).json({ error: 'A rule for this location already exists' });
   }
@@ -50,6 +72,7 @@ locationColorRulesRouter.put('/:id', async (req, res) => {
     data: {
       ...(location !== undefined ? { location } : {}),
       ...(color !== undefined ? { color } : {}),
+      ...patternFields,
     },
   });
   res.json(rule);
@@ -80,10 +103,12 @@ jobLocationColorRulesRouter.post('/:jobId/location-colors', async (req, res) => 
   if (!color || !HEX_COLOR_RE.test(color)) {
     return res.status(400).json({ error: 'color must be a hex value like #1FA34C' });
   }
+  const patternFields = validatePattern(req.body ?? {});
+  if ('error' in patternFields) return res.status(400).json({ error: patternFields.error });
   if (await assertNoDuplicate(jobId, location)) {
     return res.status(409).json({ error: 'A rule for this location already exists for this job' });
   }
-  const rule = await prisma.locationColorRule.create({ data: { jobId, location, color } });
+  const rule = await prisma.locationColorRule.create({ data: { jobId, location, color, ...patternFields } });
   await logActivity('location_color_rule.create', `${location} = ${color} (job-specific)`, jobId, req.user?.id);
   res.status(201).json(rule);
 });
@@ -93,6 +118,8 @@ jobLocationColorRulesRouter.put('/:jobId/location-colors/:id', async (req, res) 
   if (color !== undefined && !HEX_COLOR_RE.test(color)) {
     return res.status(400).json({ error: 'color must be a hex value like #1FA34C' });
   }
+  const patternFields = validatePattern(req.body ?? {});
+  if ('error' in patternFields) return res.status(400).json({ error: patternFields.error });
   if (location !== undefined && (await assertNoDuplicate(req.params.jobId, location, req.params.id))) {
     return res.status(409).json({ error: 'A rule for this location already exists for this job' });
   }
@@ -101,6 +128,7 @@ jobLocationColorRulesRouter.put('/:jobId/location-colors/:id', async (req, res) 
     data: {
       ...(location !== undefined ? { location } : {}),
       ...(color !== undefined ? { color } : {}),
+      ...patternFields,
     },
   });
   res.json(rule);

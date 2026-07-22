@@ -52,10 +52,14 @@ export interface FixtureTypeRule {
   caseLabelOverride: string | null;
 }
 
+export type LocationColorPattern = 'SOLID' | 'DIAGONAL_STRIPES';
+
 export interface LocationColorRule {
   id: string;
   location: string;
   color: string;
+  pattern: LocationColorPattern;
+  secondaryColor: string | null;
 }
 
 export interface Fixture {
@@ -257,18 +261,25 @@ export const api = {
   },
   locationColorRules: {
     list: () => request<LocationColorRule[]>('/location-color-rules'),
-    create: (data: { location: string; color: string }) =>
+    create: (data: { location: string; color: string; pattern?: LocationColorPattern; secondaryColor?: string }) =>
       request<LocationColorRule>('/location-color-rules', { method: 'POST', body: JSON.stringify(data) }),
-    update: (id: string, data: Partial<{ location: string; color: string }>) =>
-      request<LocationColorRule>(`/location-color-rules/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    update: (
+      id: string,
+      data: Partial<{ location: string; color: string; pattern: LocationColorPattern; secondaryColor: string | null }>
+    ) => request<LocationColorRule>(`/location-color-rules/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     remove: (id: string) => request<void>(`/location-color-rules/${id}`, { method: 'DELETE' }),
   },
   jobLocationColorRules: {
     list: (jobId: string) => request<LocationColorRule[]>(`/jobs/${jobId}/location-colors`),
-    create: (jobId: string, data: { location: string; color: string }) =>
-      request<LocationColorRule>(`/jobs/${jobId}/location-colors`, { method: 'POST', body: JSON.stringify(data) }),
-    update: (jobId: string, id: string, data: Partial<{ location: string; color: string }>) =>
-      request<LocationColorRule>(`/jobs/${jobId}/location-colors/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    create: (
+      jobId: string,
+      data: { location: string; color: string; pattern?: LocationColorPattern; secondaryColor?: string }
+    ) => request<LocationColorRule>(`/jobs/${jobId}/location-colors`, { method: 'POST', body: JSON.stringify(data) }),
+    update: (
+      jobId: string,
+      id: string,
+      data: Partial<{ location: string; color: string; pattern: LocationColorPattern; secondaryColor: string | null }>
+    ) => request<LocationColorRule>(`/jobs/${jobId}/location-colors/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     remove: (jobId: string, id: string) =>
       request<void>(`/jobs/${jobId}/location-colors/${id}`, { method: 'DELETE' }),
   },

@@ -26,7 +26,7 @@ import { currentRmsRouter, jobCurrentRmsRouter } from './routes/currentRms';
 import { restartCurrentRmsPolling } from './currentRms/sync';
 import { locationColorRulesRouter, jobLocationColorRulesRouter } from './routes/locationColorRules';
 import { permissionsRouter } from './routes/permissions';
-import { seedDefaultLocationColorsIfEmpty } from './pdf/locationColors';
+import { seedDefaultLocationColorsIfEmpty, seedNewDefaultLocationColorsIfMissing } from './pdf/locationColors';
 import { prisma } from './db';
 
 const app = express();
@@ -109,3 +109,6 @@ process.on('SIGINT', () => shutdown('SIGINT'));
 
 restartCurrentRmsPolling().catch((err) => console.error('Could not start Current RMS polling:', err));
 seedDefaultLocationColorsIfEmpty().catch((err) => console.error('Could not seed location colors:', err));
+seedNewDefaultLocationColorsIfMissing(['Spare', 'Rigging']).catch((err) =>
+  console.error('Could not top up new default location colors:', err)
+);
