@@ -305,6 +305,10 @@ export const api = {
       request<Fixture>(`/jobs/${jobId}/fixtures/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     removeFixture: (jobId: string, id: string) =>
       request<void>(`/jobs/${jobId}/fixtures/${id}`, { method: 'DELETE' }),
+    bulkSetLocation: (jobId: string, ids: string[], location: string) =>
+      request<{ updated: number }>(`/jobs/${jobId}/fixtures/bulk`, { method: 'PUT', body: JSON.stringify({ ids, location }) }),
+    bulkRemoveFixtures: (jobId: string, ids: string[]) =>
+      request<{ deleted: number }>(`/jobs/${jobId}/fixtures/bulk`, { method: 'DELETE', body: JSON.stringify({ ids }) }),
   },
   cases: {
     generate: (jobId: string) => request<{ generated: number }>(`/jobs/${jobId}/cases/generate`, { method: 'POST' }),
@@ -314,6 +318,10 @@ export const api = {
     update: (jobId: string, id: string, data: Partial<{ fixtureType: string; label: string; location: string }>) =>
       request<CaseGroup>(`/jobs/${jobId}/cases/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     remove: (jobId: string, id: string) => request<void>(`/jobs/${jobId}/cases/${id}`, { method: 'DELETE' }),
+    bulkSetLocation: (jobId: string, ids: string[], location: string) =>
+      request<{ updated: number }>(`/jobs/${jobId}/cases/bulk`, { method: 'PUT', body: JSON.stringify({ ids, location }) }),
+    bulkRemove: (jobId: string, ids: string[]) =>
+      request<{ deleted: number }>(`/jobs/${jobId}/cases/bulk`, { method: 'DELETE', body: JSON.stringify({ ids }) }),
   },
   adHocLabels: {
     list: (jobId: string) => request<AdHocLabel[]>(`/jobs/${jobId}/adhoc-labels`),

@@ -8,6 +8,8 @@ export default function CasesPanel({ jobId }: { jobId: string }) {
   const [newLabel, setNewLabel] = useState('');
   const [newLocation, setNewLocation] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkLocation, setBulkLocation] = useState('');
 
   const refresh = () => api.cases.list(jobId).then(setCases);
 
@@ -27,6 +29,7 @@ export default function CasesPanel({ jobId }: { jobId: string }) {
     setBusy(true);
     try {
       await api.cases.generate(jobId);
+      setSelected(new Set());
       await refresh();
     } finally {
       setBusy(false);
@@ -42,6 +45,38 @@ export default function CasesPanel({ jobId }: { jobId: string }) {
   const remove = async (id: string) => {
     if (!confirm('Delete this case row?')) return;
     await api.cases.remove(jobId, id);
+    setSelected((s) => {
+      const next = new Set(s);
+      next.delete(id);
+      return next;
+    });
+    refresh();
+  };
+
+  const toggleSelected = (id: string) => {
+    setSelected((s) => {
+      const next = new Set(s);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    setSelected((s) => (s.size === cases.length ? new Set() : new Set(cases.map((c) => c.id))));
+  };
+
+  const bulkSetLocation = async () => {
+    await api.cases.bulkSetLocation(jobId, [...selected], bulkLocation);
+    setBulkLocation('');
+    setSelected(new Set());
+    refresh();
+  };
+
+  const bulkDelete = async () => {
+    if (!confirm(`Delete ${selected.size} selected case rows?`)) return;
+    await api.cases.bulkRemove(jobId, [...selected]);
+    setSelected(new Set());
     refresh();
   };
 
@@ -79,42 +114,72 @@ export default function CasesPanel({ jobId }: { jobId: string }) {
       </p>
       {cases.length === 0 && <p className="muted">No cases yet — generate from the patch, or add one below.</p>}
       {cases.length > 0 && (
-        <table>
-          <thead>
-            <tr>
-              <th>Fixture type</th>
-              <th>Case label</th>
-              <th>Location</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {cases.map((c) => (
-              <tr key={c.id}>
-                <td>
+        <>
+          {selected.size > 0 && (
+            <div className="row panel" style={{ background: 'rgba(255,255,255,0.04)', alignItems: 'center', gap: '0.6rem' }}>
+              <strong>{selected.size} selected</strong>
+              <input
+                placeholder="Set location to…"
+                value={bulkLocation}
+                onChange={(e) => setBulkLocation(e.target.value)}
+                style={{ width: 160 }}
+              />
+              <button onClick={bulkSetLocation}>Set location</button>
+              <button className="secondary" onClick={bulkDelete}>
+                Delete selected
+              </button>
+              <button className="secondary" onClick={() => setSelected(new Set())}>
+                Clear selection
+              </button>
+            </div>
+          )}
+          <table>
+            <thead>
+              <tr>
+                <th>
                   <input
-                    defaultValue={c.fixtureType}
-                    onBlur={(e) => updateField(c, 'fixtureType', e.target.value)}
+                    type="checkbox"
+                    checked={selected.size === cases.length && cases.length > 0}
+                    onChange={toggleSelectAll}
                   />
-                </td>
-                <td>
-                  <input defaultValue={c.label} onBlur={(e) => updateField(c, 'label', e.target.value)} />
-                </td>
-                <td>
-                  <input
-                    defaultValue={c.location ?? ''}
-                    onBlur={(e) => updateField(c, 'location', e.target.value)}
-                  />
-                </td>
-                <td>
-                  <button className="secondary" onClick={() => remove(c.id)}>
-                    Delete
-                  </button>
-                </td>
+                </th>
+                <th>Fixture type</th>
+                <th>Case label</th>
+                <th>Location</th>
+                <th></th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {cases.map((c) => (
+                <tr key={c.id}>
+                  <td>
+                    <input type="checkbox" checked={selected.has(c.id)} onChange={() => toggleSelected(c.id)} />
+                  </td>
+                  <td>
+                    <input
+                      defaultValue={c.fixtureType}
+                      onBlur={(e) => updateField(c, 'fixtureType', e.target.value)}
+                    />
+                  </td>
+                  <td>
+                    <input defaultValue={c.label} onBlur={(e) => updateField(c, 'label', e.target.value)} />
+                  </td>
+                  <td>
+                    <input
+                      defaultValue={c.location ?? ''}
+                      onBlur={(e) => updateField(c, 'location', e.target.value)}
+                    />
+                  </td>
+                  <td>
+                    <button className="secondary" onClick={() => remove(c.id)}>
+                      Delete
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </>
       )}
 
       <h4 style={{ marginTop: '1.25rem' }}>Add a case</h4>
