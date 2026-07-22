@@ -18,23 +18,33 @@ integration, printer control, and prep-bay digital signage.
   synonyms (Spot→address, Patch→universe.address, Position→location, ...) are auto-guessed
   from a sample file.
 - **Case-packing algorithm**: groups fixtures into cases by a configurable "units per case" rule
-  per fixture type, matching Elex's existing convention — pairs join as `"201 + 202"`, full
-  groups of 3+ collapse to a range `"401 - 403"`, and a short leftover case fills the gap with
+  per fixture type, matching Elex's existing convention — pairs join as `"201 + 202"`, any run
+  of 3+ real addresses collapses to a range `"401 - 403"` (including a leftover/partial case,
+  e.g. `"401 - 403 + Spare"`), and a short leftover case fills the remaining gap with
   `"+ Spare"` (e.g. `"303 + Spare"`). Verified against the real Wu_Lyf_PAL.pptx examples.
 - **Four label types**, rendered as print-ready PDF at the exact physical geometry measured from
   Elex's existing templates (`Midge_Fixture_Labels.docx`, `Midge_Truss_Spikess.docx`,
   `Midge_Cable_Labels.docx`, `Wu_Lyf_PAL.pptx`):
   - Fixture labels (address + Main/Pixel universe+address + mode)
   - Truss/Spike labels (position number, "DO NOT TIP", sACN node IP/subnet) — 3 sub-types
-    sharing one physical sheet layout
-  - Cable labels, including the DMX variant narrowed by 1/3 with a cut line
+    sharing one physical sheet layout, printed full-color by location like PAL. The sheet
+    prints only 5 of its 6 rows (15 cells), since the printer used for these cuts off the
+    bottom row.
+  - Cable labels, including the DMX variant narrowed by 1/3 with a cut line — also full-color
+    by location
   - PAL case labels (job logo, color-coded stage location bar, case content/address range)
   - Rack labels (placeholder layout — no template was supplied for these yet)
+  - Long free-text fields (fixture type names, cable/tip text, PAL title/subtitle) auto-shrink
+    to fit the label, then shorten by dropping trailing words if they still don't fit — e.g.
+    "Maverick Storm 1 Flex Hybrid" becomes "Maverick Storm 1" rather than overlapping.
 - **Location colors** (Settings → Location Colors): maps a stage location string (Floor,
-  Downstage, Mid Stage, Upstage, SR Dimmers, or any others you add) to a color for the PAL
-  label's location bar, seeded on first run with Elex's house colors (green/red/orange/
-  yellow/purple). Text color auto-switches black/white for contrast against whatever color
-  is picked. A location with no rule prints with the original neutral dark bar.
+  Downstage, Mid Stage, Upstage, SR Dimmers, Spare, Rigging, or any others you add) to a color
+  used on PAL's location bar and the full-color Cable/Truss-Spike labels, seeded on first run
+  with Elex's house colors (green/red/orange/yellow/purple) plus two hazard-stripe defaults:
+  **Spare** (red/white diagonal stripes) and **Rigging** (yellow/black diagonal stripes). Any
+  rule can be solid or diagonal stripes, with a second color for the stripe pattern. Text color
+  (and, for stripes, an outline) auto-switches for contrast against whatever color is picked. A
+  location with no rule prints with the original neutral dark bar.
   - **Per-job overrides** (Job Settings tab, on each job): jobs whose patch uses location
     names that don't match the house defaults (e.g. a Wysiwyg export with "Cube North",
     "Entrance Arch Top", "Stage Structure" instead of Floor/Downstage/...) can define their
@@ -53,16 +63,20 @@ integration, printer control, and prep-bay digital signage.
 - **Everything is editable in place, everywhere** — no page requires deleting and re-adding a
   row to fix a typo:
   - Imported fixtures: every column (address, type, universes/addresses, mode, location),
-    plus per-row delete, straight in the Patch Import table.
+    plus per-row delete, straight in the Patch Import table. Row checkboxes plus a bulk action
+    bar let you set location or delete across a multi-row selection at once.
   - Cases: fixture type/label/location edit inline, delete individual rows, or add a manual
     case (e.g. a spare/hand case that didn't come from the patch) alongside the generated
     ones. Regenerating from the patch (destructive) warns first if it would wipe out manual
-    edits or additions.
+    edits or additions. Same bulk select/set-location/delete as the fixtures table.
   - Fixture type rules: name and case label override edit inline.
-  - Ad hoc labels: every content field edits inline (not just quantity) — location/title/
-    subtitle for PAL, IP/subnet for sACN nodes, text for cable/tip labels, etc., matching
-    whichever fields that label type uses.
-  - Location colors: color edits inline via a color picker.
+  - Labels tab (one-off/ad hoc labels), split into 3 sections — **PAL**, **Cables**, and
+    **Truss Spikes and Fixture Labels** (which also covers Rack labels) — each with its own
+    scoped create form and table. Every content field edits inline (not just quantity) —
+    location/title/subtitle for PAL, IP/subnet for sACN nodes, text for cable/tip labels, etc.,
+    matching whichever fields that label type uses.
+  - Location colors: color (and, for hazard-stripe rules, the pattern + second color) edits
+    inline via a color picker.
 - **Jobs list**: search by name/venue, admin-only delete (cleans up the job's fixtures, cases,
   plots, print-job history, and every uploaded file — logo, plot PDFs, print-job PDFs — so
   nothing is left orphaned on disk or in the database).
@@ -89,8 +103,12 @@ integration, printer control, and prep-bay digital signage.
     instead of the local case list: each row shows the item, quantity, and Current RMS's own
     "Booked Out" status (read straight from its documented opportunity-item status codes),
     plus an ElexPrep-side **prepped** checkbox crew tap directly on the TV as they pull each
-    item — the one deliberate, narrow exception to SIGNAGE's read-only rule. If not linked,
-    falls back to the local case list grouped by fixture type (previous behavior).
+    item — the one deliberate, narrow exception to SIGNAGE's read-only rule. Ticking prepped
+    is ElexPrep-local bookkeeping only — it does **not** call Current RMS's own book-out API;
+    the "Booked Out" badge reflects whatever Current RMS's own item status already says.
+    Current RMS "Group" rows (section headings like "Lighting - Moving Lights") render as
+    plain titles here and in the Current RMS job tab, not as pickable/prepped rows. If not
+    linked, falls back to the local case list grouped by fixture type (previous behavior).
   - **Change alerts**: when the sync poller detects the linked opportunity's pick list
     actually changed (not just any field — specifically added/removed/quantity-changed
     items), the screen flashes a full-screen, GitHub-diff-style alert — red for what was
