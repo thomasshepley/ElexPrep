@@ -25,6 +25,31 @@ allow TCP 4000 through the firewall).
 The first visit shows the **create admin account** screen. Do this immediately — whoever
 gets there first owns the instance.
 
+## Previewing externally (before portal.elex.lighting is wired up)
+
+The production target is `portal.elex.lighting`, but until that domain's DNS is pointed
+somewhere, use a Cloudflare Tunnel for a real, working, HTTPS-accessible preview — no port
+forwarding, no DNS changes, works behind a dynamic IP/CGNAT:
+
+```bash
+# one-off install (see https://pkg.cloudflare.com for other platforms)
+# Windows: winget install --id Cloudflare.cloudflared   (open a NEW terminal afterward)
+# macOS:   brew install cloudflared
+# Linux:   curl -L --output cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb && sudo dpkg -i cloudflared.deb
+
+cloudflared tunnel --url http://localhost:4000
+```
+
+This prints a `https://random-words.trycloudflare.com` URL immediately — open it from
+anywhere (e.g. your phone on mobile data) to confirm the deployment is really reachable
+externally. The URL changes each time you restart the command, so it's only meant for
+ad hoc previews, not something to leave running.
+
+Once `portal.elex.lighting`'s DNS is ready, the permanent path is a **named tunnel**
+through the Cloudflare Zero Trust dashboard (Networks → Tunnels), with the `cloudflared`
+service already scaffolded in `docker-compose.yml` (commented out — add your tunnel token
+to a `.env` file as `CLOUDFLARE_TUNNEL_TOKEN` and uncomment the service to enable it).
+
 ## Test checklist (everything except physical printing)
 
 Printing defaults to **Dry run** mode, so you can exercise the whole flow with zero risk of

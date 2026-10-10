@@ -15,7 +15,7 @@ function App() {
   return (
     <div className="app-shell">
       <header className="app-header">
-        <div className="brand">ElexPrep</div>
+        <div className="brand">ELEX Portal</div>
         <nav>
           <NavLink to="/" end>Jobs</NavLink>
           <NavLink to="/settings">Settings</NavLink>
