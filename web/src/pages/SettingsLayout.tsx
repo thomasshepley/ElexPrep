@@ -16,6 +16,7 @@ const SECTIONS: SettingsSection[] = [
   { to: '/settings/printer', label: 'Printer', adminOnly: true },
   { to: '/settings/current-rms', label: 'Current RMS', adminOnly: true },
   { to: '/settings/users', label: 'Users', adminOnly: true },
+  { to: '/settings/crew', label: 'Crew', adminOnly: true },
   { to: '/settings/permissions', label: 'Permissions', adminOnly: true },
   { to: '/settings/activity', label: 'Activity Log', permission: 'viewActivityLog' },
   { to: '/settings/preferences', label: 'My Preferences' },

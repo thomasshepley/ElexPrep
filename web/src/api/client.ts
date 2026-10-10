@@ -111,9 +111,15 @@ export interface ActivityLogEntry {
   jobName?: string | null;
 }
 
-export type Role = 'ADMIN' | 'USER' | 'SIGNAGE';
+export type Role = 'ADMIN' | 'USER' | 'SIGNAGE' | 'CREW';
 
-export type PermissionKey = 'createJobs' | 'deleteJobs' | 'publishJobs' | 'viewActivityLog' | 'linkCurrentRms';
+export type PermissionKey =
+  | 'createJobs'
+  | 'deleteJobs'
+  | 'publishJobs'
+  | 'viewActivityLog'
+  | 'linkCurrentRms'
+  | 'manageCrewAssignments';
 
 export interface AuthedUser {
   id: string;
@@ -122,6 +128,30 @@ export interface AuthedUser {
   role: Role;
   prefs: Record<string, unknown>;
   permissions?: Record<PermissionKey, boolean>;
+}
+
+export interface CrewMember {
+  id: string;
+  userId: string;
+  username: string;
+  displayName: string;
+  phone: string | null;
+  skills: string | null;
+  dayRate: string | null;
+  notes: string | null;
+  active: boolean;
+  createdAt: string;
+}
+
+export interface JobCrewAssignment {
+  id: string;
+  crewProfileId: string;
+  displayName: string;
+  username: string;
+  role: string;
+  dayRate: string | null;
+  profileDayRate: string | null;
+  active: boolean;
 }
 
 export interface Plot {
@@ -212,6 +242,39 @@ export const api = {
     update: (id: string, data: Partial<{ displayName: string; role: Role; password: string }>) =>
       request<AuthedUser>(`/users/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     remove: (id: string) => request<void>(`/users/${id}`, { method: 'DELETE' }),
+  },
+  crew: {
+    list: () => request<CrewMember[]>('/crew'),
+    create: (data: {
+      username: string;
+      password: string;
+      displayName?: string;
+      phone?: string;
+      skills?: string;
+      dayRate?: string;
+      notes?: string;
+    }) => request<CrewMember>('/crew', { method: 'POST', body: JSON.stringify(data) }),
+    update: (
+      id: string,
+      data: Partial<{
+        displayName: string;
+        password: string;
+        phone: string;
+        skills: string;
+        dayRate: string;
+        notes: string;
+        active: boolean;
+      }>
+    ) => request<CrewMember>(`/crew/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    remove: (id: string) => request<void>(`/crew/${id}`, { method: 'DELETE' }),
+  },
+  jobCrewAssignments: {
+    list: (jobId: string) => request<JobCrewAssignment[]>(`/jobs/${jobId}/crew`),
+    create: (jobId: string, data: { crewProfileId: string; role: string; dayRate?: string }) =>
+      request<JobCrewAssignment>(`/jobs/${jobId}/crew`, { method: 'POST', body: JSON.stringify(data) }),
+    update: (jobId: string, id: string, data: Partial<{ role: string; dayRate: string }>) =>
+      request<JobCrewAssignment>(`/jobs/${jobId}/crew/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    remove: (jobId: string, id: string) => request<void>(`/jobs/${jobId}/crew/${id}`, { method: 'DELETE' }),
   },
   permissions: {
     get: () =>

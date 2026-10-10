@@ -11,6 +11,9 @@ function App() {
   if (user.role === 'SIGNAGE' && location.pathname !== '/signage') {
     return <Navigate to="/signage" replace />
   }
+  if (user.role === 'CREW' && location.pathname !== '/crew') {
+    return <Navigate to="/crew" replace />
+  }
 
   return (
     <div className="app-shell">

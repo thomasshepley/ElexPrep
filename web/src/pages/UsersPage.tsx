@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { api, type AuthedUser, type Role } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 
@@ -68,7 +69,8 @@ export default function UsersPage() {
       <h1>Users</h1>
       <p className="muted">
         ADMIN can manage users and see the activity log. USER can run prep. SIGNAGE is a
-        view-only login for prep-bay TV screens.
+        view-only login for prep-bay TV screens. Freelance crew accounts are managed separately
+        on the <Link to="/settings/crew">Crew</Link> page.
       </p>
       <div className="panel">
         <h3>Add user</h3>

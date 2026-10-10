@@ -9,8 +9,9 @@ import PrintQueuePanel from '../components/PrintQueuePanel';
 import PlotsPanel from '../components/PlotsPanel';
 import CurrentRmsPanel from '../components/CurrentRmsPanel';
 import JobLocationColorsPanel from '../components/JobLocationColorsPanel';
+import JobCrewPanel from '../components/JobCrewPanel';
 
-const TABS = ['Patch Import', 'Cases', 'Labels', 'Print Queue', 'Plots', 'Current RMS', 'Job Settings'] as const;
+const TABS = ['Patch Import', 'Cases', 'Labels', 'Print Queue', 'Plots', 'Crew', 'Current RMS', 'Job Settings'] as const;
 type Tab = (typeof TABS)[number];
 
 export default function JobDetailPage() {
@@ -43,6 +44,7 @@ export default function JobDetailPage() {
       {tab === 'Labels' && <LabelsPanel jobId={jobId} />}
       {tab === 'Print Queue' && <PrintQueuePanel jobId={jobId} />}
       {tab === 'Plots' && <PlotsPanel jobId={jobId} />}
+      {tab === 'Crew' && <JobCrewPanel jobId={jobId} />}
       {tab === 'Current RMS' && <CurrentRmsPanel jobId={jobId} />}
       {tab === 'Job Settings' && job && <JobSettingsPanel job={job} onUpdate={setJob} />}
     </div>

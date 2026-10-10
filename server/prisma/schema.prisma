@@ -42,6 +42,53 @@ model Job {
   locationColorRules LocationColorRule[]
   pickListItemStatuses PickListItemStatus[]
   labelTemplates LabelTemplate[]
+  crewAssignments JobCrewAssignment[]
+}
+
+/// A freelance crew member's profile — 1:1 with a User whose role is CREW. For now the only
+/// way one of these pairs comes into existence is an admin creating both together on the Crew
+/// settings page (see routes/crew.ts); the public application flow (a later milestone) will be
+/// the second path, via CrewApplication approval instead. Compliance documents (right-to-work,
+/// insurance, bank details) are deliberately not modeled here yet — that needs the encrypted
+/// storage a later milestone builds; this is just contact/professional info for attribution.
+model CrewProfile {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  phone     String?
+  /// Free-text list of roles/skills (e.g. "LD, Rigger, Spot Op") — a simple string for now
+  /// rather than a separate taxonomy table, since nothing queries or filters by skill yet.
+  skills    String?
+  /// Default day rate as a plain string (e.g. "250.00") rather than a typed money column —
+  /// nothing does arithmetic on it yet; a future Xero integration can introduce real currency
+  /// handling once it actually moves money (see xeroContactId on JobCrewAssignment).
+  dayRate   String?
+  notes     String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  assignments JobCrewAssignment[]
+}
+
+/// Attributes a crew member to a job: their role on that job, plus an optional per-job
+/// day-rate override (falls back to the profile's default dayRate when unset). xeroContactId
+/// is a nullable placeholder for a later Xero integration — no payment processing happens here.
+model JobCrewAssignment {
+  id            String      @id @default(cuid())
+  jobId         String
+  job           Job         @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  crewProfileId String
+  crewProfile   CrewProfile @relation(fields: [crewProfileId], references: [id], onDelete: Cascade)
+  role          String
+  dayRate       String?
+  xeroContactId String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@unique([jobId, crewProfileId])
+  @@index([jobId])
+  @@index([crewProfileId])
 }
 
 /// Per-job override of a label type's default layout (see @elexprep/shared's
@@ -203,7 +250,9 @@ model AppSetting {
   updatedAt DateTime @updatedAt
 }
 
-/// role is one of: ADMIN, USER, SIGNAGE (signage = read-only login for prep bay TVs).
+/// role is one of: ADMIN, USER, SIGNAGE, CREW (signage = read-only login for prep bay TVs;
+/// crew = a freelancer's portal login, see CrewProfile — created only via routes/crew.ts,
+/// never through the generic /api/users endpoint, so a CREW user always has a profile).
 model User {
   id           String    @id @default(cuid())
   username     String    @unique
@@ -214,6 +263,7 @@ model User {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
   sessions     Session[]
+  crewProfile  CrewProfile?
 }
 
 model Session {
