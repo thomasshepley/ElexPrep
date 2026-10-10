@@ -10,3 +10,8 @@ web/dist/
 .DS_Store
 data/elexprep.db
 /data/uploads
+
+# Local agent/skill tooling (installed via `npx skills add`), not project code
+.agents/
+.claude/
+skills-lock.json
