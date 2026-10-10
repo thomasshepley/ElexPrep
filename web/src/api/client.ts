@@ -88,6 +88,7 @@ export interface PrintQueueItem {
   sourceType: string;
   quantity: number;
   status: 'PENDING' | 'CONFIRMED' | 'PRINTED';
+  order: number;
   content: Record<string, unknown>;
 }
 
@@ -95,6 +96,8 @@ export interface AdHocLabel {
   id: string;
   labelType: string;
   quantity: number;
+  order: number;
+  excludeFromPrint: boolean;
   content: Record<string, unknown>;
 }
 
@@ -327,8 +330,11 @@ export const api = {
     list: (jobId: string) => request<AdHocLabel[]>(`/jobs/${jobId}/adhoc-labels`),
     create: (jobId: string, data: { labelType: string; content: Record<string, unknown>; quantity: number }) =>
       request<AdHocLabel>(`/jobs/${jobId}/adhoc-labels`, { method: 'POST', body: JSON.stringify(data) }),
-    update: (jobId: string, id: string, data: Partial<{ content: Record<string, unknown>; quantity: number }>) =>
-      request<AdHocLabel>(`/jobs/${jobId}/adhoc-labels/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    update: (
+      jobId: string,
+      id: string,
+      data: Partial<{ content: Record<string, unknown>; quantity: number; excludeFromPrint: boolean }>
+    ) => request<AdHocLabel>(`/jobs/${jobId}/adhoc-labels/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     remove: (jobId: string, id: string) =>
       request<void>(`/jobs/${jobId}/adhoc-labels/${id}`, { method: 'DELETE' }),
   },
@@ -343,6 +349,11 @@ export const api = {
       request<PrintQueueItem>(`/jobs/${jobId}/print-queue/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     removeItem: (jobId: string, id: string) =>
       request<void>(`/jobs/${jobId}/print-queue/${id}`, { method: 'DELETE' }),
+    reorder: (jobId: string, labelType: string, items: { source: 'queue' | 'adhoc'; id: string }[]) =>
+      request<{ reordered: number }>(`/jobs/${jobId}/print-queue/reorder`, {
+        method: 'PUT',
+        body: JSON.stringify({ labelType, items }),
+      }),
     confirm: (jobId: string, ids: string[], override = false) =>
       request<{ confirmed: number }>(`/jobs/${jobId}/print-queue/confirm`, {
         method: 'POST',

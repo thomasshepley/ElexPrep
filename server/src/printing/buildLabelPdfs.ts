@@ -16,6 +16,13 @@ import {
 
 export type LabelContentByType = Record<string, unknown[]>;
 
+interface OrderedRow {
+  labelType: string;
+  order: number;
+  contentJson: string;
+  quantity: number;
+}
+
 function expandContent(
   byType: LabelContentByType,
   labelType: string,
@@ -27,16 +34,27 @@ function expandContent(
   for (let i = 0; i < quantity; i++) byType[labelType].push(content);
 }
 
+/**
+ * Combines queue items + ad hoc labels into one ordered list per label type, sorted by the
+ * shared `order` field rather than simply concatenating queue-then-adhoc — so a manual
+ * reorder (which writes `order` across both sources in the same per-type sequence) is
+ * respected when building the actual print PDF, not just whatever order the two tables
+ * happen to return rows in.
+ */
+function buildOrderedByType(rows: OrderedRow[]): LabelContentByType {
+  const sorted = [...rows].sort((a, b) => a.order - b.order);
+  const byType: LabelContentByType = {};
+  for (const row of sorted) expandContent(byType, row.labelType, row.contentJson, row.quantity);
+  return byType;
+}
+
 /** Expands confirmed queue items + ad hoc labels into per-type content lists (one entry per copy). */
 export async function collectConfirmedContent(jobId: string): Promise<LabelContentByType> {
   const [confirmed, adHoc] = await Promise.all([
     prisma.printQueueItem.findMany({ where: { jobId, status: 'CONFIRMED' } }),
-    prisma.adHocLabel.findMany({ where: { jobId } }),
+    prisma.adHocLabel.findMany({ where: { jobId, excludeFromPrint: false } }),
   ]);
-  const byType: LabelContentByType = {};
-  for (const item of confirmed) expandContent(byType, item.labelType, item.contentJson, item.quantity);
-  for (const item of adHoc) expandContent(byType, item.labelType, item.contentJson, item.quantity);
-  return byType;
+  return buildOrderedByType([...confirmed, ...adHoc]);
 }
 
 /**
@@ -47,12 +65,9 @@ export async function collectConfirmedContent(jobId: string): Promise<LabelConte
 export async function collectPendingContent(jobId: string): Promise<LabelContentByType> {
   const [pending, adHoc] = await Promise.all([
     prisma.printQueueItem.findMany({ where: { jobId, status: 'PENDING' } }),
-    prisma.adHocLabel.findMany({ where: { jobId } }),
+    prisma.adHocLabel.findMany({ where: { jobId, excludeFromPrint: false } }),
   ]);
-  const byType: LabelContentByType = {};
-  for (const item of pending) expandContent(byType, item.labelType, item.contentJson, item.quantity);
-  for (const item of adHoc) expandContent(byType, item.labelType, item.contentJson, item.quantity);
-  return byType;
+  return buildOrderedByType([...pending, ...adHoc]);
 }
 
 async function loadJobLogo(jobId: string): Promise<{ bytes: Uint8Array; kind: 'png' | 'jpg' } | undefined> {
