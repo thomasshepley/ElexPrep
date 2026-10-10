@@ -3,3 +3,5 @@ export * from './labelGeometry';
 export * from './casePacking';
 export * from './csvHeader';
 export * from './pickListDiff';
+export * from './locationColors';
+export * from './labelElements';
