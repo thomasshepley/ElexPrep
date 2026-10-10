@@ -1,18 +1,11 @@
 import path from 'path';
 import fs from 'fs';
 import { PDFDocument } from 'pdf-lib';
+import { DEFAULT_LABEL_TEMPLATES, LabelType } from '@elexprep/shared';
 import { prisma } from '../db';
 import { uploadDir } from '../routes/jobs';
 import { loadLocationColorMap, LocationColorMap } from '../pdf/locationColors';
-import {
-  buildCableLabelsPdf,
-  buildFixtureLabelsPdf,
-  buildPalLabelsPdf,
-  buildRackLabelsPdf,
-  buildTrussSpikePositionPdf,
-  buildTrussSpikeSacnPdf,
-  buildTrussSpikeTipPdf,
-} from '../pdf/labelRenderers';
+import { renderLabelTypeGeneric } from '../pdf/genericRenderer';
 
 export type LabelContentByType = Record<string, unknown[]>;
 
@@ -87,24 +80,11 @@ export async function renderLabelType(
   items: unknown[],
   locationColors: LocationColorMap
 ): Promise<void> {
-  switch (labelType) {
-    case 'FIXTURE':
-      return buildFixtureLabelsPdf(doc, items as never, locationColors);
-    case 'TRUSS_SPIKE_POSITION':
-      return buildTrussSpikePositionPdf(doc, items as never, locationColors);
-    case 'TRUSS_SPIKE_TIP':
-      return buildTrussSpikeTipPdf(doc, items as never, locationColors);
-    case 'TRUSS_SPIKE_SACN':
-      return buildTrussSpikeSacnPdf(doc, items as never, locationColors);
-    case 'CABLE':
-      return buildCableLabelsPdf(doc, items as never, locationColors);
-    case 'PAL':
-      return buildPalLabelsPdf(doc, items as never, await loadJobLogo(jobId), locationColors);
-    case 'RACK':
-      return buildRackLabelsPdf(doc, items as never, locationColors);
-    default:
-      throw new Error(`Unknown label type: ${labelType}`);
-  }
+  const template = DEFAULT_LABEL_TEMPLATES[labelType as LabelType];
+  if (!template) throw new Error(`Unknown label type: ${labelType}`);
+  const logo = template.labelType === 'PAL' ? await loadJobLogo(jobId) : undefined;
+  const logoImage = logo ? await (logo.kind === 'png' ? doc.embedPng(logo.bytes) : doc.embedJpg(logo.bytes)) : undefined;
+  return renderLabelTypeGeneric(doc, template, items, locationColors, logoImage);
 }
 
 /** One PDF per label type — the unit a print job (and its tray selection) operates on. */

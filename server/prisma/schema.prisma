@@ -41,6 +41,26 @@ model Job {
   plots          Plot[]
   locationColorRules LocationColorRule[]
   pickListItemStatuses PickListItemStatus[]
+  labelTemplates LabelTemplate[]
+}
+
+/// Per-job override of a label type's default layout (see @elexprep/shared's
+/// DEFAULT_LABEL_TEMPLATES/mergeTemplate) — not read by anything yet; the print-queue
+/// interactive editor (a later milestone) will be the first writer/reader. elementsJson is a
+/// partial, per-element-id patch (Record<elementId, Partial<LabelElementDef>>), merged onto
+/// the matching default template at render time — never a whole-template replacement, so a
+/// new default element introduced later still reaches jobs that already customized this type.
+model LabelTemplate {
+  id            String   @id @default(cuid())
+  jobId         String
+  job           Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  labelType     String
+  elementsJson  String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([jobId, labelType])
+  @@index([jobId])
 }
 
 /// Tracks each Current RMS opportunity item's local crew-prep state ("pulled"/"booked out")

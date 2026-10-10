@@ -1,25 +1,16 @@
 import { prisma } from '../db';
+import { DEFAULT_LOCATION_COLOR_RULES, LocationColorMap, toLocationColorMapEntry } from '@elexprep/shared';
 
-/** Used for any location with no matching rule — same look as the original fixed black bar. */
-export const DEFAULT_LOCATION_COLOR = '#1a1a1a';
-
-export type LocationColorPattern = 'SOLID' | 'DIAGONAL_STRIPES';
-
-export const DEFAULT_LOCATION_COLOR_RULES: {
-  location: string;
-  color: string;
-  pattern?: LocationColorPattern;
-  secondaryColor?: string;
-}[] = [
-  { location: 'Floor', color: '#1FA34C' },
-  { location: 'Downstage', color: '#D32F2F' },
-  { location: 'Mid Stage', color: '#F57C00' },
-  { location: 'Upstage', color: '#F5C400' },
-  { location: 'SR Dimmers', color: '#7B1FA2' },
-  // Hazard-stripe conventions: red/white for spares, yellow/black for rigging.
-  { location: 'Spare', color: '#D32F2F', pattern: 'DIAGONAL_STRIPES', secondaryColor: '#FFFFFF' },
-  { location: 'Rigging', color: '#F5C400', pattern: 'DIAGONAL_STRIPES', secondaryColor: '#1a1a1a' },
-];
+export {
+  DEFAULT_LOCATION_COLOR,
+  DEFAULT_LOCATION_COLOR_RULES,
+  LocationColorPattern,
+  ResolvedLocationColor,
+  LocationColorMap,
+  resolveLocationColor,
+  contrastingTextIsWhite,
+  hexToRgbFractions,
+} from '@elexprep/shared';
 
 /** Seeds the house-standard colors on first run only — never overwrites existing rules. */
 export async function seedDefaultLocationColorsIfEmpty() {
@@ -45,34 +36,6 @@ export async function seedNewDefaultLocationColorsIfMissing(locations: string[])
   if (missing.length > 0) await prisma.locationColorRule.createMany({ data: missing });
 }
 
-export interface ResolvedLocationColor {
-  color: string;
-  pattern: LocationColorPattern;
-  secondaryColor?: string | null;
-}
-
-const FALLBACK_COLOR: ResolvedLocationColor = { color: DEFAULT_LOCATION_COLOR, pattern: 'SOLID' };
-
-export type LocationColorMap = Map<string, ResolvedLocationColor>;
-
-interface LocationColorRuleLike {
-  location: string;
-  color: string;
-  pattern: string;
-  secondaryColor: string | null;
-}
-
-function toMapEntry(r: LocationColorRuleLike): [string, ResolvedLocationColor] {
-  return [
-    r.location.toLowerCase().trim(),
-    {
-      color: r.color,
-      pattern: r.pattern === 'DIAGONAL_STRIPES' ? 'DIAGONAL_STRIPES' : 'SOLID',
-      secondaryColor: r.secondaryColor,
-    },
-  ];
-}
-
 /**
  * Loads the global default color rules plus, when jobId is given, that job's own overrides
  * layered on top — so a job with unique location names (e.g. "Cube North", "Entrance Arch
@@ -84,36 +47,10 @@ export async function loadLocationColorMap(jobId?: string | null): Promise<Locat
     prisma.locationColorRule.findMany({ where: { jobId: null } }),
     jobId ? prisma.locationColorRule.findMany({ where: { jobId } }) : Promise.resolve([]),
   ]);
-  const map: LocationColorMap = new Map(globalRules.map(toMapEntry));
+  const map: LocationColorMap = new Map(globalRules.map(toLocationColorMapEntry));
   for (const r of jobRules) {
-    const [key, value] = toMapEntry(r);
+    const [key, value] = toLocationColorMapEntry(r);
     map.set(key, value);
   }
   return map;
-}
-
-export function resolveLocationColor(map: LocationColorMap, location: string | null | undefined): ResolvedLocationColor {
-  if (!location) return FALLBACK_COLOR;
-  return map.get(location.toLowerCase().trim()) ?? FALLBACK_COLOR;
-}
-
-/** Simple relative-luminance check so text stays legible against any admin-picked color. */
-export function contrastingTextIsWhite(hex: string): boolean {
-  const clean = hex.replace('#', '');
-  if (clean.length !== 6) return true;
-  const r = parseInt(clean.slice(0, 2), 16) / 255;
-  const g = parseInt(clean.slice(2, 4), 16) / 255;
-  const b = parseInt(clean.slice(4, 6), 16) / 255;
-  const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-  return luminance < 0.55;
-}
-
-export function hexToRgbFractions(hex: string): { r: number; g: number; b: number } {
-  const clean = hex.replace('#', '');
-  const valid = /^[0-9a-fA-F]{6}$/.test(clean) ? clean : '1a1a1a';
-  return {
-    r: parseInt(valid.slice(0, 2), 16) / 255,
-    g: parseInt(valid.slice(2, 4), 16) / 255,
-    b: parseInt(valid.slice(4, 6), 16) / 255,
-  };
 }
