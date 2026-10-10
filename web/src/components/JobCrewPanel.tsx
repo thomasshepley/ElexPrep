@@ -59,22 +59,33 @@ export default function JobCrewPanel({ jobId }: { jobId: string }) {
       <h3>Crew</h3>
       {canManage && (
         <>
-          <form className="row" onSubmit={add}>
-            <select value={crewProfileId} onChange={(e) => setCrewProfileId(e.target.value)} required>
-              <option value="" disabled>
-                Select crew member…
-              </option>
-              {available.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.displayName}
-                </option>
-              ))}
-            </select>
-            <input placeholder="Role (e.g. LD, Rigger)" value={role} onChange={(e) => setRole(e.target.value)} required />
-            <input placeholder="Day rate (optional override)" value={dayRate} onChange={(e) => setDayRate(e.target.value)} />
-            <button type="submit" disabled={!crewProfileId}>
-              Add
-            </button>
+          <form onSubmit={add}>
+            <div className="row" style={{ alignItems: 'flex-end', flexWrap: 'wrap', gap: '0.9rem' }}>
+              <div className="field" style={{ width: '12rem' }}>
+                <label htmlFor="assign-crew-member">Crew member</label>
+                <select id="assign-crew-member" value={crewProfileId} onChange={(e) => setCrewProfileId(e.target.value)} required>
+                  <option value="" disabled>
+                    Select…
+                  </option>
+                  {available.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.displayName}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="field" style={{ width: '11rem' }}>
+                <label htmlFor="assign-role">Role</label>
+                <input id="assign-role" value={role} onChange={(e) => setRole(e.target.value)} placeholder="LD, Rigger…" required />
+              </div>
+              <div className="field" style={{ width: '9rem' }}>
+                <label htmlFor="assign-day-rate">Day rate override</label>
+                <input id="assign-day-rate" value={dayRate} onChange={(e) => setDayRate(e.target.value)} placeholder="Optional" />
+              </div>
+              <button type="submit" disabled={!crewProfileId}>
+                Add to job
+              </button>
+            </div>
           </form>
           {available.length === 0 && roster.length > 0 && (
             <p className="muted">Every active crew member is already assigned to this job.</p>
@@ -107,7 +118,7 @@ export default function JobCrewPanel({ jobId }: { jobId: string }) {
                   {canManage ? (
                     <input value={a.role} onChange={(e) => updateRole(a, e.target.value)} style={{ width: '10rem' }} />
                   ) : (
-                    a.role
+                    <span className="chip chip-role">{a.role}</span>
                   )}
                 </td>
                 <td>{a.dayRate ?? a.profileDayRate ?? '—'}</td>

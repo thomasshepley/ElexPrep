@@ -75,20 +75,41 @@ export default function CrewPage() {
       </p>
       <div className="panel">
         <h3>Add crew member</h3>
-        <form className="row" onSubmit={create} style={{ flexWrap: 'wrap' }}>
-          <input placeholder="Username" value={username} onChange={(e) => setUsername(e.target.value)} required />
-          <input placeholder="Display name" value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
-          <input
-            type="password"
-            placeholder="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
-          <input placeholder="Phone" value={phone} onChange={(e) => setPhone(e.target.value)} />
-          <input placeholder="Skills (e.g. LD, Rigger)" value={skills} onChange={(e) => setSkills(e.target.value)} />
-          <input placeholder="Default day rate" value={dayRate} onChange={(e) => setDayRate(e.target.value)} />
-          <button type="submit">Add</button>
+        <form onSubmit={create}>
+          <div className="row" style={{ alignItems: 'flex-end', flexWrap: 'wrap', gap: '0.9rem' }}>
+            <div className="field" style={{ width: '12rem' }}>
+              <label htmlFor="crew-username">Username</label>
+              <input id="crew-username" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="jsmith" required />
+            </div>
+            <div className="field" style={{ width: '12rem' }}>
+              <label htmlFor="crew-display-name">Display name</label>
+              <input id="crew-display-name" value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="Jamie Smith" />
+            </div>
+            <div className="field" style={{ width: '12rem' }}>
+              <label htmlFor="crew-password">Password</label>
+              <input
+                id="crew-password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="At least 8 characters"
+                required
+              />
+            </div>
+            <div className="field" style={{ width: '10rem' }}>
+              <label htmlFor="crew-phone">Phone</label>
+              <input id="crew-phone" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="07700 900000" />
+            </div>
+            <div className="field" style={{ width: '12rem' }}>
+              <label htmlFor="crew-skills">Skills</label>
+              <input id="crew-skills" value={skills} onChange={(e) => setSkills(e.target.value)} placeholder="LD, Rigger" />
+            </div>
+            <div className="field" style={{ width: '9rem' }}>
+              <label htmlFor="crew-day-rate">Day rate</label>
+              <input id="crew-day-rate" value={dayRate} onChange={(e) => setDayRate(e.target.value)} placeholder="250" />
+            </div>
+            <button type="submit">Add crew member</button>
+          </div>
         </form>
         {error && <p className="error">{error}</p>}
       </div>
@@ -108,16 +129,16 @@ export default function CrewPage() {
           {crew.map((c) => (
             <tr key={c.id}>
               <td>
-                {c.displayName}
-                <br />
+                <div style={{ fontWeight: 600 }}>{c.displayName}</div>
                 <span className="muted">{c.username}</span>
               </td>
               <td>{c.phone ?? '—'}</td>
               <td>{c.skills ?? '—'}</td>
               <td>{c.dayRate ?? '—'}</td>
               <td>
-                <label className="row" style={{ gap: '0.4rem' }}>
+                <label className="switch">
                   <input type="checkbox" checked={c.active} onChange={() => toggleActive(c)} />
+                  <span className="switch-track" />
                   {c.active ? 'Active' : 'Inactive'}
                 </label>
               </td>

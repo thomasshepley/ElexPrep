@@ -14,7 +14,16 @@ export default function UsersPage() {
   const [role, setRole] = useState<Role>('USER');
   const [error, setError] = useState<string | null>(null);
 
-  const refresh = () => api.users.list().then(setUsers).catch((e) => setError(e.message));
+  // CREW accounts are real rows from GET /api/users (it's unfiltered), but this page's own
+  // role <select> only ever offers ADMIN/USER/SIGNAGE — a CREW row would render a dropdown
+  // whose value matches none of its options, which browsers silently resolve to the first
+  // option (ADMIN), visually misrepresenting a crew login as an admin one. They're managed on
+  // the Crew page instead, so they're filtered out here rather than ever rendering that select.
+  const refresh = () =>
+    api.users
+      .list()
+      .then((all) => setUsers(all.filter((u) => u.role !== 'CREW')))
+      .catch((e) => setError(e.message));
 
   useEffect(() => {
     refresh();

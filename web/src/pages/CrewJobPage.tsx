@@ -1,9 +1,14 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useParams } from 'react-router-dom';
 import { api, type CrewJobDetail } from '../api/client';
+import Chevron from '../components/Chevron';
+import { WhoIcon, WhatIcon, WhenIcon, WhereIcon } from '../components/Icons';
+
+const NO_DATE = 'No date set yet';
+const NO_VENUE = 'No venue set yet';
 
 function formatDateTime(iso: string | null): string {
-  if (!iso) return 'Not set yet';
+  if (!iso) return NO_DATE;
   return new Date(iso).toLocaleString(undefined, {
     weekday: 'short',
     day: 'numeric',
@@ -15,31 +20,42 @@ function formatDateTime(iso: string | null): string {
 
 /**
  * One expandable card — collapsed shows just the summary line, expanded reveals the detail
- * slot. Matches the "clickable to expand" interaction from the original ask; several of the
- * detail slots are still thin placeholders (venue access info, a real day schedule) that later
- * milestones fill in — the card already exists so they slot in without a layout change.
+ * slot. The trigger is a real <button> wrapped in an <h2> (the WAI-ARIA disclosure pattern),
+ * not a div with a nested heading, so this reads correctly to screen-reader heading navigation
+ * and keeps a visible keyboard focus ring. Several of the detail slots are still thin
+ * placeholders (venue access info, a real day schedule) that later milestones fill in — the
+ * card already exists so they slot in without a layout change.
  */
-function InfoCard({ label, summary, children }: { label: string; summary: string; children: React.ReactNode }) {
+function InfoCard({
+  id,
+  icon,
+  label,
+  summary,
+  children,
+}: {
+  id: string;
+  icon: ReactNode;
+  label: string;
+  summary: string;
+  children: ReactNode;
+}) {
   const [open, setOpen] = useState(false);
+  const contentId = `${id}-detail`;
   return (
-    <div className="panel">
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        style={{
-          all: 'unset',
-          cursor: 'pointer',
-          display: 'block',
-          width: '100%',
-        }}
-      >
-        <div className="row" style={{ justifyContent: 'space-between' }}>
-          <h4 style={{ margin: 0 }}>{label}</h4>
-          <span className="muted">{open ? '▲' : '▼'}</span>
+    <div className="panel card-interactive">
+      <h2 className="info-card-heading">
+        <button type="button" className="info-card-trigger" aria-expanded={open} aria-controls={contentId} onClick={() => setOpen((o) => !o)}>
+          <span className="info-card-icon">{icon}</span>
+          <span className="info-card-label">{label}</span>
+          <Chevron open={open} />
+        </button>
+      </h2>
+      <p className="info-card-summary">{summary}</p>
+      {open && (
+        <div id={contentId} className="info-card-detail">
+          {children}
         </div>
-        <p style={{ margin: '0.4rem 0 0' }}>{summary}</p>
-      </button>
-      {open && <div style={{ marginTop: '0.75rem', borderTop: '1px solid var(--border)', paddingTop: '0.75rem' }}>{children}</div>}
+      )}
     </div>
   );
 }
@@ -64,26 +80,34 @@ export default function CrewJobPage() {
     <div>
       <h1>{detail.what.jobName}</h1>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '0.75rem', marginTop: '1rem' }}>
-        <InfoCard label="Who" summary={`You: ${detail.who.you.role}`}>
-          {detail.who.others.length > 0 ? (
-            <ul style={{ margin: 0, paddingLeft: '1.1rem' }}>
-              {detail.who.others.map((o, i) => (
-                <li key={i}>
-                  {o.displayName} — {o.role}
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="muted">No other crew assigned yet.</p>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '0.9rem', marginTop: '1.25rem' }}>
+        <InfoCard id="who" icon={<WhoIcon />} label="Who" summary={`You: ${detail.who.you.role}`}>
+          <p className="muted" style={{ margin: '0 0 0.5rem' }}>
+            You
+          </p>
+          <span className="chip chip-role">{detail.who.you.role}</span>
+          {detail.who.others.length > 0 && (
+            <>
+              <p className="muted" style={{ margin: '1rem 0 0.5rem' }}>
+                Also on this job
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                {detail.who.others.map((o, i) => (
+                  <div key={i} className="row" style={{ justifyContent: 'space-between' }}>
+                    <span>{o.displayName}</span>
+                    <span className="chip chip-role">{o.role}</span>
+                  </div>
+                ))}
+              </div>
+            </>
           )}
         </InfoCard>
 
-        <InfoCard label="What" summary={detail.what.jobName}>
+        <InfoCard id="what" icon={<WhatIcon />} label="What" summary={detail.what.jobName}>
           <p>{detail.what.description ?? 'No further description yet.'}</p>
         </InfoCard>
 
-        <InfoCard label="When" summary={formatDateTime(detail.when.startsAt)}>
+        <InfoCard id="when" icon={<WhenIcon />} label="When" summary={formatDateTime(detail.when.startsAt)}>
           <p>
             Starts: {formatDateTime(detail.when.startsAt)}
             <br />
@@ -92,8 +116,8 @@ export default function CrewJobPage() {
           {!detail.when.startsAt && <p className="muted">A day schedule will show here once one's set for this job.</p>}
         </InfoCard>
 
-        <InfoCard label="Where" summary={detail.where.venue ?? 'Venue not set yet'}>
-          <p>{detail.where.venue ?? 'No venue set for this job yet.'}</p>
+        <InfoCard id="where" icon={<WhereIcon />} label="Where" summary={detail.where.venue ?? NO_VENUE}>
+          <p>{detail.where.venue ?? NO_VENUE}</p>
           <p className="muted">Access notes, parking, and load-in info will show here once that's added.</p>
         </InfoCard>
       </div>
