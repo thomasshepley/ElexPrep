@@ -40,7 +40,7 @@ export default function LoginPage() {
   return (
     <div style={{ display: 'grid', placeItems: 'center', minHeight: '100vh' }}>
       <div className="panel" style={{ width: 360 }}>
-        <h2>ElexPrep</h2>
+        <h2>ELEX Portal</h2>
         {needsSetup ? (
           <p className="muted">First run — create the admin account.</p>
         ) : (

@@ -19,18 +19,19 @@ services:
       - ./data:/data
 
   # Cloudflare Tunnel: exposes the app at your chosen hostname (set up in the Zero Trust
-  # dashboard under Networks -> Tunnels) without opening any port on your router. Only
-  # needed if you're using the permanent named-tunnel setup — remove this service (and
-  # keep the "cloudflared tunnel --url ..." command instead) if you just want the quick,
-  # temporary trycloudflare.com URL for testing.
-  cloudflared:
-    image: cloudflare/cloudflared:latest
-    container_name: elexprep-cloudflared
-    restart: unless-stopped
-    command: tunnel run
-    environment:
-      # Paste the tunnel token from Zero Trust -> Networks -> Tunnels -> (your tunnel) ->
-      # "Install connector" step. Keep this out of version control (see the note below).
-      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
-    depends_on:
-      - elexprep
+  # dashboard under Networks -> Tunnels) without opening any port on your router. Uncomment
+  # once you have a tunnel token (paste it into a .env file next to this compose file as
+  # CLOUDFLARE_TUNNEL_TOKEN) — left commented out by default so an unconfigured token
+  # doesn't crash-loop this container. For a quick, temporary preview URL instead (no token
+  # needed), run `cloudflared tunnel --url http://localhost:4000` on the host directly.
+  # cloudflared:
+  #   image: cloudflare/cloudflared:latest
+  #   container_name: elexprep-cloudflared
+  #   restart: unless-stopped
+  #   command: tunnel run
+  #   environment:
+  #     # Paste the tunnel token from Zero Trust -> Networks -> Tunnels -> (your tunnel) ->
+  #     # "Install connector" step.
+  #     - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
+  #   depends_on:
+  #     - elexprep

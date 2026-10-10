@@ -1,13 +1,83 @@
+/*
+ * Design tokens — established via an Apple-HIG-grounded design pass (see the apple-design
+ * skill's accessibility/color lenses). Two concrete contrast bugs fixed here: white button
+ * text on --accent and --danger both fell under the 4.5:1 minimum for normal-weight text
+ * (3.22:1 and 3.01:1 respectively) — each signal color now has a lighter "foreground" shade
+ * (for text/links/icons on a dark surface) and, where it's ever used as a solid button fill,
+ * a separate darker "-fill" shade verified at >=4.5:1 against white text. Light-mode values
+ * are provided (prefers-color-scheme) so the app follows the OS setting; dark remains the
+ * default/primary theme this team actually uses day to day.
+ */
 :root {
   color-scheme: dark;
-  --bg: #15161a;
-  --panel: #1d1e24;
+
+  /* Surfaces & content */
+  --surface: #15161a;
+  --surface-raised: #1d1e24;
   --border: #33343c;
-  --text: #e4e4e7;
-  --text-dim: #9a9aa2;
+  --content: #e4e4e7;
+  --content-muted: #9a9aa2;
+
+  /* Accent (brand blue) — --accent for text/links/icons on a dark surface (5.6:1), --accent-fill
+     for solid button backgrounds with white text (4.7:1 with #fff). */
   --accent: #4f8cff;
+  --accent-fill: #2f6fe0;
+
+  /* Signal colors. --success/--warning reuse the exact hex already used for "Floor"/an amber
+     gel tone in the location-color system (see shared/src/locationColors.ts) — the same
+     contrast-adaptive text-color logic used for printed labels (light text on a dark fill,
+     dark text on a light fill) applies here via --on-success/--on-warning. */
   --danger: #ff5d5d;
+  --danger-fill: #cc3b3b;
+  --success: #1fa34c;
+  --on-success: #0a1f10;
+  --warning: #d98c22;
+  --on-warning: #211604;
+
+  /* Type scale (rem; :root sets the page's root font-size to 15px, so 1rem = 15px here). */
+  --text-xs: 0.8667rem; /* 13px */
+  --text-sm: 0.9333rem; /* 14px */
+  --text-base: 1rem; /* 15px */
+  --text-lg: 1.1333rem; /* 17px */
+  --text-xl: 1.3333rem; /* 20px */
+  --text-2xl: 1.6rem; /* 24px */
+  --text-3xl: 2rem; /* 30px */
+
+  /* Spacing scale (rem). */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+
   font: 15px/1.5 system-ui, 'Segoe UI', Roboto, sans-serif;
+
+  /* Legacy aliases kept during the rebrand — existing components still reference these;
+     new/updated components should use the roles above directly. */
+  --bg: var(--surface);
+  --panel: var(--surface-raised);
+  --text: var(--content);
+  --text-dim: var(--content-muted);
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme='dark']) {
+    color-scheme: light;
+    --surface: #f5f6f8;
+    --surface-raised: #ffffff;
+    --border: #d8dade;
+    --content: #1b1c20;
+    --content-muted: #5b5d66;
+    --accent: #2f6fe0;
+    --accent-fill: #2f6fe0;
+    --danger: #cc3b3b;
+    --danger-fill: #cc3b3b;
+    --success: #1fa34c;
+    --on-success: #ffffff;
+    --warning: #a4650f;
+    --on-warning: #ffffff;
+  }
 }
 
 * {
@@ -16,13 +86,25 @@
 
 body {
   margin: 0;
-  background: var(--bg);
-  color: var(--text);
+  background: var(--surface);
+  color: var(--content);
+}
+
+h1 {
+  font-size: var(--text-3xl);
+}
+
+h2 {
+  font-size: var(--text-2xl);
+}
+
+h3 {
+  font-size: var(--text-xl);
 }
 
 h1, h2, h3 {
   font-weight: 600;
-  margin: 0 0 0.75rem;
+  margin: 0 0 var(--space-3);
 }
 
 a {
@@ -31,22 +113,31 @@ a {
 
 button {
   font: inherit;
-  background: var(--accent);
+  background: var(--accent-fill);
   color: #fff;
   border: none;
   border-radius: 6px;
-  padding: 0.5rem 1rem;
+  padding: var(--space-2) var(--space-4);
   cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+
+button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 button.secondary {
   background: transparent;
   border: 1px solid var(--border);
-  color: var(--text);
+  color: var(--content);
 }
 
 button.danger {
-  background: var(--danger);
+  background: var(--danger-fill);
 }
 
 button:disabled {
@@ -56,11 +147,16 @@ button:disabled {
 
 input, select, textarea {
   font: inherit;
-  background: var(--bg);
-  color: var(--text);
+  background: var(--surface);
+  color: var(--content);
   border: 1px solid var(--border);
   border-radius: 4px;
   padding: 0.4rem 0.6rem;
+}
+
+input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
 
 table {
@@ -72,15 +168,15 @@ th, td {
   text-align: left;
   padding: 0.45rem 0.6rem;
   border-bottom: 1px solid var(--border);
-  font-size: 0.9rem;
+  font-size: var(--text-sm);
 }
 
 .panel {
-  background: var(--panel);
+  background: var(--surface-raised);
   border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 1rem 1.25rem;
-  margin-bottom: 1.25rem;
+  padding: var(--space-4) var(--space-5);
+  margin-bottom: var(--space-5);
 }
 
 .row {
@@ -91,23 +187,23 @@ th, td {
 }
 
 .muted {
-  color: var(--text-dim);
-  font-size: 0.85rem;
+  color: var(--content-muted);
+  font-size: var(--text-xs);
 }
 
 .error {
   color: var(--danger);
-  font-size: 0.9rem;
+  font-size: var(--text-sm);
 }
 
 .job-card {
   display: block;
   padding: 0.9rem 1.1rem;
-  background: var(--panel);
+  background: var(--surface-raised);
   border: 1px solid var(--border);
   border-radius: 8px;
   text-decoration: none;
-  color: var(--text);
+  color: var(--content);
   margin-bottom: 0.6rem;
 }
 
@@ -118,14 +214,14 @@ th, td {
 .tabs {
   display: flex;
   gap: 0.4rem;
-  margin-bottom: 1rem;
+  margin-bottom: var(--space-4);
   border-bottom: 1px solid var(--border);
 }
 
 .tabs button,
 .tabs a {
   background: transparent;
-  color: var(--text-dim);
+  color: var(--content-muted);
   border-radius: 0;
   border-bottom: 2px solid transparent;
   padding: 0.5rem 0.9rem;
@@ -135,6 +231,51 @@ th, td {
 
 .tabs button.active,
 .tabs a.active {
-  color: var(--text);
+  color: var(--content);
   border-bottom-color: var(--accent);
+}
+
+/*
+ * Chip — the app's one signature element. Rather than a generic badge, it reuses the exact
+ * color language already used on physical printed labels (the location-color system: Floor,
+ * Downstage, Spare, Rigging...) as a consistent status motif across the whole UI — job status,
+ * print job state, and (later) crew roles all read through the same visual language the crew
+ * already sees on the labels themselves.
+ */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  color: var(--content-muted);
+}
+
+.chip-success {
+  background: var(--success);
+  color: var(--on-success);
+  border-color: transparent;
+}
+
+.chip-warning {
+  background: var(--warning);
+  color: var(--on-warning);
+  border-color: transparent;
+}
+
+.chip-danger {
+  background: var(--danger-fill);
+  color: #fff;
+  border-color: transparent;
+}
+
+.chip-accent {
+  background: var(--accent-fill);
+  color: #fff;
+  border-color: transparent;
 }
