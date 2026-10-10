@@ -4,6 +4,7 @@ import { MAX_COPIES_WITHOUT_OVERRIDE } from '../constants';
 import { buildCombinedPdf, collectConfirmedContent, collectPendingContent } from '../printing/buildLabelPdfs';
 import { createPrintJobs } from '../printing/printJobService';
 import { getPrinterSettings } from '../printing/printerSettings';
+import { nextOrderStart } from '../printing/queueOrder';
 
 export const printQueueRouter = Router();
 
@@ -29,6 +30,7 @@ printQueueRouter.post('/:jobId/print-queue/build', async (req, res) => {
 
   if (includeFixtureLabels) {
     const fixtures = await prisma.fixture.findMany({ where: { jobId } });
+    let order = await nextOrderStart(jobId, 'FIXTURE');
     for (const f of fixtures) {
       const item = await prisma.printQueueItem.create({
         data: {
@@ -46,6 +48,7 @@ printQueueRouter.post('/:jobId/print-queue/build', async (req, res) => {
             location: f.location,
           }),
           quantity: 1,
+          order: order++,
         },
       });
       created.push(item.id);
@@ -54,6 +57,7 @@ printQueueRouter.post('/:jobId/print-queue/build', async (req, res) => {
 
   if (includePalLabels) {
     const cases = await prisma.caseGroupRecord.findMany({ where: { jobId } });
+    let order = await nextOrderStart(jobId, 'PAL');
     for (const c of cases) {
       const item = await prisma.printQueueItem.create({
         data: {
@@ -67,6 +71,7 @@ printQueueRouter.post('/:jobId/print-queue/build', async (req, res) => {
             subtitle: c.label,
           }),
           quantity: 1,
+          order: order++,
         },
       });
       created.push(item.id);
@@ -80,13 +85,40 @@ printQueueRouter.post('/:jobId/print-queue/build', async (req, res) => {
 printQueueRouter.get('/:jobId/print-queue', async (req, res) => {
   const { jobId } = req.params;
   const [queue, adHoc] = await Promise.all([
-    prisma.printQueueItem.findMany({ where: { jobId }, orderBy: { createdAt: 'asc' } }),
-    prisma.adHocLabel.findMany({ where: { jobId }, orderBy: { createdAt: 'asc' } }),
+    prisma.printQueueItem.findMany({ where: { jobId }, orderBy: { order: 'asc' } }),
+    prisma.adHocLabel.findMany({ where: { jobId }, orderBy: { order: 'asc' } }),
   ]);
   res.json({
     queue: queue.map((q) => ({ ...q, content: JSON.parse(q.contentJson) })),
     adHoc: adHoc.map((a) => ({ ...a, content: JSON.parse(a.contentJson) })),
   });
+});
+
+/**
+ * Bulk-reorders items within one label type's print-run sequence — the shared `order` field
+ * spans both PrintQueueItem and AdHocLabel rows, so dragging an ad hoc label above/below a
+ * patch-sourced item (or vice versa) is a single write across both tables, not two separate
+ * per-table operations.
+ */
+printQueueRouter.put('/:jobId/print-queue/reorder', async (req, res) => {
+  const { labelType, items } = req.body ?? {};
+  if (!labelType || !Array.isArray(items) || items.length === 0) {
+    return res.status(400).json({ error: 'labelType and a non-empty items array are required' });
+  }
+  for (const entry of items) {
+    if (!entry || (entry.source !== 'queue' && entry.source !== 'adhoc') || !entry.id) {
+      return res.status(400).json({ error: 'each item must be { source: "queue"|"adhoc", id }' });
+    }
+  }
+  const { jobId } = req.params;
+  await prisma.$transaction(
+    items.map((entry: { source: 'queue' | 'adhoc'; id: string }, index: number) =>
+      entry.source === 'queue'
+        ? prisma.printQueueItem.updateMany({ where: { id: entry.id, jobId, labelType }, data: { order: index } })
+        : prisma.adHocLabel.updateMany({ where: { id: entry.id, jobId, labelType }, data: { order: index } })
+    )
+  );
+  res.json({ reordered: items.length });
 });
 
 /**

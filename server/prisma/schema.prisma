@@ -137,6 +137,12 @@ model AdHocLabel {
   labelType   String
   contentJson String
   quantity    Int       @default(1)
+  /// Print-run position, shared with PrintQueueItem's `order` across the same
+  /// (jobId, labelType) group — determines which physical cell a copy lands in.
+  order       Int       @default(0)
+  /// Skips this ad hoc label for the next print run without deleting the label recipe
+  /// itself (which stays editable/reusable in the Labels tab).
+  excludeFromPrint Boolean @default(false)
   createdAt   DateTime  @default(now())
 }
 
@@ -151,6 +157,9 @@ model PrintQueueItem {
   contentJson String
   quantity    Int      @default(1)
   status      String   @default("PENDING")
+  /// Print-run position, shared with AdHocLabel's `order` across the same
+  /// (jobId, labelType) group — determines which physical cell a copy lands in.
+  order       Int      @default(0)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
