@@ -15,6 +15,8 @@ function App() {
     return <Navigate to="/crew" replace />
   }
 
+  const initial = user.displayName.trim().charAt(0).toUpperCase() || '?'
+
   return (
     <div className="app-shell">
       <header className="app-header">
@@ -25,6 +27,7 @@ function App() {
           <NavLink to="/signage">Signage</NavLink>
         </nav>
         <div className="header-user">
+          <span className="avatar">{initial}</span>
           <NavLink to="/settings/preferences">{user.displayName}</NavLink>
           <button className="secondary" onClick={logout}>
             Sign out

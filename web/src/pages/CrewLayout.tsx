@@ -10,6 +10,7 @@ import { useAuth } from '../auth/AuthContext';
  */
 export default function CrewLayout() {
   const { user, logout } = useAuth();
+  const initial = user?.displayName?.trim().charAt(0).toUpperCase() ?? '?';
 
   return (
     <div className="app-shell">
@@ -21,6 +22,7 @@ export default function CrewLayout() {
           </NavLink>
         </nav>
         <div className="header-user">
+          <span className="avatar">{initial}</span>
           <span>{user?.displayName}</span>
           <button className="secondary" onClick={logout}>
             Sign out

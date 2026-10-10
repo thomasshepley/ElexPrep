@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, type CrewMyJob } from '../api/client';
+import { WhereIcon } from '../components/Icons';
+
+const NO_DATE = 'No date set yet';
 
 function formatDateRange(startsAt: string | null, endsAt: string | null): string {
-  if (!startsAt) return 'No date set yet';
+  if (!startsAt) return NO_DATE;
   const start = new Date(startsAt);
   const startStr = start.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
   if (!endsAt || endsAt === startsAt) return startStr;
@@ -33,25 +36,30 @@ export default function CrewSchedulePage() {
       <h1>Your schedule</h1>
       {error && <p className="error">{error}</p>}
       {jobs === null && !error && <p className="muted">Loading…</p>}
-      {jobs !== null && jobs.length === 0 && (
-        <p className="muted">You're not assigned to any jobs yet.</p>
-      )}
+      {jobs !== null && jobs.length === 0 && <p className="muted">You're not assigned to any jobs yet.</p>}
       {jobs !== null && jobs.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-          {jobs.map((j) => (
-            <Link key={j.jobId} to={`/crew/jobs/${j.jobId}`} className="panel" style={{ display: 'block', textDecoration: 'none' }}>
-              <div className="row" style={{ justifyContent: 'space-between' }}>
-                <div>
-                  <h3 style={{ margin: 0 }}>{j.jobName}</h3>
-                  <p className="muted" style={{ margin: '0.25rem 0 0' }}>
-                    {j.role}
-                    {j.venue && ` · ${j.venue}`}
-                  </p>
+          {jobs.map((j) => {
+            const dateRange = formatDateRange(j.startsAt, j.endsAt);
+            return (
+              <Link key={j.jobId} to={`/crew/jobs/${j.jobId}`} className="job-card">
+                <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div>
+                    <h3 style={{ margin: 0 }}>{j.jobName}</h3>
+                    <div className="row" style={{ marginTop: '0.5rem', gap: '0.5rem' }}>
+                      <span className="chip chip-role">{j.role}</span>
+                      {j.venue && (
+                        <span className="row muted" style={{ gap: '0.3rem', fontSize: 'var(--text-xs)' }}>
+                          <WhereIcon /> {j.venue}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <span className={dateRange === NO_DATE ? 'chip chip-neutral' : 'chip chip-accent'}>{dateRange}</span>
                 </div>
-                <span className="chip chip-accent">{formatDateRange(j.startsAt, j.endsAt)}</span>
-              </div>
-            </Link>
-          ))}
+              </Link>
+            );
+          })}
         </div>
       )}
     </div>
