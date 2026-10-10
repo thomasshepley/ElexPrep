@@ -27,6 +27,7 @@ import { restartCurrentRmsPolling } from './currentRms/sync';
 import { locationColorRulesRouter, jobLocationColorRulesRouter } from './routes/locationColorRules';
 import { permissionsRouter } from './routes/permissions';
 import { crewRouter } from './routes/crew';
+import { crewPortalRouter } from './routes/crewPortal';
 import { jobCrewAssignmentsRouter } from './routes/jobCrewAssignments';
 import { seedDefaultLocationColorsIfEmpty, seedNewDefaultLocationColorsIfMissing } from './pdf/locationColors';
 import { prisma } from './db';
@@ -60,6 +61,10 @@ app.use('/api/jobs', plotsRouter);
 app.use('/api/jobs', jobCurrentRmsRouter);
 app.use('/api/jobs', jobLocationColorRulesRouter);
 app.use('/api/jobs', jobCrewAssignmentsRouter);
+// crewPortalRouter (self-service, CREW-only) is mounted before the admin-only crewRouter at
+// the same prefix so its specific /me* paths are tried first; anything it doesn't match
+// (the bare roster list/CRUD) falls through to crewRouter unchanged.
+app.use('/api/crew', crewPortalRouter);
 app.use('/api/crew', crewRouter);
 app.use('/api/current-rms', currentRmsRouter);
 app.use('/api/print-jobs', printJobsRouter);

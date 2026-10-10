@@ -6,7 +6,9 @@ import App from './App.tsx'
 import { AuthProvider } from './auth/AuthContext'
 import LoginPage from './pages/LoginPage'
 import SignagePage from './pages/SignagePage'
-import CrewComingSoonPage from './pages/CrewComingSoonPage'
+import CrewLayout from './pages/CrewLayout'
+import CrewSchedulePage from './pages/CrewSchedulePage'
+import CrewJobPage from './pages/CrewJobPage'
 import JobsListPage from './pages/JobsListPage'
 import JobDetailPage from './pages/JobDetailPage'
 import SettingsLayout from './pages/SettingsLayout'
@@ -28,7 +30,10 @@ createRoot(document.getElementById('root')!).render(
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signage" element={<SignagePage />} />
-          <Route path="/crew" element={<CrewComingSoonPage />} />
+          <Route path="/crew" element={<CrewLayout />}>
+            <Route index element={<CrewSchedulePage />} />
+            <Route path="jobs/:jobId" element={<CrewJobPage />} />
+          </Route>
           <Route path="/" element={<App />}>
             <Route index element={<JobsListPage />} />
             <Route path="jobs/:jobId" element={<JobDetailPage />} />

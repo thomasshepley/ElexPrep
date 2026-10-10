@@ -154,6 +154,42 @@ export interface JobCrewAssignment {
   active: boolean;
 }
 
+export interface CrewMe {
+  id: string;
+  displayName: string;
+  phone: string | null;
+  skills: string | null;
+  dayRate: string | null;
+}
+
+export interface CrewMyJob {
+  jobId: string;
+  jobName: string;
+  venue: string | null;
+  role: string;
+  startsAt: string | null;
+  endsAt: string | null;
+}
+
+export interface CrewJobDetail {
+  jobId: string;
+  who: {
+    you: { role: string };
+    others: { displayName: string; role: string }[];
+  };
+  what: {
+    jobName: string;
+    description: string | null;
+  };
+  when: {
+    startsAt: string | null;
+    endsAt: string | null;
+  };
+  where: {
+    venue: string | null;
+  };
+}
+
 export interface Plot {
   id: string;
   jobId: string;
@@ -267,6 +303,11 @@ export const api = {
       }>
     ) => request<CrewMember>(`/crew/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     remove: (id: string) => request<void>(`/crew/${id}`, { method: 'DELETE' }),
+  },
+  crewPortal: {
+    me: () => request<CrewMe>('/crew/me'),
+    myJobs: () => request<CrewMyJob[]>('/crew/me/jobs'),
+    jobDetail: (jobId: string) => request<CrewJobDetail>(`/crew/me/jobs/${jobId}`),
   },
   jobCrewAssignments: {
     list: (jobId: string) => request<JobCrewAssignment[]>(`/jobs/${jobId}/crew`),
