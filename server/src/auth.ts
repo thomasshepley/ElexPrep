@@ -66,12 +66,11 @@ export function toAuthedUser(u: {
 // touches stays GET-only.
 const SIGNAGE_WRITE_ALLOWLIST = [/^\/api\/jobs\/[^/]+\/current-rms\/pick-list\/[^/]+\/prepped$/];
 
-// CREW accounts exist (an admin can create one on the Crew settings page) before the crew
-// portal itself does — nothing beyond auth/me is built for them yet. Until that portal ships,
-// a CREW login can only reach the auth endpoints (already allowlisted below) and its own
-// preferences; every other route stays a hard 403 rather than silently falling through to
-// whatever a plain USER could do.
-const CREW_ALLOWLIST = [/^\/api\/auth\/me$/];
+// The crew portal (routes/crewPortal.ts) is entirely self-service: every path here only ever
+// returns the logged-in crew member's own data (profile, their jobs, a job's Who/What/When/
+// Where) — nothing takes another crew member's id from the client. Everything else stays a
+// hard 403 rather than silently falling through to whatever a plain USER could do.
+const CREW_ALLOWLIST = [/^\/api\/auth\/me$/, /^\/api\/crew\/me(\/jobs(\/[^/]+)?)?$/];
 
 /**
  * Resolves the session cookie to req.user, then gates every /api route except health
