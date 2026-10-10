@@ -6,6 +6,7 @@ import App from './App.tsx'
 import { AuthProvider } from './auth/AuthContext'
 import LoginPage from './pages/LoginPage'
 import SignagePage from './pages/SignagePage'
+import CrewComingSoonPage from './pages/CrewComingSoonPage'
 import JobsListPage from './pages/JobsListPage'
 import JobDetailPage from './pages/JobDetailPage'
 import SettingsLayout from './pages/SettingsLayout'
@@ -13,6 +14,7 @@ import FixtureTypeRulesPage from './pages/FixtureTypeRulesPage'
 import LocationColorsPage from './pages/LocationColorsPage'
 import ImportMappingPage from './pages/ImportMappingPage'
 import UsersPage from './pages/UsersPage'
+import CrewPage from './pages/CrewPage'
 import PreferencesPage from './pages/PreferencesPage'
 import PrinterSettingsPage from './pages/PrinterSettingsPage'
 import CurrentRmsSettingsPage from './pages/CurrentRmsSettingsPage'
@@ -26,6 +28,7 @@ createRoot(document.getElementById('root')!).render(
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signage" element={<SignagePage />} />
+          <Route path="/crew" element={<CrewComingSoonPage />} />
           <Route path="/" element={<App />}>
             <Route index element={<JobsListPage />} />
             <Route path="jobs/:jobId" element={<JobDetailPage />} />
@@ -35,6 +38,7 @@ createRoot(document.getElementById('root')!).render(
               <Route path="location-colors" element={<LocationColorsPage />} />
               <Route path="import-mapping" element={<ImportMappingPage />} />
               <Route path="users" element={<UsersPage />} />
+              <Route path="crew" element={<CrewPage />} />
               <Route path="permissions" element={<PermissionsPage />} />
               <Route path="printer" element={<PrinterSettingsPage />} />
               <Route path="current-rms" element={<CurrentRmsSettingsPage />} />

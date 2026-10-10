@@ -18,7 +18,7 @@ export default function LoginPage() {
   }, []);
 
   useEffect(() => {
-    if (user) navigate(user.role === 'SIGNAGE' ? '/signage' : '/', { replace: true });
+    if (user) navigate(user.role === 'SIGNAGE' ? '/signage' : user.role === 'CREW' ? '/crew' : '/', { replace: true });
   }, [user, navigate]);
 
   const submit = async (e: React.FormEvent) => {

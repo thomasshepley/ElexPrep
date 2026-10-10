@@ -26,6 +26,8 @@ import { currentRmsRouter, jobCurrentRmsRouter } from './routes/currentRms';
 import { restartCurrentRmsPolling } from './currentRms/sync';
 import { locationColorRulesRouter, jobLocationColorRulesRouter } from './routes/locationColorRules';
 import { permissionsRouter } from './routes/permissions';
+import { crewRouter } from './routes/crew';
+import { jobCrewAssignmentsRouter } from './routes/jobCrewAssignments';
 import { seedDefaultLocationColorsIfEmpty, seedNewDefaultLocationColorsIfMissing } from './pdf/locationColors';
 import { prisma } from './db';
 
@@ -57,6 +59,8 @@ app.use('/api/jobs', printQueueRouter);
 app.use('/api/jobs', plotsRouter);
 app.use('/api/jobs', jobCurrentRmsRouter);
 app.use('/api/jobs', jobLocationColorRulesRouter);
+app.use('/api/jobs', jobCrewAssignmentsRouter);
+app.use('/api/crew', crewRouter);
 app.use('/api/current-rms', currentRmsRouter);
 app.use('/api/print-jobs', printJobsRouter);
 app.use('/api/printer-settings', printerSettingsRouter);

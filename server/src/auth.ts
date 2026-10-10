@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs';
 import { NextFunction, Request, Response } from 'express';
 import { prisma } from './db';
 
-export type Role = 'ADMIN' | 'USER' | 'SIGNAGE';
+export type Role = 'ADMIN' | 'USER' | 'SIGNAGE' | 'CREW';
 
 export interface AuthedUser {
   id: string;
@@ -66,11 +66,20 @@ export function toAuthedUser(u: {
 // touches stays GET-only.
 const SIGNAGE_WRITE_ALLOWLIST = [/^\/api\/jobs\/[^/]+\/current-rms\/pick-list\/[^/]+\/prepped$/];
 
+// CREW accounts exist (an admin can create one on the Crew settings page) before the crew
+// portal itself does — nothing beyond auth/me is built for them yet. Until that portal ships,
+// a CREW login can only reach the auth endpoints (already allowlisted below) and its own
+// preferences; every other route stays a hard 403 rather than silently falling through to
+// whatever a plain USER could do.
+const CREW_ALLOWLIST = [/^\/api\/auth\/me$/];
+
 /**
  * Resolves the session cookie to req.user, then gates every /api route except health
  * and the auth endpoints themselves. SIGNAGE accounts are read-only (aside from the one
  * allowlisted exception above): any other non-GET request from one is rejected, so a
- * compromised prep-bay TV login can't mutate anything else.
+ * compromised prep-bay TV login can't mutate anything else. CREW accounts are locked out of
+ * everything except auth/me until the crew portal (a later milestone) gives them somewhere
+ * to go — see CREW_ALLOWLIST.
  */
 export async function authMiddleware(req: Request, res: Response, next: NextFunction) {
   const token = req.cookies?.[SESSION_COOKIE];
@@ -92,6 +101,10 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
   if (req.user.role === 'SIGNAGE' && req.method !== 'GET') {
     const allowed = SIGNAGE_WRITE_ALLOWLIST.some((re) => re.test(req.path));
     if (!allowed) return res.status(403).json({ error: 'Signage accounts are view-only' });
+  }
+  if (req.user.role === 'CREW') {
+    const allowed = CREW_ALLOWLIST.some((re) => re.test(req.path));
+    if (!allowed) return res.status(403).json({ error: 'The crew portal is not available yet' });
   }
   next();
 }
