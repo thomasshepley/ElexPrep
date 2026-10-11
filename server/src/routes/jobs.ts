@@ -4,6 +4,7 @@ import path from 'path';
 import fs from 'fs';
 import { prisma, logActivity } from '../db';
 import { requirePermission, resolvePermissionsForUser } from '../permissions';
+import { normalizeCrewFeaturesPatch } from '../crewFeatures';
 
 const uploadDir = process.env.UPLOADS_DIR
   ? path.resolve(process.env.UPLOADS_DIR)
@@ -33,18 +34,10 @@ jobsRouter.get('/', async (req, res) => {
   res.json(jobs);
 });
 
-// Job lifecycle (create/publish/delete) defaults to admin-only, same as printer/user
-// settings, but each is individually delegatable to USER via Settings -> Permissions.
-jobsRouter.post('/', requirePermission('createJobs'), async (req, res) => {
-  const { name, venue } = req.body ?? {};
-  if (!name || typeof name !== 'string') {
-    return res.status(400).json({ error: 'name is required' });
-  }
-  const job = await prisma.job.create({ data: { name, venue: venue ?? null } });
-  await logActivity('job.create', name, job.id, req.user?.id);
-  res.status(201).json(job);
-});
-
+// Jobs can no longer be created directly — every job enters the portal by onboarding a
+// Current RMS Quote/Order (see routes/currentRms.ts's import/bulk-import endpoints), so the
+// job list and its data (crew features, OneDrive folder, etc.) always starts from a real
+// opportunity rather than a blank admin-typed name.
 jobsRouter.get('/:id', async (req, res) => {
   const job = await prisma.job.findUnique({ where: { id: req.params.id } });
   if (!job) return res.status(404).json({ error: 'not found' });
@@ -53,12 +46,22 @@ jobsRouter.get('/:id', async (req, res) => {
 });
 
 jobsRouter.put('/:id', async (req, res) => {
-  const { name, venue, isPublic } = req.body ?? {};
+  const { name, venue, isPublic, crewFeatures } = req.body ?? {};
   if (isPublic !== undefined && req.user?.role !== 'ADMIN') {
     const perms = req.user?.role === 'USER' ? await resolvePermissionsForUser(req.user.id, 'USER') : null;
     if (!perms?.publishJobs) {
       return res.status(403).json({ error: "Insufficient permissions to change a job's public visibility" });
     }
+  }
+  if (crewFeatures !== undefined && req.user?.role !== 'ADMIN') {
+    const perms = req.user?.role === 'USER' ? await resolvePermissionsForUser(req.user.id, 'USER') : null;
+    if (!perms?.onboardJobs && !perms?.manageCrewAssignments) {
+      return res.status(403).json({ error: "Insufficient permissions to change this job's crew portal features" });
+    }
+  }
+  let crewFeaturesJson: string | null | undefined;
+  if (crewFeatures !== undefined) {
+    crewFeaturesJson = crewFeatures === null ? null : JSON.stringify(normalizeCrewFeaturesPatch(crewFeatures));
   }
   const job = await prisma.job.update({
     where: { id: req.params.id },
@@ -66,9 +69,11 @@ jobsRouter.put('/:id', async (req, res) => {
       ...(name !== undefined ? { name } : {}),
       ...(venue !== undefined ? { venue } : {}),
       ...(isPublic !== undefined ? { isPublic } : {}),
+      ...(crewFeaturesJson !== undefined ? { crewFeaturesJson } : {}),
     },
   });
   if (isPublic !== undefined) await logActivity('job.visibility', `isPublic=${isPublic}`, job.id, req.user?.id);
+  if (crewFeaturesJson !== undefined) await logActivity('job.crew_features', crewFeaturesJson ?? 'reset to default', job.id, req.user?.id);
   res.json(job);
 });
 

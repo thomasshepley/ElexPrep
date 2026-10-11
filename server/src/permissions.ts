@@ -9,11 +9,12 @@ import { AuthedUser, Role } from './auth';
  * every one of these previously required ADMIN outright, so an admin has to opt in to delegate.
  */
 export const PERMISSION_KEYS = [
-  'createJobs',
   'deleteJobs',
   'publishJobs',
   'viewActivityLog',
   'linkCurrentRms',
+  'onboardJobs',
+  'manageOneDrive',
   'manageCrewAssignments',
   'manageCrewApplications',
   'moderateDiscussion',
@@ -23,22 +24,24 @@ export type PermissionKey = (typeof PERMISSION_KEYS)[number];
 export type RolePermissions = Record<PermissionKey, boolean>;
 
 export const PERMISSION_LABELS: Record<PermissionKey, string> = {
-  createJobs: 'Create new jobs',
   deleteJobs: 'Delete jobs',
   publishJobs: "Publish/unpublish jobs (toggle a job's public visibility)",
   viewActivityLog: 'View the activity log',
   linkCurrentRms: 'Link or unlink a job to a Current RMS opportunity',
+  onboardJobs: 'Onboard a Current RMS Quote/Order into a portal job (the only way jobs are created)',
+  manageOneDrive: "Link a job's OneDrive folder and choose which files/folders crew can see",
   manageCrewAssignments: 'Attribute crew members to a job (add/remove/edit their role on it)',
   manageCrewApplications: 'Review freelance crew applications (approve/reject, view compliance documents)',
   moderateDiscussion: "Delete other people's messages in a job's discussion thread",
 };
 
 export const DEFAULT_PERMISSIONS: RolePermissions = {
-  createJobs: false,
   deleteJobs: false,
   publishJobs: false,
   viewActivityLog: false,
   linkCurrentRms: false,
+  onboardJobs: false,
+  manageOneDrive: false,
   manageCrewAssignments: false,
   manageCrewApplications: false,
   moderateDiscussion: false,

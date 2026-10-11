@@ -8,6 +8,11 @@ import { plotsDir } from './plots';
 import { uploadDir } from './jobs';
 import { notifyLabelRequestSubmitted, notifyDiscussionMessage } from '../notifications';
 import { encryptBankDetails, decryptBankDetails, parseBankDetails } from '../bankDetails';
+import { resolveCrewFeatures } from '../crewFeatures';
+import { findSharedCadPdf } from '../oneDrive/cad';
+import { listJobShares, isItemSharedWithJob } from '../oneDrive/shares';
+import { streamOneDriveFile } from '../oneDrive/client';
+import { getOneDriveConfig } from '../oneDrive/config';
 
 /**
  * Self-service data for a logged-in CREW account: their own profile, the jobs they're
@@ -258,6 +263,8 @@ crewPortalRouter.get('/me/jobs/:jobId', requireRole('CREW'), async (req, res) =>
 crewPortalRouter.get('/me/jobs/:jobId/schedule', requireRole('CREW'), async (req, res) => {
   const found = await requireAssignedJob(req.user!.id, req.params.jobId);
   if (!found) return res.status(404).json({ error: 'Job not found' });
+  const features = await resolveCrewFeatures(found.assignment.job);
+  if (!features.schedule) return res.json([]);
   const items = await prisma.jobScheduleItem.findMany({
     where: { jobId: req.params.jobId },
     orderBy: { startsAt: 'asc' },
@@ -268,6 +275,8 @@ crewPortalRouter.get('/me/jobs/:jobId/schedule', requireRole('CREW'), async (req
 crewPortalRouter.get('/me/jobs/:jobId/documents', requireRole('CREW'), async (req, res) => {
   const found = await requireAssignedJob(req.user!.id, req.params.jobId);
   if (!found) return res.status(404).json({ error: 'Job not found' });
+  const features = await resolveCrewFeatures(found.assignment.job);
+  if (!features.documents) return res.json([]);
   const documents = await prisma.jobDocument.findMany({
     where: { jobId: req.params.jobId },
     orderBy: { createdAt: 'desc' },
@@ -278,6 +287,8 @@ crewPortalRouter.get('/me/jobs/:jobId/documents', requireRole('CREW'), async (re
 crewPortalRouter.get('/me/jobs/:jobId/documents/:docId/file', requireRole('CREW'), async (req, res) => {
   const found = await requireAssignedJob(req.user!.id, req.params.jobId);
   if (!found) return res.status(404).end();
+  const features = await resolveCrewFeatures(found.assignment.job);
+  if (!features.documents) return res.status(404).end();
   const document = await prisma.jobDocument.findUnique({ where: { id: req.params.docId } });
   if (!document || document.jobId !== req.params.jobId) return res.status(404).end();
   res.setHeader('Content-Type', document.mimeType);
@@ -288,6 +299,8 @@ crewPortalRouter.get('/me/jobs/:jobId/documents/:docId/file', requireRole('CREW'
 crewPortalRouter.get('/me/jobs/:jobId/plots', requireRole('CREW'), async (req, res) => {
   const found = await requireAssignedJob(req.user!.id, req.params.jobId);
   if (!found) return res.status(404).json({ error: 'Job not found' });
+  const features = await resolveCrewFeatures(found.assignment.job);
+  if (!features.plots) return res.json([]);
   const plots = await prisma.plot.findMany({ where: { jobId: req.params.jobId }, orderBy: { createdAt: 'desc' } });
   res.json(plots);
 });
@@ -295,11 +308,54 @@ crewPortalRouter.get('/me/jobs/:jobId/plots', requireRole('CREW'), async (req, r
 crewPortalRouter.get('/me/jobs/:jobId/plots/:plotId/file', requireRole('CREW'), async (req, res) => {
   const found = await requireAssignedJob(req.user!.id, req.params.jobId);
   if (!found) return res.status(404).end();
+  const features = await resolveCrewFeatures(found.assignment.job);
+  if (!features.plots) return res.status(404).end();
   const plot = await prisma.plot.findUnique({ where: { id: req.params.plotId } });
   if (!plot || plot.jobId !== req.params.jobId) return res.status(404).end();
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(plot.originalName)}"`);
   res.sendFile(path.join(plotsDir, plot.fileName));
+});
+
+/**
+ * OneDrive-sourced CAD/files for the crew CAD section: the auto-detected first PDF in the
+ * job's matched "CAD" folder (always surfaced once a folder's linked — see oneDrive/cad.ts),
+ * plus anything else an admin has explicitly shared with crew via the Files tab. Both are
+ * scaffolded against the Graph API and return empty/null until OneDrive is actually
+ * configured with real Azure credentials (see oneDrive/config.ts).
+ */
+crewPortalRouter.get('/me/jobs/:jobId/onedrive', requireRole('CREW'), async (req, res) => {
+  const found = await requireAssignedJob(req.user!.id, req.params.jobId);
+  if (!found) return res.status(404).json({ error: 'Job not found' });
+  const features = await resolveCrewFeatures(found.assignment.job);
+  if (!features.plots) return res.json({ cadPdf: null, shared: [] });
+  const [cadPdf, shared] = await Promise.all([
+    findSharedCadPdf(found.assignment.job).catch(() => null),
+    listJobShares(req.params.jobId),
+  ]);
+  res.json({ cadPdf, shared });
+});
+
+/** Streams a OneDrive item's bytes through our own auth, rather than handing the crew member a
+ * raw Graph URL — scaffolded; throws a clear "not configured" error until real credentials are
+ * wired in (see oneDrive/client.ts). */
+crewPortalRouter.get('/me/jobs/:jobId/onedrive/:itemId/file', requireRole('CREW'), async (req, res) => {
+  const found = await requireAssignedJob(req.user!.id, req.params.jobId);
+  if (!found) return res.status(404).end();
+  const { itemId } = req.params;
+  const cadPdf = await findSharedCadPdf(found.assignment.job).catch(() => null);
+  const isSharedCad = cadPdf?.itemId === itemId;
+  const isExplicitlyShared = isSharedCad ? true : await isItemSharedWithJob(req.params.jobId, itemId);
+  if (!isExplicitlyShared) return res.status(404).end();
+  try {
+    const config = await getOneDriveConfig();
+    const { stream, contentType, fileName } = await streamOneDriveFile(config, itemId);
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(fileName)}"`);
+    stream.pipe(res);
+  } catch (err) {
+    res.status(502).json({ error: (err as Error).message });
+  }
 });
 
 /**
@@ -311,6 +367,8 @@ crewPortalRouter.get('/me/jobs/:jobId/plots/:plotId/file', requireRole('CREW'), 
 crewPortalRouter.get('/me/jobs/:jobId/kit-list', requireRole('CREW'), async (req, res) => {
   const found = await requireAssignedJob(req.user!.id, req.params.jobId);
   if (!found) return res.status(404).json({ error: 'Job not found' });
+  const features = await resolveCrewFeatures(found.assignment.job);
+  if (!features.kitList) return res.json({ items: [] });
   if (!found.assignment.job.currentRmsOpportunityId) return res.json({ items: [] });
   try {
     const config = await getCurrentRmsConfig();
@@ -378,6 +436,8 @@ function toDiscussionMessageDto(m: {
 crewPortalRouter.get('/me/jobs/:jobId/discussion', requireRole('CREW'), async (req, res) => {
   const found = await requireAssignedJob(req.user!.id, req.params.jobId);
   if (!found) return res.status(404).json({ error: 'Job not found' });
+  const features = await resolveCrewFeatures(found.assignment.job);
+  if (!features.discussion) return res.json([]);
   const messages = await prisma.jobDiscussionMessage.findMany({
     where: { jobId: req.params.jobId },
     include: { authorUser: { select: { displayName: true, role: true } } },
@@ -389,6 +449,8 @@ crewPortalRouter.get('/me/jobs/:jobId/discussion', requireRole('CREW'), async (r
 crewPortalRouter.post('/me/jobs/:jobId/discussion', requireRole('CREW'), async (req, res) => {
   const found = await requireAssignedJob(req.user!.id, req.params.jobId);
   if (!found) return res.status(404).json({ error: 'Job not found' });
+  const features = await resolveCrewFeatures(found.assignment.job);
+  if (!features.discussion) return res.status(403).json({ error: 'Discussion is not enabled for this job' });
   const { body } = req.body ?? {};
   if (!body || typeof body !== 'string' || !body.trim()) return res.status(400).json({ error: 'body is required' });
 

@@ -135,6 +135,21 @@ a {
   color: var(--accent);
 }
 
+.link-button {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  font-weight: 600;
+  color: var(--accent);
+  cursor: pointer;
+  text-decoration: underline;
+}
+.link-button:hover {
+  opacity: 0.8;
+}
+
 button {
   font: inherit;
   font-weight: 600;

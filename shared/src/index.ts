@@ -8,3 +8,4 @@ export * from './labelElements';
 export * from './crewSkills';
 export * from './crewCertifications';
 export * from './notificationCategories';
+export * from './crewFeatures';

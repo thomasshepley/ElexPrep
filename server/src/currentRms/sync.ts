@@ -46,6 +46,23 @@ function extractStatus(raw: RawOpportunity): string | null {
 }
 
 /**
+ * Best-effort QUOTE vs ORDER classification for the jobs onboarding dashboard's color coding.
+ * Current RMS's status taxonomy is configurable per account (verified against a real
+ * account's "Provisional" example), so this reads the human label rather than assuming a fixed
+ * set of numeric codes: anything mentioning "order"/"confirmed"/"booked" reads as an ORDER
+ * (the client has committed), anything mentioning "quote"/"provisional"/"enquiry"/"opportunity"
+ * reads as a QUOTE (still being proposed), everything else falls back to OTHER rather than
+ * guessing. Checked against status first, then state, since status is the more commonly
+ * customized field on a real account.
+ */
+function extractKind(raw: RawOpportunity): string {
+  const label = `${raw.status_name ?? ''} ${raw.state_name ?? ''}`.toLowerCase();
+  if (/order|confirmed|booked|hired out/.test(label)) return 'ORDER';
+  if (/quote|provisional|enquiry|opportunity|draft/.test(label)) return 'QUOTE';
+  return 'OTHER';
+}
+
+/**
  * Best-effort order value. Current RMS's documented opportunity fields for this aren't
  * verified against a real account yet (see the model comment) — this tries the handful of
  * field names other integrations commonly see on this endpoint (a pre-tax charge total is
@@ -136,6 +153,7 @@ export async function runCurrentRmsSync(): Promise<SyncResult> {
           rmsId: raw.id,
           subject: extractSubject(raw),
           status: extractStatus(raw),
+          kind: extractKind(raw),
           memberName: extractMemberName(raw),
           value: extractValue(raw),
           startsAt: toDate(raw.starts_at),
@@ -146,6 +164,7 @@ export async function runCurrentRmsSync(): Promise<SyncResult> {
         update: {
           subject: extractSubject(raw),
           status: extractStatus(raw),
+          kind: extractKind(raw),
           memberName: extractMemberName(raw),
           value: extractValue(raw),
           startsAt: toDate(raw.starts_at),
