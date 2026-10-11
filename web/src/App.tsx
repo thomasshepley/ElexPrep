@@ -29,19 +29,19 @@ function App() {
             <span className="sidebar-brand-text">ELEX Portal</span>
           </div>
           <nav className="sidebar-nav">
-            <NavLink to="/" end>
+            <NavLink to="/" end aria-label="Dashboard">
               <DashboardIcon />
               <span>Dashboard</span>
             </NavLink>
-            <NavLink to="/jobs">
+            <NavLink to="/jobs" aria-label="Jobs">
               <JobsIcon />
               <span>Jobs</span>
             </NavLink>
-            <NavLink to="/settings">
+            <NavLink to="/settings" aria-label="Settings">
               <SettingsIcon />
               <span>Settings</span>
             </NavLink>
-            <NavLink to="/signage">
+            <NavLink to="/signage" aria-label="Signage">
               <SignageIcon />
               <span>Signage</span>
             </NavLink>
@@ -49,13 +49,13 @@ function App() {
           <div className="sidebar-user">
             <div className="sidebar-user-row">
               <span className="avatar">{initial}</span>
-              <NavLink to="/settings/preferences" className="sidebar-username">
+              <NavLink to="/settings/preferences" className="sidebar-username" aria-label={`${user.displayName} — preferences`}>
                 {user.displayName}
               </NavLink>
             </div>
             <NotificationBell />
             <ThemeToggle />
-            <button className="secondary sidebar-signout" onClick={logout}>
+            <button className="secondary sidebar-signout" onClick={logout} aria-label="Sign out">
               <SignOutIcon />
               <span>Sign out</span>
             </button>

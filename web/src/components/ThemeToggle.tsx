@@ -13,7 +13,12 @@ export default function ThemeToggle() {
   };
 
   return (
-    <button className="secondary sidebar-theme-toggle" onClick={toggle} aria-pressed={theme === 'light'}>
+    <button
+      className="secondary sidebar-theme-toggle"
+      onClick={toggle}
+      aria-pressed={theme === 'light'}
+      aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+    >
       {theme === 'dark' ? <MoonIcon /> : <SunIcon />}
       <span>{theme === 'dark' ? 'Dark' : 'Light'}</span>
     </button>
