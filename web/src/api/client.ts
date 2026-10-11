@@ -211,6 +211,7 @@ export interface CrewMe {
   displayName: string;
   phone: string | null;
   skills: string | null;
+  notes: string | null;
   dayRate: string | null;
 }
 
@@ -444,6 +445,8 @@ export const api = {
   },
   crewPortal: {
     me: () => request<CrewMe>('/crew/me'),
+    updateMe: (data: Partial<{ phone: string; skills: string; notes: string }>) =>
+      request<CrewMe>('/crew/me', { method: 'PUT', body: JSON.stringify(data) }),
     myJobs: () => request<CrewMyJob[]>('/crew/me/jobs'),
     jobDetail: (jobId: string) => request<CrewJobDetail>(`/crew/me/jobs/${jobId}`),
     schedule: (jobId: string) => request<JobScheduleItem[]>(`/crew/me/jobs/${jobId}/schedule`),

@@ -1,6 +1,6 @@
 import { NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
-import { JobsIcon, SignOutIcon } from '../components/Icons';
+import { JobsIcon, SettingsIcon, SignOutIcon } from '../components/Icons';
 import ThemeToggle from '../components/ThemeToggle';
 import NotificationBell from '../components/NotificationBell';
 
@@ -28,11 +28,17 @@ export default function CrewLayout() {
               <JobsIcon />
               <span>Schedule</span>
             </NavLink>
+            <NavLink to="/crew/account" aria-label="My account">
+              <SettingsIcon />
+              <span>My account</span>
+            </NavLink>
           </nav>
           <div className="sidebar-user">
             <div className="sidebar-user-row">
               <span className="avatar">{initial}</span>
-              <span className="sidebar-username">{user?.displayName}</span>
+              <NavLink to="/crew/account" className="sidebar-username" aria-label={`${user?.displayName} — account`}>
+                {user?.displayName}
+              </NavLink>
             </div>
             <NotificationBell />
             <ThemeToggle />

@@ -50,7 +50,34 @@ crewPortalRouter.get('/me', requireRole('CREW'), async (req, res) => {
     displayName: req.user!.displayName,
     phone: profile.phone,
     skills: profile.skills,
+    notes: profile.notes,
     dayRate: profile.dayRate,
+  });
+});
+
+// Self-service profile edit — deliberately excludes dayRate (admin-set compensation data) and
+// displayName/password (already handled by the role-agnostic /api/auth/me). A crew member can
+// only ever touch their own row here: there's no id in the request, it's always ownProfile(req.user.id).
+crewPortalRouter.put('/me', requireRole('CREW'), async (req, res) => {
+  const profile = await ownProfile(req.user!.id);
+  if (!profile) return res.status(404).json({ error: 'No crew profile found for this account' });
+  const { phone, skills, notes } = req.body ?? {};
+  const updated = await prisma.crewProfile.update({
+    where: { id: profile.id },
+    data: {
+      ...(phone !== undefined ? { phone: phone || null } : {}),
+      ...(skills !== undefined ? { skills: skills || null } : {}),
+      ...(notes !== undefined ? { notes: notes || null } : {}),
+    },
+  });
+  await logActivity('crew.selfUpdate', req.user!.displayName, undefined, req.user!.id);
+  res.json({
+    id: updated.id,
+    displayName: req.user!.displayName,
+    phone: updated.phone,
+    skills: updated.skills,
+    notes: updated.notes,
+    dayRate: updated.dayRate,
   });
 });
 

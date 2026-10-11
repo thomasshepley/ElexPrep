@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { api } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
+import NotificationPreferences from '../components/NotificationPreferences';
 
 export default function PreferencesPage() {
   const { user, setUser } = useAuth();
@@ -85,6 +86,11 @@ export default function PreferencesPage() {
           </div>
           <button type="submit">Change password</button>
         </form>
+      </div>
+
+      <div className="panel">
+        <h3>Notifications</h3>
+        <NotificationPreferences />
       </div>
     </div>
   );
