@@ -74,7 +74,13 @@ export default function NotificationBell() {
 
   return (
     <div className="notification-bell" ref={rootRef}>
-      <button ref={buttonRef} className="secondary sidebar-signout" onClick={toggleOpen}>
+      <button
+        ref={buttonRef}
+        className="secondary sidebar-signout"
+        onClick={toggleOpen}
+        aria-label={unread > 0 ? `Notifications, ${unread} unread` : 'Notifications'}
+        aria-expanded={open}
+      >
         <BellIcon />
         <span>Notifications</span>
         {unread > 0 && <span className="notification-badge">{unread > 9 ? '9+' : unread}</span>}

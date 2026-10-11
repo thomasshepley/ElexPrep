@@ -41,13 +41,14 @@ export default function PermissionsPage() {
                 <tr key={key}>
                   <td>{labels[key] ?? key}</td>
                   <td style={{ textAlign: 'right' }}>
-                    <label className="row" style={{ gap: '0.4rem', justifyContent: 'flex-end' }}>
+                    <label className="switch">
                       <input
                         type="checkbox"
                         checked={permissions[key]}
                         onChange={(e) => toggle(key, e.target.checked)}
                       />
-                      Allowed
+                      <span className="switch-track" />
+                      {permissions[key] ? 'Allowed' : 'Not allowed'}
                     </label>
                   </td>
                 </tr>

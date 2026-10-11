@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 
 export const AD_HOC_TYPES = ['TRUSS_SPIKE_POSITION', 'TRUSS_SPIKE_TIP', 'TRUSS_SPIKE_SACN', 'CABLE', 'PAL', 'RACK'] as const;
 export type AdHocType = (typeof AD_HOC_TYPES)[number];
@@ -50,10 +50,20 @@ export default function LabelTypeForm({
   const [fields, setFields] = useState<Record<string, string>>({});
   const [isDmx, setIsDmx] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const idPrefix = useId();
 
-  const field = (key: string, placeholder: string) => (
-    <input placeholder={placeholder} value={fields[key] ?? ''} onChange={(e) => setFields((f) => ({ ...f, [key]: e.target.value }))} />
-  );
+  // Every field gets a persistent, visible label (not just placeholder text, which disappears
+  // once typing starts) — see writing.md's "label all fields clearly, and use hint or
+  // placeholder text", and the same .field pattern used by LoginPage/ApplyPage.
+  const field = (key: string, labelText: string, placeholder: string) => {
+    const id = `${idPrefix}-${key}`;
+    return (
+      <div className="field">
+        <label htmlFor={id}>{labelText}</label>
+        <input id={id} placeholder={placeholder} value={fields[key] ?? ''} onChange={(e) => setFields((f) => ({ ...f, [key]: e.target.value }))} />
+      </div>
+    );
+  };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -71,40 +81,43 @@ export default function LabelTypeForm({
 
   return (
     <div>
-      <form className="row" onSubmit={submit}>
+      <form className="row" style={{ alignItems: 'flex-end' }} onSubmit={submit}>
         {types.length > 1 && (
-          <select value={labelType} onChange={(e) => setLabelType(e.target.value as AdHocType)}>
-            {types.map((t) => (
-              <option key={t} value={t}>
-                {TYPE_LABELS[t]}
-              </option>
-            ))}
-          </select>
+          <div className="field">
+            <label htmlFor={`${idPrefix}-labelType`}>Label type</label>
+            <select id={`${idPrefix}-labelType`} value={labelType} onChange={(e) => setLabelType(e.target.value as AdHocType)}>
+              {types.map((t) => (
+                <option key={t} value={t}>
+                  {TYPE_LABELS[t]}
+                </option>
+              ))}
+            </select>
+          </div>
         )}
 
         {labelType === 'TRUSS_SPIKE_POSITION' && (
           <>
-            {field('address', 'Position number')}
-            {field('location', 'Location (e.g. FOH, Floor)')}
+            {field('address', 'Position number', 'e.g. 12')}
+            {field('location', 'Location', 'e.g. FOH, Floor')}
           </>
         )}
         {labelType === 'TRUSS_SPIKE_TIP' && (
           <>
-            {field('text', 'Text (default: DO NOT TIP)')}
-            {field('location', 'Location (e.g. FOH, Floor)')}
+            {field('text', 'Text', 'Default: DO NOT TIP')}
+            {field('location', 'Location', 'e.g. FOH, Floor')}
           </>
         )}
         {labelType === 'TRUSS_SPIKE_SACN' && (
           <>
-            {field('ipAddress', 'IP address')}
-            {field('subnetMask', 'Subnet mask (default 255.0.0.0)')}
-            {field('location', 'Location (e.g. FOH, Floor)')}
+            {field('ipAddress', 'IP address', 'e.g. 2.0.0.1')}
+            {field('subnetMask', 'Subnet mask', 'Default: 255.0.0.0')}
+            {field('location', 'Location', 'e.g. FOH, Floor')}
           </>
         )}
         {labelType === 'CABLE' && (
           <>
-            {field('text', 'Cable/circuit text')}
-            {field('location', 'Location (e.g. FOH, Floor)')}
+            {field('text', 'Cable/circuit text', 'e.g. DMX 1')}
+            {field('location', 'Location', 'e.g. FOH, Floor')}
             <label className="row" style={{ gap: '0.3rem' }}>
               <input type="checkbox" checked={isDmx} onChange={(e) => setIsDmx(e.target.checked)} />
               DMX (narrow + cut line)
@@ -113,20 +126,23 @@ export default function LabelTypeForm({
         )}
         {labelType === 'PAL' && (
           <>
-            {field('location', 'Location (e.g. FOH, Floor)')}
-            {field('title', 'Title (e.g. equipment name)')}
-            {field('subtitle', 'Subtitle (optional)')}
+            {field('location', 'Location', 'e.g. FOH, Floor')}
+            {field('title', 'Title', 'e.g. equipment name')}
+            {field('subtitle', 'Subtitle', 'Optional')}
           </>
         )}
         {labelType === 'RACK' && (
           <>
-            {field('title', 'Title')}
-            {field('subtitle', 'Subtitle (optional)')}
-            {field('location', 'Location (e.g. FOH, Floor)')}
+            {field('title', 'Title', '')}
+            {field('subtitle', 'Subtitle', 'Optional')}
+            {field('location', 'Location', 'e.g. FOH, Floor')}
           </>
         )}
 
-        <input type="number" min={1} value={quantity} onChange={(e) => setQuantity(Number(e.target.value))} style={{ width: 70 }} />
+        <div className="field" style={{ width: 70 }}>
+          <label htmlFor={`${idPrefix}-quantity`}>Quantity</label>
+          <input id={`${idPrefix}-quantity`} type="number" min={1} value={quantity} onChange={(e) => setQuantity(Number(e.target.value))} />
+        </div>
         <button type="submit">{submitLabel}</button>
       </form>
       {error && <p className="error">{error}</p>}

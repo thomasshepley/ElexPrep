@@ -47,8 +47,11 @@ export default function PreferencesPage() {
 
       <div className="panel">
         <h3>Profile</h3>
-        <form className="row" onSubmit={saveProfile}>
-          <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} required />
+        <form className="row" style={{ alignItems: 'flex-end' }} onSubmit={saveProfile}>
+          <div className="field">
+            <label htmlFor="prefs-display-name">Display name</label>
+            <input id="prefs-display-name" value={displayName} onChange={(e) => setDisplayName(e.target.value)} required />
+          </div>
           <button type="submit">Save</button>
         </form>
         <p className="muted">
@@ -58,21 +61,28 @@ export default function PreferencesPage() {
 
       <div className="panel">
         <h3>Change password</h3>
-        <form className="row" onSubmit={changePassword}>
-          <input
-            type="password"
-            placeholder="Current password"
-            value={currentPassword}
-            onChange={(e) => setCurrentPassword(e.target.value)}
-            required
-          />
-          <input
-            type="password"
-            placeholder="New password"
-            value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
-            required
-          />
+        <form className="row" style={{ alignItems: 'flex-end' }} onSubmit={changePassword}>
+          <div className="field">
+            <label htmlFor="prefs-current-password">Current password</label>
+            <input
+              id="prefs-current-password"
+              type="password"
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              required
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="prefs-new-password">New password</label>
+            <input
+              id="prefs-new-password"
+              type="password"
+              placeholder="At least 8 characters"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              required
+            />
+          </div>
           <button type="submit">Change password</button>
         </form>
       </div>

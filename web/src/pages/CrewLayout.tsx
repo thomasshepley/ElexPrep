@@ -24,7 +24,7 @@ export default function CrewLayout() {
             <span className="sidebar-brand-text">ELEX Portal</span>
           </div>
           <nav className="sidebar-nav">
-            <NavLink to="/crew" end>
+            <NavLink to="/crew" end aria-label="Schedule">
               <JobsIcon />
               <span>Schedule</span>
             </NavLink>
@@ -36,7 +36,7 @@ export default function CrewLayout() {
             </div>
             <NotificationBell />
             <ThemeToggle />
-            <button className="secondary sidebar-signout" onClick={logout}>
+            <button className="secondary sidebar-signout" onClick={logout} aria-label="Sign out">
               <SignOutIcon />
               <span>Sign out</span>
             </button>
