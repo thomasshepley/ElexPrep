@@ -886,7 +886,7 @@ export const api = {
   },
   currentRms: {
     getConfig: () => request<CurrentRmsConfig>('/current-rms/config'),
-    updateConfig: (data: Partial<{ enabled: boolean; subdomain: string; apiKey: string; pollMinutes: number }>) =>
+    updateConfig: (data: Partial<{ enabled: boolean; subdomain: string; apiKey: string; pollMinutes: number; removeApiKey: boolean }>) =>
       request<CurrentRmsConfig>('/current-rms/config', { method: 'PUT', body: JSON.stringify(data) }),
     testConnection: (subdomain?: string, apiKey?: string) =>
       request<{ ok: boolean; message?: string }>('/current-rms/test-connection', {

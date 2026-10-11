@@ -4,11 +4,16 @@ import { api, type CurrentRmsConfig, type CurrentRmsOpportunity } from '../api/c
 export default function CurrentRmsSettingsPage() {
   const [config, setConfig] = useState<CurrentRmsConfig | null>(null);
   const [subdomain, setSubdomain] = useState('');
-  const [apiKey, setApiKey] = useState('');
+  const [apiKeyInput, setApiKeyInput] = useState('');
+  // Shows the plain input for typing/replacing a key; hidden in favor of a "saved" chip once
+  // a key is already stored, so the field never looks like it silently lost what you typed.
+  const [editingApiKey, setEditingApiKey] = useState(true);
   const [pollMinutes, setPollMinutes] = useState(15);
   const [enabled, setEnabled] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [testResult, setTestResult] = useState<{ ok: boolean; text: string } | null>(null);
+  const [syncResult, setSyncResult] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
 
   const [opportunities, setOpportunities] = useState<CurrentRmsOpportunity[]>([]);
@@ -20,6 +25,7 @@ export default function CurrentRmsSettingsPage() {
       setSubdomain(c.subdomain);
       setPollMinutes(c.pollMinutes);
       setEnabled(c.enabled);
+      setEditingApiKey(!c.hasApiKey);
     });
 
   const loadOpportunities = (q?: string) => api.currentRms.listOpportunities(q).then(setOpportunities);
@@ -31,20 +37,39 @@ export default function CurrentRmsSettingsPage() {
 
   const save = async () => {
     setBusy(true);
-    setError(null);
-    setMessage(null);
+    setSaveError(null);
+    setSaveMessage(null);
     try {
       const updated = await api.currentRms.updateConfig({
         enabled,
         subdomain,
         pollMinutes,
-        ...(apiKey ? { apiKey } : {}),
+        ...(apiKeyInput ? { apiKey: apiKeyInput } : {}),
       });
       setConfig(updated);
-      setApiKey('');
-      setMessage('Saved.');
+      setApiKeyInput('');
+      setEditingApiKey(!updated.hasApiKey);
+      setSaveMessage('Saved.');
     } catch (e) {
-      setError((e as Error).message);
+      setSaveError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const removeApiKey = async () => {
+    if (!confirm('Remove the saved Current RMS API key? Syncing will stop working until a new key is saved.')) return;
+    setBusy(true);
+    setSaveError(null);
+    setSaveMessage(null);
+    try {
+      const updated = await api.currentRms.updateConfig({ removeApiKey: true });
+      setConfig(updated);
+      setApiKeyInput('');
+      setEditingApiKey(true);
+      setSaveMessage('API key removed.');
+    } catch (e) {
+      setSaveError((e as Error).message);
     } finally {
       setBusy(false);
     }
@@ -52,13 +77,12 @@ export default function CurrentRmsSettingsPage() {
 
   const testConnection = async () => {
     setBusy(true);
-    setError(null);
-    setMessage(null);
+    setTestResult(null);
     try {
-      const res = await api.currentRms.testConnection(subdomain, apiKey || undefined);
-      setMessage(res.message ?? 'Connected.');
+      const res = await api.currentRms.testConnection(subdomain, apiKeyInput || undefined);
+      setTestResult({ ok: true, text: res.message ?? 'Connected.' });
     } catch (e) {
-      setError((e as Error).message);
+      setTestResult({ ok: false, text: (e as Error).message });
     } finally {
       setBusy(false);
     }
@@ -66,16 +90,15 @@ export default function CurrentRmsSettingsPage() {
 
   const syncNow = async () => {
     setBusy(true);
-    setError(null);
-    setMessage(null);
+    setSyncResult(null);
     try {
       const res = await api.currentRms.sync();
-      if (res.error) setError(res.error);
-      else setMessage(`Synced — ${res.pulled} opportunities pulled, ${res.alertsRaised} change alert(s) raised.`);
+      if (res.error) setSyncResult({ ok: false, text: res.error });
+      else setSyncResult({ ok: true, text: `${res.pulled} opportunities pulled, ${res.alertsRaised} change alert(s) raised.` });
       await loadConfig();
       await loadOpportunities(search || undefined);
     } catch (e) {
-      setError((e as Error).message);
+      setSyncResult({ ok: false, text: (e as Error).message });
     } finally {
       setBusy(false);
     }
@@ -105,8 +128,8 @@ export default function CurrentRmsSettingsPage() {
         see this raw opportunity list — once you import one as a job, it stays private until
         you mark it Public in that job's settings, which is when normal users can see it.
       </p>
-      {message && <p className="muted">{message}</p>}
-      {error && <p className="error">{error}</p>}
+      {saveMessage && <p className="muted">{saveMessage}</p>}
+      {saveError && <p className="error">{saveError}</p>}
 
       <div className="panel">
         <h3>Connection</h3>
@@ -127,13 +150,47 @@ export default function CurrentRmsSettingsPage() {
           <label>
             API key
             <br />
-            <input
-              type="password"
-              value={apiKey}
-              placeholder={config.hasApiKey ? '•••••••• (set — leave blank to keep)' : 'paste API key'}
-              onChange={(e) => setApiKey(e.target.value)}
-              style={{ width: 260 }}
-            />
+            {!editingApiKey ? (
+              <div className="row" style={{ marginTop: '0.1rem' }}>
+                <span className="success" style={{ fontWeight: 600 }}>
+                  •••••••• saved
+                </span>
+                <button type="button" className="secondary" onClick={() => setEditingApiKey(true)}>
+                  Replace
+                </button>
+                <button type="button" className="secondary" onClick={removeApiKey} disabled={busy}>
+                  Remove
+                </button>
+              </div>
+            ) : (
+              <div className="row" style={{ marginTop: '0.1rem' }}>
+                <input
+                  type="password"
+                  value={apiKeyInput}
+                  placeholder="paste API key"
+                  onChange={(e) => setApiKeyInput(e.target.value)}
+                  style={{ width: 260 }}
+                  autoComplete="off"
+                />
+                {config.hasApiKey && (
+                  <button
+                    type="button"
+                    className="secondary"
+                    onClick={() => {
+                      setEditingApiKey(false);
+                      setApiKeyInput('');
+                    }}
+                  >
+                    Cancel
+                  </button>
+                )}
+              </div>
+            )}
+            <div className="muted" style={{ fontSize: '0.8rem', marginTop: '0.25rem' }}>
+              {editingApiKey
+                ? 'Not saved until you click Save below.'
+                : "Saved — Test connection below uses this saved key unless you click Replace and type a new one."}
+            </div>
           </label>
           <label>
             Poll every (minutes)
@@ -161,10 +218,35 @@ export default function CurrentRmsSettingsPage() {
             Sync now
           </button>
         </div>
-        <p className="muted" style={{ marginTop: '0.5rem' }}>
-          {config.lastSyncedAt ? `Last synced ${new Date(config.lastSyncedAt).toLocaleString()}` : 'Never synced yet'}
-          {config.lastSyncError ? ` — last sync failed: ${config.lastSyncError}` : ''}
-        </p>
+        {testResult && (
+          <p className={testResult.ok ? 'success' : 'error'} style={{ marginTop: '0.5rem', fontWeight: 600 }}>
+            {testResult.ok ? '✓' : '✕'} {testResult.text}
+          </p>
+        )}
+        {syncResult && (
+          <p className={syncResult.ok ? 'success' : 'error'} style={{ marginTop: '0.5rem', fontWeight: 600 }}>
+            {syncResult.ok ? '✓' : '✕'} {syncResult.text}
+          </p>
+        )}
+        <div
+          className="row"
+          style={{
+            justifyContent: 'space-between',
+            marginTop: '0.75rem',
+            paddingTop: '0.6rem',
+            borderTop: '1px solid var(--border)',
+          }}
+        >
+          <strong>Last synced</strong>
+          <span className={config.lastSyncError ? 'error' : 'muted'}>
+            {config.lastSyncedAt ? new Date(config.lastSyncedAt).toLocaleString() : 'Never synced yet'}
+          </span>
+        </div>
+        {config.lastSyncError && (
+          <p className="error" style={{ marginTop: '0.25rem' }}>
+            Last sync failed: {config.lastSyncError}
+          </p>
+        )}
       </div>
 
       <div className="panel">

@@ -328,6 +328,11 @@ tbody tr:hover {
   font-size: var(--text-sm);
 }
 
+.success {
+  color: var(--success);
+  font-size: var(--text-sm);
+}
+
 .job-card {
   display: block;
   padding: 0.9rem 1.1rem;
