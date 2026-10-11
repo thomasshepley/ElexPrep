@@ -107,3 +107,36 @@ export const PAL_CELL_LAYOUT: PalCellLayout = {
 
 /** No rack label template was supplied yet — reuse the fixture/truss-spike stock as a placeholder. */
 export const RACK_SHEET: SheetGeometry = GRID_18_SHEET;
+
+/**
+ * Avery 105x148-R: a blank Avery mail-merge template for 4 landscape labels (105mm tall x
+ * 148mm wide each) on one A4 landscape sheet, measured from Avery's own .docx template
+ * (table cell/row geometry; the document's stated page margins don't self-consistently add
+ * up with its table width, so the nominal 105/148mm product dimensions are trusted as the
+ * authoritative label size instead, centered on a standard A4 landscape page). This is a
+ * second, alternate sheet for PAL content — printed on plain A4 with Avery's self-adhesive
+ * stock through an ordinary office printer — distinct from PAL_SHEET above, which is
+ * calibrated against Elex's existing die-cut label stock fed through the dedicated label
+ * printer. Reuses PAL_SHEET's own element template (see labelElements.ts's PAL entry) rather
+ * than needing a separate one: the two sheets' cell aspect ratios are close enough (1.413:1
+ * vs 1.410:1) that the existing proportional layout carries over directly, just scaled up to
+ * the physically larger Avery label.
+ */
+const MM_PER_IN = 25.4;
+const PAL_AVERY_CELL_W = 148 / MM_PER_IN;
+const PAL_AVERY_CELL_H = 105 / MM_PER_IN;
+const PAL_AVERY_PAGE_W = 297 / MM_PER_IN; // A4 long edge
+const PAL_AVERY_PAGE_H = 210 / MM_PER_IN; // A4 short edge
+const PAL_AVERY_MARGIN_X = (PAL_AVERY_PAGE_W - 2 * PAL_AVERY_CELL_W) / 2;
+
+export const PAL_AVERY_SHEET: SheetGeometry = {
+  pageWidthIn: PAL_AVERY_PAGE_W,
+  pageHeightIn: PAL_AVERY_PAGE_H,
+  landscape: true,
+  cells: [
+    { x: PAL_AVERY_MARGIN_X, y: 0, w: PAL_AVERY_CELL_W, h: PAL_AVERY_CELL_H },
+    { x: PAL_AVERY_MARGIN_X + PAL_AVERY_CELL_W, y: 0, w: PAL_AVERY_CELL_W, h: PAL_AVERY_CELL_H },
+    { x: PAL_AVERY_MARGIN_X, y: PAL_AVERY_CELL_H, w: PAL_AVERY_CELL_W, h: PAL_AVERY_CELL_H },
+    { x: PAL_AVERY_MARGIN_X + PAL_AVERY_CELL_W, y: PAL_AVERY_CELL_H, w: PAL_AVERY_CELL_W, h: PAL_AVERY_CELL_H },
+  ],
+};

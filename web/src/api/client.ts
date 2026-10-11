@@ -843,6 +843,7 @@ export const api = {
       }),
     pdfUrl: (jobId: string) => `${BASE}/jobs/${jobId}/print-queue/pdf`,
     previewUrl: (jobId: string) => `${BASE}/jobs/${jobId}/print-queue/preview.pdf`,
+    palAveryPdfUrl: (jobId: string) => `${BASE}/jobs/${jobId}/print-queue/pal/avery.pdf`,
     send: (jobId: string) =>
       request<{ printJobs: PrintJob[] }>(`/jobs/${jobId}/print-queue/send`, { method: 'POST' }),
     printerConfig: (jobId: string) =>
