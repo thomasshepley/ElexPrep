@@ -1,9 +1,7 @@
 /**
- * Physical label sheet geometry, measured directly from Elex's existing Word/PowerPoint
- * label templates (Midge_Fixture_Labels.docx, Midge_Truss_Spikess.docx, Midge_Cable_Labels.docx,
- * Wu_Lyf_PAL.pptx) by reading each shape's absolute page position/size out of the underlying XML.
- * All dimensions are in inches. Treat these as the starting point for print calibration —
- * printers/stock vary by a few mm, so the app exposes a per-template X/Y nudge in settings.
+ * Physical label sheet geometry. All dimensions are in inches. Treat these as the starting
+ * point for print calibration — printers/stock vary by a few mm, so the app exposes a
+ * per-template X/Y nudge in settings.
  */
 
 export interface Point {
@@ -23,40 +21,46 @@ export interface SheetGeometry {
   cells: CellGeometry[];
 }
 
-const FIXTURE_GRID_COLS = [0.06, 2.80, 5.55];
-const FIXTURE_GRID_ROWS = [0.41, 2.36, 4.31, 6.26, 8.21, 10.16];
-const FIXTURE_CELL_W = 2.681;
-const FIXTURE_CELL_H = 1.949;
+/**
+ * Fixture and Truss/Spike labels: genuine Avery L7161 stock (63.5 x 46.6mm, 3 columns x 6
+ * rows, A4 portrait) — read directly from Avery's own blank Word template (table cell
+ * widths/row heights and page margins out of the underlying XML; the template's own
+ * `Blank_MP1_panelN` bookmark naming confirms it as an authentic unmodified Avery file, the
+ * same convention seen in Avery's PAL sheet template). Columns are very slightly asymmetric
+ * in Avery's own file (2.5in / 2.4847in / 2.4847in) — kept as-is rather than rounded to a
+ * single uniform width, since the renderer already scales each label's content to its own
+ * cell's actual width (see genericRenderer.ts), the same technique PAL_SHEET's own
+ * slightly-wider right column relies on.
+ *
+ * This replaces an earlier, substantially-off calibration (originally sourced from Elex's own
+ * Midge_Fixture_Labels.docx) whose ~6-7% error in row pitch compounded down the sheet — bad
+ * enough by row 6 that it was worked around by simply not printing that row at all. The
+ * correct geometry below fits all 6 rows on the page with margin to spare, so that workaround
+ * is removed.
+ */
+const FIXTURE_COLS: { x: number; w: number }[] = [
+  { x: 0.3403, w: 2.5 },
+  { x: 2.9549, w: 2.4847 },
+  { x: 5.5542, w: 2.4847 },
+];
+const FIXTURE_ROW_H = 1.8326;
+const FIXTURE_ROWS_Y = [0.3472, 2.1799, 4.0125, 5.8451, 7.6778, 9.5104];
 
-function buildGridCells(cols: number[], rows: number[], w: number, h: number): CellGeometry[] {
+function buildFixtureGridCells(rows: number[]): CellGeometry[] {
   const cells: CellGeometry[] = [];
   for (const y of rows) {
-    for (const x of cols) {
-      cells.push({ x, y, w, h });
+    for (const col of FIXTURE_COLS) {
+      cells.push({ x: col.x, y, w: col.w, h: FIXTURE_ROW_H });
     }
   }
   return cells;
 }
 
-/** 3x6 die-cut A4 stock, all 6 rows — kept only as the source grid for the placeholder Rack
- * layout below (no real Rack template has been supplied yet). */
-export const GRID_18_SHEET: SheetGeometry = {
-  pageWidthIn: 8.27,
-  pageHeightIn: 11.69,
-  landscape: false,
-  cells: buildGridCells(FIXTURE_GRID_COLS, FIXTURE_GRID_ROWS, FIXTURE_CELL_W, FIXTURE_CELL_H),
-};
-
-/**
- * Fixture and Truss/Spike labels share the exact same physical die-cut stock, printed on the
- * same printer — which cuts off the bottom row in practice for both, so these sheets stop at
- * 5 rows (15 cells) rather than 6.
- */
 export const FIXTURE_TRUSS_SPIKE_SHEET: SheetGeometry = {
   pageWidthIn: 8.27,
   pageHeightIn: 11.69,
   landscape: false,
-  cells: buildGridCells(FIXTURE_GRID_COLS, FIXTURE_GRID_ROWS.slice(0, -1), FIXTURE_CELL_W, FIXTURE_CELL_H),
+  cells: buildFixtureGridCells(FIXTURE_ROWS_Y),
 };
 
 /** Cable label stock: single column of contiguous strips, each name printed twice (wrap-round flag). */
@@ -106,7 +110,7 @@ export const PAL_CELL_LAYOUT: PalCellLayout = {
 };
 
 /** No rack label template was supplied yet — reuse the fixture/truss-spike stock as a placeholder. */
-export const RACK_SHEET: SheetGeometry = GRID_18_SHEET;
+export const RACK_SHEET: SheetGeometry = FIXTURE_TRUSS_SPIKE_SHEET;
 
 /**
  * Avery 105x148-R: a blank Avery mail-merge template for 4 landscape labels (105mm tall x
