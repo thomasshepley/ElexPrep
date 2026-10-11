@@ -48,6 +48,26 @@ export function WhereIcon() {
   );
 }
 
+export function DashboardIcon() {
+  return (
+    <svg {...common}>
+      <rect x="2.2" y="2.2" width="5" height="5" rx="1" {...stroke} />
+      <rect x="8.8" y="2.2" width="5" height="5" rx="1" {...stroke} />
+      <rect x="2.2" y="8.8" width="5" height="5" rx="1" {...stroke} />
+      <rect x="8.8" y="8.8" width="5" height="5" rx="1" {...stroke} />
+    </svg>
+  );
+}
+
+export function WhyIcon() {
+  return (
+    <svg {...common}>
+      <path d="M8 1.8a4.2 4.2 0 0 0-2.4 7.65c.45.32.7.85.7 1.4v.35h3.4v-.35c0-.55.25-1.08.7-1.4A4.2 4.2 0 0 0 8 1.8Z" {...stroke} />
+      <path d="M6.1 13.6h3.8M6.6 14.95h2.8" {...stroke} />
+    </svg>
+  );
+}
+
 export function JobsIcon() {
   return (
     <svg {...common}>

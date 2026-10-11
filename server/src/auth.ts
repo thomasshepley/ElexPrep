@@ -68,9 +68,11 @@ const SIGNAGE_WRITE_ALLOWLIST = [/^\/api\/jobs\/[^/]+\/current-rms\/pick-list\/[
 
 // The crew portal (routes/crewPortal.ts) is entirely self-service: every path here only ever
 // returns the logged-in crew member's own data (profile, their jobs, a job's Who/What/When/
-// Where) — nothing takes another crew member's id from the client. Everything else stays a
-// hard 403 rather than silently falling through to whatever a plain USER could do.
-const CREW_ALLOWLIST = [/^\/api\/auth\/me$/, /^\/api\/crew\/me(\/jobs(\/[^/]+)?)?$/];
+// Where/Why — schedule, documents, plots, kit list, prep requests) — nothing takes another
+// crew member's id from the client, and every /me/jobs/:jobId/* handler re-checks the caller
+// is actually assigned to that job before touching its data. Everything else stays a hard 403
+// rather than silently falling through to whatever a plain USER could do.
+const CREW_ALLOWLIST = [/^\/api\/auth\/me$/, /^\/api\/crew\/me$/, /^\/api\/crew\/me\/jobs$/, /^\/api\/crew\/me\/jobs\/[^/]+(\/.*)?$/];
 
 /**
  * Resolves the session cookie to req.user, then gates every /api route except health

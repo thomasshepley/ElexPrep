@@ -46,6 +46,19 @@ function extractStatus(raw: RawOpportunity): string | null {
 }
 
 /**
+ * Best-effort order value. Current RMS's documented opportunity fields for this aren't
+ * verified against a real account yet (see the model comment) — this tries the handful of
+ * field names other integrations commonly see on this endpoint (a pre-tax charge total is
+ * preferred over a post-tax one, since tax handling varies by account) and falls back to null
+ * rather than guessing, since rawJson keeps the full response regardless for later use.
+ */
+function extractValue(raw: RawOpportunity): number | null {
+  const candidate = raw.charge_pre_tax_total ?? raw.charge_total ?? raw.price_total ?? raw.total ?? raw.value;
+  const num = typeof candidate === 'string' ? Number(candidate) : candidate;
+  return typeof num === 'number' && Number.isFinite(num) ? num : null;
+}
+
+/**
  * The opportunities list endpoint doesn't embed the customer record (just `member_id`) on
  * a real account, so this is usually null from sync alone — see fetchOpportunityMemberName
  * for the richer single-opportunity lookup used when importing one as a job.
@@ -124,6 +137,7 @@ export async function runCurrentRmsSync(): Promise<SyncResult> {
           subject: extractSubject(raw),
           status: extractStatus(raw),
           memberName: extractMemberName(raw),
+          value: extractValue(raw),
           startsAt: toDate(raw.starts_at),
           endsAt: toDate(raw.ends_at),
           rmsUpdatedAt: newUpdatedAt,
@@ -133,6 +147,7 @@ export async function runCurrentRmsSync(): Promise<SyncResult> {
           subject: extractSubject(raw),
           status: extractStatus(raw),
           memberName: extractMemberName(raw),
+          value: extractValue(raw),
           startsAt: toDate(raw.starts_at),
           endsAt: toDate(raw.ends_at),
           rmsUpdatedAt: newUpdatedAt,
