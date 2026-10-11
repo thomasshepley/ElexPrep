@@ -139,6 +139,17 @@ docker compose up -d --build
 Database migrations run automatically on container start. The `data/` folder is untouched
 by rebuilds.
 
+**Optional: a one-word `updatesite` command.** `scripts/updatesite.sh` runs those same two
+commands from wherever the repo actually lives, so you don't have to remember the path.
+Make it runnable as a plain command once:
+
+```bash
+chmod +x scripts/updatesite.sh
+sudo ln -s "$(pwd)/scripts/updatesite.sh" /usr/local/bin/updatesite
+```
+
+From then on, `updatesite` from any directory pulls and rebuilds.
+
 ## Wiring up the real printer (later phase)
 
 When ready, go to **Printer Settings** (admin) and switch from Dry run to one of:
