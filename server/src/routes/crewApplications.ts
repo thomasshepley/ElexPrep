@@ -4,6 +4,7 @@ import { prisma, logActivity } from '../db';
 import { MIN_PASSWORD_LENGTH, hashPassword, requireRole } from '../auth';
 import { requirePermission } from '../permissions';
 import { DOCUMENT_FIELDS, saveDocuments, streamDecryptedDocument } from '../crewDocumentsStorage';
+import { notifyCrewApplicationSubmitted } from '../notifications';
 
 /**
  * Public application intake + admin review queue for the freelance crew roster. The public
@@ -78,6 +79,7 @@ crewApplicationsRouter.post(
       },
     });
     await saveDocuments({ applicationId: application.id }, req.files as Record<string, Express.Multer.File[]> | undefined);
+    await notifyCrewApplicationSubmitted(fullName);
     res.status(201).json({ id: application.id });
   }
 );

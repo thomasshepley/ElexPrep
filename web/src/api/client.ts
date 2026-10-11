@@ -320,6 +320,16 @@ export interface DashboardOrder {
   crewCount: number;
 }
 
+export interface AppNotification {
+  id: string;
+  type: string;
+  title: string;
+  body: string | null;
+  link: string | null;
+  readAt: string | null;
+  createdAt: string;
+}
+
 export interface CurrentRmsPickItem {
   id: number;
   name?: string;
@@ -446,6 +456,12 @@ export const api = {
   },
   dashboard: {
     get: () => request<{ orders: DashboardOrder[] }>('/dashboard'),
+  },
+  notifications: {
+    list: () => request<AppNotification[]>('/notifications'),
+    unreadCount: () => request<{ count: number }>('/notifications/unread-count'),
+    markRead: (id: string) => request<AppNotification>(`/notifications/${id}/read`, { method: 'POST' }),
+    markAllRead: () => request<void>('/notifications/read-all', { method: 'POST' }),
   },
   jobCrewAssignments: {
     list: (jobId: string) => request<JobCrewAssignment[]>(`/jobs/${jobId}/crew`),

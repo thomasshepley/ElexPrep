@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { prisma, logActivity } from '../db';
 import { nextOrderStart } from '../printing/queueOrder';
+import { notifyLabelRequestReviewed } from '../notifications';
 
 /**
  * Admin/staff side of a crew member's label request: review, approve (creates the real
@@ -34,7 +35,10 @@ crewLabelRequestsRouter.get('/:jobId/label-requests', async (req, res) => {
 });
 
 crewLabelRequestsRouter.post('/:jobId/label-requests/:id/approve', async (req, res) => {
-  const request = await prisma.crewLabelRequest.findUnique({ where: { id: req.params.id } });
+  const request = await prisma.crewLabelRequest.findUnique({
+    where: { id: req.params.id },
+    include: { crewProfile: true, job: { select: { name: true } } },
+  });
   if (!request || request.jobId !== req.params.jobId) return res.status(404).json({ error: 'Request not found' });
   if (request.status !== 'PENDING') return res.status(409).json({ error: 'Request has already been reviewed' });
 
@@ -57,12 +61,16 @@ crewLabelRequestsRouter.post('/:jobId/label-requests/:id/approve', async (req, r
     return created;
   });
   await logActivity('crew_label_request.approve', request.labelType, request.jobId, req.user?.id);
+  await notifyLabelRequestReviewed(request.crewProfile.userId, request.jobId, request.job.name, true);
   res.json({ ...label, content: JSON.parse(label.contentJson) });
 });
 
 crewLabelRequestsRouter.post('/:jobId/label-requests/:id/reject', async (req, res) => {
   const { note } = req.body ?? {};
-  const request = await prisma.crewLabelRequest.findUnique({ where: { id: req.params.id } });
+  const request = await prisma.crewLabelRequest.findUnique({
+    where: { id: req.params.id },
+    include: { crewProfile: true, job: { select: { name: true } } },
+  });
   if (!request || request.jobId !== req.params.jobId) return res.status(404).json({ error: 'Request not found' });
   if (request.status !== 'PENDING') return res.status(409).json({ error: 'Request has already been reviewed' });
 
@@ -71,5 +79,6 @@ crewLabelRequestsRouter.post('/:jobId/label-requests/:id/reject', async (req, re
     data: { status: 'REJECTED', reviewedAt: new Date(), reviewedBy: req.user?.id, rejectionNote: note || null },
   });
   await logActivity('crew_label_request.reject', request.labelType, request.jobId, req.user?.id);
+  await notifyLabelRequestReviewed(request.crewProfile.userId, request.jobId, request.job.name, false);
   res.status(204).end();
 });

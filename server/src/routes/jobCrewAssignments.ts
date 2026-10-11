@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { prisma, logActivity } from '../db';
 import { requirePermission } from '../permissions';
+import { notifyCrewAssigned } from '../notifications';
 
 /**
  * Job-scoped crew attribution: who's working this job, in what role, at what rate. Viewing is
@@ -73,6 +74,8 @@ jobCrewAssignmentsRouter.post('/:jobId/crew', requirePermission('manageCrewAssig
     include: assignmentInclude,
   });
   await logActivity('crew_assignment.create', `${assignment.crewProfile.user.username} as ${role}`, jobId, req.user?.id);
+  const job = await prisma.job.findUnique({ where: { id: jobId }, select: { name: true } });
+  if (job) await notifyCrewAssigned(assignment.crewProfile.userId, jobId, job.name, role);
   res.status(201).json(toAssignmentDto(assignment));
 });
 

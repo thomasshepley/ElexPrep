@@ -59,6 +59,15 @@ export function DashboardIcon() {
   );
 }
 
+export function BellIcon() {
+  return (
+    <svg {...common}>
+      <path d="M8 2a3.4 3.4 0 0 0-3.4 3.4v2.1c0 .5-.18.98-.5 1.37L2.9 10.3a.9.9 0 0 0 .68 1.5h8.84a.9.9 0 0 0 .68-1.5l-1.2-1.43a2.1 2.1 0 0 1-.5-1.37V5.4A3.4 3.4 0 0 0 8 2Z" {...stroke} />
+      <path d="M6.3 13.4a1.8 1.8 0 0 0 3.4 0" {...stroke} />
+    </svg>
+  );
+}
+
 export function WhyIcon() {
   return (
     <svg {...common}>

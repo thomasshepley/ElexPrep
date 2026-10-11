@@ -2,6 +2,7 @@ import { NavLink, Navigate, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from './auth/AuthContext'
 import { DashboardIcon, JobsIcon, SettingsIcon, SignageIcon, SignOutIcon } from './components/Icons'
 import ThemeToggle from './components/ThemeToggle'
+import NotificationBell from './components/NotificationBell'
 import './App.css'
 
 function App() {
@@ -52,6 +53,7 @@ function App() {
                 {user.displayName}
               </NavLink>
             </div>
+            <NotificationBell />
             <ThemeToggle />
             <button className="secondary sidebar-signout" onClick={logout}>
               <SignOutIcon />
