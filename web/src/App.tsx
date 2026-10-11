@@ -1,5 +1,6 @@
 import { NavLink, Navigate, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from './auth/AuthContext'
+import { JobsIcon, SettingsIcon, SignageIcon, SignOutIcon } from './components/Icons'
 import './App.css'
 
 function App() {
@@ -18,24 +19,43 @@ function App() {
   const initial = user.displayName.trim().charAt(0).toUpperCase() || '?'
 
   return (
-    <div className="app-shell">
-      <header className="app-header">
-        <div className="brand">ELEX Portal</div>
-        <nav>
-          <NavLink to="/" end>Jobs</NavLink>
-          <NavLink to="/settings">Settings</NavLink>
-          <NavLink to="/signage">Signage</NavLink>
+    <div className="shell">
+      <aside className="sidebar">
+        <div className="sidebar-brand">
+          <span className="sidebar-brand-mark" />
+          <span className="sidebar-brand-text">ELEX Portal</span>
+        </div>
+        <nav className="sidebar-nav">
+          <NavLink to="/" end>
+            <JobsIcon />
+            <span>Jobs</span>
+          </NavLink>
+          <NavLink to="/settings">
+            <SettingsIcon />
+            <span>Settings</span>
+          </NavLink>
+          <NavLink to="/signage">
+            <SignageIcon />
+            <span>Signage</span>
+          </NavLink>
         </nav>
-        <div className="header-user">
-          <span className="avatar">{initial}</span>
-          <NavLink to="/settings/preferences">{user.displayName}</NavLink>
-          <button className="secondary" onClick={logout}>
-            Sign out
+        <div className="sidebar-user">
+          <div className="sidebar-user-row">
+            <span className="avatar">{initial}</span>
+            <NavLink to="/settings/preferences" className="sidebar-username">
+              {user.displayName}
+            </NavLink>
+          </div>
+          <button className="secondary sidebar-signout" onClick={logout}>
+            <SignOutIcon />
+            <span>Sign out</span>
           </button>
         </div>
-      </header>
-      <main className="app-main">
-        <Outlet />
+      </aside>
+      <main className="shell-main">
+        <div className="shell-main-inner">
+          <Outlet />
+        </div>
       </main>
     </div>
   )
