@@ -5,8 +5,18 @@ import { nextOrderStart } from '../printing/queueOrder';
 export const adHocLabelsRouter = Router();
 
 adHocLabelsRouter.get('/:jobId/adhoc-labels', async (req, res) => {
-  const items = await prisma.adHocLabel.findMany({ where: { jobId: req.params.jobId }, orderBy: { order: 'asc' } });
-  res.json(items.map((i) => ({ ...i, content: JSON.parse(i.contentJson) })));
+  const items = await prisma.adHocLabel.findMany({
+    where: { jobId: req.params.jobId },
+    orderBy: { order: 'asc' },
+    include: { requestedByCrewProfile: { include: { user: { select: { displayName: true } } } } },
+  });
+  res.json(
+    items.map(({ requestedByCrewProfile, contentJson, ...rest }) => ({
+      ...rest,
+      content: JSON.parse(contentJson),
+      requestedByDisplayName: requestedByCrewProfile?.user.displayName ?? null,
+    }))
+  );
 });
 
 adHocLabelsRouter.post('/:jobId/adhoc-labels', async (req, res) => {
