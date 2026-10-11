@@ -1,6 +1,12 @@
 import { Router } from 'express';
-import { prisma } from '../db';
+import path from 'path';
+import { prisma, logActivity } from '../db';
 import { requireRole } from '../auth';
+import { getCurrentRmsConfig } from '../currentRms/config';
+import { fetchPickListSnapshot } from '../currentRms/sync';
+import { nextOrderStart } from '../printing/queueOrder';
+import { plotsDir } from './plots';
+import { uploadDir } from './jobs';
 
 /**
  * Self-service data for a logged-in CREW account: their own profile, the jobs they're
@@ -15,6 +21,21 @@ export const crewPortalRouter = Router();
 
 async function ownProfile(userId: string) {
   return prisma.crewProfile.findUnique({ where: { userId } });
+}
+
+/**
+ * Resolves the caller's own profile + their assignment to jobId, or null if either doesn't
+ * exist — the shared "are you actually on this job" check every /me/jobs/:jobId/* sub-route
+ * below needs before touching that job's data at all.
+ */
+async function requireAssignedJob(userId: string, jobId: string) {
+  const profile = await ownProfile(userId);
+  if (!profile) return null;
+  const assignment = await prisma.jobCrewAssignment.findUnique({
+    where: { jobId_crewProfileId: { jobId, crewProfileId: profile.id } },
+    include: { job: true },
+  });
+  return assignment ? { profile, assignment } : null;
 }
 
 // requireRole('CREW') is applied per-route below, not as a router-wide `.use()` — a router-wide
@@ -108,6 +129,102 @@ crewPortalRouter.get('/me/jobs/:jobId', requireRole('CREW'), async (req, res) =>
       venue: assignment.job.venue,
     },
   });
+});
+
+crewPortalRouter.get('/me/jobs/:jobId/schedule', requireRole('CREW'), async (req, res) => {
+  const found = await requireAssignedJob(req.user!.id, req.params.jobId);
+  if (!found) return res.status(404).json({ error: 'Job not found' });
+  const items = await prisma.jobScheduleItem.findMany({
+    where: { jobId: req.params.jobId },
+    orderBy: { startsAt: 'asc' },
+  });
+  res.json(items);
+});
+
+crewPortalRouter.get('/me/jobs/:jobId/documents', requireRole('CREW'), async (req, res) => {
+  const found = await requireAssignedJob(req.user!.id, req.params.jobId);
+  if (!found) return res.status(404).json({ error: 'Job not found' });
+  const documents = await prisma.jobDocument.findMany({
+    where: { jobId: req.params.jobId },
+    orderBy: { createdAt: 'desc' },
+  });
+  res.json(documents);
+});
+
+crewPortalRouter.get('/me/jobs/:jobId/documents/:docId/file', requireRole('CREW'), async (req, res) => {
+  const found = await requireAssignedJob(req.user!.id, req.params.jobId);
+  if (!found) return res.status(404).end();
+  const document = await prisma.jobDocument.findUnique({ where: { id: req.params.docId } });
+  if (!document || document.jobId !== req.params.jobId) return res.status(404).end();
+  res.setHeader('Content-Type', document.mimeType);
+  res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(document.originalName)}"`);
+  res.sendFile(path.join(uploadDir, 'job-documents', document.fileName));
+});
+
+crewPortalRouter.get('/me/jobs/:jobId/plots', requireRole('CREW'), async (req, res) => {
+  const found = await requireAssignedJob(req.user!.id, req.params.jobId);
+  if (!found) return res.status(404).json({ error: 'Job not found' });
+  const plots = await prisma.plot.findMany({ where: { jobId: req.params.jobId }, orderBy: { createdAt: 'desc' } });
+  res.json(plots);
+});
+
+crewPortalRouter.get('/me/jobs/:jobId/plots/:plotId/file', requireRole('CREW'), async (req, res) => {
+  const found = await requireAssignedJob(req.user!.id, req.params.jobId);
+  if (!found) return res.status(404).end();
+  const plot = await prisma.plot.findUnique({ where: { id: req.params.plotId } });
+  if (!plot || plot.jobId !== req.params.jobId) return res.status(404).end();
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(plot.originalName)}"`);
+  res.sendFile(path.join(plotsDir, plot.fileName));
+});
+
+/**
+ * Kit list, no pricing — reuses fetchPickListSnapshot (the same pricing-free {id, name,
+ * quantity} shape the pick-list-diff alert already uses), not the admin/signage pick-list
+ * endpoint, which spreads the full raw Current RMS item (including whatever price fields the
+ * account's response carries) into its response.
+ */
+crewPortalRouter.get('/me/jobs/:jobId/kit-list', requireRole('CREW'), async (req, res) => {
+  const found = await requireAssignedJob(req.user!.id, req.params.jobId);
+  if (!found) return res.status(404).json({ error: 'Job not found' });
+  if (!found.assignment.job.currentRmsOpportunityId) return res.json({ items: [] });
+  try {
+    const config = await getCurrentRmsConfig();
+    if (!config.enabled) return res.json({ items: [] });
+    const items = await fetchPickListSnapshot(config, Number(found.assignment.job.currentRmsOpportunityId));
+    res.json({ items });
+  } catch {
+    res.json({ items: [] });
+  }
+});
+
+/**
+ * The "request to prep system" form: a crew member asks for an extra/replacement label. Lands
+ * as a PENDING PrintQueueItem on a generic PAL (case/sign) label — the same editor Milestone 5
+ * built handles it with no further plumbing, since it's just another pending item of a known
+ * label type.
+ */
+crewPortalRouter.post('/me/jobs/:jobId/requests', requireRole('CREW'), async (req, res) => {
+  const found = await requireAssignedJob(req.user!.id, req.params.jobId);
+  if (!found) return res.status(404).json({ error: 'Job not found' });
+  const { title, notes } = req.body ?? {};
+  if (!title || typeof title !== 'string') return res.status(400).json({ error: 'title is required' });
+
+  const order = await nextOrderStart(req.params.jobId, 'PAL');
+  const item = await prisma.printQueueItem.create({
+    data: {
+      jobId: req.params.jobId,
+      labelType: 'PAL',
+      sourceType: 'CREW_REQUEST',
+      sourceId: found.profile.id,
+      contentJson: JSON.stringify({ location: null, title, subtitle: notes || 'Crew request' }),
+      quantity: 1,
+      status: 'PENDING',
+      order,
+    },
+  });
+  await logActivity('crew_request.create', title, req.params.jobId, req.user!.id);
+  res.status(201).json(item);
 });
 
 /** Batch-loads the (at most a handful of) distinct linked opportunities a crew member's jobs reference. */

@@ -43,6 +43,42 @@ model Job {
   pickListItemStatuses PickListItemStatus[]
   labelTemplates LabelTemplate[]
   crewAssignments JobCrewAssignment[]
+  scheduleItems  JobScheduleItem[]
+  documents      JobDocument[]
+}
+
+/// One timed entry in a job's day schedule (load-in, soundcheck, doors, show, get-out, ...) —
+/// the crew job page's "Why" section renders these as a Google-Calendar-style day timeline.
+/// Admin-managed from the job detail page's Schedule tab; crew get read-only access through
+/// the crew portal. Deliberately its own small model rather than a document upload, so it can
+/// actually be rendered as a timeline instead of just linking to a PDF.
+model JobScheduleItem {
+  id        String    @id @default(cuid())
+  jobId     String
+  job       Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  title     String
+  startsAt  DateTime
+  endsAt    DateTime?
+  notes     String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([jobId])
+}
+
+/// General job files (call sheets, info packs, contracts) — unencrypted like Plot, since
+/// nothing here is the compliance-sensitive personal data CrewDocument protects. Admin-managed
+/// from the job detail page; crew get read-only access to their assigned jobs' documents.
+model JobDocument {
+  id           String   @id @default(cuid())
+  jobId        String
+  job          Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  originalName String
+  fileName     String
+  mimeType     String
+  createdAt    DateTime @default(now())
+
+  @@index([jobId])
 }
 
 /// A freelance crew member's profile — 1:1 with a User whose role is CREW. For now the only
@@ -375,6 +411,11 @@ model CurrentRmsOpportunity {
   subject      String
   status       String?
   memberName   String?
+  /// Best-effort order value, extracted from whichever total/charge field the raw response
+  /// actually carries (see extractValue in sync.ts) — field naming hasn't been verified
+  /// against a real account's /opportunities response, so this can be null even when the
+  /// opportunity does have a value Current RMS just doesn't expose in a field we recognize yet.
+  value        Float?
   startsAt     DateTime?
   endsAt       DateTime?
   rmsUpdatedAt DateTime?

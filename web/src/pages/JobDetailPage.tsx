@@ -7,12 +7,14 @@ import CasesPanel from '../components/CasesPanel';
 import LabelsPanel from '../components/LabelsPanel';
 import PrintQueuePanel from '../components/PrintQueuePanel';
 import PlotsPanel from '../components/PlotsPanel';
+import JobSchedulePanel from '../components/JobSchedulePanel';
+import JobDocumentsPanel from '../components/JobDocumentsPanel';
 import CurrentRmsPanel from '../components/CurrentRmsPanel';
 import JobLocationColorsPanel from '../components/JobLocationColorsPanel';
 import JobCrewPanel from '../components/JobCrewPanel';
 import FileInput from '../components/FileInput';
 
-const TABS = ['Patch Import', 'Cases', 'Labels', 'Print Queue', 'Plots', 'Crew', 'Current RMS', 'Job Settings'] as const;
+const TABS = ['Patch Import', 'Cases', 'Labels', 'Print Queue', 'Plots', 'Schedule', 'Documents', 'Crew', 'Current RMS', 'Job Settings'] as const;
 type Tab = (typeof TABS)[number];
 
 export default function JobDetailPage() {
@@ -45,6 +47,8 @@ export default function JobDetailPage() {
       {tab === 'Labels' && <LabelsPanel jobId={jobId} />}
       {tab === 'Print Queue' && <PrintQueuePanel jobId={jobId} />}
       {tab === 'Plots' && <PlotsPanel jobId={jobId} />}
+      {tab === 'Schedule' && <JobSchedulePanel jobId={jobId} />}
+      {tab === 'Documents' && <JobDocumentsPanel jobId={jobId} />}
       {tab === 'Crew' && <JobCrewPanel jobId={jobId} />}
       {tab === 'Current RMS' && <CurrentRmsPanel jobId={jobId} />}
       {tab === 'Job Settings' && job && <JobSettingsPanel job={job} onUpdate={setJob} />}

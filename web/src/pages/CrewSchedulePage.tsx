@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, type CrewMyJob } from '../api/client';
 import { WhereIcon } from '../components/Icons';
+import MonthCalendar, { type CalendarEvent } from '../components/MonthCalendar';
 
 const NO_DATE = 'No date set yet';
 
@@ -9,10 +10,10 @@ function formatDateRange(startsAt: string | null, endsAt: string | null): string
   if (!startsAt) return NO_DATE;
   const start = new Date(startsAt);
   const startStr = start.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
-  if (!endsAt || endsAt === startsAt) return startStr;
+  if (!endsAt) return startStr;
   const end = new Date(endsAt);
   const endStr = end.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
-  return `${startStr} – ${endStr}`;
+  return endStr === startStr ? startStr : `${startStr} – ${endStr}`;
 }
 
 /**
@@ -23,6 +24,7 @@ function formatDateRange(startsAt: string | null, endsAt: string | null): string
 export default function CrewSchedulePage() {
   const [jobs, setJobs] = useState<CrewMyJob[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [view, setView] = useState<'calendar' | 'list'>('calendar');
 
   useEffect(() => {
     api.crewPortal
@@ -31,14 +33,35 @@ export default function CrewSchedulePage() {
       .catch((e) => setError(e.message));
   }, []);
 
+  const events: CalendarEvent[] = (jobs ?? [])
+    .filter((j) => j.startsAt)
+    .map((j) => ({ id: j.jobId, title: j.jobName, startsAt: j.startsAt!, endsAt: j.endsAt, href: `/crew/jobs/${j.jobId}` }));
+
   return (
     <div>
-      <h1>Your schedule</h1>
+      <div className="row" style={{ justifyContent: 'space-between' }}>
+        <h1>Your schedule</h1>
+        <div className="tabs" style={{ marginBottom: 0 }}>
+          <button className={view === 'calendar' ? 'active' : undefined} onClick={() => setView('calendar')}>
+            Calendar
+          </button>
+          <button className={view === 'list' ? 'active' : undefined} onClick={() => setView('list')}>
+            List
+          </button>
+        </div>
+      </div>
       {error && <p className="error">{error}</p>}
       {jobs === null && !error && <p className="muted">Loading…</p>}
       {jobs !== null && jobs.length === 0 && <p className="muted">You're not assigned to any jobs yet.</p>}
-      {jobs !== null && jobs.length > 0 && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+
+      {jobs !== null && jobs.length > 0 && view === 'calendar' && (
+        <div style={{ marginTop: '1rem' }}>
+          <MonthCalendar events={events} />
+        </div>
+      )}
+
+      {jobs !== null && jobs.length > 0 && view === 'list' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '1rem' }}>
           {jobs.map((j) => {
             const dateRange = formatDateRange(j.startsAt, j.endsAt);
             return (

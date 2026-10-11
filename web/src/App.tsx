@@ -1,6 +1,6 @@
 import { NavLink, Navigate, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from './auth/AuthContext'
-import { JobsIcon, SettingsIcon, SignageIcon, SignOutIcon } from './components/Icons'
+import { DashboardIcon, JobsIcon, SettingsIcon, SignageIcon, SignOutIcon } from './components/Icons'
 import ThemeToggle from './components/ThemeToggle'
 import './App.css'
 
@@ -29,6 +29,10 @@ function App() {
           </div>
           <nav className="sidebar-nav">
             <NavLink to="/" end>
+              <DashboardIcon />
+              <span>Dashboard</span>
+            </NavLink>
+            <NavLink to="/jobs">
               <JobsIcon />
               <span>Jobs</span>
             </NavLink>

@@ -264,10 +264,45 @@ export interface CurrentRmsOpportunity {
   subject: string;
   status: string | null;
   memberName: string | null;
+  value: number | null;
   startsAt: string | null;
   endsAt: string | null;
   rmsUpdatedAt: string | null;
   syncedAt: string;
+}
+
+export interface JobScheduleItem {
+  id: string;
+  jobId: string;
+  title: string;
+  startsAt: string;
+  endsAt: string | null;
+  notes: string | null;
+}
+
+export interface JobDocument {
+  id: string;
+  jobId: string;
+  originalName: string;
+  mimeType: string;
+  createdAt: string;
+}
+
+export interface KitListItem {
+  id: number;
+  name: string;
+  quantity: number;
+}
+
+export interface DashboardOrder {
+  jobId: string;
+  jobName: string;
+  venue: string | null;
+  status: string | null;
+  startsAt: string | null;
+  endsAt: string | null;
+  value: number | null;
+  crewCount: number;
 }
 
 export interface CurrentRmsPickItem {
@@ -359,6 +394,35 @@ export const api = {
     me: () => request<CrewMe>('/crew/me'),
     myJobs: () => request<CrewMyJob[]>('/crew/me/jobs'),
     jobDetail: (jobId: string) => request<CrewJobDetail>(`/crew/me/jobs/${jobId}`),
+    schedule: (jobId: string) => request<JobScheduleItem[]>(`/crew/me/jobs/${jobId}/schedule`),
+    kitList: (jobId: string) => request<{ items: KitListItem[] }>(`/crew/me/jobs/${jobId}/kit-list`),
+    documents: (jobId: string) => request<JobDocument[]>(`/crew/me/jobs/${jobId}/documents`),
+    documentUrl: (jobId: string, docId: string) => `${BASE}/crew/me/jobs/${jobId}/documents/${docId}/file`,
+    plots: (jobId: string) => request<Plot[]>(`/crew/me/jobs/${jobId}/plots`),
+    plotUrl: (jobId: string, plotId: string) => `${BASE}/crew/me/jobs/${jobId}/plots/${plotId}/file`,
+    submitRequest: (jobId: string, data: { title: string; notes?: string }) =>
+      request<PrintQueueItem>(`/crew/me/jobs/${jobId}/requests`, { method: 'POST', body: JSON.stringify(data) }),
+  },
+  jobSchedule: {
+    list: (jobId: string) => request<JobScheduleItem[]>(`/jobs/${jobId}/schedule`),
+    create: (jobId: string, data: { title: string; startsAt: string; endsAt?: string; notes?: string }) =>
+      request<JobScheduleItem>(`/jobs/${jobId}/schedule`, { method: 'POST', body: JSON.stringify(data) }),
+    update: (jobId: string, id: string, data: Partial<{ title: string; startsAt: string; endsAt: string | null; notes: string }>) =>
+      request<JobScheduleItem>(`/jobs/${jobId}/schedule/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    remove: (jobId: string, id: string) => request<void>(`/jobs/${jobId}/schedule/${id}`, { method: 'DELETE' }),
+  },
+  jobDocuments: {
+    list: (jobId: string) => request<JobDocument[]>(`/jobs/${jobId}/documents`),
+    upload: async (jobId: string, file: File) => {
+      const form = new FormData();
+      form.append('document', file);
+      return request<JobDocument>(`/jobs/${jobId}/documents`, { method: 'POST', body: form });
+    },
+    fileUrl: (jobId: string, id: string) => `${BASE}/jobs/${jobId}/documents/${id}/file`,
+    remove: (jobId: string, id: string) => request<void>(`/jobs/${jobId}/documents/${id}`, { method: 'DELETE' }),
+  },
+  dashboard: {
+    get: () => request<{ orders: DashboardOrder[] }>('/dashboard'),
   },
   jobCrewAssignments: {
     list: (jobId: string) => request<JobCrewAssignment[]>(`/jobs/${jobId}/crew`),
