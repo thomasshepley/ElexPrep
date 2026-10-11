@@ -18,6 +18,7 @@ export default function CrewApplicationsPage() {
   const [applications, setApplications] = useState<CrewApplicationSummary[]>([]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<CrewApplicationDetail | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
 
   const refresh = () =>
@@ -30,6 +31,7 @@ export default function CrewApplicationsPage() {
     refresh();
     setExpandedId(null);
     setDetail(null);
+    setSelected(new Set());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filter]);
 
@@ -46,6 +48,28 @@ export default function CrewApplicationsPage() {
   const reject = async (id: string) => {
     const note = prompt('Rejection note (optional):') ?? '';
     await api.crewApplications.reject(id, note || undefined);
+    setExpandedId(null);
+    setDetail(null);
+    refresh();
+  };
+
+  const toggleSelected = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const pendingIds = applications.filter((a) => a.status === 'PENDING').map((a) => a.id);
+  const toggleSelectAll = () => setSelected((prev) => (prev.size === pendingIds.length ? new Set() : new Set(pendingIds)));
+
+  const bulkReject = async () => {
+    const note = prompt(`Rejection note for ${selected.size} applications (optional):`) ?? '';
+    await Promise.all([...selected].map((id) => api.crewApplications.reject(id, note || undefined)));
+    setSelected(new Set());
     setExpandedId(null);
     setDetail(null);
     refresh();
@@ -70,15 +94,43 @@ export default function CrewApplicationsPage() {
       {error && <p className="error">{error}</p>}
       {applications.length === 0 && <p className="muted">No applications here.</p>}
 
+      {pendingIds.length > 0 && (
+        <div className="row" style={{ marginBottom: '0.75rem', gap: '0.5rem' }}>
+          <label className="row" style={{ gap: '0.3rem' }}>
+            <input type="checkbox" checked={selected.size === pendingIds.length} onChange={toggleSelectAll} />
+            <span className="muted">Select all pending</span>
+          </label>
+          {selected.size > 0 && (
+            <>
+              <span className="muted">{selected.size} selected</span>
+              <button className="secondary" onClick={bulkReject}>
+                Reject selected
+              </button>
+            </>
+          )}
+        </div>
+      )}
+
       {applications.map((a) => (
         <div key={a.id} className="panel card-interactive">
           <div className="row" style={{ justifyContent: 'space-between' }} onClick={() => toggleExpand(a.id)}>
-            <div>
-              <strong>{a.fullName}</strong>{' '}
-              <span className="muted">
-                {a.email}
-                {a.dayRate ? ` · £${a.dayRate}/day` : ''}
-              </span>
+            <div className="row" style={{ gap: '0.6rem' }}>
+              {a.status === 'PENDING' && (
+                <input
+                  type="checkbox"
+                  aria-label={`Select ${a.fullName}`}
+                  checked={selected.has(a.id)}
+                  onChange={() => {}}
+                  onClick={(e) => toggleSelected(a.id, e)}
+                />
+              )}
+              <div>
+                <strong>{a.fullName}</strong>{' '}
+                <span className="muted">
+                  {a.email}
+                  {a.dayRate ? ` · £${a.dayRate}/day` : ''}
+                </span>
+              </div>
             </div>
             <span className={statusChipClass(a.status)}>{a.status}</span>
           </div>

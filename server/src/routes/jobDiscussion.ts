@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { prisma, logActivity } from '../db';
 import { requireRole } from '../auth';
 import { notifyDiscussionMessage } from '../notifications';
+import { resolvePermissionsForUser } from '../permissions';
 
 /**
  * A job's discussion thread — staff side (ADMIN/USER). The crew side lives in crewPortal.ts at
@@ -53,4 +54,18 @@ jobDiscussionRouter.post('/:jobId/discussion', requireRole('ADMIN', 'USER'), asy
   await logActivity('job_discussion.create', req.params.jobId, req.params.jobId, req.user!.id);
   await notifyDiscussionMessage(req.params.jobId, job.name, req.user!.id, req.user!.displayName, message.body);
   res.status(201).json(toMessageDto(message));
+});
+
+// Anyone can delete their own message; deleting someone else's needs the (delegatable)
+// moderateDiscussion permission — ADMIN always has it, a USER account only if granted.
+jobDiscussionRouter.delete('/:jobId/discussion/:messageId', requireRole('ADMIN', 'USER'), async (req, res) => {
+  const message = await prisma.jobDiscussionMessage.findUnique({ where: { id: req.params.messageId } });
+  if (!message || message.jobId !== req.params.jobId) return res.status(404).json({ error: 'Message not found' });
+  if (message.authorUserId !== req.user!.id) {
+    const perms = await resolvePermissionsForUser(req.user!.id, req.user!.role);
+    if (!perms.moderateDiscussion) return res.status(403).json({ error: 'Insufficient permissions' });
+  }
+  await prisma.jobDiscussionMessage.delete({ where: { id: message.id } });
+  await logActivity('job_discussion.delete', req.params.jobId, req.params.jobId, req.user!.id);
+  res.status(204).end();
 });
