@@ -9,7 +9,17 @@
  * Requires only Node.js 18+ (built-in fetch) and SumatraPDF. See agent/README.md for setup.
  */
 import { spawn } from 'child_process';
-import { mkdtempSync, writeFileSync, rmSync, existsSync, readFileSync } from 'fs';
+import {
+  mkdtempSync,
+  writeFileSync,
+  appendFileSync,
+  renameSync,
+  rmSync,
+  existsSync,
+  readFileSync,
+  mkdirSync,
+  statSync,
+} from 'fs';
 import { tmpdir } from 'os';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -47,7 +57,31 @@ if (!existsSync(SUMATRA)) {
 }
 
 const headers = { 'X-Agent-Token': TOKEN, 'Content-Type': 'application/json' };
-const log = (...args) => console.log(new Date().toISOString(), ...args);
+
+// Scheduled Tasks (install-service.bat) run with no console attached, so console.log alone
+// would silently disappear — every line also goes to logs/agent.log, which is what actually
+// lets you diagnose a failure that happened unattended, e.g. after a reboot.
+const LOG_DIR = join(here, 'logs');
+const LOG_FILE = join(LOG_DIR, 'agent.log');
+const LOG_MAX_BYTES = 5 * 1024 * 1024;
+mkdirSync(LOG_DIR, { recursive: true });
+try {
+  if (statSync(LOG_FILE).size > LOG_MAX_BYTES) {
+    renameSync(LOG_FILE, `${LOG_FILE}.old`);
+  }
+} catch {
+  // no existing log file yet — nothing to rotate
+}
+
+const log = (...args) => {
+  const line = `${new Date().toISOString()} ${args.join(' ')}`;
+  console.log(line);
+  try {
+    appendFileSync(LOG_FILE, line + '\n');
+  } catch {
+    // logging must never crash the agent
+  }
+};
 
 async function claimJob() {
   const res = await fetch(`${SERVER_URL}/api/agent/print-jobs/claim`, { method: 'POST', headers });
@@ -124,6 +158,14 @@ process.on('SIGINT', () => {
 });
 process.on('SIGTERM', () => {
   stopping = true;
+});
+process.on('uncaughtException', (err) => {
+  log(`FATAL uncaught exception: ${err.stack || err.message}`);
+  process.exit(1);
+});
+process.on('unhandledRejection', (err) => {
+  log(`FATAL unhandled rejection: ${err?.stack || err}`);
+  process.exit(1);
 });
 
 async function main() {

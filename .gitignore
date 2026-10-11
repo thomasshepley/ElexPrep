@@ -15,3 +15,7 @@ data/elexprep.db
 .agents/
 .claude/
 skills-lock.json
+
+# Windows print agent's real config (holds the agent token) and its log directory
+agent/agent-config.json
+agent/logs/
