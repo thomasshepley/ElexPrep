@@ -328,6 +328,16 @@ export interface DashboardOrder {
   crewCount: number;
 }
 
+export interface DiscussionMessage {
+  id: string;
+  jobId: string;
+  authorUserId: string;
+  authorName: string;
+  authorRole: string;
+  body: string;
+  createdAt: string;
+}
+
 export interface AppNotification {
   id: string;
   type: string;
@@ -444,6 +454,11 @@ export const api = {
     plotUrl: (jobId: string, plotId: string) => `${BASE}/crew/me/jobs/${jobId}/plots/${plotId}/file`,
     submitLabelRequest: (jobId: string, data: { labelType: string; content: Record<string, unknown>; quantity?: number }) =>
       request<CrewLabelRequest>(`/crew/me/jobs/${jobId}/label-requests`, { method: 'POST', body: JSON.stringify(data) }),
+    discussion: {
+      list: (jobId: string) => request<DiscussionMessage[]>(`/crew/me/jobs/${jobId}/discussion`),
+      send: (jobId: string, body: string) =>
+        request<DiscussionMessage>(`/crew/me/jobs/${jobId}/discussion`, { method: 'POST', body: JSON.stringify({ body }) }),
+    },
   },
   labelRequests: {
     list: (jobId: string, status?: string) =>
@@ -460,6 +475,11 @@ export const api = {
     update: (jobId: string, id: string, data: Partial<{ title: string; startsAt: string; endsAt: string | null; notes: string }>) =>
       request<JobScheduleItem>(`/jobs/${jobId}/schedule/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     remove: (jobId: string, id: string) => request<void>(`/jobs/${jobId}/schedule/${id}`, { method: 'DELETE' }),
+  },
+  jobDiscussion: {
+    list: (jobId: string) => request<DiscussionMessage[]>(`/jobs/${jobId}/discussion`),
+    send: (jobId: string, body: string) =>
+      request<DiscussionMessage>(`/jobs/${jobId}/discussion`, { method: 'POST', body: JSON.stringify({ body }) }),
   },
   jobDocuments: {
     list: (jobId: string) => request<JobDocument[]>(`/jobs/${jobId}/documents`),
