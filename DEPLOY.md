@@ -10,12 +10,20 @@ One container runs everything: the API, the web UI, and the SQLite database. All
   - **Windows Server / Windows 11**: [Docker Desktop](https://docs.docker.com/desktop/setup/install/windows-install/)
     (or Docker Engine in WSL2)
   - **Linux**: `docker` + `docker compose` from your distro or docker.com
+- The `elex.lighting` domain in a Cloudflare account (free plan is fine), for the permanent
+  `portal.elex.lighting` binding below. Not needed just to run the app locally/on the LAN.
 
 ## First deployment
 
 ```bash
 git clone https://github.com/thomasshepley/ElexPrep.git
 cd ElexPrep
+
+# Required: the key that encrypts crew compliance documents, bank details, and 2FA secrets
+# at rest. Generate one and save it somewhere safe (a password manager, not just this .env
+# file) — losing it makes any already-stored crew documents/bank details unrecoverable.
+echo "CREW_DOC_ENCRYPTION_KEY=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")" > .env
+
 docker compose up -d --build
 ```
 
@@ -27,9 +35,9 @@ gets there first owns the instance.
 
 ## Previewing externally (before portal.elex.lighting is wired up)
 
-The production target is `portal.elex.lighting`, but until that domain's DNS is pointed
-somewhere, use a Cloudflare Tunnel for a real, working, HTTPS-accessible preview — no port
-forwarding, no DNS changes, works behind a dynamic IP/CGNAT:
+Until the permanent domain (below) is set up, use a quick Cloudflare Tunnel for a real,
+working, HTTPS-accessible preview — no port forwarding, no DNS changes, works behind a
+dynamic IP/CGNAT:
 
 ```bash
 # one-off install (see https://pkg.cloudflare.com for other platforms)
@@ -45,10 +53,46 @@ anywhere (e.g. your phone on mobile data) to confirm the deployment is really re
 externally. The URL changes each time you restart the command, so it's only meant for
 ad hoc previews, not something to leave running.
 
-Once `portal.elex.lighting`'s DNS is ready, the permanent path is a **named tunnel**
-through the Cloudflare Zero Trust dashboard (Networks → Tunnels), with the `cloudflared`
-service already scaffolded in `docker-compose.yml` (commented out — add your tunnel token
-to a `.env` file as `CLOUDFLARE_TUNNEL_TOKEN` and uncomment the service to enable it).
+## Going live at portal.elex.lighting (permanent, no port forwarding)
+
+A **named tunnel** through Cloudflare keeps `portal.elex.lighting` pointed at this
+container permanently, with a real TLS certificate Cloudflare manages for you — no port
+forwarding, no static IP needed, and the tunnel survives the server rebooting or the ISP
+changing your IP. The `cloudflared` service is already scaffolded in `docker-compose.yml`
+(commented out); this just walks through turning it on.
+
+1. **Create the tunnel.** In the [Cloudflare Zero Trust dashboard](https://one.dash.cloudflare.com/)
+   (the `elex.lighting` account) go to **Networks → Tunnels → Create a tunnel**, choose
+   **Cloudflared**, and name it something like `elexprep-portal`.
+2. **Copy the token.** The next step ("Install and run a connector") shows a command
+   containing a long token after `--token`. Copy just that token value — you won't paste
+   the whole command, Docker runs the connector for you.
+3. **Save it to `.env`** next to `docker-compose.yml` on the server (alongside
+   `CREW_DOC_ENCRYPTION_KEY` from the first-deployment step above):
+   ```bash
+   echo "CLOUDFLARE_TUNNEL_TOKEN=<paste the token here>" >> .env
+   ```
+4. **Add the public hostname.** Still in the tunnel's settings, go to **Public Hostnames →
+   Add a public hostname**: subdomain `portal`, domain `elex.lighting`, service type
+   `HTTP`, URL `elexprep:4000` (the container name from `docker-compose.yml`, reachable by
+   name on Docker's internal network — not `localhost`). Save. Cloudflare creates the
+   `portal.elex.lighting` DNS record for you automatically; no manual DNS edit needed.
+5. **Uncomment the `cloudflared` service** in `docker-compose.yml` (delete the `#` at the
+   start of each of its lines) and start it:
+   ```bash
+   docker compose up -d
+   ```
+6. **Confirm it's live**: open `https://portal.elex.lighting` from a phone on mobile data
+   (not the office Wi-Fi) to prove it's really reachable over the public internet, not just
+   the LAN.
+7. **Turn on `COOKIE_SECURE`** now that every login goes through HTTPS — add
+   `COOKIE_SECURE=true` to `.env` and `docker compose up -d` once more to pick it up. Skip
+   this if signage TVs or anything else still logs in over plain `http://<lan-ip>:4000` —
+   see the comment in `docker-compose.yml` for why that combination breaks login.
+
+From here, `git pull && docker compose up -d --build` (see **Updating to a new version**
+below) keeps `portal.elex.lighting` current — the tunnel and domain binding don't need
+touching again.
 
 ## Test checklist (everything except physical printing)
 
@@ -127,10 +171,13 @@ with a full batch.
 
 - **Ports**: change the left side of `4000:4000` in `docker-compose.yml` to expose a
   different port (e.g. `80:4000`).
-- **HTTPS**: for LAN-only office use, plain HTTP is usually fine; if you expose it wider,
-  put Caddy/nginx/Traefik in front and set `COOKIE_SECURE=true` in the environment so the
-  session cookie is only sent over TLS. Leave it `false` (the default) for plain HTTP —
-  a secure cookie is silently dropped by the browser otherwise, which breaks login.
+- **HTTPS**: for LAN-only office use, plain HTTP is fine — leave `COOKIE_SECURE` unset
+  (the default `false`). For `portal.elex.lighting`, see **Going live at
+  portal.elex.lighting** above (a Cloudflare Tunnel is the recommended path here; a
+  reverse proxy like Caddy/nginx/Traefik in front works too if you'd rather terminate TLS
+  yourself). Either way, only set `COOKIE_SECURE=true` once *every* login goes through
+  HTTPS — a secure cookie is silently dropped by the browser on a plain-HTTP request,
+  which breaks login for whichever access path doesn't use TLS.
 - **Backups**: stop the container (`docker compose stop`), copy `data/`, start it again —
   or just copy `data/` live; SQLite single-writer usage here makes that low-risk. The server
   handles `docker compose stop`/`restart` (`SIGTERM`) by closing its DB connection cleanly
