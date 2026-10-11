@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, type Job } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
+import { PlusIcon, SearchIcon, WhereIcon } from '../components/Icons';
 
 export default function JobsListPage() {
   const { user } = useAuth();
@@ -9,6 +10,7 @@ export default function JobsListPage() {
   const canCreate = isAdmin || Boolean(user?.permissions?.createJobs);
   const canDelete = isAdmin || Boolean(user?.permissions?.deleteJobs);
   const [jobs, setJobs] = useState<Job[]>([]);
+  const [showCreate, setShowCreate] = useState(false);
   const [name, setName] = useState('');
   const [venue, setVenue] = useState('');
   const [search, setSearch] = useState('');
@@ -27,6 +29,7 @@ export default function JobsListPage() {
       await api.jobs.create({ name, venue: venue || undefined });
       setName('');
       setVenue('');
+      setShowCreate(false);
       refresh();
     } catch (e) {
       setError((e as Error).message);
@@ -51,55 +54,87 @@ export default function JobsListPage() {
 
   return (
     <div>
-      <h1>Jobs</h1>
-      {canCreate && (
+      <div className="dashboard-header">
+        <div>
+          <h1>Jobs</h1>
+          <p className="muted">{jobs.length === 0 ? 'Nothing here yet' : `${jobs.length} job${jobs.length === 1 ? '' : 's'}`}</p>
+        </div>
+        {canCreate && (
+          <button type="button" onClick={() => setShowCreate((s) => !s)} className="row" style={{ gap: '0.4rem' }}>
+            <PlusIcon /> New job
+          </button>
+        )}
+      </div>
+
+      {canCreate && showCreate && (
         <div className="panel">
           <h3>New job</h3>
           <p className="muted">
-            Or import one directly from an opportunity in{' '}
-            <Link to="/settings/current-rms">Settings → Current RMS</Link>.
+            Or import one directly from an opportunity in <Link to="/settings/current-rms">Settings → Current RMS</Link>.
           </p>
-          <form className="row" onSubmit={createJob}>
-            <input placeholder="Job name" value={name} onChange={(e) => setName(e.target.value)} required />
-            <input placeholder="Venue (optional)" value={venue} onChange={(e) => setVenue(e.target.value)} />
-            <button type="submit">Create job</button>
+          <form onSubmit={createJob}>
+            <div className="row" style={{ alignItems: 'flex-end', gap: '0.9rem' }}>
+              <div className="field" style={{ width: '14rem' }}>
+                <label htmlFor="new-job-name">Job name</label>
+                <input id="new-job-name" value={name} onChange={(e) => setName(e.target.value)} autoFocus required />
+              </div>
+              <div className="field" style={{ width: '14rem' }}>
+                <label htmlFor="new-job-venue">Venue</label>
+                <input id="new-job-venue" value={venue} onChange={(e) => setVenue(e.target.value)} placeholder="Optional" />
+              </div>
+              <button type="submit">Create job</button>
+            </div>
           </form>
           {error && <p className="error">{error}</p>}
         </div>
       )}
 
       {jobs.length > 0 && (
-        <input
-          placeholder="Search jobs by name or venue"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          style={{ marginBottom: '0.75rem', width: '100%', maxWidth: 360 }}
-        />
+        <div className="toolbar">
+          <div className="search-field">
+            <SearchIcon />
+            <input placeholder="Search jobs by name or venue" value={search} onChange={(e) => setSearch(e.target.value)} />
+          </div>
+        </div>
       )}
 
-      <div>
-        {jobs.length === 0 && <p className="muted">No jobs yet{canCreate ? ' — create one above.' : '.'}</p>}
-        {jobs.length > 0 && filtered.length === 0 && <p className="muted">No jobs match "{search}".</p>}
-        {filtered.map((job) => (
-          <div
-            key={job.id}
-            className="job-card"
-            style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', justifyContent: 'space-between' }}
-          >
-            <Link to={`/jobs/${job.id}`} style={{ flex: 1, color: 'inherit', textDecoration: 'none' }}>
-              <strong>{job.name}</strong>
-              {job.venue && <span className="muted"> — {job.venue}</span>}
-              {isAdmin && !job.isPublic && <span className="muted"> (private)</span>}
-              {job.rmsAlertAt && <span className="error"> • RMS changed</span>}
-            </Link>
-            {canDelete && (
-              <button className="secondary" onClick={(e) => removeJob(job, e)}>
-                Delete
-              </button>
-            )}
-          </div>
-        ))}
-      </div>
+      {jobs.length === 0 && (
+        <div className="empty-state">
+          <p style={{ margin: 0 }}>No jobs yet{canCreate ? ' — create one above to get started.' : '.'}</p>
+        </div>
+      )}
+      {jobs.length > 0 && filtered.length === 0 && (
+        <div className="empty-state">
+          <p style={{ margin: 0 }}>No jobs match "{search}".</p>
+        </div>
+      )}
+
+      {filtered.length > 0 && (
+        <div className="job-grid">
+          {filtered.map((job) => (
+            <div key={job.id} className="job-card" style={{ position: 'relative' }}>
+              <Link to={`/jobs/${job.id}`} className="job-card-stretched-link" aria-label={job.name} />
+              <div className="job-card-top">
+                <h3>{job.name}</h3>
+                {canDelete && (
+                  <button className="secondary job-card-delete" onClick={(e) => removeJob(job, e)}>
+                    Delete
+                  </button>
+                )}
+              </div>
+              {job.venue && (
+                <div className="job-card-venue">
+                  <WhereIcon /> {job.venue}
+                </div>
+              )}
+              <div className="job-card-tags">
+                {isAdmin && <span className={`chip ${job.isPublic ? 'chip-success' : 'chip-neutral'}`}>{job.isPublic ? 'Public' : 'Private'}</span>}
+                {job.rmsAlertAt && <span className="chip chip-warning">RMS changed</span>}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

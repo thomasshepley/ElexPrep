@@ -1,7 +1,7 @@
 /**
- * A small, consistent-weight icon set (1.75pt stroke, 16x16, currentColor) for the crew job
- * page's cards — matches Chevron.tsx's style so every icon in the app shares one visual
- * language rather than mixing glyph styles.
+ * A small, consistent-weight icon set (1.6pt stroke, 16x16, currentColor) — matches Chevron.tsx's
+ * style so every icon in the app (sidebar nav, dashboard toolbar, the crew job page's cards)
+ * shares one visual language rather than mixing glyph styles.
  */
 const common = {
   width: 16,
@@ -44,6 +44,63 @@ export function WhereIcon() {
     <svg {...common}>
       <path d="M8 14s4.6-4.3 4.6-7.8A4.6 4.6 0 0 0 3.4 6.2C3.4 9.7 8 14 8 14Z" {...stroke} />
       <circle cx="8" cy="6.2" r="1.6" {...stroke} />
+    </svg>
+  );
+}
+
+export function JobsIcon() {
+  return (
+    <svg {...common}>
+      <rect x="2.2" y="5" width="11.6" height="8" rx="1.4" {...stroke} />
+      <path d="M5.6 5V3.8a1.4 1.4 0 0 1 1.4-1.4h2a1.4 1.4 0 0 1 1.4 1.4V5" {...stroke} />
+      <path d="M2.2 8.6h11.6" {...stroke} />
+    </svg>
+  );
+}
+
+export function SettingsIcon() {
+  return (
+    <svg {...common}>
+      <circle cx="8" cy="8" r="2.1" {...stroke} />
+      <path
+        d="M8 2.6v1.3M8 12.1v1.3M13.4 8h-1.3M3.9 8H2.6M11.6 4.4l-.9.9M5.3 10.7l-.9.9M11.6 11.6l-.9-.9M5.3 5.3l-.9-.9"
+        {...stroke}
+      />
+    </svg>
+  );
+}
+
+export function SignageIcon() {
+  return (
+    <svg {...common}>
+      <rect x="2.2" y="3" width="11.6" height="8" rx="1.2" {...stroke} />
+      <path d="M6 13.4h4M8 11v2.4" {...stroke} />
+    </svg>
+  );
+}
+
+export function SearchIcon() {
+  return (
+    <svg {...common}>
+      <circle cx="7" cy="7" r="4.3" {...stroke} />
+      <path d="M13.2 13.2l-2.9-2.9" {...stroke} />
+    </svg>
+  );
+}
+
+export function PlusIcon() {
+  return (
+    <svg {...common}>
+      <path d="M8 2.8v10.4M2.8 8h10.4" {...stroke} />
+    </svg>
+  );
+}
+
+export function SignOutIcon() {
+  return (
+    <svg {...common}>
+      <path d="M6.8 2.8H4a1.2 1.2 0 0 0-1.2 1.2v8a1.2 1.2 0 0 0 1.2 1.2h2.8" {...stroke} />
+      <path d="M10.6 10.8l2.8-2.8-2.8-2.8M13.2 8H6.4" {...stroke} />
     </svg>
   );
 }

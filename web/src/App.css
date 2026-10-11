@@ -1,86 +1,169 @@
-.app-shell {
+/*
+ * Sidebar-based shell — replaces the earlier top-nav-bar layout. Shared by the admin/prep
+ * shell (App.tsx) and the crew portal shell (CrewLayout.tsx); both import this file once via
+ * App.tsx, and since Vite's CSS isn't scoped, the classes are available globally once either
+ * route has loaded — consistent with how the old top-nav classes already worked across both.
+ */
+
+.shell {
   min-height: 100vh;
   display: flex;
-  flex-direction: column;
 }
 
-.app-header {
+.sidebar {
+  width: 248px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-raised);
+  border-right: 1px solid var(--border);
+  padding: 1.5rem 1rem;
   position: sticky;
   top: 0;
-  z-index: 10;
-  display: flex;
-  align-items: center;
-  gap: 2rem;
-  padding: 0.8rem 1.75rem;
-  border-bottom: 1px solid var(--border);
-  background: color-mix(in srgb, var(--surface-raised) 88%, transparent);
-  backdrop-filter: blur(12px) saturate(1.4);
-  -webkit-backdrop-filter: blur(12px) saturate(1.4);
+  height: 100vh;
+  overflow-y: auto;
 }
 
-.brand {
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0 0.6rem;
+  margin-bottom: 2.25rem;
+}
+
+.sidebar-brand-mark {
+  width: 1.8rem;
+  height: 1.8rem;
+  border-radius: 7px;
+  background: linear-gradient(150deg, var(--accent), var(--accent-fill));
+  flex-shrink: 0;
+}
+
+.sidebar-brand-text {
   font-weight: 700;
-  letter-spacing: -0.01em;
   font-size: var(--text-lg);
+  letter-spacing: -0.01em;
 }
 
-.app-header nav {
+.sidebar-nav {
   display: flex;
-  gap: 1.5rem;
+  flex-direction: column;
+  gap: 0.15rem;
 }
 
-.app-header nav a {
-  position: relative;
-  color: var(--content-muted);
-  text-decoration: none;
-  font-size: 0.95rem;
-  font-weight: 500;
-  padding: 0.3rem 0;
-  transition: color 120ms ease;
-}
-
-.app-header nav a.active,
-.app-header nav a:hover {
-  color: var(--content);
-}
-
-.app-header nav a.active::after {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: -0.95rem;
-  height: 2px;
-  background: var(--accent);
-  border-radius: 2px;
-}
-
-.header-user {
-  margin-left: auto;
+.sidebar-nav a {
   display: flex;
   align-items: center;
-  gap: 0.9rem;
-}
-
-.header-user a {
+  gap: 0.75rem;
+  padding: 0.55rem 0.6rem;
+  border-radius: var(--radius-sm);
   color: var(--content-muted);
   text-decoration: none;
-  font-size: 0.9rem;
+  font-weight: 500;
+  font-size: var(--text-sm);
+  transition: background-color 120ms ease, color 120ms ease;
 }
 
-.header-user a:hover {
+.sidebar-nav a svg {
+  flex-shrink: 0;
+}
+
+.sidebar-nav a:hover {
+  background: var(--surface-sunken);
   color: var(--content);
 }
 
-.header-user button {
-  padding: 0.35rem 0.8rem;
-  font-size: 0.85rem;
+.sidebar-nav a.active {
+  background: var(--accent-wash);
+  color: var(--accent);
+  font-weight: 600;
 }
 
-.app-main {
-  flex: 1;
-  padding: 2rem 1.5rem;
-  max-width: 1100px;
+.sidebar-user {
+  margin-top: auto;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.sidebar-user-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0 0.6rem;
+  min-width: 0;
+}
+
+.sidebar-user-row a {
+  color: var(--content);
+  text-decoration: none;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-user-row a:hover {
+  color: var(--accent);
+}
+
+.sidebar-signout {
   width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.shell-main {
+  flex: 1;
+  min-width: 0;
+  padding: 2.75rem 3rem;
+}
+
+.shell-main-inner {
+  max-width: 1080px;
   margin: 0 auto;
+}
+
+@media (max-width: 760px) {
+  .sidebar {
+    width: 76px;
+    padding: 1.25rem 0.5rem;
+    align-items: center;
+  }
+
+  .sidebar-brand-text,
+  .sidebar-nav a span,
+  .sidebar-username,
+  .sidebar-signout span {
+    display: none;
+  }
+
+  .sidebar-brand {
+    justify-content: center;
+    padding: 0;
+  }
+
+  .sidebar-nav a {
+    justify-content: center;
+    padding: 0.65rem;
+  }
+
+  .sidebar-user-row {
+    justify-content: center;
+    padding: 0;
+  }
+
+  .sidebar-signout {
+    padding: 0.6rem;
+  }
+
+  .shell-main {
+    padding: 1.5rem 1rem;
+  }
 }

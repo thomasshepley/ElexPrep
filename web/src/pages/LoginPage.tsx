@@ -38,36 +38,39 @@ export default function LoginPage() {
   };
 
   return (
-    <div style={{ display: 'grid', placeItems: 'center', minHeight: '100vh' }}>
-      <div className="panel" style={{ width: 360 }}>
-        <h2>ELEX Portal</h2>
-        {needsSetup ? (
-          <p className="muted">First run — create the admin account.</p>
-        ) : (
-          <p className="muted">Sign in to continue.</p>
-        )}
-        <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-          <input
-            placeholder="Username"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            autoFocus
-            required
-          />
+    <div className="auth-page">
+      <div className="auth-card">
+        <div className="auth-brand">
+          <span className="auth-brand-mark" />
+          <h1>ELEX Portal</h1>
+          <p>{needsSetup ? 'First run — create the admin account.' : 'Sign in to continue.'}</p>
+        </div>
+        <form onSubmit={submit}>
+          <div className="field">
+            <label htmlFor="login-username">Username</label>
+            <input id="login-username" value={username} onChange={(e) => setUsername(e.target.value)} autoFocus required />
+          </div>
           {needsSetup && (
-            <input
-              placeholder="Display name (optional)"
-              value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
-            />
+            <div className="field">
+              <label htmlFor="login-display-name">Display name</label>
+              <input
+                id="login-display-name"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                placeholder="Optional"
+              />
+            </div>
           )}
-          <input
-            type="password"
-            placeholder="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
+          <div className="field">
+            <label htmlFor="login-password">Password</label>
+            <input
+              id="login-password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+          </div>
           {error && <p className="error">{error}</p>}
           <button type="submit" disabled={busy}>
             {needsSetup ? 'Create admin account' : 'Sign in'}
