@@ -77,6 +77,7 @@ export default function ActivityLogPage() {
             <th>Job</th>
             <th>Action</th>
             <th>Detail</th>
+            <th>IP</th>
           </tr>
         </thead>
         <tbody>
@@ -93,6 +94,7 @@ export default function ActivityLogPage() {
               </td>
               <td>{prettifyAction(e.action)}</td>
               <td>{e.detail}</td>
+              <td className="muted" title={e.userAgent ?? undefined}>{e.ipAddress ?? '—'}</td>
             </tr>
           ))}
         </tbody>

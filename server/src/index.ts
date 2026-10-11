@@ -9,7 +9,9 @@ import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import multer from 'multer';
 import { authMiddleware } from './auth';
+import { requestContextMiddleware } from './requestContext';
 import { authRouter } from './routes/auth';
+import { twoFactorRouter } from './routes/twoFactor';
 import { usersRouter } from './routes/users';
 import { settingsRouter } from './routes/settings';
 import { jobsRouter } from './routes/jobs';
@@ -44,6 +46,11 @@ import { seedDefaultLocationColorsIfEmpty, seedNewDefaultLocationColorsIfMissing
 import { prisma } from './db';
 
 const app = express();
+// One reverse proxy in front of this app in the documented deployment (see DEPLOY.md) — trust
+// its X-Forwarded-For so req.ip (used for activity-log IP logging, see requestContext.ts) is
+// the real client address, not the proxy's. Harmless when there's no proxy (nothing sets the
+// header, so req.ip falls back to the direct connection's address same as before).
+app.set('trust proxy', 1);
 // CSP is left off: the SPA and its PDF previews/native viewers are all served same-origin
 // with no external resources, so the main risk it guards against doesn't apply here, and a
 // misconfigured policy is more likely to break a page (iframe/PDF embeds) than help.
@@ -54,11 +61,13 @@ app.use(helmet({ contentSecurityPolicy: false, hsts: false }));
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json({ limit: '10mb' }));
 app.use(cookieParser());
+app.use(requestContextMiddleware);
 app.use(authMiddleware);
 
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
 
 app.use('/api/auth', authRouter);
+app.use('/api/2fa', twoFactorRouter);
 app.use('/api/users', usersRouter);
 app.use('/api/settings', settingsRouter);
 app.use('/api/jobs', jobsRouter);

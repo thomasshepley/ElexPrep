@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { api } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import NotificationPreferences from '../components/NotificationPreferences';
+import TwoFactorPanel from '../components/TwoFactorPanel';
 
 export default function PreferencesPage() {
   const { user, setUser } = useAuth();
@@ -86,6 +87,11 @@ export default function PreferencesPage() {
           </div>
           <button type="submit">Change password</button>
         </form>
+      </div>
+
+      <div className="panel">
+        <h3>Two-factor authentication</h3>
+        <TwoFactorPanel />
       </div>
 
       <div className="panel">

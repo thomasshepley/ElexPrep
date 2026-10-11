@@ -16,6 +16,7 @@
     "@elexprep/shared": "*",
     "papaparse": "^5.5.4",
     "pdfjs-dist": "^4.7.76",
+    "qrcode": "^1.5.4",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-router-dom": "^7.1.1"
@@ -23,6 +24,7 @@
   "devDependencies": {
     "@types/node": "^24.13.2",
     "@types/papaparse": "^5.5.2",
+    "@types/qrcode": "^1.5.5",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.3",

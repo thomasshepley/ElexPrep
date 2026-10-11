@@ -128,6 +128,8 @@ export interface ActivityLogEntry {
   jobId: string | null;
   action: string;
   detail: string | null;
+  ipAddress: string | null;
+  userAgent: string | null;
   createdAt: string;
   userName?: string | null;
   jobName?: string | null;
@@ -446,13 +448,20 @@ export interface CurrentRmsPickItem {
   [key: string]: unknown;
 }
 
+export interface LoginRequiresTotp {
+  requiresTotp: true;
+  pendingToken: string;
+}
+
 export const api = {
   auth: {
     status: () => request<{ needsSetup: boolean }>('/auth/status'),
     setup: (data: { username: string; password: string; displayName?: string }) =>
       request<AuthedUser>('/auth/setup', { method: 'POST', body: JSON.stringify(data) }),
     login: (data: { username: string; password: string }) =>
-      request<AuthedUser>('/auth/login', { method: 'POST', body: JSON.stringify(data) }),
+      request<AuthedUser | LoginRequiresTotp>('/auth/login', { method: 'POST', body: JSON.stringify(data) }),
+    verifyTotp: (data: { pendingToken: string; code?: string; backupCode?: string }) =>
+      request<AuthedUser>('/auth/login/verify-2fa', { method: 'POST', body: JSON.stringify(data) }),
     logout: () => request<void>('/auth/logout', { method: 'POST' }),
     me: () => request<AuthedUser>('/auth/me'),
     updateMe: (data: {
@@ -461,6 +470,15 @@ export const api = {
       currentPassword?: string;
       prefs?: Record<string, unknown>;
     }) => request<AuthedUser>('/auth/me', { method: 'PUT', body: JSON.stringify(data) }),
+  },
+  twoFactor: {
+    status: () => request<{ enabled: boolean; verifiedAt: string | null; backupCodesRemaining: number }>('/2fa/status'),
+    setup: () => request<{ secret: string; otpauthUrl: string }>('/2fa/setup', { method: 'POST' }),
+    confirm: (data: { secret: string; code: string }) =>
+      request<{ backupCodes: string[] }>('/2fa/confirm', { method: 'POST', body: JSON.stringify(data) }),
+    disable: (password: string) => request<void>('/2fa/disable', { method: 'POST', body: JSON.stringify({ password }) }),
+    regenerateBackupCodes: (password: string) =>
+      request<{ backupCodes: string[] }>('/2fa/backup-codes/regenerate', { method: 'POST', body: JSON.stringify({ password }) }),
   },
   users: {
     list: () => request<AuthedUser[]>('/users'),

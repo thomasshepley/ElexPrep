@@ -76,6 +76,7 @@ const SIGNAGE_WRITE_ALLOWLIST = [/^\/api\/jobs\/[^/]+\/current-rms\/pick-list\/[
 // whatever a plain USER could do.
 const CREW_ALLOWLIST = [
   /^\/api\/auth\/me$/,
+  /^\/api\/2fa(\/.*)?$/,
   /^\/api\/crew\/me$/,
   /^\/api\/crew\/me\/bank-details$/,
   /^\/api\/crew\/me\/rate-lines(\/.*)?$/,
