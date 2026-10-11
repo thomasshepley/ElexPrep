@@ -41,6 +41,11 @@ the same thing as picking the tray in the print dialog.
 
 ## Troubleshooting
 
+Everything the agent logs also goes to `agent/logs/agent.log` (rotated once it passes 5MB),
+not just the console window — this is what to check after the agent's been running
+unattended (e.g. as the scheduled task from step 7) and something went wrong with nobody
+watching the screen.
+
 - **401 / token rejected** — regenerate the token in Printer Settings and update
   `agent-config.json`; there is exactly one valid token at a time.
 - **Prints from the wrong tray** — the bin name doesn't match the driver's. Re-run
