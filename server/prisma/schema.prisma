@@ -114,11 +114,26 @@ model CrewProfile {
   /// Free-text list of roles/skills (e.g. "LD, Rigger, Spot Op") — a simple string for now
   /// rather than a separate taxonomy table, since nothing queries or filters by skill yet.
   skills    String?
+  /// Same comma-separated-string convention as skills (see shared/src/crewCertifications.ts).
+  certifications String?
   /// Default day rate as a plain string (e.g. "250.00") rather than a typed money column —
   /// nothing does arithmetic on it yet; a future Xero integration can introduce real currency
   /// handling once it actually moves money (see xeroContactId on JobCrewAssignment).
   dayRate   String?
   notes     String?
+  gender    String?
+  address   String?
+  pronouns  String?
+  instagramUrl String?
+  facebookUrl  String?
+  otherLinkUrl String?
+  /// Bank details, structured (not a file) but still encrypted at rest with the same AES-256-GCM
+  /// scheme as CrewDocument (see crewDocCrypto.ts) — ciphertext is the JSON-stringified field set
+  /// ({accountName, sortCode, accountNumber, bankName}), base64-encoded. Never returned in a list
+  /// response; a dedicated admin-only route decrypts it on request, same posture as documents.
+  bankDetailsCiphertext String?
+  bankDetailsIv         String?
+  bankDetailsAuthTag    String?
   active    Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -158,9 +173,17 @@ model CrewApplication {
   email         String
   phone         String?
   skills        String?
+  certifications String?
   dayRate       String?
   rightToWork   String?
   notes         String?
+  gender        String?
+  address       String?
+  /// See CrewProfile.bankDetailsCiphertext — same scheme, copied across to the CrewProfile on
+  /// approval (routes/crewApplications.ts) rather than re-encrypted.
+  bankDetailsCiphertext String?
+  bankDetailsIv         String?
+  bankDetailsAuthTag    String?
   /// PENDING | APPROVED | REJECTED
   status        String    @default("PENDING")
   reviewedAt    DateTime?
@@ -169,6 +192,24 @@ model CrewApplication {
   createdAt     DateTime  @default(now())
 
   documents CrewDocument[]
+
+  @@index([status])
+}
+
+/// The lighter-weight intake path for people we already want on the roster and don't need to
+/// run through the full CrewApplication review — just a name, reviewed, then a signup link.
+/// Approval here only decides "do we want this person at all"; the invitee then completes their
+/// own profile (bank details, skills, etc.) via a one-time token link, rather than an admin
+/// filling it in on their behalf. token is null until approved (nothing to visit before then).
+model OnboardingInvite {
+  id         String    @id @default(cuid())
+  fullName   String
+  token      String?   @unique
+  /// PENDING | APPROVED | REJECTED | COMPLETED
+  status     String    @default("PENDING")
+  reviewedAt DateTime?
+  reviewedBy String?
+  createdAt  DateTime  @default(now())
 
   @@index([status])
 }

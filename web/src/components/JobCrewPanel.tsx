@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, type CrewMember, type JobCrewAssignment } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
+import WhatsAppButton from './WhatsAppButton';
 
 /**
  * Who's working this job, in what role, at what rate. Viewing is open to anyone who can see
@@ -104,6 +105,7 @@ export default function JobCrewPanel({ jobId }: { jobId: string }) {
               <th>Name</th>
               <th>Role</th>
               <th>Day rate</th>
+              <th></th>
               {canManage && <th></th>}
             </tr>
           </thead>
@@ -122,6 +124,9 @@ export default function JobCrewPanel({ jobId }: { jobId: string }) {
                   )}
                 </td>
                 <td>{a.dayRate ?? a.profileDayRate ?? '—'}</td>
+                <td>
+                  <WhatsAppButton phone={a.phone} label="WhatsApp" />
+                </td>
                 {canManage && (
                   <td>
                     <button type="button" className="secondary" onClick={() => remove(a)}>

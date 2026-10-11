@@ -155,10 +155,25 @@ export interface CrewMember {
   displayName: string;
   phone: string | null;
   skills: string | null;
+  certifications: string | null;
   dayRate: string | null;
   notes: string | null;
+  gender: string | null;
+  address: string | null;
+  pronouns: string | null;
+  instagramUrl: string | null;
+  facebookUrl: string | null;
+  otherLinkUrl: string | null;
+  hasBankDetails: boolean;
   active: boolean;
   createdAt: string;
+}
+
+export interface BankDetails {
+  accountName: string;
+  sortCode: string;
+  accountNumber: string;
+  bankName?: string;
 }
 
 export interface CrewRateLine {
@@ -183,9 +198,13 @@ export interface CrewApplicationSummary {
   email: string;
   phone: string | null;
   skills: string | null;
+  certifications: string | null;
   dayRate: string | null;
   rightToWork: string | null;
   notes: string | null;
+  gender: string | null;
+  address: string | null;
+  hasBankDetails: boolean;
   status: 'PENDING' | 'APPROVED' | 'REJECTED';
   reviewedAt: string | null;
   rejectionNote: string | null;
@@ -196,11 +215,22 @@ export interface CrewApplicationDetail extends CrewApplicationSummary {
   documents: CrewDocumentSummary[];
 }
 
+export interface OnboardingInvite {
+  id: string;
+  fullName: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'COMPLETED';
+  reviewedAt: string | null;
+  createdAt: string;
+  /** The signup link token — only present once approved, and only in the admin list response. */
+  token: string | null;
+}
+
 export interface JobCrewAssignment {
   id: string;
   crewProfileId: string;
   displayName: string;
   username: string;
+  phone: string | null;
   role: string;
   dayRate: string | null;
   profileDayRate: string | null;
@@ -212,8 +242,16 @@ export interface CrewMe {
   displayName: string;
   phone: string | null;
   skills: string | null;
+  certifications: string | null;
   notes: string | null;
   dayRate: string | null;
+  gender: string | null;
+  address: string | null;
+  pronouns: string | null;
+  instagramUrl: string | null;
+  facebookUrl: string | null;
+  otherLinkUrl: string | null;
+  hasBankDetails: boolean;
 }
 
 export interface CrewMyJob {
@@ -396,8 +434,16 @@ export const api = {
       displayName?: string;
       phone?: string;
       skills?: string;
+      certifications?: string;
       dayRate?: string;
       notes?: string;
+      gender?: string;
+      address?: string;
+      pronouns?: string;
+      instagramUrl?: string;
+      facebookUrl?: string;
+      otherLinkUrl?: string;
+      bankDetails?: BankDetails;
     }) => request<CrewMember>('/crew', { method: 'POST', body: JSON.stringify(data) }),
     update: (
       id: string,
@@ -406,12 +452,21 @@ export const api = {
         password: string;
         phone: string;
         skills: string;
+        certifications: string;
         dayRate: string;
         notes: string;
+        gender: string;
+        address: string;
+        pronouns: string;
+        instagramUrl: string;
+        facebookUrl: string;
+        otherLinkUrl: string;
+        bankDetails: BankDetails;
         active: boolean;
       }>
     ) => request<CrewMember>(`/crew/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     remove: (id: string) => request<void>(`/crew/${id}`, { method: 'DELETE' }),
+    bankDetails: (id: string) => request<BankDetails>(`/crew/${id}/bank-details`),
     documents: {
       list: (crewId: string) => request<CrewDocumentSummary[]>(`/crew/${crewId}/documents`),
       upload: (crewId: string, form: FormData) =>
@@ -436,6 +491,7 @@ export const api = {
       request<CrewApplicationSummary[]>(`/crew-applications${status ? `?status=${status}` : ''}`),
     get: (id: string) => request<CrewApplicationDetail>(`/crew-applications/${id}`),
     documentUrl: (appId: string, docId: string) => `${BASE}/crew-applications/${appId}/documents/${docId}`,
+    bankDetails: (id: string) => request<BankDetails>(`/crew-applications/${id}/bank-details`),
     approve: (id: string, data: { username: string; password: string; displayName?: string }) =>
       request<{ userId: string; crewProfileId: string; username: string }>(`/crew-applications/${id}/approve`, {
         method: 'POST',
@@ -444,10 +500,57 @@ export const api = {
     reject: (id: string, note?: string) =>
       request<void>(`/crew-applications/${id}/reject`, { method: 'POST', body: JSON.stringify({ note }) }),
   },
+  onboarding: {
+    submit: (fullName: string) => request<{ id: string }>('/onboarding', { method: 'POST', body: JSON.stringify({ fullName }) }),
+    list: (status?: string) => request<OnboardingInvite[]>(`/onboarding${status ? `?status=${status}` : ''}`),
+    approve: (id: string) => request<OnboardingInvite>(`/onboarding/${id}/approve`, { method: 'POST' }),
+    reject: (id: string) => request<void>(`/onboarding/${id}/reject`, { method: 'POST' }),
+    invite: {
+      get: (token: string) => request<{ fullName: string; status: string }>(`/onboarding/invite/${token}`),
+      complete: (
+        token: string,
+        data: {
+          username: string;
+          password: string;
+          displayName?: string;
+          phone?: string;
+          skills?: string;
+          certifications?: string;
+          gender?: string;
+          address?: string;
+          dayRate?: string;
+          notes?: string;
+          bankDetails?: BankDetails;
+        }
+      ) => request<{ userId: string; username: string }>(`/onboarding/invite/${token}/complete`, { method: 'POST', body: JSON.stringify(data) }),
+    },
+  },
   crewPortal: {
     me: () => request<CrewMe>('/crew/me'),
-    updateMe: (data: Partial<{ phone: string; skills: string; notes: string }>) =>
-      request<CrewMe>('/crew/me', { method: 'PUT', body: JSON.stringify(data) }),
+    updateMe: (
+      data: Partial<{
+        phone: string;
+        skills: string;
+        certifications: string;
+        notes: string;
+        gender: string;
+        address: string;
+        pronouns: string;
+        instagramUrl: string;
+        facebookUrl: string;
+        otherLinkUrl: string;
+        bankDetails: BankDetails;
+      }>
+    ) => request<CrewMe>('/crew/me', { method: 'PUT', body: JSON.stringify(data) }),
+    bankDetails: () => request<BankDetails>('/crew/me/bank-details'),
+    rateLines: {
+      list: () => request<CrewRateLine[]>('/crew/me/rate-lines'),
+      create: (data: { label: string; amount: string }) =>
+        request<CrewRateLine>('/crew/me/rate-lines', { method: 'POST', body: JSON.stringify(data) }),
+      update: (lineId: string, data: Partial<{ label: string; amount: string }>) =>
+        request<CrewRateLine>(`/crew/me/rate-lines/${lineId}`, { method: 'PUT', body: JSON.stringify(data) }),
+      remove: (lineId: string) => request<void>(`/crew/me/rate-lines/${lineId}`, { method: 'DELETE' }),
+    },
     myJobs: () => request<CrewMyJob[]>('/crew/me/jobs'),
     jobDetail: (jobId: string) => request<CrewJobDetail>(`/crew/me/jobs/${jobId}`),
     schedule: (jobId: string) => request<JobScheduleItem[]>(`/crew/me/jobs/${jobId}/schedule`),

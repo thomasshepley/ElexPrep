@@ -53,6 +53,10 @@ export async function notifyCrewApplicationSubmitted(fullName: string) {
   );
 }
 
+export async function notifyOnboardingRequestSubmitted(fullName: string) {
+  await notifyAdmins('onboarding.submitted', 'New onboarding request', `${fullName} asked to be onboarded to the crew roster.`, '/settings/onboarding');
+}
+
 export async function notifyLabelRequestSubmitted(jobId: string, jobName: string, requesterName: string, labelType: string) {
   await notifyAdmins(
     'crew_label_request.submitted',

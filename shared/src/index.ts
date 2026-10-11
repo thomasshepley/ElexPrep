@@ -6,4 +6,5 @@ export * from './pickListDiff';
 export * from './locationColors';
 export * from './labelElements';
 export * from './crewSkills';
+export * from './crewCertifications';
 export * from './notificationCategories';

@@ -1,13 +1,13 @@
 import { useState } from 'react';
-import { api } from '../api/client';
+import { api, type BankDetails } from '../api/client';
 import FileInput from '../components/FileInput';
 import SkillPicker from '../components/SkillPicker';
+import CertificationPicker from '../components/CertificationPicker';
+import BankDetailsForm from '../components/BankDetailsForm';
 
 const DOCUMENT_SLOTS = [
   { field: 'idDocument', label: 'Photo ID' },
-  { field: 'rightToWorkDocument', label: 'Right to work evidence' },
   { field: 'insuranceDocument', label: 'Public liability insurance' },
-  { field: 'bankDetailsDocument', label: 'Bank details' },
 ] as const;
 
 type DocumentField = (typeof DOCUMENT_SLOTS)[number]['field'];
@@ -17,8 +17,12 @@ export default function ApplyPage() {
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [skills, setSkills] = useState('');
+  const [certifications, setCertifications] = useState('');
   const [dayRate, setDayRate] = useState('');
   const [rightToWork, setRightToWork] = useState('');
+  const [gender, setGender] = useState('');
+  const [address, setAddress] = useState('');
+  const [bankDetails, setBankDetails] = useState<BankDetails | null>(null);
   const [notes, setNotes] = useState('');
   const [files, setFiles] = useState<Partial<Record<DocumentField, File>>>({});
   const [busy, setBusy] = useState(false);
@@ -35,8 +39,12 @@ export default function ApplyPage() {
       form.append('email', email);
       if (phone) form.append('phone', phone);
       if (skills) form.append('skills', skills);
+      if (certifications) form.append('certifications', certifications);
       if (dayRate) form.append('dayRate', dayRate);
       if (rightToWork) form.append('rightToWork', rightToWork);
+      if (gender) form.append('gender', gender);
+      if (address) form.append('address', address);
+      if (bankDetails) form.append('bankDetails', JSON.stringify(bankDetails));
       if (notes) form.append('notes', notes);
       for (const { field } of DOCUMENT_SLOTS) {
         const file = files[field];
@@ -93,6 +101,17 @@ export default function ApplyPage() {
             </div>
           </div>
 
+          <div className="row" style={{ flexWrap: 'wrap', gap: '1rem' }}>
+            <div className="field" style={{ flex: '1 1 10rem' }}>
+              <label htmlFor="apply-gender">Gender (optional)</label>
+              <input id="apply-gender" value={gender} onChange={(e) => setGender(e.target.value)} />
+            </div>
+            <div className="field" style={{ flex: '1 1 14rem' }}>
+              <label htmlFor="apply-address">Address</label>
+              <input id="apply-address" value={address} onChange={(e) => setAddress(e.target.value)} />
+            </div>
+          </div>
+
           <SkillPicker value={skills} onChange={setSkills} />
 
           <div className="field">
@@ -104,6 +123,10 @@ export default function ApplyPage() {
               placeholder="e.g. UK/EU citizen, has a valid visa"
             />
           </div>
+
+          <BankDetailsForm value={bankDetails} onChange={setBankDetails} />
+
+          <CertificationPicker value={certifications} onChange={setCertifications} />
 
           <div className="field">
             <label htmlFor="apply-notes">Anything else?</label>

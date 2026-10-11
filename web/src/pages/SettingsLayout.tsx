@@ -19,6 +19,7 @@ const SECTIONS: SettingsSection[] = [
   { to: '/settings/users', label: 'Users', adminOnly: true },
   { to: '/settings/crew', label: 'Crew', adminOnly: true },
   { to: '/settings/crew-applications', label: 'Applications', permission: 'manageCrewApplications' },
+  { to: '/settings/onboarding', label: 'Onboarding', permission: 'manageCrewApplications' },
   { to: '/settings/permissions', label: 'Permissions', adminOnly: true },
   { to: '/settings/activity', label: 'Activity Log', permission: 'viewActivityLog' },
   { to: '/settings/preferences', label: 'My Preferences' },

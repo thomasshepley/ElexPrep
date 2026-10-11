@@ -29,6 +29,7 @@ import { locationColorRulesRouter, jobLocationColorRulesRouter } from './routes/
 import { permissionsRouter } from './routes/permissions';
 import { crewRouter } from './routes/crew';
 import { crewApplicationsRouter } from './routes/crewApplications';
+import { onboardingRouter } from './routes/onboarding';
 import { crewPortalRouter } from './routes/crewPortal';
 import { jobCrewAssignmentsRouter } from './routes/jobCrewAssignments';
 import { labelTemplatesRouter } from './routes/labelTemplates';
@@ -82,6 +83,7 @@ app.use('/api/notifications', notificationsRouter);
 app.use('/api/crew', crewPortalRouter);
 app.use('/api/crew', crewRouter);
 app.use('/api/crew-applications', crewApplicationsRouter);
+app.use('/api/onboarding', onboardingRouter);
 app.use('/api/current-rms', currentRmsRouter);
 app.use('/api/print-jobs', printJobsRouter);
 app.use('/api/printer-settings', printerSettingsRouter);

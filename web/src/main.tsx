@@ -6,6 +6,8 @@ import App from './App.tsx'
 import { AuthProvider } from './auth/AuthContext'
 import LoginPage from './pages/LoginPage'
 import ApplyPage from './pages/ApplyPage'
+import OnboardPage from './pages/OnboardPage'
+import OnboardCompletePage from './pages/OnboardCompletePage'
 import SignagePage from './pages/SignagePage'
 import CrewLayout from './pages/CrewLayout'
 import CrewSchedulePage from './pages/CrewSchedulePage'
@@ -26,6 +28,7 @@ import PrinterSettingsPage from './pages/PrinterSettingsPage'
 import CurrentRmsSettingsPage from './pages/CurrentRmsSettingsPage'
 import ActivityLogPage from './pages/ActivityLogPage'
 import PermissionsPage from './pages/PermissionsPage'
+import OnboardingPage from './pages/OnboardingPage'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -34,6 +37,8 @@ createRoot(document.getElementById('root')!).render(
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/apply" element={<ApplyPage />} />
+          <Route path="/onboard" element={<OnboardPage />} />
+          <Route path="/onboard/complete/:token" element={<OnboardCompletePage />} />
           <Route path="/signage" element={<SignagePage />} />
           <Route path="/crew" element={<CrewLayout />}>
             <Route index element={<CrewSchedulePage />} />
@@ -52,6 +57,7 @@ createRoot(document.getElementById('root')!).render(
               <Route path="users" element={<UsersPage />} />
               <Route path="crew" element={<CrewPage />} />
               <Route path="crew-applications" element={<CrewApplicationsPage />} />
+              <Route path="onboarding" element={<OnboardingPage />} />
               <Route path="permissions" element={<PermissionsPage />} />
               <Route path="printer" element={<PrinterSettingsPage />} />
               <Route path="current-rms" element={<CurrentRmsSettingsPage />} />

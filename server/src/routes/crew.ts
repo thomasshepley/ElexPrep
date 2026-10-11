@@ -3,6 +3,7 @@ import multer from 'multer';
 import { prisma, logActivity } from '../db';
 import { MIN_PASSWORD_LENGTH, hashPassword, requireRole } from '../auth';
 import { DOCUMENT_FIELDS, deleteDocumentFile, saveDocuments, streamDecryptedDocument } from '../crewDocumentsStorage';
+import { encryptBankDetails, decryptBankDetails, parseBankDetails } from '../bankDetails';
 
 /**
  * Admin-only crew roster: creates/edits/removes a CREW User + its CrewProfile together, so a
@@ -20,8 +21,16 @@ interface CrewProfileRow {
   userId: string;
   phone: string | null;
   skills: string | null;
+  certifications: string | null;
   dayRate: string | null;
   notes: string | null;
+  gender: string | null;
+  address: string | null;
+  pronouns: string | null;
+  instagramUrl: string | null;
+  facebookUrl: string | null;
+  otherLinkUrl: string | null;
+  bankDetailsCiphertext: string | null;
   active: boolean;
   createdAt: Date;
   user: { username: string; displayName: string };
@@ -35,8 +44,16 @@ function toCrewDto(p: CrewProfileRow) {
     displayName: p.user.displayName,
     phone: p.phone,
     skills: p.skills,
+    certifications: p.certifications,
     dayRate: p.dayRate,
     notes: p.notes,
+    gender: p.gender,
+    address: p.address,
+    pronouns: p.pronouns,
+    instagramUrl: p.instagramUrl,
+    facebookUrl: p.facebookUrl,
+    otherLinkUrl: p.otherLinkUrl,
+    hasBankDetails: p.bankDetailsCiphertext !== null,
     active: p.active,
     createdAt: p.createdAt,
   };
@@ -51,7 +68,10 @@ crewRouter.get('/', async (_req, res) => {
 });
 
 crewRouter.post('/', async (req, res) => {
-  const { username, password, displayName, phone, skills, dayRate, notes } = req.body ?? {};
+  const {
+    username, password, displayName, phone, skills, certifications, dayRate, notes,
+    gender, address, pronouns, instagramUrl, facebookUrl, otherLinkUrl, bankDetails,
+  } = req.body ?? {};
   if (!username || !password) return res.status(400).json({ error: 'username and password are required' });
   if (password.length < MIN_PASSWORD_LENGTH) {
     return res.status(400).json({ error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters` });
@@ -59,12 +79,30 @@ crewRouter.post('/', async (req, res) => {
   const existing = await prisma.user.findUnique({ where: { username } });
   if (existing) return res.status(409).json({ error: 'Username already taken' });
 
+  let bankEncrypted: { ciphertext: string; iv: string; authTag: string } | null = null;
+  try {
+    const parsed = parseBankDetails(bankDetails);
+    if (parsed) bankEncrypted = encryptBankDetails(parsed);
+  } catch (err) {
+    return res.status(400).json({ error: (err as Error).message });
+  }
+
   const profile = await prisma.crewProfile.create({
     data: {
       phone: phone || null,
       skills: skills || null,
+      certifications: certifications || null,
       dayRate: dayRate || null,
       notes: notes || null,
+      gender: gender || null,
+      address: address || null,
+      pronouns: pronouns || null,
+      instagramUrl: instagramUrl || null,
+      facebookUrl: facebookUrl || null,
+      otherLinkUrl: otherLinkUrl || null,
+      bankDetailsCiphertext: bankEncrypted?.ciphertext ?? null,
+      bankDetailsIv: bankEncrypted?.iv ?? null,
+      bankDetailsAuthTag: bankEncrypted?.authTag ?? null,
       user: {
         create: {
           username,
@@ -81,12 +119,28 @@ crewRouter.post('/', async (req, res) => {
 });
 
 crewRouter.put('/:id', async (req, res) => {
-  const { displayName, password, phone, skills, dayRate, notes, active } = req.body ?? {};
+  const {
+    displayName, password, phone, skills, certifications, dayRate, notes, active,
+    gender, address, pronouns, instagramUrl, facebookUrl, otherLinkUrl, bankDetails,
+  } = req.body ?? {};
   if (password !== undefined && password.length < MIN_PASSWORD_LENGTH) {
     return res.status(400).json({ error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters` });
   }
   const existing = await prisma.crewProfile.findUnique({ where: { id: req.params.id } });
   if (!existing) return res.status(404).json({ error: 'Crew member not found' });
+
+  let bankPatch: { bankDetailsCiphertext: string; bankDetailsIv: string; bankDetailsAuthTag: string } | undefined;
+  if (bankDetails !== undefined) {
+    try {
+      const parsed = parseBankDetails(bankDetails);
+      if (parsed) {
+        const enc = encryptBankDetails(parsed);
+        bankPatch = { bankDetailsCiphertext: enc.ciphertext, bankDetailsIv: enc.iv, bankDetailsAuthTag: enc.authTag };
+      }
+    } catch (err) {
+      return res.status(400).json({ error: (err as Error).message });
+    }
+  }
 
   if (displayName !== undefined || password !== undefined) {
     await prisma.user.update({
@@ -102,14 +156,33 @@ crewRouter.put('/:id', async (req, res) => {
     data: {
       ...(phone !== undefined ? { phone: phone || null } : {}),
       ...(skills !== undefined ? { skills: skills || null } : {}),
+      ...(certifications !== undefined ? { certifications: certifications || null } : {}),
       ...(dayRate !== undefined ? { dayRate: dayRate || null } : {}),
       ...(notes !== undefined ? { notes: notes || null } : {}),
+      ...(gender !== undefined ? { gender: gender || null } : {}),
+      ...(address !== undefined ? { address: address || null } : {}),
+      ...(pronouns !== undefined ? { pronouns: pronouns || null } : {}),
+      ...(instagramUrl !== undefined ? { instagramUrl: instagramUrl || null } : {}),
+      ...(facebookUrl !== undefined ? { facebookUrl: facebookUrl || null } : {}),
+      ...(otherLinkUrl !== undefined ? { otherLinkUrl: otherLinkUrl || null } : {}),
       ...(active !== undefined ? { active: Boolean(active) } : {}),
+      ...bankPatch,
     },
     include: { user: { select: { username: true, displayName: true } } },
   });
   await logActivity('crew.update', profile.user.username, undefined, req.user!.id);
   res.json(toCrewDto(profile));
+});
+
+crewRouter.get('/:id/bank-details', async (req, res) => {
+  const profile = await prisma.crewProfile.findUnique({ where: { id: req.params.id }, include: { user: { select: { username: true } } } });
+  if (!profile) return res.status(404).json({ error: 'Crew member not found' });
+  if (!profile.bankDetailsCiphertext || !profile.bankDetailsIv || !profile.bankDetailsAuthTag) {
+    return res.status(404).json({ error: 'No bank details on file' });
+  }
+  const details = decryptBankDetails(profile.bankDetailsCiphertext, profile.bankDetailsIv, profile.bankDetailsAuthTag);
+  await logActivity('crew.bankDetails.view', profile.user.username, undefined, req.user!.id);
+  res.json(details);
 });
 
 // Deletes the User row, not just the CrewProfile — a CREW user with no profile is meaningless,

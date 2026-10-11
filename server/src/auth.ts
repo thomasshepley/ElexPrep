@@ -77,6 +77,8 @@ const SIGNAGE_WRITE_ALLOWLIST = [/^\/api\/jobs\/[^/]+\/current-rms\/pick-list\/[
 const CREW_ALLOWLIST = [
   /^\/api\/auth\/me$/,
   /^\/api\/crew\/me$/,
+  /^\/api\/crew\/me\/bank-details$/,
+  /^\/api\/crew\/me\/rate-lines(\/.*)?$/,
   /^\/api\/crew\/me\/jobs$/,
   /^\/api\/crew\/me\/jobs\/[^/]+(\/.*)?$/,
   /^\/api\/notifications(\/.*)?$/,
@@ -111,6 +113,11 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
   // prefix (list/approve/reject/documents) stays behind the normal auth + permission check
   // below, matched by not being this exact path/method.
   if (req.path === '/api/crew-applications' && req.method === 'POST') return next();
+  // Same reasoning for the onboarding flow: the initial name-only request, and the invitee's
+  // later lookup/completion of their own approved invite by its one-time token, both happen
+  // before any account exists. Listing/approving/rejecting invites stays admin-only below.
+  if (req.path === '/api/onboarding' && req.method === 'POST') return next();
+  if (/^\/api\/onboarding\/invite\/[^/]+(\/complete)?$/.test(req.path)) return next();
   if (!req.user) return res.status(401).json({ error: 'Not signed in' });
   if (req.user.role === 'SIGNAGE' && req.method !== 'GET') {
     const allowed = SIGNAGE_WRITE_ALLOWLIST.some((re) => re.test(req.path));
