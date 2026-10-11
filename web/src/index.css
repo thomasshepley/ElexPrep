@@ -1109,6 +1109,12 @@ tbody tr:hover {
   font-size: var(--text-sm);
 }
 
+.discussion-message-delete {
+  margin-left: auto;
+  padding: 0.1rem 0.5rem;
+  font-size: var(--text-xs);
+}
+
 .discussion-message-body {
   white-space: pre-wrap;
   word-break: break-word;

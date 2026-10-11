@@ -3,7 +3,7 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import { prisma, logActivity } from '../db';
-import { requirePermission, loadRolePermissions } from '../permissions';
+import { requirePermission, resolvePermissionsForUser } from '../permissions';
 
 const uploadDir = process.env.UPLOADS_DIR
   ? path.resolve(process.env.UPLOADS_DIR)
@@ -55,7 +55,7 @@ jobsRouter.get('/:id', async (req, res) => {
 jobsRouter.put('/:id', async (req, res) => {
   const { name, venue, isPublic } = req.body ?? {};
   if (isPublic !== undefined && req.user?.role !== 'ADMIN') {
-    const perms = req.user?.role === 'USER' ? await loadRolePermissions() : null;
+    const perms = req.user?.role === 'USER' ? await resolvePermissionsForUser(req.user.id, 'USER') : null;
     if (!perms?.publishJobs) {
       return res.status(403).json({ error: "Insufficient permissions to change a job's public visibility" });
     }

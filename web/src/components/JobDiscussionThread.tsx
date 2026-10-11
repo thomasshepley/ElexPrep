@@ -25,6 +25,11 @@ export default function JobDiscussionThread({ jobId, scope }: { jobId: string; s
 
   const list = scope === 'staff' ? api.jobDiscussion.list : api.crewPortal.discussion.list;
   const send = scope === 'staff' ? api.jobDiscussion.send : api.crewPortal.discussion.send;
+  const remove = scope === 'staff' ? api.jobDiscussion.remove : api.crewPortal.discussion.remove;
+  // Staff with the moderateDiscussion permission (ADMIN always has it) can remove anyone's
+  // message; crew can only ever remove their own — see routes/jobDiscussion.ts's and
+  // crewPortal.ts's matching server-side checks, which this only mirrors for the UI affordance.
+  const canModerate = scope === 'staff' && Boolean(user?.permissions?.moderateDiscussion);
 
   const refresh = () => list(jobId).then(setMessages).catch((e) => setError(e.message));
 
@@ -55,21 +60,45 @@ export default function JobDiscussionThread({ jobId, scope }: { jobId: string; s
     }
   };
 
+  const deleteMessage = async (messageId: string) => {
+    if (!confirm('Delete this message?')) return;
+    try {
+      await remove(jobId, messageId);
+      setMessages((prev) => prev?.filter((m) => m.id !== messageId) ?? null);
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  };
+
   return (
     <div className="discussion-thread">
       <div className="discussion-messages" ref={listRef}>
         {messages === null && <p className="muted">Loading…</p>}
         {messages !== null && messages.length === 0 && <p className="muted">No messages yet — say hello.</p>}
-        {messages?.map((m) => (
-          <div key={m.id} className={`discussion-message${m.authorUserId === user?.id ? ' is-own' : ''}`}>
-            <div className="discussion-message-meta">
-              <strong>{m.authorName}</strong>
-              <span className="chip chip-role">{m.authorRole}</span>
-              <span className="muted">{formatTime(m.createdAt)}</span>
+        {messages?.map((m) => {
+          const isOwn = m.authorUserId === user?.id;
+          const canDelete = isOwn || canModerate;
+          return (
+            <div key={m.id} className={`discussion-message${isOwn ? ' is-own' : ''}`}>
+              <div className="discussion-message-meta">
+                <strong>{m.authorName}</strong>
+                <span className="chip chip-role">{m.authorRole}</span>
+                <span className="muted">{formatTime(m.createdAt)}</span>
+                {canDelete && (
+                  <button
+                    type="button"
+                    className="secondary discussion-message-delete"
+                    onClick={() => deleteMessage(m.id)}
+                    aria-label="Delete message"
+                  >
+                    Delete
+                  </button>
+                )}
+              </div>
+              <div className="discussion-message-body">{m.body}</div>
             </div>
-            <div className="discussion-message-body">{m.body}</div>
-          </div>
-        ))}
+          );
+        })}
       </div>
       <form className="discussion-compose" onSubmit={submit}>
         <input

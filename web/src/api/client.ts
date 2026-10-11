@@ -136,7 +136,8 @@ export type PermissionKey =
   | 'viewActivityLog'
   | 'linkCurrentRms'
   | 'manageCrewAssignments'
-  | 'manageCrewApplications';
+  | 'manageCrewApplications'
+  | 'moderateDiscussion';
 
 export interface AuthedUser {
   id: string;
@@ -461,6 +462,8 @@ export const api = {
       list: (jobId: string) => request<DiscussionMessage[]>(`/crew/me/jobs/${jobId}/discussion`),
       send: (jobId: string, body: string) =>
         request<DiscussionMessage>(`/crew/me/jobs/${jobId}/discussion`, { method: 'POST', body: JSON.stringify({ body }) }),
+      remove: (jobId: string, messageId: string) =>
+        request<void>(`/crew/me/jobs/${jobId}/discussion/${messageId}`, { method: 'DELETE' }),
     },
   },
   labelRequests: {
@@ -483,6 +486,7 @@ export const api = {
     list: (jobId: string) => request<DiscussionMessage[]>(`/jobs/${jobId}/discussion`),
     send: (jobId: string, body: string) =>
       request<DiscussionMessage>(`/jobs/${jobId}/discussion`, { method: 'POST', body: JSON.stringify({ body }) }),
+    remove: (jobId: string, messageId: string) => request<void>(`/jobs/${jobId}/discussion/${messageId}`, { method: 'DELETE' }),
   },
   jobDocuments: {
     list: (jobId: string) => request<JobDocument[]>(`/jobs/${jobId}/documents`),
@@ -518,6 +522,18 @@ export const api = {
       ),
     update: (permissions: Partial<Record<PermissionKey, boolean>>) =>
       request<{ permissions: Record<PermissionKey, boolean> }>('/permissions', {
+        method: 'PUT',
+        body: JSON.stringify({ permissions }),
+      }),
+    getUser: (userId: string) =>
+      request<{
+        permissions: Record<PermissionKey, boolean>;
+        override: Partial<Record<PermissionKey, boolean>> | null;
+        keys: PermissionKey[];
+        labels: Record<PermissionKey, string>;
+      }>(`/permissions/users/${userId}`),
+    updateUser: (userId: string, permissions: Partial<Record<PermissionKey, boolean>> | null) =>
+      request<{ permissions: Record<PermissionKey, boolean> }>(`/permissions/users/${userId}`, {
         method: 'PUT',
         body: JSON.stringify({ permissions }),
       }),

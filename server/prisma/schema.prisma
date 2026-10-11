@@ -421,6 +421,11 @@ model User {
   passwordHash String
   role         String    @default("USER")
   prefsJson    String    @default("{}")
+  /// Per-user override of the role-level permissions baseline (see permissions.ts's
+  /// loadRolePermissions/PERMISSION_KEYS) — null means "use the shared USER-role baseline
+  /// unmodified", same posture as JobCrewAssignment.dayRate falling back to CrewProfile.dayRate.
+  /// Only meaningful for USER-role accounts; ADMIN/SIGNAGE permissions are fixed regardless.
+  permissionsJson String?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
   sessions     Session[]

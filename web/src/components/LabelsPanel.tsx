@@ -71,6 +71,7 @@ function summarizeContent(labelType: string, content: Record<string, unknown>): 
 
 function RequestedLabelsPanel({ jobId, onChanged }: { jobId: string; onChanged: () => void }) {
   const [requests, setRequests] = useState<CrewLabelRequest[]>([]);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
 
   const refresh = () => api.labelRequests.list(jobId, 'PENDING').then(setRequests).catch((e) => setError(e.message));
@@ -92,6 +93,33 @@ function RequestedLabelsPanel({ jobId, onChanged }: { jobId: string; onChanged: 
     refresh();
   };
 
+  const toggleSelected = (id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    setSelected((prev) => (prev.size === requests.length ? new Set() : new Set(requests.map((r) => r.id))));
+  };
+
+  const bulkApprove = async () => {
+    await Promise.all([...selected].map((id) => api.labelRequests.approve(jobId, id)));
+    setSelected(new Set());
+    refresh();
+    onChanged();
+  };
+
+  const bulkReject = async () => {
+    const note = prompt(`Reason for denying ${selected.size} requests (optional):`) ?? '';
+    await Promise.all([...selected].map((id) => api.labelRequests.reject(jobId, id, note || undefined)));
+    setSelected(new Set());
+    refresh();
+  };
+
   if (requests.length === 0) return null;
 
   return (
@@ -99,9 +127,26 @@ function RequestedLabelsPanel({ jobId, onChanged }: { jobId: string; onChanged: 
       <h3>Requested labels</h3>
       <p className="muted">Labels crew members have asked for from the job's Why section — review before they print.</p>
       {error && <p className="error">{error}</p>}
+      {selected.size > 0 && (
+        <div className="row" style={{ marginBottom: '0.5rem', gap: '0.5rem' }}>
+          <span className="muted">{selected.size} selected</span>
+          <button onClick={bulkApprove}>Approve selected</button>
+          <button className="secondary" onClick={bulkReject}>
+            Deny selected
+          </button>
+        </div>
+      )}
       <table>
         <thead>
           <tr>
+            <th>
+              <input
+                type="checkbox"
+                aria-label="Select all requests"
+                checked={selected.size === requests.length}
+                onChange={toggleSelectAll}
+              />
+            </th>
             <th>From</th>
             <th>Type</th>
             <th>Content</th>
@@ -112,6 +157,14 @@ function RequestedLabelsPanel({ jobId, onChanged }: { jobId: string; onChanged: 
         <tbody>
           {requests.map((r) => (
             <tr key={r.id}>
+              <td>
+                <input
+                  type="checkbox"
+                  aria-label={`Select request from ${r.requestedByDisplayName}`}
+                  checked={selected.has(r.id)}
+                  onChange={() => toggleSelected(r.id)}
+                />
+              </td>
               <td>
                 <span className="row" style={{ gap: '0.3rem' }}>
                   <WhoIcon />

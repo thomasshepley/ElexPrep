@@ -304,6 +304,19 @@ crewPortalRouter.post('/me/jobs/:jobId/discussion', requireRole('CREW'), async (
   res.status(201).json(toDiscussionMessageDto(message));
 });
 
+// A crew member can only ever delete their own message — no moderation permission applies on
+// this side, matching routes/jobDiscussion.ts's staff-side moderateDiscussion check.
+crewPortalRouter.delete('/me/jobs/:jobId/discussion/:messageId', requireRole('CREW'), async (req, res) => {
+  const found = await requireAssignedJob(req.user!.id, req.params.jobId);
+  if (!found) return res.status(404).json({ error: 'Job not found' });
+  const message = await prisma.jobDiscussionMessage.findUnique({ where: { id: req.params.messageId } });
+  if (!message || message.jobId !== req.params.jobId) return res.status(404).json({ error: 'Message not found' });
+  if (message.authorUserId !== req.user!.id) return res.status(403).json({ error: 'You can only delete your own messages' });
+  await prisma.jobDiscussionMessage.delete({ where: { id: message.id } });
+  await logActivity('job_discussion.delete', req.params.jobId, req.params.jobId, req.user!.id);
+  res.status(204).end();
+});
+
 /** Batch-loads the (at most a handful of) distinct linked opportunities a crew member's jobs reference. */
 async function loadOpportunitiesFor(jobs: { currentRmsOpportunityId: string | null }[]) {
   const ids = [...new Set(jobs.map((j) => j.currentRmsOpportunityId).filter((id): id is string => Boolean(id)))].map(Number);
