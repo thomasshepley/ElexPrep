@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { prisma, logActivity } from '../db';
 import { MAX_COPIES_WITHOUT_OVERRIDE } from '../constants';
-import { buildCombinedPdf, collectConfirmedContent, collectPendingContent } from '../printing/buildLabelPdfs';
+import { buildCombinedPdf, buildPalAverySheetPdf, collectConfirmedContent, collectPendingContent } from '../printing/buildLabelPdfs';
 import { createPrintJobs } from '../printing/printJobService';
 import { getPrinterSettings } from '../printing/printerSettings';
 import { nextOrderStart } from '../printing/queueOrder';
@@ -137,6 +137,28 @@ printQueueRouter.get('/:jobId/print-queue/preview.pdf', async (req, res) => {
   const pdf = await buildCombinedPdf(jobId, byType);
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', 'inline; filename="preview.pdf"');
+  res.send(pdf);
+});
+
+/**
+ * PAL labels collated 4-up onto an Avery 105x148-R sheet (A4 landscape) instead of PAL's
+ * usual one-per-page direct-to-label-printer layout — for printing on plain paper with Avery
+ * self-adhesive stock through an ordinary office printer. Reads the currently-queued PAL
+ * items (pending + ad hoc, same source as the live preview) rather than requiring them to be
+ * confirmed first, and doesn't touch queue status — this is a separate export, not part of
+ * the confirm/send-to-printer lifecycle.
+ */
+printQueueRouter.get('/:jobId/print-queue/pal/avery.pdf', async (req, res) => {
+  const { jobId } = req.params;
+  const byType = await collectPendingContent(jobId);
+  const items = byType.PAL ?? [];
+  if (items.length === 0) {
+    return res.status(400).json({ error: 'No PAL labels queued yet' });
+  }
+  const pdf = await buildPalAverySheetPdf(jobId, items);
+  await logActivity('print_queue.pal_avery_pdf_generated', `${items.length} PAL label(s)`, jobId, req.user?.id);
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', 'attachment; filename="pal-labels-avery-105x148.pdf"');
   res.send(pdf);
 });
 

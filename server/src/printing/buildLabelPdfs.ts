@@ -1,7 +1,7 @@
 import path from 'path';
 import fs from 'fs';
 import { PDFDocument } from 'pdf-lib';
-import { LabelType } from '@elexprep/shared';
+import { LabelType, PAL_AVERY_SHEET } from '@elexprep/shared';
 import { prisma } from '../db';
 import { uploadDir } from '../routes/jobs';
 import { loadLocationColorMap, LocationColorMap } from '../pdf/locationColors';
@@ -114,5 +114,24 @@ export async function buildCombinedPdf(jobId: string, byType: LabelContentByType
     if (items.length === 0) continue;
     await renderLabelType(doc, jobId, labelType, items, locationColors);
   }
+  return Buffer.from(await doc.save());
+}
+
+/**
+ * PAL content collated 4-up onto an Avery 105x148-R sheet (A4 landscape, plain paper + Avery
+ * self-adhesive stock) instead of PAL's usual one-per-page direct-to-label-printer output —
+ * a separate export for print shops/offices without the dedicated die-cut label printer.
+ * Reuses the job's own (possibly customized) PAL template content/logo, swapping only the
+ * sheet geometry — see PAL_AVERY_SHEET's own comment for why the same element layout carries
+ * over to the physically larger Avery label without needing its own template.
+ */
+export async function buildPalAverySheetPdf(jobId: string, items: unknown[]): Promise<Buffer> {
+  const locationColors = await loadLocationColorMap(jobId);
+  const doc = await PDFDocument.create();
+  const template = await loadMergedTemplate(jobId, 'PAL');
+  const averyTemplate = { ...template, sheet: PAL_AVERY_SHEET };
+  const logo = await loadJobLogo(jobId);
+  const logoImage = logo ? await (logo.kind === 'png' ? doc.embedPng(logo.bytes) : doc.embedJpg(logo.bytes)) : undefined;
+  await renderLabelTypeGeneric(doc, averyTemplate, items, locationColors, logoImage);
   return Buffer.from(await doc.save());
 }

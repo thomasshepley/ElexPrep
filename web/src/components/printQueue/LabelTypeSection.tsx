@@ -177,9 +177,16 @@ export default function LabelTypeSection({
           {isCustomized && <span className="chip chip-neutral">Custom layout</span>}
         </div>
         {!customizing ? (
-          <button className="secondary" onClick={startCustomizing}>
-            Customize layout
-          </button>
+          <div className="row">
+            {labelType === 'PAL' && (
+              <button className="secondary" onClick={() => { window.location.href = api.printQueue.palAveryPdfUrl(jobId); }}>
+                Download Avery sheet (4-up)
+              </button>
+            )}
+            <button className="secondary" onClick={startCustomizing}>
+              Customize layout
+            </button>
+          </div>
         ) : (
           <div className="row">
             <button className="secondary" onClick={cancelCustomizing}>
