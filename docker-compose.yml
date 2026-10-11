@@ -5,21 +5,20 @@ services:
     restart: unless-stopped
     ports:
       - "4000:4000"
-    # environment:
-    #   Required: a 64-hex-char (32-byte) AES-256-GCM key that encrypts crew compliance
-    #   documents at rest. Generate one with
-    #   `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` and keep it
-    #   out of version control — crew document upload/download is unavailable without it, and
-    #   losing it makes any already-uploaded documents unrecoverable.
-    #   - CREW_DOC_ENCRYPTION_KEY=
-    #
-    #   Only set COOKIE_SECURE=true if EVERY login will go through the https:// tunnel
-    #   hostname from now on, including on-site (e.g. prep-bay signage TVs switched to the
-    #   tunnel URL instead of a plain http://<lan-ip>:4000 address) — a Secure-flagged
-    #   cookie is dropped by the browser on any plain-HTTP request, which would break login
-    #   for whichever access path doesn't use HTTPS. Leaving this false (the default) still
-    #   works correctly over the HTTPS tunnel; it just doesn't add that extra hardening.
-    #   - COOKIE_SECURE=true
+    environment:
+      # Required: a 64-hex-char (32-byte) AES-256-GCM key that encrypts crew compliance
+      # documents, bank details, and 2FA secrets at rest — see DEPLOY.md's "First
+      # deployment" for the one-liner that generates it into a sibling .env file (read
+      # here automatically by Compose's ${...} substitution). Keep .env out of version
+      # control; losing this key makes anything already encrypted with it unrecoverable.
+      - CREW_DOC_ENCRYPTION_KEY=${CREW_DOC_ENCRYPTION_KEY}
+      # Only set to true in .env once EVERY login goes through HTTPS (see DEPLOY.md's
+      # "Going live at portal.elex.lighting") — a Secure-flagged cookie is dropped by the
+      # browser on any plain-HTTP request, which would break login for whichever access
+      # path doesn't use TLS (e.g. a prep-bay signage TV still on a plain http://<lan-ip>
+      # address). Defaults to false, which works correctly either way, just without that
+      # extra hardening.
+      - COOKIE_SECURE=${COOKIE_SECURE:-false}
     volumes:
       # Database, logos, plots, and generated print-job PDFs all live here —
       # back this folder up and the whole app state comes with it.
