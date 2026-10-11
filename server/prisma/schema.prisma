@@ -69,6 +69,63 @@ model CrewProfile {
   updatedAt DateTime @updatedAt
 
   assignments JobCrewAssignment[]
+  documents   CrewDocument[]
+}
+
+/// A public, unauthenticated submission to join the freelance crew roster — deliberately has
+/// no User row until an admin approves it (see routes/crewApplications.ts): there is nothing to
+/// log into before approval, not just a status flag that happens to be checked. rightToWork is
+/// the applicant's own free-text statement, not a substitute for the actual document (see
+/// CrewDocument) — this model holds only the form fields.
+model CrewApplication {
+  id            String    @id @default(cuid())
+  fullName      String
+  email         String
+  phone         String?
+  skills        String?
+  dayRate       String?
+  rightToWork   String?
+  notes         String?
+  /// PENDING | APPROVED | REJECTED
+  status        String    @default("PENDING")
+  reviewedAt    DateTime?
+  reviewedBy    String?
+  rejectionNote String?
+  createdAt     DateTime  @default(now())
+
+  documents CrewDocument[]
+
+  @@index([status])
+}
+
+/// Encrypted compliance documents (right-to-work, insurance, bank details, ID) — see
+/// server/src/crewDocCrypto.ts for the AES-256-GCM scheme (key from CREW_DOC_ENCRYPTION_KEY).
+/// Attached to a CrewApplication while it's pending, or to a CrewProfile once approved (exactly
+/// one of the two FKs is set at a time — approval moves the rows over, see
+/// routes/crewApplications.ts). Served only through a dedicated decrypt-and-stream route, never
+/// res.sendFile; every read is logged via the existing ActivityLogEntry (see plan: no new audit
+/// table needed for v1). expiresAt is modeled but nothing acts on it yet — automated
+/// retention/deletion is a policy decision for later, not a technical one.
+model CrewDocument {
+  id            String           @id @default(cuid())
+  applicationId String?
+  application   CrewApplication? @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  crewProfileId String?
+  crewProfile   CrewProfile?     @relation(fields: [crewProfileId], references: [id], onDelete: Cascade)
+  /// RIGHT_TO_WORK | INSURANCE | BANK_DETAILS | ID | OTHER
+  kind          String
+  originalName  String
+  /// On-disk filename under uploads/crew-documents/ — content is ciphertext, never plaintext.
+  fileName      String
+  mimeType      String
+  /// Base64 AES-GCM IV and auth tag, needed alongside the key to decrypt.
+  iv            String
+  authTag       String
+  expiresAt     DateTime?
+  createdAt     DateTime         @default(now())
+
+  @@index([applicationId])
+  @@index([crewProfileId])
 }
 
 /// Attributes a crew member to a job: their role on that job, plus an optional per-job

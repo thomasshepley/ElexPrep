@@ -5,6 +5,7 @@ import './index.css'
 import App from './App.tsx'
 import { AuthProvider } from './auth/AuthContext'
 import LoginPage from './pages/LoginPage'
+import ApplyPage from './pages/ApplyPage'
 import SignagePage from './pages/SignagePage'
 import CrewLayout from './pages/CrewLayout'
 import CrewSchedulePage from './pages/CrewSchedulePage'
@@ -17,6 +18,7 @@ import LocationColorsPage from './pages/LocationColorsPage'
 import ImportMappingPage from './pages/ImportMappingPage'
 import UsersPage from './pages/UsersPage'
 import CrewPage from './pages/CrewPage'
+import CrewApplicationsPage from './pages/CrewApplicationsPage'
 import PreferencesPage from './pages/PreferencesPage'
 import PrinterSettingsPage from './pages/PrinterSettingsPage'
 import CurrentRmsSettingsPage from './pages/CurrentRmsSettingsPage'
@@ -29,6 +31,7 @@ createRoot(document.getElementById('root')!).render(
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/apply" element={<ApplyPage />} />
           <Route path="/signage" element={<SignagePage />} />
           <Route path="/crew" element={<CrewLayout />}>
             <Route index element={<CrewSchedulePage />} />
@@ -44,6 +47,7 @@ createRoot(document.getElementById('root')!).render(
               <Route path="import-mapping" element={<ImportMappingPage />} />
               <Route path="users" element={<UsersPage />} />
               <Route path="crew" element={<CrewPage />} />
+              <Route path="crew-applications" element={<CrewApplicationsPage />} />
               <Route path="permissions" element={<PermissionsPage />} />
               <Route path="printer" element={<PrinterSettingsPage />} />
               <Route path="current-rms" element={<CurrentRmsSettingsPage />} />

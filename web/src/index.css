@@ -610,6 +610,12 @@ tbody tr:hover {
   -webkit-backdrop-filter: blur(24px) saturate(1.3);
 }
 
+/* A wider variant for longer forms on the same branded entrance treatment (e.g. the public
+   crew application) — everything else about .auth-card stays the same. */
+.auth-card-wide {
+  max-width: 640px;
+}
+
 .auth-brand {
   display: flex;
   flex-direction: column;

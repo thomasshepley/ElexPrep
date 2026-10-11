@@ -6,6 +6,13 @@ services:
     ports:
       - "4000:4000"
     # environment:
+    #   Required: a 64-hex-char (32-byte) AES-256-GCM key that encrypts crew compliance
+    #   documents at rest. Generate one with
+    #   `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` and keep it
+    #   out of version control — crew document upload/download is unavailable without it, and
+    #   losing it makes any already-uploaded documents unrecoverable.
+    #   - CREW_DOC_ENCRYPTION_KEY=
+    #
     #   Only set COOKIE_SECURE=true if EVERY login will go through the https:// tunnel
     #   hostname from now on, including on-site (e.g. prep-bay signage TVs switched to the
     #   tunnel URL instead of a plain http://<lan-ip>:4000 address) — a Secure-flagged

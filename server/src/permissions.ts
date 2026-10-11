@@ -15,6 +15,7 @@ export const PERMISSION_KEYS = [
   'viewActivityLog',
   'linkCurrentRms',
   'manageCrewAssignments',
+  'manageCrewApplications',
 ] as const;
 
 export type PermissionKey = (typeof PERMISSION_KEYS)[number];
@@ -27,6 +28,7 @@ export const PERMISSION_LABELS: Record<PermissionKey, string> = {
   viewActivityLog: 'View the activity log',
   linkCurrentRms: 'Link or unlink a job to a Current RMS opportunity',
   manageCrewAssignments: 'Attribute crew members to a job (add/remove/edit their role on it)',
+  manageCrewApplications: 'Review freelance crew applications (approve/reject, view compliance documents)',
 };
 
 export const DEFAULT_PERMISSIONS: RolePermissions = {
@@ -36,6 +38,7 @@ export const DEFAULT_PERMISSIONS: RolePermissions = {
   viewActivityLog: false,
   linkCurrentRms: false,
   manageCrewAssignments: false,
+  manageCrewApplications: false,
 };
 
 const SETTING_KEY = 'rolePermissions';

@@ -120,7 +120,8 @@ export type PermissionKey =
   | 'publishJobs'
   | 'viewActivityLog'
   | 'linkCurrentRms'
-  | 'manageCrewAssignments';
+  | 'manageCrewAssignments'
+  | 'manageCrewApplications';
 
 export interface AuthedUser {
   id: string;
@@ -142,6 +143,33 @@ export interface CrewMember {
   notes: string | null;
   active: boolean;
   createdAt: string;
+}
+
+export interface CrewDocumentSummary {
+  id: string;
+  kind: string;
+  originalName: string;
+  mimeType: string;
+  createdAt: string;
+}
+
+export interface CrewApplicationSummary {
+  id: string;
+  fullName: string;
+  email: string;
+  phone: string | null;
+  skills: string | null;
+  dayRate: string | null;
+  rightToWork: string | null;
+  notes: string | null;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  reviewedAt: string | null;
+  rejectionNote: string | null;
+  createdAt: string;
+}
+
+export interface CrewApplicationDetail extends CrewApplicationSummary {
+  documents: CrewDocumentSummary[];
 }
 
 export interface JobCrewAssignment {
@@ -304,6 +332,28 @@ export const api = {
       }>
     ) => request<CrewMember>(`/crew/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     remove: (id: string) => request<void>(`/crew/${id}`, { method: 'DELETE' }),
+    documents: {
+      list: (crewId: string) => request<CrewDocumentSummary[]>(`/crew/${crewId}/documents`),
+      upload: (crewId: string, form: FormData) =>
+        request<CrewDocumentSummary[]>(`/crew/${crewId}/documents`, { method: 'POST', body: form }),
+      url: (crewId: string, docId: string) => `${BASE}/crew/${crewId}/documents/${docId}`,
+      remove: (crewId: string, docId: string) =>
+        request<void>(`/crew/${crewId}/documents/${docId}`, { method: 'DELETE' }),
+    },
+  },
+  crewApplications: {
+    submit: (form: FormData) => request<{ id: string }>('/crew-applications', { method: 'POST', body: form }),
+    list: (status?: string) =>
+      request<CrewApplicationSummary[]>(`/crew-applications${status ? `?status=${status}` : ''}`),
+    get: (id: string) => request<CrewApplicationDetail>(`/crew-applications/${id}`),
+    documentUrl: (appId: string, docId: string) => `${BASE}/crew-applications/${appId}/documents/${docId}`,
+    approve: (id: string, data: { username: string; password: string; displayName?: string }) =>
+      request<{ userId: string; crewProfileId: string; username: string }>(`/crew-applications/${id}/approve`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    reject: (id: string, note?: string) =>
+      request<void>(`/crew-applications/${id}/reject`, { method: 'POST', body: JSON.stringify({ note }) }),
   },
   crewPortal: {
     me: () => request<CrewMe>('/crew/me'),

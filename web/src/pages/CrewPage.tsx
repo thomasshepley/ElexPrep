@@ -1,5 +1,13 @@
-import { useEffect, useState } from 'react';
-import { api, type CrewMember } from '../api/client';
+import { Fragment, useEffect, useState } from 'react';
+import { api, type CrewMember, type CrewDocumentSummary } from '../api/client';
+import FileInput from '../components/FileInput';
+
+const DOCUMENT_SLOTS = [
+  { field: 'idDocument', label: 'Photo ID' },
+  { field: 'rightToWorkDocument', label: 'Right to work' },
+  { field: 'insuranceDocument', label: 'Insurance' },
+  { field: 'bankDetailsDocument', label: 'Bank details' },
+] as const;
 
 export default function CrewPage() {
   const [crew, setCrew] = useState<CrewMember[]>([]);
@@ -10,6 +18,7 @@ export default function CrewPage() {
   const [skills, setSkills] = useState('');
   const [dayRate, setDayRate] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const refresh = () => api.crew.list().then(setCrew).catch((e) => setError(e.message));
 
@@ -127,33 +136,107 @@ export default function CrewPage() {
         </thead>
         <tbody>
           {crew.map((c) => (
-            <tr key={c.id}>
-              <td>
-                <div style={{ fontWeight: 600 }}>{c.displayName}</div>
-                <span className="muted">{c.username}</span>
-              </td>
-              <td>{c.phone ?? '—'}</td>
-              <td>{c.skills ?? '—'}</td>
-              <td>{c.dayRate ?? '—'}</td>
-              <td>
-                <label className="switch">
-                  <input type="checkbox" checked={c.active} onChange={() => toggleActive(c)} />
-                  <span className="switch-track" />
-                  {c.active ? 'Active' : 'Inactive'}
-                </label>
-              </td>
-              <td className="row">
-                <button className="secondary" onClick={() => resetPassword(c)}>
-                  Reset password
-                </button>
-                <button className="secondary" onClick={() => remove(c)}>
-                  Delete
-                </button>
-              </td>
-            </tr>
+            <Fragment key={c.id}>
+              <tr>
+                <td>
+                  <div style={{ fontWeight: 600 }}>{c.displayName}</div>
+                  <span className="muted">{c.username}</span>
+                </td>
+                <td>{c.phone ?? '—'}</td>
+                <td>{c.skills ?? '—'}</td>
+                <td>{c.dayRate ?? '—'}</td>
+                <td>
+                  <label className="switch">
+                    <input type="checkbox" checked={c.active} onChange={() => toggleActive(c)} />
+                    <span className="switch-track" />
+                    {c.active ? 'Active' : 'Inactive'}
+                  </label>
+                </td>
+                <td className="row">
+                  <button className="secondary" onClick={() => setExpandedId(expandedId === c.id ? null : c.id)}>
+                    Documents
+                  </button>
+                  <button className="secondary" onClick={() => resetPassword(c)}>
+                    Reset password
+                  </button>
+                  <button className="secondary" onClick={() => remove(c)}>
+                    Delete
+                  </button>
+                </td>
+              </tr>
+              {expandedId === c.id && (
+                <tr>
+                  <td colSpan={6}>
+                    <CrewDocumentsPanel crewId={c.id} />
+                  </td>
+                </tr>
+              )}
+            </Fragment>
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+function CrewDocumentsPanel({ crewId }: { crewId: string }) {
+  const [documents, setDocuments] = useState<CrewDocumentSummary[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  const refresh = () => api.crew.documents.list(crewId).then(setDocuments).catch((e) => setError(e.message));
+
+  useEffect(() => {
+    refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [crewId]);
+
+  const upload = async (field: string, file: File) => {
+    setError(null);
+    try {
+      const form = new FormData();
+      form.append(field, file);
+      setDocuments(await api.crew.documents.upload(crewId, form));
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  };
+
+  const remove = async (docId: string) => {
+    await api.crew.documents.remove(crewId, docId);
+    refresh();
+  };
+
+  return (
+    <div style={{ padding: '0.75rem 0' }}>
+      <strong>Compliance documents</strong>
+      {error && <p className="error">{error}</p>}
+      {documents.length === 0 ? (
+        <p className="muted">No documents on file.</p>
+      ) : (
+        <ul style={{ margin: '0.5rem 0' }}>
+          {documents.map((d) => (
+            <li key={d.id}>
+              <a href={api.crew.documents.url(crewId, d.id)} target="_blank" rel="noreferrer">
+                {d.originalName}
+              </a>{' '}
+              <span className="muted">({d.kind.replace(/_/g, ' ').toLowerCase()})</span>{' '}
+              <button className="secondary" style={{ padding: '0.1rem 0.5rem' }} onClick={() => remove(d.id)}>
+                Remove
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="row" style={{ flexWrap: 'wrap', gap: '0.75rem', marginTop: '0.5rem' }}>
+        {DOCUMENT_SLOTS.map(({ field, label }) => (
+          <div key={field} className="row">
+            <span className="muted" style={{ fontSize: 'var(--text-sm)' }}>
+              {label}
+            </span>
+            <FileInput accept="application/pdf,image/*" label="Upload" onFile={(file) => upload(field, file)} />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
