@@ -34,6 +34,20 @@ export function cellToPt(cell: CellGeometry, pageHeightIn: number): CellRectPt {
   };
 }
 
+/**
+ * A striped background alternates two colors (e.g. Rigging's yellow/near-black hazard tape),
+ * so a single flat text fill can only ever contrast reliably against ONE of the two — for
+ * exactly that reason, the color actually chosen for the fill often coincides with one of the
+ * stripe colors (see textColorsFor in genericRenderer.ts), which would otherwise make the
+ * text vanish into that stripe. The outline (drawn as offset copies of the opposite color,
+ * behind the real text) is what keeps it legible there instead, so it has to read as a real,
+ * fairly bold stroke — not just a hairline nudge — or it degrades to a thin, hard-to-read
+ * hollow outline exactly where the fill disappears. The radius scales with font size (pdf-lib
+ * has no native text-stroke, so this is pure sampled copies) and samples a full ring of
+ * points rather than just the 8 compass directions, so the stroke stays smooth at any size.
+ */
+const OUTLINE_RING_POINTS = 16;
+
 export function centerText(
   page: PDFPage,
   text: string,
@@ -47,21 +61,12 @@ export function centerText(
   const width = font.widthOfTextAtSize(text, size);
   const x = cell.xPt + cell.wPt / 2 - width / 2;
   const y = cell.yPt + yOffsetPt;
-  // A striped background alternates two colors, so a single flat text color can vanish against
-  // whichever stripe matches it — an outline (drawn as offset copies behind the real text)
-  // keeps it legible against either stripe.
   if (outlineColor) {
-    const offset = 1;
-    for (const [dx, dy] of [
-      [-offset, -offset],
-      [0, -offset],
-      [offset, -offset],
-      [-offset, 0],
-      [offset, 0],
-      [-offset, offset],
-      [0, offset],
-      [offset, offset],
-    ]) {
+    const radius = Math.max(1.2, size * 0.07);
+    for (let i = 0; i < OUTLINE_RING_POINTS; i++) {
+      const angle = (i / OUTLINE_RING_POINTS) * Math.PI * 2;
+      const dx = Math.cos(angle) * radius;
+      const dy = Math.sin(angle) * radius;
       page.drawText(text, { x: x + dx, y: y + dy, size, font, color: outlineColor });
     }
   }
