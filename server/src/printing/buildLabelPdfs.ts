@@ -1,11 +1,12 @@
 import path from 'path';
 import fs from 'fs';
 import { PDFDocument } from 'pdf-lib';
-import { DEFAULT_LABEL_TEMPLATES, LabelType } from '@elexprep/shared';
+import { LabelType } from '@elexprep/shared';
 import { prisma } from '../db';
 import { uploadDir } from '../routes/jobs';
 import { loadLocationColorMap, LocationColorMap } from '../pdf/locationColors';
 import { renderLabelTypeGeneric } from '../pdf/genericRenderer';
+import { loadMergedTemplate } from '../routes/labelTemplates';
 
 export type LabelContentByType = Record<string, unknown[]>;
 
@@ -80,7 +81,7 @@ export async function renderLabelType(
   items: unknown[],
   locationColors: LocationColorMap
 ): Promise<void> {
-  const template = DEFAULT_LABEL_TEMPLATES[labelType as LabelType];
+  const template = await loadMergedTemplate(jobId, labelType as LabelType);
   if (!template) throw new Error(`Unknown label type: ${labelType}`);
   const logo = template.labelType === 'PAL' ? await loadJobLogo(jobId) : undefined;
   const logoImage = logo ? await (logo.kind === 'png' ? doc.embedPng(logo.bytes) : doc.embedJpg(logo.bytes)) : undefined;
