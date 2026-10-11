@@ -1,6 +1,8 @@
 import { Router } from 'express';
+import multer from 'multer';
 import { prisma, logActivity } from '../db';
 import { MIN_PASSWORD_LENGTH, hashPassword, requireRole } from '../auth';
+import { DOCUMENT_FIELDS, deleteDocumentFile, saveDocuments, streamDecryptedDocument } from '../crewDocumentsStorage';
 
 /**
  * Admin-only crew roster: creates/edits/removes a CREW User + its CrewProfile together, so a
@@ -118,5 +120,59 @@ crewRouter.delete('/:id', async (req, res) => {
   if (!existing) return res.status(404).json({ error: 'Crew member not found' });
   await prisma.user.delete({ where: { id: existing.userId } });
   await logActivity('crew.delete', existing.user.username, undefined, req.user!.id);
+  res.status(204).end();
+});
+
+// Compliance documents, post-approval. The whole router is already requireRole('ADMIN') (see
+// top of file) with no delegation, matching the plan's "document visibility stays admin-only"
+// decision — unlike the applications review queue, nothing here is ever gated by a permission.
+const documentUpload = multer({
+  storage: multer.memoryStorage(),
+  fileFilter: (_req, file, cb) => {
+    cb(null, file.mimetype === 'application/pdf' || file.mimetype.startsWith('image/'));
+  },
+  limits: { fileSize: 15 * 1024 * 1024, files: DOCUMENT_FIELDS.length },
+});
+
+crewRouter.get('/:id/documents', async (req, res) => {
+  const profile = await prisma.crewProfile.findUnique({ where: { id: req.params.id } });
+  if (!profile) return res.status(404).json({ error: 'Crew member not found' });
+  const documents = await prisma.crewDocument.findMany({
+    where: { crewProfileId: profile.id },
+    select: { id: true, kind: true, originalName: true, mimeType: true, createdAt: true },
+    orderBy: { createdAt: 'desc' },
+  });
+  res.json(documents);
+});
+
+crewRouter.post(
+  '/:id/documents',
+  documentUpload.fields(DOCUMENT_FIELDS.map((d) => ({ name: d.field, maxCount: 1 }))),
+  async (req, res) => {
+    const profile = await prisma.crewProfile.findUnique({ where: { id: req.params.id } });
+    if (!profile) return res.status(404).json({ error: 'Crew member not found' });
+    await saveDocuments({ crewProfileId: profile.id }, req.files as Record<string, Express.Multer.File[]> | undefined);
+    await logActivity('crew.document.upload', profile.id, undefined, req.user!.id);
+    const documents = await prisma.crewDocument.findMany({
+      where: { crewProfileId: profile.id },
+      select: { id: true, kind: true, originalName: true, mimeType: true, createdAt: true },
+      orderBy: { createdAt: 'desc' },
+    });
+    res.status(201).json(documents);
+  }
+);
+
+crewRouter.get('/:id/documents/:docId', async (req, res) => {
+  const doc = await prisma.crewDocument.findUnique({ where: { id: req.params.docId } });
+  if (!doc || doc.crewProfileId !== req.params.id) return res.status(404).end();
+  await streamDecryptedDocument(res, doc, req.user?.id);
+});
+
+crewRouter.delete('/:id/documents/:docId', async (req, res) => {
+  const doc = await prisma.crewDocument.findUnique({ where: { id: req.params.docId } });
+  if (!doc || doc.crewProfileId !== req.params.id) return res.status(404).end();
+  await prisma.crewDocument.delete({ where: { id: doc.id } });
+  await deleteDocumentFile(doc.fileName);
+  await logActivity('crew.document.delete', doc.originalName, undefined, req.user!.id);
   res.status(204).end();
 });

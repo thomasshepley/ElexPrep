@@ -27,6 +27,7 @@ import { restartCurrentRmsPolling } from './currentRms/sync';
 import { locationColorRulesRouter, jobLocationColorRulesRouter } from './routes/locationColorRules';
 import { permissionsRouter } from './routes/permissions';
 import { crewRouter } from './routes/crew';
+import { crewApplicationsRouter } from './routes/crewApplications';
 import { crewPortalRouter } from './routes/crewPortal';
 import { jobCrewAssignmentsRouter } from './routes/jobCrewAssignments';
 import { labelTemplatesRouter } from './routes/labelTemplates';
@@ -68,6 +69,7 @@ app.use('/api/jobs', labelTemplatesRouter);
 // (the bare roster list/CRUD) falls through to crewRouter unchanged.
 app.use('/api/crew', crewPortalRouter);
 app.use('/api/crew', crewRouter);
+app.use('/api/crew-applications', crewApplicationsRouter);
 app.use('/api/current-rms', currentRmsRouter);
 app.use('/api/print-jobs', printJobsRouter);
 app.use('/api/printer-settings', printerSettingsRouter);

@@ -96,6 +96,11 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
   if (req.path === '/api/health' || req.path.startsWith('/api/auth/') || req.path.startsWith('/api/agent/')) {
     return next();
   }
+  // The one public write in the whole app: submitting a crew application needs no login (the
+  // applicant doesn't have an account yet — that's the point). Every other path under this
+  // prefix (list/approve/reject/documents) stays behind the normal auth + permission check
+  // below, matched by not being this exact path/method.
+  if (req.path === '/api/crew-applications' && req.method === 'POST') return next();
   if (!req.user) return res.status(401).json({ error: 'Not signed in' });
   if (req.user.role === 'SIGNAGE' && req.method !== 'GET') {
     const allowed = SIGNAGE_WRITE_ALLOWLIST.some((re) => re.test(req.path));
