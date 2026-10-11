@@ -7,6 +7,7 @@ import { fetchPickListSnapshot } from '../currentRms/sync';
 import { plotsDir } from './plots';
 import { uploadDir } from './jobs';
 import { notifyLabelRequestSubmitted, notifyDiscussionMessage } from '../notifications';
+import { encryptBankDetails, decryptBankDetails, parseBankDetails } from '../bankDetails';
 
 /**
  * Self-service data for a logged-in CREW account: their own profile, the jobs they're
@@ -50,24 +51,55 @@ crewPortalRouter.get('/me', requireRole('CREW'), async (req, res) => {
     displayName: req.user!.displayName,
     phone: profile.phone,
     skills: profile.skills,
+    certifications: profile.certifications,
     notes: profile.notes,
     dayRate: profile.dayRate,
+    gender: profile.gender,
+    address: profile.address,
+    pronouns: profile.pronouns,
+    instagramUrl: profile.instagramUrl,
+    facebookUrl: profile.facebookUrl,
+    otherLinkUrl: profile.otherLinkUrl,
+    hasBankDetails: profile.bankDetailsCiphertext !== null,
   });
 });
 
-// Self-service profile edit — deliberately excludes dayRate (admin-set compensation data) and
+// Self-service profile edit — deliberately excludes dayRate (admin-set compensation data,
+// superseded by the crew member's own rate card — see the rate-lines routes below) and
 // displayName/password (already handled by the role-agnostic /api/auth/me). A crew member can
 // only ever touch their own row here: there's no id in the request, it's always ownProfile(req.user.id).
 crewPortalRouter.put('/me', requireRole('CREW'), async (req, res) => {
   const profile = await ownProfile(req.user!.id);
   if (!profile) return res.status(404).json({ error: 'No crew profile found for this account' });
-  const { phone, skills, notes } = req.body ?? {};
+  const { phone, skills, certifications, notes, gender, address, pronouns, instagramUrl, facebookUrl, otherLinkUrl, bankDetails } = req.body ?? {};
+
+  let bankPatch: { bankDetailsCiphertext: string; bankDetailsIv: string; bankDetailsAuthTag: string } | undefined;
+  if (bankDetails !== undefined) {
+    try {
+      const parsed = parseBankDetails(bankDetails);
+      if (parsed) {
+        const enc = encryptBankDetails(parsed);
+        bankPatch = { bankDetailsCiphertext: enc.ciphertext, bankDetailsIv: enc.iv, bankDetailsAuthTag: enc.authTag };
+      }
+    } catch (err) {
+      return res.status(400).json({ error: (err as Error).message });
+    }
+  }
+
   const updated = await prisma.crewProfile.update({
     where: { id: profile.id },
     data: {
       ...(phone !== undefined ? { phone: phone || null } : {}),
       ...(skills !== undefined ? { skills: skills || null } : {}),
+      ...(certifications !== undefined ? { certifications: certifications || null } : {}),
       ...(notes !== undefined ? { notes: notes || null } : {}),
+      ...(gender !== undefined ? { gender: gender || null } : {}),
+      ...(address !== undefined ? { address: address || null } : {}),
+      ...(pronouns !== undefined ? { pronouns: pronouns || null } : {}),
+      ...(instagramUrl !== undefined ? { instagramUrl: instagramUrl || null } : {}),
+      ...(facebookUrl !== undefined ? { facebookUrl: facebookUrl || null } : {}),
+      ...(otherLinkUrl !== undefined ? { otherLinkUrl: otherLinkUrl || null } : {}),
+      ...bankPatch,
     },
   });
   await logActivity('crew.selfUpdate', req.user!.displayName, undefined, req.user!.id);
@@ -76,9 +108,74 @@ crewPortalRouter.put('/me', requireRole('CREW'), async (req, res) => {
     displayName: req.user!.displayName,
     phone: updated.phone,
     skills: updated.skills,
+    certifications: updated.certifications,
     notes: updated.notes,
     dayRate: updated.dayRate,
+    gender: updated.gender,
+    address: updated.address,
+    pronouns: updated.pronouns,
+    instagramUrl: updated.instagramUrl,
+    facebookUrl: updated.facebookUrl,
+    otherLinkUrl: updated.otherLinkUrl,
+    hasBankDetails: updated.bankDetailsCiphertext !== null,
   });
+});
+
+// A crew member viewing their own bank details — no admin gate needed since it's their own
+// data, but still logged the same as every other bank-details read.
+crewPortalRouter.get('/me/bank-details', requireRole('CREW'), async (req, res) => {
+  const profile = await ownProfile(req.user!.id);
+  if (!profile) return res.status(404).json({ error: 'No crew profile found for this account' });
+  if (!profile.bankDetailsCiphertext || !profile.bankDetailsIv || !profile.bankDetailsAuthTag) {
+    return res.status(404).json({ error: 'No bank details on file' });
+  }
+  const details = decryptBankDetails(profile.bankDetailsCiphertext, profile.bankDetailsIv, profile.bankDetailsAuthTag);
+  await logActivity('crew.bankDetails.view', req.user!.displayName, undefined, req.user!.id);
+  res.json(details);
+});
+
+// Self-service rate card — mirrors routes/crew.ts's admin rate-line CRUD, scoped to the
+// caller's own profile. See CrewRateLine's schema comment for the model itself.
+crewPortalRouter.get('/me/rate-lines', requireRole('CREW'), async (req, res) => {
+  const profile = await ownProfile(req.user!.id);
+  if (!profile) return res.status(404).json({ error: 'No crew profile found for this account' });
+  const lines = await prisma.crewRateLine.findMany({ where: { crewProfileId: profile.id }, orderBy: { order: 'asc' } });
+  res.json(lines);
+});
+
+crewPortalRouter.post('/me/rate-lines', requireRole('CREW'), async (req, res) => {
+  const profile = await ownProfile(req.user!.id);
+  if (!profile) return res.status(404).json({ error: 'No crew profile found for this account' });
+  const { label, amount } = req.body ?? {};
+  if (!label || !amount) return res.status(400).json({ error: 'label and amount are required' });
+  const count = await prisma.crewRateLine.count({ where: { crewProfileId: profile.id } });
+  const line = await prisma.crewRateLine.create({ data: { crewProfileId: profile.id, label, amount, order: count } });
+  await logActivity('crew.rateLine.selfCreate', `${label}: ${amount}`, undefined, req.user!.id);
+  res.status(201).json(line);
+});
+
+crewPortalRouter.put('/me/rate-lines/:lineId', requireRole('CREW'), async (req, res) => {
+  const profile = await ownProfile(req.user!.id);
+  if (!profile) return res.status(404).json({ error: 'No crew profile found for this account' });
+  const existing = await prisma.crewRateLine.findUnique({ where: { id: req.params.lineId } });
+  if (!existing || existing.crewProfileId !== profile.id) return res.status(404).json({ error: 'Rate line not found' });
+  const { label, amount } = req.body ?? {};
+  const line = await prisma.crewRateLine.update({
+    where: { id: existing.id },
+    data: { ...(label !== undefined ? { label } : {}), ...(amount !== undefined ? { amount } : {}) },
+  });
+  await logActivity('crew.rateLine.selfUpdate', `${line.label}: ${line.amount}`, undefined, req.user!.id);
+  res.json(line);
+});
+
+crewPortalRouter.delete('/me/rate-lines/:lineId', requireRole('CREW'), async (req, res) => {
+  const profile = await ownProfile(req.user!.id);
+  if (!profile) return res.status(404).json({ error: 'No crew profile found for this account' });
+  const existing = await prisma.crewRateLine.findUnique({ where: { id: req.params.lineId } });
+  if (!existing || existing.crewProfileId !== profile.id) return res.status(404).json({ error: 'Rate line not found' });
+  await prisma.crewRateLine.delete({ where: { id: existing.id } });
+  await logActivity('crew.rateLine.selfDelete', existing.label, undefined, req.user!.id);
+  res.status(204).end();
 });
 
 crewPortalRouter.get('/me/jobs', requireRole('CREW'), async (req, res) => {

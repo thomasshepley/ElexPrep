@@ -10,11 +10,12 @@ import { encryptBuffer, decryptBuffer } from './crewDocCrypto';
 export const crewDocumentsDir = path.join(uploadDir, 'crew-documents');
 fs.mkdirSync(crewDocumentsDir, { recursive: true });
 
+// Right-to-work evidence and bank details are no longer collected as file uploads — the former
+// was dropped from intake entirely, the latter is now structured fields, encrypted at rest the
+// same way (see bankDetails.ts) but stored as columns, not a CrewDocument row.
 export const DOCUMENT_FIELDS: { field: string; kind: string }[] = [
   { field: 'idDocument', kind: 'ID' },
-  { field: 'rightToWorkDocument', kind: 'RIGHT_TO_WORK' },
   { field: 'insuranceDocument', kind: 'INSURANCE' },
-  { field: 'bankDetailsDocument', kind: 'BANK_DETAILS' },
 ];
 
 export async function saveDocuments(

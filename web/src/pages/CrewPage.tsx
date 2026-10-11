@@ -1,13 +1,15 @@
 import { Fragment, useEffect, useState } from 'react';
-import { api, type CrewMember, type CrewDocumentSummary, type CrewRateLine } from '../api/client';
+import { api, type BankDetails, type CrewMember, type CrewDocumentSummary, type CrewRateLine } from '../api/client';
 import FileInput from '../components/FileInput';
 import SkillPicker from '../components/SkillPicker';
+import CertificationPicker from '../components/CertificationPicker';
+import BankDetailsForm from '../components/BankDetailsForm';
+import BankDetailsReveal from '../components/BankDetailsReveal';
+import WhatsAppButton from '../components/WhatsAppButton';
 
 const DOCUMENT_SLOTS = [
   { field: 'idDocument', label: 'Photo ID' },
-  { field: 'rightToWorkDocument', label: 'Right to work' },
   { field: 'insuranceDocument', label: 'Insurance' },
-  { field: 'bankDetailsDocument', label: 'Bank details' },
 ] as const;
 
 export default function CrewPage() {
@@ -135,7 +137,12 @@ export default function CrewPage() {
                   <div style={{ fontWeight: 600 }}>{c.displayName}</div>
                   <span className="muted">{c.username}</span>
                 </td>
-                <td>{c.phone ?? '—'}</td>
+                <td>
+                  <div className="row" style={{ gap: '0.4rem' }}>
+                    {c.phone ?? '—'}
+                    <WhatsAppButton phone={c.phone} label="WhatsApp" />
+                  </div>
+                </td>
                 <td>{c.skills ?? '—'}</td>
                 <td>
                   <label className="switch">
@@ -159,6 +166,7 @@ export default function CrewPage() {
               {expandedId === c.id && (
                 <tr>
                   <td colSpan={5}>
+                    <ProfileEditPanel crew={c} onChanged={refresh} />
                     <RateCardPanel crewId={c.id} />
                     <CrewDocumentsPanel crewId={c.id} />
                   </td>
@@ -168,6 +176,95 @@ export default function CrewPage() {
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+function ProfileEditPanel({ crew, onChanged }: { crew: CrewMember; onChanged: () => void }) {
+  const [certifications, setCertifications] = useState(crew.certifications ?? '');
+  const [gender, setGender] = useState(crew.gender ?? '');
+  const [address, setAddress] = useState(crew.address ?? '');
+  const [pronouns, setPronouns] = useState(crew.pronouns ?? '');
+  const [instagramUrl, setInstagramUrl] = useState(crew.instagramUrl ?? '');
+  const [facebookUrl, setFacebookUrl] = useState(crew.facebookUrl ?? '');
+  const [otherLinkUrl, setOtherLinkUrl] = useState(crew.otherLinkUrl ?? '');
+  const [bankDetails, setBankDetails] = useState<BankDetails | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+
+  const save = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setSaved(false);
+    try {
+      await api.crew.update(crew.id, {
+        certifications,
+        gender,
+        address,
+        pronouns,
+        instagramUrl,
+        facebookUrl,
+        otherLinkUrl,
+        bankDetails: bankDetails ?? undefined,
+      });
+      setBankDetails(null);
+      setSaved(true);
+      onChanged();
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  };
+
+  return (
+    <div style={{ padding: '0.75rem 0', borderBottom: '1px solid var(--border)' }}>
+      <strong>Profile</strong>
+      {error && <p className="error">{error}</p>}
+      <form onSubmit={save}>
+        <div className="row" style={{ flexWrap: 'wrap', gap: '0.9rem' }}>
+          <div className="field" style={{ width: '10rem' }}>
+            <label htmlFor={`profile-pronouns-${crew.id}`}>Pronouns</label>
+            <input id={`profile-pronouns-${crew.id}`} value={pronouns} onChange={(e) => setPronouns(e.target.value)} placeholder="they/them" />
+          </div>
+          <div className="field" style={{ width: '10rem' }}>
+            <label htmlFor={`profile-gender-${crew.id}`}>Gender</label>
+            <input id={`profile-gender-${crew.id}`} value={gender} onChange={(e) => setGender(e.target.value)} />
+          </div>
+          <div className="field" style={{ width: '16rem' }}>
+            <label htmlFor={`profile-address-${crew.id}`}>Address</label>
+            <input id={`profile-address-${crew.id}`} value={address} onChange={(e) => setAddress(e.target.value)} />
+          </div>
+        </div>
+        <div className="row" style={{ flexWrap: 'wrap', gap: '0.9rem' }}>
+          <div className="field" style={{ width: '14rem' }}>
+            <label htmlFor={`profile-instagram-${crew.id}`}>Instagram</label>
+            <input id={`profile-instagram-${crew.id}`} value={instagramUrl} onChange={(e) => setInstagramUrl(e.target.value)} />
+          </div>
+          <div className="field" style={{ width: '14rem' }}>
+            <label htmlFor={`profile-facebook-${crew.id}`}>Facebook</label>
+            <input id={`profile-facebook-${crew.id}`} value={facebookUrl} onChange={(e) => setFacebookUrl(e.target.value)} />
+          </div>
+          <div className="field" style={{ width: '14rem' }}>
+            <label htmlFor={`profile-other-link-${crew.id}`}>Other link</label>
+            <input id={`profile-other-link-${crew.id}`} value={otherLinkUrl} onChange={(e) => setOtherLinkUrl(e.target.value)} />
+          </div>
+        </div>
+
+        <div className="field">
+          <label>Bank details</label>
+          <BankDetailsReveal hasBankDetails={crew.hasBankDetails} fetchDetails={() => api.crew.bankDetails(crew.id)} />
+        </div>
+        <BankDetailsForm value={bankDetails} onChange={setBankDetails} />
+        <p className="muted" style={{ marginTop: '-0.5rem' }}>
+          Leave blank to keep what's already on file.
+        </p>
+
+        <CertificationPicker value={certifications} onChange={setCertifications} />
+
+        <button type="submit" style={{ marginTop: '0.5rem' }}>
+          Save profile
+        </button>
+        {saved && <span className="muted" style={{ marginLeft: '0.6rem' }}>Saved ✓</span>}
+      </form>
     </div>
   );
 }

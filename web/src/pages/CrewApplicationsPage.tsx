@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { api, type CrewApplicationDetail, type CrewApplicationSummary } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
+import BankDetailsReveal from '../components/BankDetailsReveal';
+import WhatsAppButton from '../components/WhatsAppButton';
 
 const STATUS_FILTERS = ['PENDING', 'APPROVED', 'REJECTED', 'ALL'] as const;
 type StatusFilter = (typeof STATUS_FILTERS)[number];
@@ -140,7 +142,7 @@ export default function CrewApplicationsPage() {
               <p>
                 {a.phone && (
                   <>
-                    <strong>Phone:</strong> {a.phone}
+                    <strong>Phone:</strong> {a.phone} <WhatsAppButton phone={a.phone} />
                     <br />
                   </>
                 )}
@@ -150,9 +152,27 @@ export default function CrewApplicationsPage() {
                     <br />
                   </>
                 )}
+                {a.certifications && (
+                  <>
+                    <strong>Certifications:</strong> {a.certifications}
+                    <br />
+                  </>
+                )}
                 {a.rightToWork && (
                   <>
                     <strong>Right to work:</strong> {a.rightToWork}
+                    <br />
+                  </>
+                )}
+                {a.gender && (
+                  <>
+                    <strong>Gender:</strong> {a.gender}
+                    <br />
+                  </>
+                )}
+                {a.address && (
+                  <>
+                    <strong>Address:</strong> {a.address}
                     <br />
                   </>
                 )}
@@ -162,6 +182,11 @@ export default function CrewApplicationsPage() {
                   </>
                 )}
               </p>
+
+              <div style={{ marginBottom: '0.75rem' }}>
+                <strong>Bank details:</strong>{' '}
+                <BankDetailsReveal hasBankDetails={a.hasBankDetails} fetchDetails={() => api.crewApplications.bankDetails(a.id)} />
+              </div>
 
               {detail.documents.length > 0 && (
                 <div style={{ marginBottom: '0.75rem' }}>

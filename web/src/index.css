@@ -1128,3 +1128,120 @@ tbody tr:hover {
 .discussion-compose input {
   flex: 1;
 }
+
+/* A collapsible form section (see CertificationPicker) — keeps optional, rarely-filled fields
+   out of the way without a separate "show more" button to wire up. */
+.field-disclosure {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 0.6rem 0.8rem;
+  margin: 0.75rem 0;
+}
+
+.field-disclosure summary {
+  cursor: pointer;
+  font-weight: 600;
+  font-size: var(--text-sm);
+  color: var(--content-muted);
+  list-style: none;
+}
+
+.field-disclosure summary::-webkit-details-marker {
+  display: none;
+}
+
+.field-disclosure summary::before {
+  content: '▸';
+  display: inline-block;
+  margin-right: 0.5rem;
+  color: var(--accent);
+  transition: transform 150ms ease;
+}
+
+.field-disclosure[open] summary::before {
+  transform: rotate(90deg);
+}
+
+.field-disclosure[open] summary {
+  color: var(--content);
+  margin-bottom: 0.6rem;
+}
+
+.field-disclosure-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+/* Structured bank details fields (see BankDetailsForm) — a tight 2-column grid that collapses
+   to 1 column on narrow viewports, consistent with the app's mobile breakpoint elsewhere. */
+.bank-details-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+@media (max-width: 480px) {
+  .bank-details-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Crew-defined rate card (see RateCardEditor): the general rate is always visible; the
+   role-specific suggestions reveal with a brief slide/fade once it has a value, rather than
+   appearing instantly — a short, purposeful animation on a rarely-repeated action, not a
+   frequent interaction (see motion.md's guidance this codebase already follows elsewhere). */
+.rate-card-extra {
+  overflow: hidden;
+  max-height: 0;
+  opacity: 0;
+  transition: max-height 280ms ease, opacity 220ms ease;
+}
+
+.rate-card-extra.is-open {
+  max-height: 40rem;
+  opacity: 1;
+}
+
+.rate-card-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0.6rem 0;
+}
+
+.rate-card-suggestion-chip {
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  border: 1px dashed var(--border-strong);
+  background: transparent;
+  color: var(--content-muted);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  cursor: pointer;
+  box-shadow: none;
+}
+
+.rate-card-suggestion-chip:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-wash);
+  transform: none;
+}
+
+.rate-card-suggestion-chip:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* A WhatsApp deep link (wa.me) — green is a deliberate exception to the chip color language
+   (see .chip's comment): it borrows WhatsApp's own brand color so the button reads at a glance
+   as "this opens WhatsApp", same reasoning a payment button borrows its provider's mark. */
+.whatsapp-button {
+  background: #25d366;
+  color: #04280f;
+}
+
+.whatsapp-button:hover:not(:disabled) {
+  filter: brightness(1.05);
+}

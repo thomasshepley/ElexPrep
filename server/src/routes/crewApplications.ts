@@ -4,6 +4,7 @@ import { prisma, logActivity } from '../db';
 import { MIN_PASSWORD_LENGTH, hashPassword, requireRole } from '../auth';
 import { requirePermission } from '../permissions';
 import { DOCUMENT_FIELDS, saveDocuments, streamDecryptedDocument } from '../crewDocumentsStorage';
+import { encryptBankDetails, decryptBankDetails, parseBankDetails } from '../bankDetails';
 import { notifyCrewApplicationSubmitted } from '../notifications';
 
 /**
@@ -32,9 +33,13 @@ interface ApplicationRow {
   email: string;
   phone: string | null;
   skills: string | null;
+  certifications: string | null;
   dayRate: string | null;
   rightToWork: string | null;
   notes: string | null;
+  gender: string | null;
+  address: string | null;
+  bankDetailsCiphertext: string | null;
   status: string;
   reviewedAt: Date | null;
   reviewedBy: string | null;
@@ -49,9 +54,15 @@ function toApplicationDto(a: ApplicationRow) {
     email: a.email,
     phone: a.phone,
     skills: a.skills,
+    certifications: a.certifications,
     dayRate: a.dayRate,
     rightToWork: a.rightToWork,
     notes: a.notes,
+    gender: a.gender,
+    address: a.address,
+    // Never the ciphertext itself — just whether bank details were provided at all, so the
+    // review UI can show "on file" without a dedicated decrypt call every list render.
+    hasBankDetails: a.bankDetailsCiphertext !== null,
     status: a.status,
     reviewedAt: a.reviewedAt,
     rejectionNote: a.rejectionNote,
@@ -63,9 +74,17 @@ crewApplicationsRouter.post(
   '/',
   upload.fields(DOCUMENT_FIELDS.map((d) => ({ name: d.field, maxCount: 1 }))),
   async (req, res) => {
-    const { fullName, email, phone, skills, dayRate, rightToWork, notes } = req.body ?? {};
+    const { fullName, email, phone, skills, certifications, dayRate, rightToWork, notes, gender, address, bankDetails } = req.body ?? {};
     if (!fullName || typeof fullName !== 'string') return res.status(400).json({ error: 'fullName is required' });
     if (!email || typeof email !== 'string') return res.status(400).json({ error: 'email is required' });
+
+    let bankEncrypted: { ciphertext: string; iv: string; authTag: string } | null = null;
+    try {
+      const parsed = parseBankDetails(bankDetails);
+      if (parsed) bankEncrypted = encryptBankDetails(parsed);
+    } catch (err) {
+      return res.status(400).json({ error: (err as Error).message });
+    }
 
     const application = await prisma.crewApplication.create({
       data: {
@@ -73,9 +92,15 @@ crewApplicationsRouter.post(
         email,
         phone: phone || null,
         skills: skills || null,
+        certifications: certifications || null,
         dayRate: dayRate || null,
         rightToWork: rightToWork || null,
         notes: notes || null,
+        gender: gender || null,
+        address: address || null,
+        bankDetailsCiphertext: bankEncrypted?.ciphertext ?? null,
+        bankDetailsIv: bankEncrypted?.iv ?? null,
+        bankDetailsAuthTag: bankEncrypted?.authTag ?? null,
       },
     });
     await saveDocuments({ applicationId: application.id }, req.files as Record<string, Express.Multer.File[]> | undefined);
@@ -110,6 +135,18 @@ crewApplicationsRouter.get('/:id/documents/:docId', requireRole('ADMIN'), async 
   await streamDecryptedDocument(res, doc, req.user?.id);
 });
 
+// Same admin-only-never-delegated posture as the document bytes above.
+crewApplicationsRouter.get('/:id/bank-details', requireRole('ADMIN'), async (req, res) => {
+  const application = await prisma.crewApplication.findUnique({ where: { id: req.params.id } });
+  if (!application) return res.status(404).json({ error: 'Application not found' });
+  if (!application.bankDetailsCiphertext || !application.bankDetailsIv || !application.bankDetailsAuthTag) {
+    return res.status(404).json({ error: 'No bank details on file' });
+  }
+  const details = decryptBankDetails(application.bankDetailsCiphertext, application.bankDetailsIv, application.bankDetailsAuthTag);
+  await logActivity('crew_application.bankDetails.view', application.fullName, undefined, req.user?.id);
+  res.json(details);
+});
+
 crewApplicationsRouter.post('/:id/approve', requirePermission('manageCrewApplications'), async (req, res) => {
   const { username, password, displayName } = req.body ?? {};
   if (!username || !password) return res.status(400).json({ error: 'username and password are required' });
@@ -128,8 +165,14 @@ crewApplicationsRouter.post('/:id/approve', requirePermission('manageCrewApplica
       data: {
         phone: application.phone,
         skills: application.skills,
+        certifications: application.certifications,
         dayRate: application.dayRate,
         notes: application.notes,
+        gender: application.gender,
+        address: application.address,
+        bankDetailsCiphertext: application.bankDetailsCiphertext,
+        bankDetailsIv: application.bankDetailsIv,
+        bankDetailsAuthTag: application.bankDetailsAuthTag,
         user: {
           create: {
             username,

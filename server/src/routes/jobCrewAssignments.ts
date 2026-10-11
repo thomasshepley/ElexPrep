@@ -22,6 +22,7 @@ interface AssignmentRow {
   crewProfile: {
     id: string;
     dayRate: string | null;
+    phone: string | null;
     active: boolean;
     user: { username: string; displayName: string };
   };
@@ -33,6 +34,7 @@ function toAssignmentDto(a: AssignmentRow) {
     crewProfileId: a.crewProfileId,
     displayName: a.crewProfile.user.displayName,
     username: a.crewProfile.user.username,
+    phone: a.crewProfile.phone,
     role: a.role,
     dayRate: a.dayRate,
     profileDayRate: a.crewProfile.dayRate,
