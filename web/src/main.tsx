@@ -10,6 +10,7 @@ import SignagePage from './pages/SignagePage'
 import CrewLayout from './pages/CrewLayout'
 import CrewSchedulePage from './pages/CrewSchedulePage'
 import CrewJobPage from './pages/CrewJobPage'
+import CrewAccountPage from './pages/CrewAccountPage'
 import DashboardPage from './pages/DashboardPage'
 import JobsListPage from './pages/JobsListPage'
 import JobDetailPage from './pages/JobDetailPage'
@@ -37,6 +38,7 @@ createRoot(document.getElementById('root')!).render(
           <Route path="/crew" element={<CrewLayout />}>
             <Route index element={<CrewSchedulePage />} />
             <Route path="jobs/:jobId" element={<CrewJobPage />} />
+            <Route path="account" element={<CrewAccountPage />} />
           </Route>
           <Route path="/" element={<App />}>
             <Route index element={<DashboardPage />} />

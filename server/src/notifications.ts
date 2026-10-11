@@ -1,4 +1,5 @@
 import { prisma } from './db';
+import { NOTIFICATION_CATEGORIES, type NotificationCategory } from '@elexprep/shared';
 
 /**
  * In-app notifications v1 — deliberately a handful of trigger points, not a general event
@@ -6,7 +7,28 @@ import { prisma } from './db';
  * the route that causes the thing it describes; nothing here polls or infers.
  */
 
+function categoryOf(type: string): NotificationCategory | null {
+  const prefix = type.split('.')[0];
+  return (NOTIFICATION_CATEGORIES as readonly string[]).includes(prefix) ? (prefix as NotificationCategory) : null;
+}
+
+/** A category with no entry in prefs.notifications, or no parseable prefs at all, defaults to
+ * enabled — opting out is an explicit choice, not the starting state (same "default false, admin
+ * must opt in" posture permissions.ts uses, just inverted since these default to on). */
+function isCategoryEnabled(prefsJson: string, type: string): boolean {
+  const category = categoryOf(type);
+  if (!category) return true;
+  try {
+    const prefs = JSON.parse(prefsJson) as { notifications?: Partial<Record<NotificationCategory, boolean>> };
+    return prefs.notifications?.[category] !== false;
+  } catch {
+    return true;
+  }
+}
+
 export async function notifyUser(userId: string, type: string, title: string, body?: string, link?: string) {
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { prefsJson: true } });
+  if (user && !isCategoryEnabled(user.prefsJson, type)) return;
   await prisma.notification.create({ data: { userId, type, title, body, link } });
 }
 
@@ -14,10 +36,11 @@ export async function notifyUser(userId: string, type: string, title: string, bo
  * application, a new label request) rather than every USER, which would be noisier than useful
  * for a small team. */
 async function notifyAdmins(type: string, title: string, body?: string, link?: string) {
-  const admins = await prisma.user.findMany({ where: { role: 'ADMIN' }, select: { id: true } });
-  if (admins.length === 0) return;
+  const admins = await prisma.user.findMany({ where: { role: 'ADMIN' }, select: { id: true, prefsJson: true } });
+  const recipients = admins.filter((a) => isCategoryEnabled(a.prefsJson, type));
+  if (recipients.length === 0) return;
   await prisma.notification.createMany({
-    data: admins.map((a) => ({ userId: a.id, type, title, body, link })),
+    data: recipients.map((a) => ({ userId: a.id, type, title, body, link })),
   });
 }
 
@@ -65,21 +88,32 @@ export async function notifyDiscussionMessage(jobId: string, jobName: string, au
   const excerpt = body.length > EXCERPT_LENGTH ? `${body.slice(0, EXCERPT_LENGTH)}…` : body;
   const title = `${authorName} in ${jobName}`;
 
-  const staff = await prisma.user.findMany({ where: { role: { in: ['ADMIN', 'USER'] }, id: { not: authorUserId } }, select: { id: true } });
-  if (staff.length > 0) {
+  const staff = await prisma.user.findMany({
+    where: { role: { in: ['ADMIN', 'USER'] }, id: { not: authorUserId } },
+    select: { id: true, prefsJson: true },
+  });
+  const staffRecipients = staff.filter((u) => isCategoryEnabled(u.prefsJson, 'job_discussion.message'));
+  if (staffRecipients.length > 0) {
     await prisma.notification.createMany({
-      data: staff.map((u) => ({ userId: u.id, type: 'job_discussion.message', title, body: excerpt, link: `/jobs/${jobId}` })),
+      data: staffRecipients.map((u) => ({ userId: u.id, type: 'job_discussion.message', title, body: excerpt, link: `/jobs/${jobId}` })),
     });
   }
 
   const assignments = await prisma.jobCrewAssignment.findMany({
     where: { jobId, crewProfile: { userId: { not: authorUserId } } },
-    select: { crewProfile: { select: { userId: true } } },
+    select: { crewProfile: { select: { userId: true, user: { select: { prefsJson: true } } } } },
   });
-  const crewUserIds = [...new Set(assignments.map((a) => a.crewProfile.userId))];
-  if (crewUserIds.length > 0) {
+  const seen = new Set<string>();
+  const crewRecipients = assignments
+    .map((a) => a.crewProfile)
+    .filter((p) => {
+      if (seen.has(p.userId)) return false;
+      seen.add(p.userId);
+      return isCategoryEnabled(p.user.prefsJson, 'job_discussion.message');
+    });
+  if (crewRecipients.length > 0) {
     await prisma.notification.createMany({
-      data: crewUserIds.map((userId) => ({ userId, type: 'job_discussion.message', title, body: excerpt, link: `/crew/jobs/${jobId}` })),
+      data: crewRecipients.map((p) => ({ userId: p.userId, type: 'job_discussion.message', title, body: excerpt, link: `/crew/jobs/${jobId}` })),
     });
   }
 }
