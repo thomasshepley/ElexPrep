@@ -1,6 +1,7 @@
 import { NavLink, Navigate, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from './auth/AuthContext'
 import { JobsIcon, SettingsIcon, SignageIcon, SignOutIcon } from './components/Icons'
+import ThemeToggle from './components/ThemeToggle'
 import './App.css'
 
 function App() {
@@ -21,35 +22,38 @@ function App() {
   return (
     <div className="shell">
       <aside className="sidebar">
-        <div className="sidebar-brand">
-          <span className="sidebar-brand-mark" />
-          <span className="sidebar-brand-text">ELEX Portal</span>
-        </div>
-        <nav className="sidebar-nav">
-          <NavLink to="/" end>
-            <JobsIcon />
-            <span>Jobs</span>
-          </NavLink>
-          <NavLink to="/settings">
-            <SettingsIcon />
-            <span>Settings</span>
-          </NavLink>
-          <NavLink to="/signage">
-            <SignageIcon />
-            <span>Signage</span>
-          </NavLink>
-        </nav>
-        <div className="sidebar-user">
-          <div className="sidebar-user-row">
-            <span className="avatar">{initial}</span>
-            <NavLink to="/settings/preferences" className="sidebar-username">
-              {user.displayName}
-            </NavLink>
+        <div className="sidebar-sticky">
+          <div className="sidebar-brand">
+            <span className="sidebar-brand-mark" />
+            <span className="sidebar-brand-text">ELEX Portal</span>
           </div>
-          <button className="secondary sidebar-signout" onClick={logout}>
-            <SignOutIcon />
-            <span>Sign out</span>
-          </button>
+          <nav className="sidebar-nav">
+            <NavLink to="/" end>
+              <JobsIcon />
+              <span>Jobs</span>
+            </NavLink>
+            <NavLink to="/settings">
+              <SettingsIcon />
+              <span>Settings</span>
+            </NavLink>
+            <NavLink to="/signage">
+              <SignageIcon />
+              <span>Signage</span>
+            </NavLink>
+          </nav>
+          <div className="sidebar-user">
+            <div className="sidebar-user-row">
+              <span className="avatar">{initial}</span>
+              <NavLink to="/settings/preferences" className="sidebar-username">
+                {user.displayName}
+              </NavLink>
+            </div>
+            <ThemeToggle />
+            <button className="secondary sidebar-signout" onClick={logout}>
+              <SignOutIcon />
+              <span>Sign out</span>
+            </button>
+          </div>
         </div>
       </aside>
       <main className="shell-main">

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api, type Plot } from '../api/client';
+import FileInput from './FileInput';
 
 export default function PlotsPanel({ jobId }: { jobId: string }) {
   const [plots, setPlots] = useState<Plot[]>([]);
@@ -39,12 +40,7 @@ export default function PlotsPanel({ jobId }: { jobId: string }) {
     <div>
       <div className="panel">
         <h3>Plot CAD PDFs</h3>
-        <input
-          type="file"
-          accept="application/pdf,.pdf"
-          disabled={busy}
-          onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])}
-        />
+        <FileInput accept="application/pdf,.pdf" disabled={busy} onFile={upload} label="Choose PDF" />
         {error && <p className="error">{error}</p>}
         {plots.length > 0 && (
           <table style={{ marginTop: '0.75rem' }}>

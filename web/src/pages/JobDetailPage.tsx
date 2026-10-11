@@ -10,6 +10,7 @@ import PlotsPanel from '../components/PlotsPanel';
 import CurrentRmsPanel from '../components/CurrentRmsPanel';
 import JobLocationColorsPanel from '../components/JobLocationColorsPanel';
 import JobCrewPanel from '../components/JobCrewPanel';
+import FileInput from '../components/FileInput';
 
 const TABS = ['Patch Import', 'Cases', 'Labels', 'Print Queue', 'Plots', 'Crew', 'Current RMS', 'Job Settings'] as const;
 type Tab = (typeof TABS)[number];
@@ -116,12 +117,7 @@ function JobSettingsPanel({ job, onUpdate }: { job: Job; onUpdate: (j: Job) => v
         <h4>Job logo</h4>
         <p className="muted">Used on PAL/generic labels and prep displays.</p>
         {job.logoPath && <img src={api.jobs.logoUrl(job.id)} alt="Job logo" style={{ maxHeight: 80, display: 'block', marginBottom: '0.5rem' }} />}
-        <input
-          type="file"
-          accept="image/*"
-          disabled={logoBusy}
-          onChange={(e) => e.target.files?.[0] && uploadLogo(e.target.files[0])}
-        />
+        <FileInput accept="image/*" disabled={logoBusy} onFile={uploadLogo} label="Choose image" />
       </div>
 
       <div style={{ marginTop: '1.25rem' }}>

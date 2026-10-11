@@ -8,6 +8,7 @@ import {
   type PatchFieldKey,
 } from '@elexprep/shared';
 import { api } from '../api/client';
+import FileInput from '../components/FileInput';
 
 const normalizeHeader = (h: string) => h.toLowerCase().replace(/[^a-z]/g, '');
 
@@ -81,11 +82,7 @@ export default function ImportMappingPage() {
 
       <div className="panel">
         <h3>Sample CSV (optional)</h3>
-        <input
-          type="file"
-          accept=".csv"
-          onChange={(e) => e.target.files?.[0] && onSampleFile(e.target.files[0])}
-        />
+        <FileInput accept=".csv" onFile={onSampleFile} label="Choose CSV" />
         {sampleHeaders.length > 0 && (
           <p className="muted">Columns found: {sampleHeaders.join(', ')}</p>
         )}
