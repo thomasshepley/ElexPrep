@@ -46,6 +46,24 @@ model Job {
   scheduleItems  JobScheduleItem[]
   documents      JobDocument[]
   labelRequests  CrewLabelRequest[]
+  discussionMessages JobDiscussionMessage[]
+}
+
+/// A flat, chronological message thread scoped to one job — like a channel for that gig.
+/// Visible/postable by any ADMIN/USER staff account and by crew assigned to the job (see
+/// routes/jobDiscussion.ts for staff, routes/crewPortal.ts's /me/jobs/:jobId/discussion for
+/// crew — two route surfaces over the same table, matching how schedule/documents/kit-list
+/// already work). No edit/delete yet — admin moderation is a later milestone.
+model JobDiscussionMessage {
+  id           String   @id @default(cuid())
+  jobId        String
+  job          Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  authorUserId String
+  authorUser   User     @relation(fields: [authorUserId], references: [id], onDelete: Cascade)
+  body         String
+  createdAt    DateTime @default(now())
+
+  @@index([jobId])
 }
 
 /// One timed entry in a job's day schedule (load-in, soundcheck, doors, show, get-out, ...) —
@@ -408,6 +426,7 @@ model User {
   sessions     Session[]
   crewProfile  CrewProfile?
   notifications Notification[]
+  jobDiscussionMessages JobDiscussionMessage[]
 }
 
 /// In-app notifications v1 — deliberately a handful of trigger points (see

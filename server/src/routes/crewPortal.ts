@@ -6,7 +6,7 @@ import { getCurrentRmsConfig } from '../currentRms/config';
 import { fetchPickListSnapshot } from '../currentRms/sync';
 import { plotsDir } from './plots';
 import { uploadDir } from './jobs';
-import { notifyLabelRequestSubmitted } from '../notifications';
+import { notifyLabelRequestSubmitted, notifyDiscussionMessage } from '../notifications';
 
 /**
  * Self-service data for a logged-in CREW account: their own profile, the jobs they're
@@ -228,6 +228,53 @@ crewPortalRouter.post('/me/jobs/:jobId/label-requests', requireRole('CREW'), asy
   await logActivity('crew_label_request.create', labelType, req.params.jobId, req.user!.id);
   await notifyLabelRequestSubmitted(req.params.jobId, found.assignment.job.name, req.user!.displayName, labelType);
   res.status(201).json({ ...request, content: JSON.parse(request.contentJson) });
+});
+
+function toDiscussionMessageDto(m: {
+  id: string;
+  jobId: string;
+  authorUserId: string;
+  body: string;
+  createdAt: Date;
+  authorUser: { displayName: string; role: string };
+}) {
+  return {
+    id: m.id,
+    jobId: m.jobId,
+    authorUserId: m.authorUserId,
+    authorName: m.authorUser.displayName,
+    authorRole: m.authorUser.role,
+    body: m.body,
+    createdAt: m.createdAt,
+  };
+}
+
+// Same thread staff see on the job's Discussion tab (routes/jobDiscussion.ts), scoped here to
+// a job the caller is actually assigned to.
+crewPortalRouter.get('/me/jobs/:jobId/discussion', requireRole('CREW'), async (req, res) => {
+  const found = await requireAssignedJob(req.user!.id, req.params.jobId);
+  if (!found) return res.status(404).json({ error: 'Job not found' });
+  const messages = await prisma.jobDiscussionMessage.findMany({
+    where: { jobId: req.params.jobId },
+    include: { authorUser: { select: { displayName: true, role: true } } },
+    orderBy: { createdAt: 'asc' },
+  });
+  res.json(messages.map(toDiscussionMessageDto));
+});
+
+crewPortalRouter.post('/me/jobs/:jobId/discussion', requireRole('CREW'), async (req, res) => {
+  const found = await requireAssignedJob(req.user!.id, req.params.jobId);
+  if (!found) return res.status(404).json({ error: 'Job not found' });
+  const { body } = req.body ?? {};
+  if (!body || typeof body !== 'string' || !body.trim()) return res.status(400).json({ error: 'body is required' });
+
+  const message = await prisma.jobDiscussionMessage.create({
+    data: { jobId: req.params.jobId, authorUserId: req.user!.id, body: body.trim() },
+    include: { authorUser: { select: { displayName: true, role: true } } },
+  });
+  await logActivity('job_discussion.create', req.params.jobId, req.params.jobId, req.user!.id);
+  await notifyDiscussionMessage(req.params.jobId, found.assignment.job.name, req.user!.id, req.user!.displayName, message.body);
+  res.status(201).json(toDiscussionMessageDto(message));
 });
 
 /** Batch-loads the (at most a handful of) distinct linked opportunities a crew member's jobs reference. */

@@ -3,8 +3,9 @@ import { useParams } from 'react-router-dom';
 import { api, type CrewJobDetail, type JobScheduleItem, type KitListItem, type JobDocument, type Plot } from '../api/client';
 import Chevron from '../components/Chevron';
 import DayTimeline from '../components/DayTimeline';
-import { WhoIcon, WhatIcon, WhenIcon, WhereIcon, WhyIcon } from '../components/Icons';
+import { WhoIcon, WhatIcon, WhenIcon, WhereIcon, WhyIcon, DiscussionIcon } from '../components/Icons';
 import LabelTypeForm, { AD_HOC_TYPES, type AdHocType } from '../components/LabelTypeForm';
+import JobDiscussionThread from '../components/JobDiscussionThread';
 
 const NO_DATE = 'No date set yet';
 const NO_VENUE = 'No venue set yet';
@@ -221,6 +222,12 @@ export default function CrewJobPage() {
           <WhySubsection title="Need something prepped?">
             <RequestLabelForm jobId={jobId} />
           </WhySubsection>
+        </InfoCard>
+      </div>
+
+      <div style={{ marginTop: '0.9rem' }}>
+        <InfoCard id="discussion" icon={<DiscussionIcon />} label="Discussion" summary="Message the crew and prep staff on this job">
+          <JobDiscussionThread jobId={jobId} scope="crew" />
         </InfoCard>
       </div>
     </div>

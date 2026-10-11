@@ -34,6 +34,7 @@ import { jobCrewAssignmentsRouter } from './routes/jobCrewAssignments';
 import { labelTemplatesRouter } from './routes/labelTemplates';
 import { jobScheduleRouter } from './routes/jobSchedule';
 import { jobDocumentsRouter } from './routes/jobDocuments';
+import { jobDiscussionRouter } from './routes/jobDiscussion';
 import { dashboardRouter } from './routes/dashboard';
 import { notificationsRouter } from './routes/notifications';
 import { seedDefaultLocationColorsIfEmpty, seedNewDefaultLocationColorsIfMissing } from './pdf/locationColors';
@@ -72,6 +73,7 @@ app.use('/api/jobs', jobCrewAssignmentsRouter);
 app.use('/api/jobs', labelTemplatesRouter);
 app.use('/api/jobs', jobScheduleRouter);
 app.use('/api/jobs', jobDocumentsRouter);
+app.use('/api/jobs', jobDiscussionRouter);
 app.use('/api/dashboard', dashboardRouter);
 app.use('/api/notifications', notificationsRouter);
 // crewPortalRouter (self-service, CREW-only) is mounted before the admin-only crewRouter at

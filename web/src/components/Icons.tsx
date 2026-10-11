@@ -77,6 +77,14 @@ export function WhyIcon() {
   );
 }
 
+export function DiscussionIcon() {
+  return (
+    <svg {...common}>
+      <path d="M2.2 4.4a1.4 1.4 0 0 1 1.4-1.4h8.8a1.4 1.4 0 0 1 1.4 1.4v5.2a1.4 1.4 0 0 1-1.4 1.4H6.4l-2.9 2.4v-2.4H3.6a1.4 1.4 0 0 1-1.4-1.4Z" {...stroke} />
+    </svg>
+  );
+}
+
 export function JobsIcon() {
   return (
     <svg {...common}>

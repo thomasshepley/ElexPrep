@@ -52,3 +52,34 @@ export async function notifyLabelRequestReviewed(userId: string, jobId: string, 
     `/crew/jobs/${jobId}`
   );
 }
+
+const EXCERPT_LENGTH = 80;
+
+/**
+ * A new message in a job's discussion thread — notifies every ADMIN/USER staff account and
+ * every crew member assigned to the job, excluding whoever just posted it. Two batches because
+ * the two audiences land on different shells (staff -> the job's Discussion tab, crew -> their
+ * portal's job page), so they need different links.
+ */
+export async function notifyDiscussionMessage(jobId: string, jobName: string, authorUserId: string, authorName: string, body: string) {
+  const excerpt = body.length > EXCERPT_LENGTH ? `${body.slice(0, EXCERPT_LENGTH)}…` : body;
+  const title = `${authorName} in ${jobName}`;
+
+  const staff = await prisma.user.findMany({ where: { role: { in: ['ADMIN', 'USER'] }, id: { not: authorUserId } }, select: { id: true } });
+  if (staff.length > 0) {
+    await prisma.notification.createMany({
+      data: staff.map((u) => ({ userId: u.id, type: 'job_discussion.message', title, body: excerpt, link: `/jobs/${jobId}` })),
+    });
+  }
+
+  const assignments = await prisma.jobCrewAssignment.findMany({
+    where: { jobId, crewProfile: { userId: { not: authorUserId } } },
+    select: { crewProfile: { select: { userId: true } } },
+  });
+  const crewUserIds = [...new Set(assignments.map((a) => a.crewProfile.userId))];
+  if (crewUserIds.length > 0) {
+    await prisma.notification.createMany({
+      data: crewUserIds.map((userId) => ({ userId, type: 'job_discussion.message', title, body: excerpt, link: `/crew/jobs/${jobId}` })),
+    });
+  }
+}
