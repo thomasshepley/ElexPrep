@@ -965,10 +965,16 @@ tbody tr:hover {
   border-top: 1px solid var(--border);
 }
 
-.day-timeline-item {
+.day-timeline-track {
   position: absolute;
+  top: 0;
+  bottom: 0;
   left: 0.75rem;
   right: 0.75rem;
+}
+
+.day-timeline-item {
+  position: absolute;
   background: var(--accent-wash);
   border-left: 3px solid var(--accent);
   border-radius: var(--radius-sm);

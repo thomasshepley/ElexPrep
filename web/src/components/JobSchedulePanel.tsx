@@ -2,11 +2,38 @@ import { useEffect, useState } from 'react';
 import { api, type JobScheduleItem } from '../api/client';
 import DayTimeline from './DayTimeline';
 
+// The native datetime-local spinner/scroll-wheel snaps to this step, so picking a time quickly
+// moves in 15-minute jumps — typing a value directly (e.g. 09:07) is still unrestricted, so an
+// exact, non-aligned time is still just as easy to enter.
+const TIME_STEP_SECONDS = 15 * 60;
+
+function toDatetimeLocal(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+/** Today at 09:00 — the sensible default for a fresh "Starts" field. */
+function defaultStartsAt(): string {
+  const d = new Date();
+  d.setHours(9, 0, 0, 0);
+  return toDatetimeLocal(d);
+}
+
+/** One hour after the given datetime-local value, same day unless that rolls into the next one. */
+function plusOneHour(datetimeLocal: string): string {
+  const d = new Date(datetimeLocal);
+  d.setHours(d.getHours() + 1);
+  return toDatetimeLocal(d);
+}
+
 export default function JobSchedulePanel({ jobId }: { jobId: string }) {
   const [items, setItems] = useState<JobScheduleItem[]>([]);
   const [title, setTitle] = useState('');
-  const [startsAt, setStartsAt] = useState('');
-  const [endsAt, setEndsAt] = useState('');
+  const [startsAt, setStartsAt] = useState(defaultStartsAt);
+  const [endsAt, setEndsAt] = useState(() => plusOneHour(defaultStartsAt()));
+  // Once the user edits Ends directly, stop overwriting it when Starts changes — only the
+  // still-untouched default should track Starts automatically.
+  const [endsAtTouched, setEndsAtTouched] = useState(false);
   const [notes, setNotes] = useState('');
   const [error, setError] = useState<string | null>(null);
 
@@ -16,6 +43,16 @@ export default function JobSchedulePanel({ jobId }: { jobId: string }) {
     refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [jobId]);
+
+  const handleStartsChange = (value: string) => {
+    setStartsAt(value);
+    if (!endsAtTouched && value) setEndsAt(plusOneHour(value));
+  };
+
+  const handleEndsChange = (value: string) => {
+    setEndsAt(value);
+    setEndsAtTouched(true);
+  };
 
   const create = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,8 +65,10 @@ export default function JobSchedulePanel({ jobId }: { jobId: string }) {
         notes: notes || undefined,
       });
       setTitle('');
-      setStartsAt('');
-      setEndsAt('');
+      const next = defaultStartsAt();
+      setStartsAt(next);
+      setEndsAt(plusOneHour(next));
+      setEndsAtTouched(false);
       setNotes('');
       refresh();
     } catch (err) {
@@ -53,11 +92,24 @@ export default function JobSchedulePanel({ jobId }: { jobId: string }) {
           </div>
           <div className="field" style={{ width: '13rem' }}>
             <label htmlFor="sched-starts">Starts</label>
-            <input id="sched-starts" type="datetime-local" value={startsAt} onChange={(e) => setStartsAt(e.target.value)} required />
+            <input
+              id="sched-starts"
+              type="datetime-local"
+              step={TIME_STEP_SECONDS}
+              value={startsAt}
+              onChange={(e) => handleStartsChange(e.target.value)}
+              required
+            />
           </div>
           <div className="field" style={{ width: '13rem' }}>
             <label htmlFor="sched-ends">Ends (optional)</label>
-            <input id="sched-ends" type="datetime-local" value={endsAt} onChange={(e) => setEndsAt(e.target.value)} />
+            <input
+              id="sched-ends"
+              type="datetime-local"
+              step={TIME_STEP_SECONDS}
+              value={endsAt}
+              onChange={(e) => handleEndsChange(e.target.value)}
+            />
           </div>
           <div className="field" style={{ width: '16rem' }}>
             <label htmlFor="sched-notes">Notes</label>
