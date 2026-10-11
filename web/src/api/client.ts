@@ -160,6 +160,14 @@ export interface CrewMember {
   createdAt: string;
 }
 
+export interface CrewRateLine {
+  id: string;
+  crewProfileId: string;
+  label: string;
+  amount: string;
+  order: number;
+}
+
 export interface CrewDocumentSummary {
   id: string;
   kind: string;
@@ -399,6 +407,15 @@ export const api = {
       url: (crewId: string, docId: string) => `${BASE}/crew/${crewId}/documents/${docId}`,
       remove: (crewId: string, docId: string) =>
         request<void>(`/crew/${crewId}/documents/${docId}`, { method: 'DELETE' }),
+    },
+    rateLines: {
+      list: (crewId: string) => request<CrewRateLine[]>(`/crew/${crewId}/rate-lines`),
+      create: (crewId: string, data: { label: string; amount: string }) =>
+        request<CrewRateLine>(`/crew/${crewId}/rate-lines`, { method: 'POST', body: JSON.stringify(data) }),
+      update: (crewId: string, lineId: string, data: Partial<{ label: string; amount: string }>) =>
+        request<CrewRateLine>(`/crew/${crewId}/rate-lines/${lineId}`, { method: 'PUT', body: JSON.stringify(data) }),
+      remove: (crewId: string, lineId: string) =>
+        request<void>(`/crew/${crewId}/rate-lines/${lineId}`, { method: 'DELETE' }),
     },
   },
   crewApplications: {

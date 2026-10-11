@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useState } from 'react';
-import { api, type CrewMember, type CrewDocumentSummary } from '../api/client';
+import { api, type CrewMember, type CrewDocumentSummary, type CrewRateLine } from '../api/client';
 import FileInput from '../components/FileInput';
+import SkillPicker from '../components/SkillPicker';
 
 const DOCUMENT_SLOTS = [
   { field: 'idDocument', label: 'Photo ID' },
@@ -16,7 +17,6 @@ export default function CrewPage() {
   const [password, setPassword] = useState('');
   const [phone, setPhone] = useState('');
   const [skills, setSkills] = useState('');
-  const [dayRate, setDayRate] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
@@ -36,14 +36,12 @@ export default function CrewPage() {
         displayName: displayName || undefined,
         phone: phone || undefined,
         skills: skills || undefined,
-        dayRate: dayRate || undefined,
       });
       setUsername('');
       setDisplayName('');
       setPassword('');
       setPhone('');
       setSkills('');
-      setDayRate('');
       refresh();
     } catch (err) {
       setError((err as Error).message);
@@ -109,16 +107,12 @@ export default function CrewPage() {
               <label htmlFor="crew-phone">Phone</label>
               <input id="crew-phone" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="07700 900000" />
             </div>
-            <div className="field" style={{ width: '12rem' }}>
-              <label htmlFor="crew-skills">Skills</label>
-              <input id="crew-skills" value={skills} onChange={(e) => setSkills(e.target.value)} placeholder="LD, Rigger" />
-            </div>
-            <div className="field" style={{ width: '9rem' }}>
-              <label htmlFor="crew-day-rate">Day rate</label>
-              <input id="crew-day-rate" value={dayRate} onChange={(e) => setDayRate(e.target.value)} placeholder="250" />
-            </div>
-            <button type="submit">Add crew member</button>
           </div>
+          <SkillPicker value={skills} onChange={setSkills} />
+          <p className="muted" style={{ marginTop: '0.4rem' }}>
+            Set a rate card after adding them — expand their row with "Details".
+          </p>
+          <button type="submit">Add crew member</button>
         </form>
         {error && <p className="error">{error}</p>}
       </div>
@@ -129,7 +123,6 @@ export default function CrewPage() {
             <th>Name</th>
             <th>Phone</th>
             <th>Skills</th>
-            <th>Day rate</th>
             <th>Status</th>
             <th></th>
           </tr>
@@ -144,7 +137,6 @@ export default function CrewPage() {
                 </td>
                 <td>{c.phone ?? '—'}</td>
                 <td>{c.skills ?? '—'}</td>
-                <td>{c.dayRate ?? '—'}</td>
                 <td>
                   <label className="switch">
                     <input type="checkbox" checked={c.active} onChange={() => toggleActive(c)} />
@@ -154,7 +146,7 @@ export default function CrewPage() {
                 </td>
                 <td className="row">
                   <button className="secondary" onClick={() => setExpandedId(expandedId === c.id ? null : c.id)}>
-                    Documents
+                    Details
                   </button>
                   <button className="secondary" onClick={() => resetPassword(c)}>
                     Reset password
@@ -166,7 +158,8 @@ export default function CrewPage() {
               </tr>
               {expandedId === c.id && (
                 <tr>
-                  <td colSpan={6}>
+                  <td colSpan={5}>
+                    <RateCardPanel crewId={c.id} />
                     <CrewDocumentsPanel crewId={c.id} />
                   </td>
                 </tr>
@@ -175,6 +168,70 @@ export default function CrewPage() {
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+function RateCardPanel({ crewId }: { crewId: string }) {
+  const [lines, setLines] = useState<CrewRateLine[]>([]);
+  const [label, setLabel] = useState('');
+  const [amount, setAmount] = useState('');
+  const [error, setError] = useState<string | null>(null);
+
+  const refresh = () => api.crew.rateLines.list(crewId).then(setLines).catch((e) => setError(e.message));
+
+  useEffect(() => {
+    refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [crewId]);
+
+  const add = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    try {
+      await api.crew.rateLines.create(crewId, { label, amount });
+      setLabel('');
+      setAmount('');
+      refresh();
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  };
+
+  const remove = async (lineId: string) => {
+    await api.crew.rateLines.remove(crewId, lineId);
+    refresh();
+  };
+
+  return (
+    <div style={{ padding: '0.75rem 0', borderBottom: '1px solid var(--border)' }}>
+      <strong>Rate card</strong>
+      {error && <p className="error">{error}</p>}
+      {lines.length === 0 ? (
+        <p className="muted">No rate lines yet.</p>
+      ) : (
+        <ul style={{ margin: '0.5rem 0' }}>
+          {lines.map((l) => (
+            <li key={l.id}>
+              <strong>{l.label}:</strong> {l.amount}{' '}
+              <button className="secondary" style={{ padding: '0.1rem 0.5rem' }} onClick={() => remove(l.id)}>
+                Remove
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <form onSubmit={add} className="row" style={{ alignItems: 'flex-end', gap: '0.6rem', marginTop: '0.5rem' }}>
+        <div className="field" style={{ width: '12rem' }}>
+          <label htmlFor={`rate-label-${crewId}`}>Label</label>
+          <input id={`rate-label-${crewId}`} value={label} onChange={(e) => setLabel(e.target.value)} placeholder="e.g. Day rate, Overtime" required />
+        </div>
+        <div className="field" style={{ width: '8rem' }}>
+          <label htmlFor={`rate-amount-${crewId}`}>Amount</label>
+          <input id={`rate-amount-${crewId}`} value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="250" required />
+        </div>
+        <button type="submit">Add rate line</button>
+      </form>
     </div>
   );
 }
