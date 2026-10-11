@@ -13,6 +13,12 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  // Set once the password step succeeds for a 2FA-enabled account — switches the form to the
+  // code-entry step. Nothing is signed in yet at this point (see routes/auth.ts's /login).
+  const [pendingToken, setPendingToken] = useState<string | null>(null);
+  const [totpCode, setTotpCode] = useState('');
+  const [useBackupCode, setUseBackupCode] = useState(false);
+
   useEffect(() => {
     api.auth.status().then((s) => setNeedsSetup(s.needsSetup));
   }, []);
@@ -29,6 +35,27 @@ export default function LoginPage() {
       const authed = needsSetup
         ? await api.auth.setup({ username, password, displayName: displayName || undefined })
         : await api.auth.login({ username, password });
+      if ('requiresTotp' in authed) {
+        setPendingToken(authed.pendingToken);
+      } else {
+        setUser(authed);
+      }
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const submitTotp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!pendingToken) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const authed = await api.auth.verifyTotp(
+        useBackupCode ? { pendingToken, backupCode: totpCode } : { pendingToken, code: totpCode }
+      );
       setUser(authed);
     } catch (err) {
       setError((err as Error).message);
@@ -36,6 +63,51 @@ export default function LoginPage() {
       setBusy(false);
     }
   };
+
+  if (pendingToken) {
+    return (
+      <div className="auth-page">
+        <div className="auth-card">
+          <div className="auth-brand">
+            <span className="auth-brand-mark" />
+            <h1>ELEX Portal</h1>
+            <p>{useBackupCode ? 'Enter one of your backup codes.' : 'Enter the 6-digit code from your authenticator app.'}</p>
+          </div>
+          <form onSubmit={submitTotp}>
+            <div className="field">
+              <label htmlFor="login-totp">{useBackupCode ? 'Backup code' : 'Authentication code'}</label>
+              <input
+                id="login-totp"
+                value={totpCode}
+                onChange={(e) => setTotpCode(e.target.value)}
+                autoFocus
+                required
+                inputMode={useBackupCode ? 'text' : 'numeric'}
+                placeholder={useBackupCode ? 'XXXX-XXXX' : '123456'}
+              />
+            </div>
+            {error && <p className="error">{error}</p>}
+            <button type="submit" disabled={busy}>
+              Verify
+            </button>
+          </form>
+          <p className="muted" style={{ marginTop: '0.75rem' }}>
+            <button
+              type="button"
+              className="link-button"
+              onClick={() => {
+                setUseBackupCode((v) => !v);
+                setTotpCode('');
+                setError(null);
+              }}
+            >
+              {useBackupCode ? 'Use your authenticator app instead' : "Lost your device? Use a backup code"}
+            </button>
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="auth-page">

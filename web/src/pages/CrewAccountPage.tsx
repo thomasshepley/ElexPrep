@@ -7,6 +7,7 @@ import BankDetailsForm from '../components/BankDetailsForm';
 import BankDetailsReveal from '../components/BankDetailsReveal';
 import RateCardEditor from '../components/RateCardEditor';
 import NotificationPreferences from '../components/NotificationPreferences';
+import TwoFactorPanel from '../components/TwoFactorPanel';
 
 /**
  * Crew self-service: the first place a crew member can edit anything about their own account
@@ -192,6 +193,11 @@ export default function CrewAccountPage() {
           </div>
           <button type="submit">Change password</button>
         </form>
+      </div>
+
+      <div className="panel">
+        <h3>Two-factor authentication</h3>
+        <TwoFactorPanel />
       </div>
 
       <div className="panel">

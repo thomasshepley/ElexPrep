@@ -471,12 +471,19 @@ model PrintQueueItem {
   @@index([jobId])
 }
 
+/// ipAddress/userAgent are filled in automatically by logActivity() from the current
+/// request's AsyncLocalStorage context (see server/src/requestContext.ts) — every call site
+/// gets them for free, including auth.login/auth.login_failed, without having to thread req
+/// through 80+ existing logActivity() calls. Null only for entries raised outside an HTTP
+/// request (the Current RMS poll timer, etc.).
 model ActivityLogEntry {
   id        String   @id @default(cuid())
   jobId     String?
   userId    String?
   action    String
   detail    String?
+  ipAddress String?
+  userAgent String?
   createdAt DateTime @default(now())
 }
 
@@ -503,12 +510,40 @@ model User {
   /// unmodified", same posture as JobCrewAssignment.dayRate falling back to CrewProfile.dayRate.
   /// Only meaningful for USER-role accounts; ADMIN/SIGNAGE permissions are fixed regardless.
   permissionsJson String?
+
+  /// TOTP second factor (RFC 6238), self-service and opt-in for any role — see
+  /// server/src/totp.ts and routes/twoFactor.ts. The secret is encrypted at rest with the
+  /// same AES-256-GCM helper as crew documents/bank details (crewDocCrypto.ts), never stored
+  /// or returned in plaintext once confirmed. totpEnabled is false (and the secret columns
+  /// null) until the user has proven they can generate a valid code for it.
+  totpSecretCiphertext String?
+  totpSecretIv          String?
+  totpSecretAuthTag     String?
+  totpEnabled            Boolean   @default(false)
+  totpVerifiedAt         DateTime?
+
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
   sessions     Session[]
   crewProfile  CrewProfile?
   notifications Notification[]
   jobDiscussionMessages JobDiscussionMessage[]
+  backupCodes  BackupCode[]
+}
+
+/// One-time recovery codes for when a 2FA-enabled user loses their authenticator — bcrypt-
+/// hashed the same way passwords are (never stored in plaintext), each usable exactly once.
+/// Generated 10 at a time whenever 2FA is enabled or codes are regenerated; the plaintext is
+/// returned to the client exactly once, at generation time, and never again.
+model BackupCode {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  codeHash  String
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
 }
 
 /// In-app notifications v1 — deliberately a handful of trigger points (see
