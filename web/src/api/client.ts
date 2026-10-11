@@ -1,4 +1,5 @@
-import type { PickListDiff } from '@elexprep/shared';
+import type { PickListDiff, LabelElementDef, LabelTypeTemplate } from '@elexprep/shared';
+export type { LabelElementDef, LabelTypeTemplate, TextElementDef, StackedTextElementDef, FillElementDef, ImageElementDef } from '@elexprep/shared';
 
 const BASE = '/api';
 
@@ -449,7 +450,7 @@ export const api = {
         body: JSON.stringify(opts),
       }),
     list: (jobId: string) => request<{ queue: PrintQueueItem[]; adHoc: AdHocLabel[] }>(`/jobs/${jobId}/print-queue`),
-    updateItem: (jobId: string, id: string, data: Partial<{ quantity: number }>) =>
+    updateItem: (jobId: string, id: string, data: Partial<{ quantity: number; content: Record<string, unknown> }>) =>
       request<PrintQueueItem>(`/jobs/${jobId}/print-queue/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     removeItem: (jobId: string, id: string) =>
       request<void>(`/jobs/${jobId}/print-queue/${id}`, { method: 'DELETE' }),
@@ -471,6 +472,19 @@ export const api = {
       request<{ printer: string; trayMap: Record<string, string>; method: PrintMethod }>(
         `/jobs/${jobId}/printer-config`
       ),
+  },
+  labelTemplates: {
+    get: (jobId: string, labelType: string) =>
+      request<{ template: LabelTypeTemplate; isCustomized: boolean }>(`/jobs/${jobId}/label-templates/${labelType}`),
+    update: (jobId: string, labelType: string, elements: Record<string, Partial<LabelElementDef>>) =>
+      request<{ template: LabelTypeTemplate; isCustomized: boolean }>(`/jobs/${jobId}/label-templates/${labelType}`, {
+        method: 'PUT',
+        body: JSON.stringify({ elements }),
+      }),
+    reset: (jobId: string, labelType: string) =>
+      request<{ template: LabelTypeTemplate; isCustomized: boolean }>(`/jobs/${jobId}/label-templates/${labelType}`, {
+        method: 'DELETE',
+      }),
   },
   printJobs: {
     list: (jobId?: string) => request<PrintJob[]>(`/print-jobs${jobId ? `?jobId=${jobId}` : ''}`),

@@ -1,27 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { toLocationColorMapEntry, type LocationColorMap } from '@elexprep/shared';
 import { api, type PrintQueueItem, type AdHocLabel, type PrintJob, type PrintMethod } from '../api/client';
-
-function summarize(labelType: string, content: Record<string, unknown>): string {
-  switch (labelType) {
-    case 'FIXTURE':
-      return `#${content.address} — Uni ${content.mainUniverse}/${content.mainAddress}`;
-    case 'PAL':
-      return `${content.location ?? ''} — ${content.title ?? ''} ${content.subtitle ?? ''}`;
-    case 'TRUSS_SPIKE_POSITION':
-      return String(content.address ?? '');
-    case 'TRUSS_SPIKE_TIP':
-      return String(content.text ?? 'DO NOT TIP');
-    case 'TRUSS_SPIKE_SACN':
-      return `${content.ipAddress ?? ''}`;
-    case 'CABLE':
-      return `${content.text ?? ''}${content.isDmx ? ' (DMX)' : ''}`;
-    case 'RACK':
-      return `${content.title ?? ''} ${content.subtitle ?? ''}`;
-    default:
-      return JSON.stringify(content);
-  }
-}
+import LabelTypeSection, { summarize } from './printQueue/LabelTypeSection';
 
 export default function PrintQueuePanel({ jobId }: { jobId: string }) {
   const [queue, setQueue] = useState<PrintQueueItem[]>([]);
@@ -32,14 +13,13 @@ export default function PrintQueuePanel({ jobId }: { jobId: string }) {
   const [printJobs, setPrintJobs] = useState<PrintJob[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [previewVersion, setPreviewVersion] = useState(0);
+  const [locationColors, setLocationColors] = useState<LocationColorMap>(new Map());
 
   const refresh = () =>
     api.printQueue.list(jobId).then(({ queue, adHoc }) => {
       setQueue(queue);
       setAdHoc(adHoc);
       setSelected(new Set(queue.filter((q) => q.status === 'PENDING').map((q) => q.id)));
-      setPreviewVersion((v) => v + 1);
     });
 
   const refreshPrintJobs = () => api.printJobs.list(jobId).then(setPrintJobs);
@@ -51,6 +31,14 @@ export default function PrintQueuePanel({ jobId }: { jobId: string }) {
       setTrayMap(c.trayMap);
       setMethod(c.method);
     });
+    Promise.all([api.locationColorRules.list(), api.jobLocationColorRules.list(jobId)]).then(([global, job]) => {
+      const map: LocationColorMap = new Map(global.map(toLocationColorMapEntry));
+      for (const rule of job) {
+        const [key, value] = toLocationColorMapEntry(rule);
+        map.set(key, value);
+      }
+      setLocationColors(map);
+    });
   }, [jobId]);
 
   const build = async () => {
@@ -61,16 +49,6 @@ export default function PrintQueuePanel({ jobId }: { jobId: string }) {
     } finally {
       setBusy(false);
     }
-  };
-
-  const setQty = async (id: string, quantity: number) => {
-    await api.printQueue.updateItem(jobId, id, { quantity });
-    refresh();
-  };
-
-  const removeItem = async (id: string) => {
-    await api.printQueue.removeItem(jobId, id);
-    refresh();
   };
 
   const toggle = (id: string) => {
@@ -129,6 +107,13 @@ export default function PrintQueuePanel({ jobId }: { jobId: string }) {
   const pendingItems = queue.filter((q) => q.status === 'PENDING');
   const confirmedOrPrinted = queue.filter((q) => q.status !== 'PENDING');
 
+  const labelTypes = useMemo(() => {
+    const types = new Set<string>();
+    for (const item of pendingItems) types.add(item.labelType);
+    for (const item of adHoc) types.add(item.labelType);
+    return [...types];
+  }, [pendingItems, adHoc]);
+
   return (
     <div>
       <div className="panel">
@@ -154,56 +139,6 @@ export default function PrintQueuePanel({ jobId }: { jobId: string }) {
           <p className="muted">Nothing queued yet — build from patch/cases or add ad hoc labels.</p>
         )}
 
-        {pendingItems.length > 0 && (
-          <table>
-            <thead>
-              <tr>
-                <th></th>
-                <th>Type</th>
-                <th>Content</th>
-                <th>Qty</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {pendingItems.map((item) => (
-                <tr key={item.id}>
-                  <td>
-                    <input type="checkbox" checked={selected.has(item.id)} onChange={() => toggle(item.id)} />
-                  </td>
-                  <td>{item.labelType}</td>
-                  <td>{summarize(item.labelType, item.content)}</td>
-                  <td>
-                    <input
-                      type="number"
-                      min={1}
-                      defaultValue={item.quantity}
-                      style={{ width: 60 }}
-                      onBlur={(e) => setQty(item.id, Number(e.target.value))}
-                    />
-                  </td>
-                  <td>
-                    <button className="secondary" onClick={() => removeItem(item.id)}>
-                      Remove
-                    </button>
-                  </td>
-                </tr>
-              ))}
-              {adHoc.map((item) => (
-                <tr key={item.id}>
-                  <td>
-                    <input type="checkbox" checked disabled title="Ad hoc labels are always included" />
-                  </td>
-                  <td>{item.labelType}</td>
-                  <td>{summarize(item.labelType, item.content)}</td>
-                  <td>{item.quantity}</td>
-                  <td className="muted">ad hoc</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-
         {error && <p className="error">{error}</p>}
 
         <div className="row" style={{ marginTop: '1rem' }}>
@@ -220,33 +155,20 @@ export default function PrintQueuePanel({ jobId }: { jobId: string }) {
         </div>
       </div>
 
-      {(pendingItems.length > 0 || adHoc.length > 0) && (
-        <div className="panel">
-          <div className="row" style={{ justifyContent: 'space-between' }}>
-            <h3>Visual preview</h3>
-            <button className="secondary" onClick={() => setPreviewVersion((v) => v + 1)}>
-              Refresh preview
-            </button>
-          </div>
-          <p className="muted">
-            This is the actual PDF that will be produced — same layout, colors, and logo as the
-            real print, generated live from what's queued above (nothing here is confirmed or
-            sent by viewing it).
-          </p>
-          <iframe
-            key={previewVersion}
-            title="Print preview"
-            src={`${api.printQueue.previewUrl(jobId)}?v=${previewVersion}`}
-            style={{
-              width: '100%',
-              height: '70vh',
-              border: '1px solid var(--border)',
-              borderRadius: 6,
-              background: '#fff',
-            }}
-          />
-        </div>
-      )}
+      {labelTypes.map((labelType) => (
+        <LabelTypeSection
+          key={labelType}
+          jobId={jobId}
+          labelType={labelType}
+          queueItems={pendingItems.filter((q) => q.labelType === labelType)}
+          adHocItems={adHoc.filter((a) => a.labelType === labelType)}
+          selected={selected}
+          onToggleSelect={toggle}
+          locationColors={locationColors}
+          onRefresh={refresh}
+          logoUrl={labelType === 'PAL' ? api.jobs.logoUrl(jobId) : undefined}
+        />
+      ))}
 
       {printJobs.length > 0 && (
         <div className="panel">
