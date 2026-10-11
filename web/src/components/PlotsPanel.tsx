@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, type Plot } from '../api/client';
 import FileInput from './FileInput';
+import InlinePdfViewer from './InlinePdfViewer';
 
 export default function PlotsPanel({ jobId }: { jobId: string }) {
   const [plots, setPlots] = useState<Plot[]>([]);
@@ -83,17 +84,8 @@ export default function PlotsPanel({ jobId }: { jobId: string }) {
 
       {viewing && (
         <div className="panel">
-          <div className="row" style={{ justifyContent: 'space-between' }}>
-            <h3>{viewing.originalName}</h3>
-            <a href={api.plots.fileUrl(jobId, viewing.id)} target="_blank" rel="noreferrer">
-              Open in new tab
-            </a>
-          </div>
-          <iframe
-            title={viewing.originalName}
-            src={api.plots.fileUrl(jobId, viewing.id)}
-            style={{ width: '100%', height: '75vh', border: '1px solid var(--border)', borderRadius: 6 }}
-          />
+          <h3>{viewing.originalName}</h3>
+          <InlinePdfViewer url={api.plots.fileUrl(jobId, viewing.id)} title={viewing.originalName} />
         </div>
       )}
     </div>

@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { api, type Job } from '../api/client';
+import { api, type Job, type CrewFeatures, CREW_FEATURE_KEYS, CREW_FEATURE_LABELS } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import PatchImportPanel from '../components/PatchImportPanel';
 import CasesPanel from '../components/CasesPanel';
 import LabelsPanel from '../components/LabelsPanel';
 import PrintQueuePanel from '../components/PrintQueuePanel';
 import PlotsPanel from '../components/PlotsPanel';
+import OneDriveFilesPanel from '../components/OneDriveFilesPanel';
 import JobSchedulePanel from '../components/JobSchedulePanel';
 import JobDocumentsPanel from '../components/JobDocumentsPanel';
 import CurrentRmsPanel from '../components/CurrentRmsPanel';
@@ -47,7 +48,12 @@ export default function JobDetailPage() {
       {tab === 'Cases' && <CasesPanel jobId={jobId} />}
       {tab === 'Labels' && <LabelsPanel jobId={jobId} />}
       {tab === 'Print Queue' && <PrintQueuePanel jobId={jobId} />}
-      {tab === 'Plots' && <PlotsPanel jobId={jobId} />}
+      {tab === 'Plots' && (
+        <>
+          <OneDriveFilesPanel jobId={jobId} />
+          <PlotsPanel jobId={jobId} />
+        </>
+      )}
       {tab === 'Schedule' && <JobSchedulePanel jobId={jobId} />}
       {tab === 'Documents' && <JobDocumentsPanel jobId={jobId} />}
       {tab === 'Crew' && <JobCrewPanel jobId={jobId} />}
@@ -131,8 +137,59 @@ function JobSettingsPanel({ job, onUpdate }: { job: Job; onUpdate: (j: Job) => v
       </div>
 
       <div style={{ marginTop: '1.25rem' }}>
+        <JobCrewFeaturesPanel job={job} onUpdate={onUpdate} />
+      </div>
+
+      <div style={{ marginTop: '1.25rem' }}>
         <JobLocationColorsPanel jobId={job.id} />
       </div>
+    </div>
+  );
+}
+
+/** Per-job override of which crew-portal sections are visible for this job's crew — starts
+ * from whatever was set at onboarding (or the portal default, if never overridden). */
+function JobCrewFeaturesPanel({ job, onUpdate }: { job: Job; onUpdate: (j: Job) => void }) {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'ADMIN';
+  const canEdit = isAdmin || Boolean(user?.permissions?.onboardJobs) || Boolean(user?.permissions?.manageCrewAssignments);
+  const [features, setFeatures] = useState<CrewFeatures | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    api.portalSettings.getCrewFeaturesDefault().then((defaults) => {
+      const override = job.crewFeaturesJson ? (JSON.parse(job.crewFeaturesJson) as Partial<CrewFeatures>) : {};
+      setFeatures({ ...defaults, ...override });
+    });
+  }, [job.crewFeaturesJson]);
+
+  if (!canEdit || !features) return null;
+
+  const save = async () => {
+    setBusy(true);
+    try {
+      const updated = await api.jobs.update(job.id, { crewFeatures: features });
+      onUpdate(updated);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div>
+      <h4>Crew portal features</h4>
+      <p className="muted">Which sections of this job's page are visible to its crew.</p>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginBottom: '0.75rem' }}>
+        {CREW_FEATURE_KEYS.map((key) => (
+          <label key={key} className="row" style={{ gap: '0.4rem' }}>
+            <input type="checkbox" checked={features[key]} onChange={(e) => setFeatures({ ...features, [key]: e.target.checked })} />
+            {CREW_FEATURE_LABELS[key]}
+          </label>
+        ))}
+      </div>
+      <button type="button" className="secondary" onClick={save} disabled={busy}>
+        Save
+      </button>
     </div>
   );
 }

@@ -1,11 +1,12 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { useParams } from 'react-router-dom';
-import { api, type CrewJobDetail, type JobScheduleItem, type KitListItem, type JobDocument, type Plot } from '../api/client';
+import { api, type CrewJobDetail, type JobScheduleItem, type KitListItem, type JobDocument, type Plot, type OneDriveShare } from '../api/client';
 import Chevron from '../components/Chevron';
 import DayTimeline from '../components/DayTimeline';
 import { WhoIcon, WhatIcon, WhenIcon, WhereIcon, WhyIcon, DiscussionIcon } from '../components/Icons';
 import LabelTypeForm, { AD_HOC_TYPES, type AdHocType } from '../components/LabelTypeForm';
 import JobDiscussionThread from '../components/JobDiscussionThread';
+import InlinePdfViewer from '../components/InlinePdfViewer';
 
 const NO_DATE = 'No date set yet';
 const NO_VENUE = 'No venue set yet';
@@ -100,6 +101,9 @@ export default function CrewJobPage() {
   const [kitList, setKitList] = useState<KitListItem[]>([]);
   const [documents, setDocuments] = useState<JobDocument[]>([]);
   const [plots, setPlots] = useState<Plot[]>([]);
+  const [cadPdf, setCadPdf] = useState<{ itemId: string; name: string } | null>(null);
+  const [sharedFiles, setSharedFiles] = useState<OneDriveShare[]>([]);
+  const [viewingCad, setViewingCad] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -109,6 +113,13 @@ export default function CrewJobPage() {
     api.crewPortal.kitList(jobId).then((r) => setKitList(r.items)).catch(() => {});
     api.crewPortal.documents(jobId).then(setDocuments).catch(() => {});
     api.crewPortal.plots(jobId).then(setPlots).catch(() => {});
+    api.crewPortal
+      .oneDrive(jobId)
+      .then((r) => {
+        setCadPdf(r.cadPdf);
+        setSharedFiles(r.shared);
+      })
+      .catch(() => {});
   }, [jobId]);
 
   if (error) return <p className="error">{error}</p>;
@@ -172,12 +183,28 @@ export default function CrewJobPage() {
           </WhySubsection>
 
           <WhySubsection title="CAD">
-            {plots.length === 0 && <p className="muted">No CAD files uploaded yet.</p>}
-            {plots.length > 0 && (
+            {cadPdf && (
+              <div style={{ marginBottom: '0.75rem' }}>
+                {viewingCad ? (
+                  <InlinePdfViewer url={api.crewPortal.oneDriveFileUrl(jobId, cadPdf.itemId)} title={cadPdf.name} />
+                ) : (
+                  <button type="button" onClick={() => setViewingCad(true)}>
+                    View {cadPdf.name}
+                  </button>
+                )}
+              </div>
+            )}
+            {plots.length === 0 && sharedFiles.length === 0 && !cadPdf && <p className="muted">No CAD files uploaded yet.</p>}
+            {(plots.length > 0 || sharedFiles.length > 0) && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                 {plots.map((p) => (
                   <a key={p.id} href={api.crewPortal.plotUrl(jobId, p.id)} target="_blank" rel="noreferrer">
                     {p.originalName}
+                  </a>
+                ))}
+                {sharedFiles.map((s) => (
+                  <a key={s.id} href={api.crewPortal.oneDriveFileUrl(jobId, s.itemId)} target="_blank" rel="noreferrer">
+                    {s.isFolder ? '📁' : '📄'} {s.itemName}
                   </a>
                 ))}
               </div>

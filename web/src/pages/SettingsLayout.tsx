@@ -16,6 +16,8 @@ const SECTIONS: SettingsSection[] = [
   { to: '/settings/import-mapping', label: 'Import Mapping' },
   { to: '/settings/printer', label: 'Printer', adminOnly: true },
   { to: '/settings/current-rms', label: 'Current RMS', adminOnly: true },
+  { to: '/settings/onedrive', label: 'OneDrive', adminOnly: true },
+  { to: '/settings/crew-portal', label: 'Crew Portal', adminOnly: true },
   { to: '/settings/users', label: 'Users', adminOnly: true },
   { to: '/settings/crew', label: 'Crew', adminOnly: true },
   { to: '/settings/crew-applications', label: 'Applications', permission: 'manageCrewApplications' },

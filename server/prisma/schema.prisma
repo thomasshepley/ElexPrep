@@ -31,6 +31,19 @@ model Job {
   rmsItemsDiffJson         String?
   rmsItemsDiffAt           DateTime?
 
+  /// Set when onboarding matched (or an admin manually picked) a folder under the OneDrive
+  /// "Projects" root for this job — see server/src/oneDrive/matcher.ts. Null until OneDrive is
+  /// configured and linked; the whole feature stays optional per-job.
+  oneDriveFolderId     String?
+  oneDriveFolderPath   String?
+  /// MATCHED (auto-matched by name at onboarding) | MANUAL (an admin picked it) | null (no
+  /// OneDrive folder linked yet).
+  oneDriveMatchStatus  String?
+  /// Per-job override of which crew-portal sections are visible for this job's crew, merged
+  /// onto the global default (see server/src/crewFeatures.ts). Null = use the default as-is;
+  /// set at onboarding time, editable later from Job Settings.
+  crewFeaturesJson     String?
+
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -47,6 +60,29 @@ model Job {
   documents      JobDocument[]
   labelRequests  CrewLabelRequest[]
   discussionMessages JobDiscussionMessage[]
+  oneDriveShares OneDriveShare[]
+}
+
+/// A OneDrive file or folder an admin has explicitly chosen to share with this job's crew —
+/// deliberately opt-in (no blanket "crew sees everything in the matched folder") since a
+/// project folder can hold client-sensitive files crew shouldn't see. The one exception is the
+/// "CAD" folder's first PDF, which the crew job page surfaces automatically (see
+/// server/src/oneDrive/cad.ts) — that's a convenience, not a security boundary, since CAD plans
+/// are expected to be crew-visible by default.
+model OneDriveShare {
+  id           String   @id @default(cuid())
+  jobId        String
+  job          Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  /// The Microsoft Graph driveItem id of the shared file or folder.
+  itemId       String
+  itemName     String
+  itemPath     String
+  isFolder     Boolean
+  sharedAt     DateTime @default(now())
+  sharedByUserId String?
+
+  @@unique([jobId, itemId])
+  @@index([jobId])
 }
 
 /// A flat, chronological message thread scoped to one job — like a channel for that gig.
@@ -545,6 +581,11 @@ model CurrentRmsOpportunity {
   rmsId        Int       @unique
   subject      String
   status       String?
+  /// Best-effort classification of status/state into QUOTE | ORDER | OTHER, for the jobs
+  /// onboarding dashboard's color coding (see extractKind in sync.ts) — Current RMS's own
+  /// status taxonomy varies by account, so this is a heuristic read of the *_name fields,
+  /// not a guaranteed-accurate opportunity-type field.
+  kind         String?
   memberName   String?
   /// Best-effort order value, extracted from whichever total/charge field the raw response
   /// actually carries (see extractValue in sync.ts) — field naming hasn't been verified

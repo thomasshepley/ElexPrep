@@ -1,5 +1,7 @@
-import type { PickListDiff, LabelElementDef, LabelTypeTemplate } from '@elexprep/shared';
+import type { PickListDiff, LabelElementDef, LabelTypeTemplate, CrewFeatures } from '@elexprep/shared';
 export type { LabelElementDef, LabelTypeTemplate, TextElementDef, StackedTextElementDef, FillElementDef, ImageElementDef } from '@elexprep/shared';
+export type { CrewFeatures, CrewFeatureKey } from '@elexprep/shared';
+export { CREW_FEATURE_KEYS, CREW_FEATURE_LABELS, DEFAULT_CREW_FEATURES } from '@elexprep/shared';
 
 const BASE = '/api';
 
@@ -43,6 +45,10 @@ export interface Job {
   isPublic: boolean;
   currentRmsOpportunityId: string | null;
   rmsAlertAt: string | null;
+  oneDriveFolderId: string | null;
+  oneDriveFolderPath: string | null;
+  oneDriveMatchStatus: 'MATCHED' | 'MANUAL' | null;
+  crewFeaturesJson: string | null;
   createdAt: string;
 }
 
@@ -130,11 +136,12 @@ export interface ActivityLogEntry {
 export type Role = 'ADMIN' | 'USER' | 'SIGNAGE' | 'CREW';
 
 export type PermissionKey =
-  | 'createJobs'
   | 'deleteJobs'
   | 'publishJobs'
   | 'viewActivityLog'
   | 'linkCurrentRms'
+  | 'onboardJobs'
+  | 'manageOneDrive'
   | 'manageCrewAssignments'
   | 'manageCrewApplications'
   | 'moderateDiscussion';
@@ -326,12 +333,49 @@ export interface CurrentRmsOpportunity {
   rmsId: number;
   subject: string;
   status: string | null;
+  kind: 'QUOTE' | 'ORDER' | 'OTHER' | null;
   memberName: string | null;
   value: number | null;
   startsAt: string | null;
   endsAt: string | null;
   rmsUpdatedAt: string | null;
   syncedAt: string;
+}
+
+export interface OneDriveConfig {
+  enabled: boolean;
+  tenantId: string;
+  clientId: string;
+  hasClientSecret: boolean;
+  rootFolderPath: string;
+  driveId: string;
+  lastTestError: string | null;
+}
+
+export interface OneDriveItem {
+  id: string;
+  name: string;
+  folder?: { childCount: number };
+  file?: { mimeType: string };
+}
+
+export interface OneDriveShare {
+  id: string;
+  jobId: string;
+  itemId: string;
+  itemName: string;
+  itemPath: string;
+  isFolder: boolean;
+  sharedAt: string;
+}
+
+export interface JobOneDriveStatus {
+  enabled: boolean;
+  folderId: string | null;
+  folderPath: string | null;
+  matchStatus: 'MATCHED' | 'MANUAL' | null;
+  cadPdf: { itemId: string; name: string } | null;
+  shares: OneDriveShare[];
 }
 
 export interface JobScheduleItem {
@@ -559,6 +603,9 @@ export const api = {
     documentUrl: (jobId: string, docId: string) => `${BASE}/crew/me/jobs/${jobId}/documents/${docId}/file`,
     plots: (jobId: string) => request<Plot[]>(`/crew/me/jobs/${jobId}/plots`),
     plotUrl: (jobId: string, plotId: string) => `${BASE}/crew/me/jobs/${jobId}/plots/${plotId}/file`,
+    oneDrive: (jobId: string) =>
+      request<{ cadPdf: { itemId: string; name: string } | null; shared: OneDriveShare[] }>(`/crew/me/jobs/${jobId}/onedrive`),
+    oneDriveFileUrl: (jobId: string, itemId: string) => `${BASE}/crew/me/jobs/${jobId}/onedrive/${itemId}/file`,
     submitLabelRequest: (jobId: string, data: { labelType: string; content: Record<string, unknown>; quantity?: number }) =>
       request<CrewLabelRequest>(`/crew/me/jobs/${jobId}/label-requests`, { method: 'POST', body: JSON.stringify(data) }),
     discussion: {
@@ -659,10 +706,10 @@ export const api = {
   jobs: {
     list: () => request<Job[]>('/jobs'),
     get: (id: string) => request<Job>(`/jobs/${id}`),
-    create: (data: { name: string; venue?: string }) =>
-      request<Job>('/jobs', { method: 'POST', body: JSON.stringify(data) }),
-    update: (id: string, data: Partial<Pick<Job, 'name' | 'venue' | 'isPublic'>>) =>
-      request<Job>(`/jobs/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    update: (
+      id: string,
+      data: Partial<Pick<Job, 'name' | 'venue' | 'isPublic'>> & { crewFeatures?: Partial<CrewFeatures> | null }
+    ) => request<Job>(`/jobs/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     remove: (id: string) => request<void>(`/jobs/${id}`, { method: 'DELETE' }),
     uploadLogo: async (id: string, file: File) => {
       const form = new FormData();
@@ -830,8 +877,40 @@ export const api = {
     sync: () => request<{ pulled: number; alertsRaised: number; error: string | null }>('/current-rms/sync', { method: 'POST' }),
     listOpportunities: (q?: string) =>
       request<CurrentRmsOpportunity[]>(`/current-rms/opportunities${q ? `?q=${encodeURIComponent(q)}` : ''}`),
-    importOpportunity: (rmsId: number) =>
-      request<Job>(`/current-rms/opportunities/${rmsId}/import`, { method: 'POST' }),
+    importOpportunity: (rmsId: number, data?: { crewFeatures?: Partial<CrewFeatures>; oneDriveFolderPath?: string }) =>
+      request<Job>(`/current-rms/opportunities/${rmsId}/import`, { method: 'POST', body: JSON.stringify(data ?? {}) }),
+    bulkImport: (rmsIds: number[], crewFeatures?: Partial<CrewFeatures>) =>
+      request<{ created: Job[]; skipped: { rmsId: number; reason: string }[] }>('/current-rms/opportunities/bulk-import', {
+        method: 'POST',
+        body: JSON.stringify({ rmsIds, crewFeatures }),
+      }),
+  },
+  oneDrive: {
+    getConfig: () => request<OneDriveConfig>('/onedrive/config'),
+    updateConfig: (data: Partial<{ enabled: boolean; tenantId: string; clientId: string; clientSecret: string; driveId: string; rootFolderPath: string }>) =>
+      request<OneDriveConfig>('/onedrive/config', { method: 'PUT', body: JSON.stringify(data) }),
+    testConnection: () => request<{ ok: boolean; message?: string; error?: string }>('/onedrive/test-connection', { method: 'POST' }),
+  },
+  jobOneDrive: {
+    get: (jobId: string) => request<JobOneDriveStatus>(`/jobs/${jobId}/onedrive`),
+    match: (jobId: string) => request<{ matched: boolean; folderPath: string | null }>(`/jobs/${jobId}/onedrive/match`, { method: 'POST' }),
+    setFolder: (jobId: string, path: string) =>
+      request<{ folderId: string | null; folderPath: string | null; matchStatus: string | null }>(`/jobs/${jobId}/onedrive/folder`, {
+        method: 'PUT',
+        body: JSON.stringify({ path }),
+      }),
+    unlinkFolder: (jobId: string) => request<void>(`/jobs/${jobId}/onedrive/folder`, { method: 'DELETE' }),
+    browse: (jobId: string, folderId?: string) =>
+      request<{ items: OneDriveItem[] }>(`/jobs/${jobId}/onedrive/browse${folderId ? `?folderId=${encodeURIComponent(folderId)}` : ''}`),
+    share: (jobId: string, item: { itemId: string; itemName: string; itemPath: string; isFolder: boolean }) =>
+      request<OneDriveShare>(`/jobs/${jobId}/onedrive/share`, { method: 'POST', body: JSON.stringify(item) }),
+    unshare: (jobId: string, shareId: string) => request<void>(`/jobs/${jobId}/onedrive/share/${shareId}`, { method: 'DELETE' }),
+    fileUrl: (jobId: string, itemId: string) => `${BASE}/jobs/${jobId}/onedrive/file/${itemId}`,
+  },
+  portalSettings: {
+    getCrewFeaturesDefault: () => request<CrewFeatures>('/portal-settings/crew-features-default'),
+    updateCrewFeaturesDefault: (patch: Partial<CrewFeatures>) =>
+      request<CrewFeatures>('/portal-settings/crew-features-default', { method: 'PUT', body: JSON.stringify(patch) }),
   },
   jobCurrentRms: {
     get: (jobId: string) =>

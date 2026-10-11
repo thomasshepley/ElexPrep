@@ -15,6 +15,7 @@
     "@dnd-kit/utilities": "^3.2.2",
     "@elexprep/shared": "*",
     "papaparse": "^5.5.4",
+    "pdfjs-dist": "^4.7.76",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-router-dom": "^7.1.1"

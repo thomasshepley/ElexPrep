@@ -10,16 +10,21 @@ import {
   resolveAndCacheMemberName,
   fetchPickListSnapshot,
 } from '../currentRms/sync';
+import { getOneDriveConfig } from '../oneDrive/config';
+import { matchJobFolder } from '../oneDrive/matcher';
+import { getItemByPath } from '../oneDrive/client';
+import { normalizeCrewFeaturesPatch } from '../crewFeatures';
 
 export const currentRmsRouter = Router();
 
-currentRmsRouter.use(requireRole('ADMIN'));
-
-currentRmsRouter.get('/config', async (_req, res) => {
+// Connection config and manual sync stay ADMIN-only — they hold the API key and can hammer
+// Current RMS's rate limit. Browsing/onboarding opportunities (below) is delegatable instead,
+// since onboarding a job is now the only way to create one at all.
+currentRmsRouter.get('/config', requireRole('ADMIN'), async (_req, res) => {
   res.json(toPublicConfig(await getCurrentRmsConfig()));
 });
 
-currentRmsRouter.put('/config', async (req, res) => {
+currentRmsRouter.put('/config', requireRole('ADMIN'), async (req, res) => {
   const current = await getCurrentRmsConfig();
   const body = req.body ?? {};
   const next = {
@@ -37,7 +42,7 @@ currentRmsRouter.put('/config', async (req, res) => {
   res.json(toPublicConfig(next));
 });
 
-currentRmsRouter.post('/test-connection', async (req, res) => {
+currentRmsRouter.post('/test-connection', requireRole('ADMIN'), async (req, res) => {
   const config = await getCurrentRmsConfig();
   const subdomain = req.body?.subdomain || config.subdomain;
   const apiKey = req.body?.apiKey || config.apiKey;
@@ -49,7 +54,7 @@ currentRmsRouter.post('/test-connection', async (req, res) => {
   }
 });
 
-currentRmsRouter.post('/sync', async (req, res) => {
+currentRmsRouter.post('/sync', requireRole('ADMIN'), async (req, res) => {
   const result = await runCurrentRmsSync();
   await logActivity(
     'current_rms.sync',
@@ -60,7 +65,7 @@ currentRmsRouter.post('/sync', async (req, res) => {
   res.json(result);
 });
 
-currentRmsRouter.get('/opportunities', async (req, res) => {
+currentRmsRouter.get('/opportunities', requirePermission('onboardJobs'), async (req, res) => {
   const q = typeof req.query.q === 'string' ? req.query.q : undefined;
   const opportunities = await prisma.currentRmsOpportunity.findMany({
     where: q
@@ -77,7 +82,31 @@ currentRmsRouter.get('/opportunities', async (req, res) => {
   res.json(opportunities);
 });
 
-currentRmsRouter.post('/opportunities/:rmsId/import', async (req, res) => {
+/** Attempts an automatic OneDrive folder match for a newly-onboarded job, or resolves a
+ * manually-supplied path to a real folder if one was given instead. Never throws — a OneDrive
+ * failure (not configured, no match, a transient Graph error) shouldn't block onboarding the
+ * job itself, so this just falls back to "no folder linked yet" on any error. */
+async function resolveOneDriveFolderForOnboarding(
+  opp: { subject: string; startsAt: Date | null },
+  manualPath?: string
+): Promise<{ oneDriveFolderId: string | null; oneDriveFolderPath: string | null; oneDriveMatchStatus: string | null }> {
+  try {
+    const config = await getOneDriveConfig();
+    if (!config.enabled) return { oneDriveFolderId: null, oneDriveFolderPath: null, oneDriveMatchStatus: null };
+    if (manualPath) {
+      const item = await getItemByPath(config, manualPath);
+      if (item) return { oneDriveFolderId: item.id, oneDriveFolderPath: manualPath, oneDriveMatchStatus: 'MANUAL' };
+      return { oneDriveFolderId: null, oneDriveFolderPath: null, oneDriveMatchStatus: null };
+    }
+    const match = await matchJobFolder(config, opp);
+    if (match) return { oneDriveFolderId: match.folderId, oneDriveFolderPath: match.path, oneDriveMatchStatus: 'MATCHED' };
+    return { oneDriveFolderId: null, oneDriveFolderPath: null, oneDriveMatchStatus: null };
+  } catch {
+    return { oneDriveFolderId: null, oneDriveFolderPath: null, oneDriveMatchStatus: null };
+  }
+}
+
+currentRmsRouter.post('/opportunities/:rmsId/import', requirePermission('onboardJobs'), async (req, res) => {
   const rmsId = Number(req.params.rmsId);
   const opp = await prisma.currentRmsOpportunity.findUnique({ where: { rmsId } });
   if (!opp) return res.status(404).json({ error: 'Opportunity not cached — try syncing first' });
@@ -86,20 +115,63 @@ currentRmsRouter.post('/opportunities/:rmsId/import', async (req, res) => {
   if (existingJob) return res.status(409).json({ error: 'A job is already linked to this opportunity', job: existingJob });
 
   const venue = await resolveAndCacheMemberName(await getCurrentRmsConfig(), opp);
+  const { crewFeatures, oneDriveFolderPath } = req.body ?? {};
+  const oneDrive = await resolveOneDriveFolderForOnboarding(opp, oneDriveFolderPath || undefined);
+  const crewFeaturesJson = crewFeatures ? JSON.stringify(normalizeCrewFeaturesPatch(crewFeatures)) : null;
 
   const job = await prisma.job.create({
     data: {
       name: opp.subject,
       venue,
       currentRmsOpportunityId: String(rmsId),
+      crewFeaturesJson,
+      ...oneDrive,
     },
   });
   await logActivity('current_rms.import', opp.subject, job.id, req.user?.id);
   res.status(201).json(job);
 });
 
+/** Bulk-onboards several cached opportunities at once — the dashboard's "Onboard N selected"
+ * action. Each one gets its own best-effort OneDrive auto-match (no manual override makes
+ * sense across a batch of different jobs); the same crewFeatures patch, if given, applies to
+ * all of them uniformly. Skips (rather than fails the whole batch) any opportunity that's
+ * already linked or no longer cached. */
+currentRmsRouter.post('/opportunities/bulk-import', requirePermission('onboardJobs'), async (req, res) => {
+  const { rmsIds, crewFeatures } = req.body ?? {};
+  if (!Array.isArray(rmsIds) || rmsIds.length === 0) return res.status(400).json({ error: 'rmsIds (a non-empty array) is required' });
+
+  const crewFeaturesJson = crewFeatures ? JSON.stringify(normalizeCrewFeaturesPatch(crewFeatures)) : null;
+  const config = await getCurrentRmsConfig();
+  const created: unknown[] = [];
+  const skipped: { rmsId: number; reason: string }[] = [];
+
+  for (const raw of rmsIds) {
+    const rmsId = Number(raw);
+    const opp = await prisma.currentRmsOpportunity.findUnique({ where: { rmsId } });
+    if (!opp) {
+      skipped.push({ rmsId, reason: 'Not cached — try syncing first' });
+      continue;
+    }
+    const existingJob = await prisma.job.findFirst({ where: { currentRmsOpportunityId: String(rmsId) } });
+    if (existingJob) {
+      skipped.push({ rmsId, reason: 'Already onboarded' });
+      continue;
+    }
+    const venue = await resolveAndCacheMemberName(config, opp);
+    const oneDrive = await resolveOneDriveFolderForOnboarding(opp);
+    const job = await prisma.job.create({
+      data: { name: opp.subject, venue, currentRmsOpportunityId: String(rmsId), crewFeaturesJson, ...oneDrive },
+    });
+    await logActivity('current_rms.import', opp.subject, job.id, req.user?.id);
+    created.push(job);
+  }
+
+  res.status(201).json({ created, skipped });
+});
+
 /** Defaults exposed so the settings page can show sensible placeholders (e.g. poll interval). */
-currentRmsRouter.get('/defaults', (_req, res) => {
+currentRmsRouter.get('/defaults', requirePermission('onboardJobs'), (_req, res) => {
   const { apiKey: _apiKey, ...rest } = DEFAULT_CURRENT_RMS_CONFIG;
   res.json(rest);
 });
