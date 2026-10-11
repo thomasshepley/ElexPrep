@@ -34,7 +34,8 @@ currentRmsRouter.put('/config', requireRole('ADMIN'), async (req, res) => {
     pollMinutes: body.pollMinutes ?? current.pollMinutes,
     // Only overwrite the stored key if a non-empty one was actually submitted — this lets
     // the settings form round-trip without the client ever needing to see the real key.
-    apiKey: body.apiKey ? body.apiKey : current.apiKey,
+    // removeApiKey is the one explicit way to clear it instead of replacing it.
+    apiKey: body.removeApiKey ? '' : body.apiKey ? body.apiKey : current.apiKey,
   };
   await saveCurrentRmsConfig(next);
   await restartCurrentRmsPolling();
