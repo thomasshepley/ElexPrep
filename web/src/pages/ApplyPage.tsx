@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { api } from '../api/client';
 import FileInput from '../components/FileInput';
+import SkillPicker from '../components/SkillPicker';
 
 const DOCUMENT_SLOTS = [
   { field: 'idDocument', label: 'Photo ID' },
@@ -92,10 +93,7 @@ export default function ApplyPage() {
             </div>
           </div>
 
-          <div className="field">
-            <label htmlFor="apply-skills">Skills / roles</label>
-            <input id="apply-skills" value={skills} onChange={(e) => setSkills(e.target.value)} placeholder="LD, Rigger, Spot Op" />
-          </div>
+          <SkillPicker value={skills} onChange={setSkills} />
 
           <div className="field">
             <label htmlFor="apply-rtw">Right to work</label>

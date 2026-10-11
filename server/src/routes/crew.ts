@@ -176,3 +176,48 @@ crewRouter.delete('/:id/documents/:docId', async (req, res) => {
   await logActivity('crew.document.delete', doc.originalName, undefined, req.user!.id);
   res.status(204).end();
 });
+
+// Rate card: named rate lines (e.g. "Day rate", "Overtime") replacing the single free-text
+// dayRate field in the admin UI — see CrewRateLine's schema comment.
+crewRouter.get('/:id/rate-lines', async (req, res) => {
+  const profile = await prisma.crewProfile.findUnique({ where: { id: req.params.id } });
+  if (!profile) return res.status(404).json({ error: 'Crew member not found' });
+  const lines = await prisma.crewRateLine.findMany({ where: { crewProfileId: profile.id }, orderBy: { order: 'asc' } });
+  res.json(lines);
+});
+
+crewRouter.post('/:id/rate-lines', async (req, res) => {
+  const profile = await prisma.crewProfile.findUnique({ where: { id: req.params.id } });
+  if (!profile) return res.status(404).json({ error: 'Crew member not found' });
+  const { label, amount } = req.body ?? {};
+  if (!label || !amount) return res.status(400).json({ error: 'label and amount are required' });
+  const count = await prisma.crewRateLine.count({ where: { crewProfileId: profile.id } });
+  const line = await prisma.crewRateLine.create({
+    data: { crewProfileId: profile.id, label, amount, order: count },
+  });
+  await logActivity('crew.rateLine.create', `${label}: ${amount}`, undefined, req.user!.id);
+  res.status(201).json(line);
+});
+
+crewRouter.put('/:id/rate-lines/:lineId', async (req, res) => {
+  const existing = await prisma.crewRateLine.findUnique({ where: { id: req.params.lineId } });
+  if (!existing || existing.crewProfileId !== req.params.id) return res.status(404).json({ error: 'Rate line not found' });
+  const { label, amount } = req.body ?? {};
+  const line = await prisma.crewRateLine.update({
+    where: { id: existing.id },
+    data: {
+      ...(label !== undefined ? { label } : {}),
+      ...(amount !== undefined ? { amount } : {}),
+    },
+  });
+  await logActivity('crew.rateLine.update', `${line.label}: ${line.amount}`, undefined, req.user!.id);
+  res.json(line);
+});
+
+crewRouter.delete('/:id/rate-lines/:lineId', async (req, res) => {
+  const existing = await prisma.crewRateLine.findUnique({ where: { id: req.params.lineId } });
+  if (!existing || existing.crewProfileId !== req.params.id) return res.status(404).json({ error: 'Rate line not found' });
+  await prisma.crewRateLine.delete({ where: { id: existing.id } });
+  await logActivity('crew.rateLine.delete', existing.label, undefined, req.user!.id);
+  res.status(204).end();
+});

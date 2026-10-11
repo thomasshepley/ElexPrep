@@ -109,6 +109,24 @@ model CrewProfile {
   documents   CrewDocument[]
   labelRequests CrewLabelRequest[]
   requestedAdHocLabels AdHocLabel[]
+  rateLines   CrewRateLine[]
+}
+
+/// A named rate line on a crew member's rate card (e.g. "Day rate", "Overtime", "Travel day") —
+/// replaces the single free-text CrewProfile.dayRate in the UI, which stays in the schema
+/// unmodified for any historical record that already used it. amount is a plain string like
+/// dayRate (see its own comment) — no arithmetic happens on it, no currency type needed yet.
+model CrewRateLine {
+  id            String      @id @default(cuid())
+  crewProfileId String
+  crewProfile   CrewProfile @relation(fields: [crewProfileId], references: [id], onDelete: Cascade)
+  label         String
+  amount        String
+  order         Int         @default(0)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@index([crewProfileId])
 }
 
 /// A public, unauthenticated submission to join the freelance crew roster — deliberately has

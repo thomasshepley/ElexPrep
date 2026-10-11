@@ -5,3 +5,4 @@ export * from './csvHeader';
 export * from './pickListDiff';
 export * from './locationColors';
 export * from './labelElements';
+export * from './crewSkills';
