@@ -104,3 +104,20 @@ export function SignOutIcon() {
     </svg>
   );
 }
+
+export function SunIcon() {
+  return (
+    <svg {...common}>
+      <circle cx="8" cy="8" r="3" {...stroke} />
+      <path d="M8 1.6v1.6M8 12.8v1.6M14.4 8h-1.6M3.2 8H1.6M12.4 3.6l-1.1 1.1M4.7 11.3l-1.1 1.1M12.4 12.4l-1.1-1.1M4.7 4.7l-1.1-1.1" {...stroke} />
+    </svg>
+  );
+}
+
+export function MoonIcon() {
+  return (
+    <svg {...common}>
+      <path d="M13.2 9.9A5.6 5.6 0 0 1 6.1 2.8a5.6 5.6 0 1 0 7.1 7.1Z" {...stroke} />
+    </svg>
+  );
+}

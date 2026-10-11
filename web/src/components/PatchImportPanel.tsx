@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PATCH_FIELD_LABELS, type PatchFieldKey } from '@elexprep/shared';
 import { api, type Fixture } from '../api/client';
+import FileInput from './FileInput';
 
 export default function PatchImportPanel({ jobId }: { jobId: string }) {
   const [rows, setRows] = useState<Record<string, string>[]>([]);
@@ -111,11 +112,7 @@ export default function PatchImportPanel({ jobId }: { jobId: string }) {
           <Link to="/settings/import-mapping">Settings → Import Mapping</Link> — no need to remap
           each time.
         </p>
-        <input
-          type="file"
-          accept=".csv"
-          onChange={(e) => e.target.files?.[0] && onFile(e.target.files[0])}
-        />
+        <FileInput accept=".csv" onFile={onFile} label="Choose CSV" />
         {error && <p className="error">{error}</p>}
       </div>
 

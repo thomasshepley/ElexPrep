@@ -10,17 +10,28 @@
   display: flex;
 }
 
+/* Two layers: .sidebar is a plain flex item with no height of its own, so it stretches (the
+   flex row's default align-items: stretch) to match .shell-main's actual content height —
+   its background/border read as full page height for pages taller than one screen, rather
+   than stopping after the first viewport. .sidebar-sticky is what actually pins to the
+   viewport while scrolling, so the nav stays reachable without the whole page needing a
+   fixed-height sidebar. */
 .sidebar {
   width: 248px;
   flex-shrink: 0;
   display: flex;
-  flex-direction: column;
   background: var(--surface-raised);
   border-right: 1px solid var(--border);
-  padding: 1.5rem 1rem;
+}
+
+.sidebar-sticky {
   position: sticky;
   top: 0;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
   height: 100vh;
+  padding: 1.5rem 1rem;
   overflow-y: auto;
 }
 
@@ -111,7 +122,8 @@
   color: var(--accent);
 }
 
-.sidebar-signout {
+.sidebar-signout,
+.sidebar-theme-toggle {
   width: 100%;
   display: flex;
   align-items: center;
@@ -133,6 +145,9 @@
 @media (max-width: 760px) {
   .sidebar {
     width: 76px;
+  }
+
+  .sidebar-sticky {
     padding: 1.25rem 0.5rem;
     align-items: center;
   }
@@ -140,7 +155,8 @@
   .sidebar-brand-text,
   .sidebar-nav a span,
   .sidebar-username,
-  .sidebar-signout span {
+  .sidebar-signout span,
+  .sidebar-theme-toggle span {
     display: none;
   }
 
@@ -159,7 +175,8 @@
     padding: 0;
   }
 
-  .sidebar-signout {
+  .sidebar-signout,
+  .sidebar-theme-toggle {
     padding: 0.6rem;
   }
 
