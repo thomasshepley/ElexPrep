@@ -50,7 +50,7 @@ export default function DayTimeline({ items }: { items: TimelineItem[] }) {
         const top = (minutesSinceMidnight(start) - dayStartHour * 60) * PX_PER_MIN;
         const durationMin = end ? Math.max(minutesSinceMidnight(end) - minutesSinceMidnight(start), MIN_BLOCK_MIN) : MIN_BLOCK_MIN;
         return (
-          <div key={item.id} className="day-timeline-item" style={{ top, height: durationMin * PX_PER_MIN }}>
+          <div key={item.id} className="day-timeline-item" style={{ top, minHeight: durationMin * PX_PER_MIN }}>
             <div className="day-timeline-item-time">
               {formatTime(start)}
               {end && ` – ${formatTime(end)}`}

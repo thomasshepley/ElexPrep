@@ -100,6 +100,21 @@ export interface AdHocLabel {
   order: number;
   excludeFromPrint: boolean;
   content: Record<string, unknown>;
+  /** Set when this label was approved from a crew member's label request. */
+  requestedByDisplayName: string | null;
+}
+
+export interface CrewLabelRequest {
+  id: string;
+  jobId: string;
+  labelType: string;
+  content: Record<string, unknown>;
+  quantity: number;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  reviewedAt: string | null;
+  rejectionNote: string | null;
+  createdAt: string;
+  requestedByDisplayName: string;
 }
 
 export interface ActivityLogEntry {
@@ -400,8 +415,16 @@ export const api = {
     documentUrl: (jobId: string, docId: string) => `${BASE}/crew/me/jobs/${jobId}/documents/${docId}/file`,
     plots: (jobId: string) => request<Plot[]>(`/crew/me/jobs/${jobId}/plots`),
     plotUrl: (jobId: string, plotId: string) => `${BASE}/crew/me/jobs/${jobId}/plots/${plotId}/file`,
-    submitRequest: (jobId: string, data: { title: string; notes?: string }) =>
-      request<PrintQueueItem>(`/crew/me/jobs/${jobId}/requests`, { method: 'POST', body: JSON.stringify(data) }),
+    submitLabelRequest: (jobId: string, data: { labelType: string; content: Record<string, unknown>; quantity?: number }) =>
+      request<CrewLabelRequest>(`/crew/me/jobs/${jobId}/label-requests`, { method: 'POST', body: JSON.stringify(data) }),
+  },
+  labelRequests: {
+    list: (jobId: string, status?: string) =>
+      request<CrewLabelRequest[]>(`/jobs/${jobId}/label-requests${status ? `?status=${status}` : ''}`),
+    approve: (jobId: string, id: string) =>
+      request<AdHocLabel>(`/jobs/${jobId}/label-requests/${id}/approve`, { method: 'POST' }),
+    reject: (jobId: string, id: string, note?: string) =>
+      request<void>(`/jobs/${jobId}/label-requests/${id}/reject`, { method: 'POST', body: JSON.stringify({ note }) }),
   },
   jobSchedule: {
     list: (jobId: string) => request<JobScheduleItem[]>(`/jobs/${jobId}/schedule`),

@@ -45,6 +45,7 @@ model Job {
   crewAssignments JobCrewAssignment[]
   scheduleItems  JobScheduleItem[]
   documents      JobDocument[]
+  labelRequests  CrewLabelRequest[]
 }
 
 /// One timed entry in a job's day schedule (load-in, soundcheck, doors, show, get-out, ...) —
@@ -106,6 +107,8 @@ model CrewProfile {
 
   assignments JobCrewAssignment[]
   documents   CrewDocument[]
+  labelRequests CrewLabelRequest[]
+  requestedAdHocLabels AdHocLabel[]
 }
 
 /// A public, unauthenticated submission to join the freelance crew roster — deliberately has
@@ -303,7 +306,36 @@ model AdHocLabel {
   /// Skips this ad hoc label for the next print run without deleting the label recipe
   /// itself (which stays editable/reusable in the Labels tab).
   excludeFromPrint Boolean @default(false)
+  /// Set when this label was created by approving a CrewLabelRequest — lets the Labels tab
+  /// show "requested by <crew member>" provenance. SetNull (not Cascade) so deleting the crew
+  /// member later doesn't delete labels already approved onto the sheet.
+  requestedByCrewProfileId String?
+  requestedByCrewProfile   CrewProfile? @relation(fields: [requestedByCrewProfileId], references: [id], onDelete: SetNull)
   createdAt   DateTime  @default(now())
+}
+
+/// A crew member's request for an extra/replacement label, built with the same type + content
+/// fields as the admin's ad hoc label creator (see web's LabelTypeForm, shared by both). Sits
+/// in PENDING until an admin/staff member approves (creating the real AdHocLabel, attributed
+/// back to the requester) or rejects it — never lands in the print queue directly.
+model CrewLabelRequest {
+  id            String      @id @default(cuid())
+  jobId         String
+  job           Job         @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  crewProfileId String
+  crewProfile   CrewProfile @relation(fields: [crewProfileId], references: [id], onDelete: Cascade)
+  labelType     String
+  contentJson   String
+  quantity      Int         @default(1)
+  /// PENDING | APPROVED | REJECTED
+  status        String      @default("PENDING")
+  reviewedAt    DateTime?
+  reviewedBy    String?
+  rejectionNote String?
+  createdAt     DateTime    @default(now())
+
+  @@index([jobId])
+  @@index([status])
 }
 
 /// status is one of: PENDING, CONFIRMED, PRINTED (see @elexprep/shared PrintQueueStatus).

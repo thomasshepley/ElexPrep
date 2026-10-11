@@ -903,7 +903,11 @@ tbody tr:hover {
   border-left: 3px solid var(--accent);
   border-radius: var(--radius-sm);
   padding: 0.3rem 0.6rem;
-  overflow: hidden;
+  /* Deliberately no overflow:hidden — a short time slot still shows its full title/notes by
+     growing past its nominal duration height (min-height, not height, on the element) rather
+     than clipping text. A slightly-taller-than-proportional block reads better than cut-off
+     text. */
+  box-sizing: border-box;
 }
 
 .day-timeline-item-time {

@@ -4,6 +4,7 @@ import { api, type CrewJobDetail, type JobScheduleItem, type KitListItem, type J
 import Chevron from '../components/Chevron';
 import DayTimeline from '../components/DayTimeline';
 import { WhoIcon, WhatIcon, WhenIcon, WhereIcon, WhyIcon } from '../components/Icons';
+import LabelTypeForm, { AD_HOC_TYPES, type AdHocType } from '../components/LabelTypeForm';
 
 const NO_DATE = 'No date set yet';
 const NO_VENUE = 'No venue set yet';
@@ -68,54 +69,26 @@ function WhySubsection({ title, children }: { title: string; children: ReactNode
   );
 }
 
-function RequestForm({ jobId }: { jobId: string }) {
-  const [title, setTitle] = useState('');
-  const [notes, setNotes] = useState('');
-  const [busy, setBusy] = useState(false);
+/**
+ * The "request to prep system" form: a real label creator (same type + content fields as the
+ * admin's ad hoc label creator, via the shared LabelTypeForm) rather than a free-text box
+ * standing in for one. Submits as a PENDING CrewLabelRequest — it doesn't print until an admin
+ * approves it from the job's Labels tab.
+ */
+function RequestLabelForm({ jobId }: { jobId: string }) {
   const [sent, setSent] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setBusy(true);
-    setError(null);
-    try {
-      await api.crewPortal.submitRequest(jobId, { title, notes: notes || undefined });
-      setTitle('');
-      setNotes('');
-      setSent(true);
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setBusy(false);
-    }
+  const submit = async (labelType: AdHocType, content: Record<string, unknown>, quantity: number) => {
+    setSent(false);
+    await api.crewPortal.submitLabelRequest(jobId, { labelType, content, quantity });
+    setSent(true);
   };
 
   return (
-    <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', maxWidth: 420 }}>
-      <div className="field">
-        <label htmlFor="request-title">What do you need?</label>
-        <input
-          id="request-title"
-          value={title}
-          onChange={(e) => {
-            setTitle(e.target.value);
-            setSent(false);
-          }}
-          placeholder="e.g. Spare GAM case label"
-          required
-        />
-      </div>
-      <div className="field">
-        <label htmlFor="request-notes">Notes (optional)</label>
-        <input id="request-notes" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Lost the original" />
-      </div>
-      {error && <p className="error">{error}</p>}
-      {sent && <p className="muted">Request sent — it'll show up in the print queue for prep to review.</p>}
-      <button type="submit" disabled={busy} style={{ alignSelf: 'flex-start' }}>
-        Send request
-      </button>
-    </form>
+    <div>
+      <LabelTypeForm types={[...AD_HOC_TYPES]} onSubmit={submit} submitLabel="Send request" />
+      {sent && <p className="muted">Request sent — it'll show up for prep to review before it prints.</p>}
+    </div>
   );
 }
 
@@ -246,7 +219,7 @@ export default function CrewJobPage() {
           </WhySubsection>
 
           <WhySubsection title="Need something prepped?">
-            <RequestForm jobId={jobId} />
+            <RequestLabelForm jobId={jobId} />
           </WhySubsection>
         </InfoCard>
       </div>

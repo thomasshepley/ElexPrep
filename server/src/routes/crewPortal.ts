@@ -4,7 +4,6 @@ import { prisma, logActivity } from '../db';
 import { requireRole } from '../auth';
 import { getCurrentRmsConfig } from '../currentRms/config';
 import { fetchPickListSnapshot } from '../currentRms/sync';
-import { nextOrderStart } from '../printing/queueOrder';
 import { plotsDir } from './plots';
 import { uploadDir } from './jobs';
 
@@ -199,32 +198,34 @@ crewPortalRouter.get('/me/jobs/:jobId/kit-list', requireRole('CREW'), async (req
 });
 
 /**
- * The "request to prep system" form: a crew member asks for an extra/replacement label. Lands
- * as a PENDING PrintQueueItem on a generic PAL (case/sign) label — the same editor Milestone 5
- * built handles it with no further plumbing, since it's just another pending item of a known
- * label type.
+ * The "request to prep system" form: a crew member builds a label with the same type + content
+ * fields the admin's ad hoc label creator uses (see web's LabelTypeForm, shared by both), but
+ * it lands as a PENDING CrewLabelRequest, not directly in the print queue or Labels tab — an
+ * admin/staff member has to approve it first (routes/crewLabelRequests.ts), at which point it
+ * becomes a real AdHocLabel attributed back to this crew member.
  */
-crewPortalRouter.post('/me/jobs/:jobId/requests', requireRole('CREW'), async (req, res) => {
+const REQUESTABLE_LABEL_TYPES = ['TRUSS_SPIKE_POSITION', 'TRUSS_SPIKE_TIP', 'TRUSS_SPIKE_SACN', 'CABLE', 'PAL', 'RACK'];
+
+crewPortalRouter.post('/me/jobs/:jobId/label-requests', requireRole('CREW'), async (req, res) => {
   const found = await requireAssignedJob(req.user!.id, req.params.jobId);
   if (!found) return res.status(404).json({ error: 'Job not found' });
-  const { title, notes } = req.body ?? {};
-  if (!title || typeof title !== 'string') return res.status(400).json({ error: 'title is required' });
+  const { labelType, content, quantity } = req.body ?? {};
+  if (!labelType || !REQUESTABLE_LABEL_TYPES.includes(labelType)) {
+    return res.status(400).json({ error: 'A valid labelType is required' });
+  }
+  if (!content || typeof content !== 'object') return res.status(400).json({ error: 'content is required' });
 
-  const order = await nextOrderStart(req.params.jobId, 'PAL');
-  const item = await prisma.printQueueItem.create({
+  const request = await prisma.crewLabelRequest.create({
     data: {
       jobId: req.params.jobId,
-      labelType: 'PAL',
-      sourceType: 'CREW_REQUEST',
-      sourceId: found.profile.id,
-      contentJson: JSON.stringify({ location: null, title, subtitle: notes || 'Crew request' }),
-      quantity: 1,
-      status: 'PENDING',
-      order,
+      crewProfileId: found.profile.id,
+      labelType,
+      contentJson: JSON.stringify(content),
+      quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : 1,
     },
   });
-  await logActivity('crew_request.create', title, req.params.jobId, req.user!.id);
-  res.status(201).json(item);
+  await logActivity('crew_label_request.create', labelType, req.params.jobId, req.user!.id);
+  res.status(201).json({ ...request, content: JSON.parse(request.contentJson) });
 });
 
 /** Batch-loads the (at most a handful of) distinct linked opportunities a crew member's jobs reference. */
