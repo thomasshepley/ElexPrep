@@ -389,6 +389,26 @@ model User {
   updatedAt    DateTime  @updatedAt
   sessions     Session[]
   crewProfile  CrewProfile?
+  notifications Notification[]
+}
+
+/// In-app notifications v1 — deliberately a handful of trigger points (see
+/// server/src/notifications.ts), not a general event bus: a crew application submitted, a
+/// label request submitted, a crew member assigned to a job, and a label request reviewed.
+/// link is a relative client-side path to navigate to on click (e.g. "/settings/crew-applications").
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String
+  title     String
+  body      String?
+  link      String?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@index([userId, readAt])
 }
 
 model Session {

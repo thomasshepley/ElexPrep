@@ -35,6 +35,7 @@ import { labelTemplatesRouter } from './routes/labelTemplates';
 import { jobScheduleRouter } from './routes/jobSchedule';
 import { jobDocumentsRouter } from './routes/jobDocuments';
 import { dashboardRouter } from './routes/dashboard';
+import { notificationsRouter } from './routes/notifications';
 import { seedDefaultLocationColorsIfEmpty, seedNewDefaultLocationColorsIfMissing } from './pdf/locationColors';
 import { prisma } from './db';
 
@@ -72,6 +73,7 @@ app.use('/api/jobs', labelTemplatesRouter);
 app.use('/api/jobs', jobScheduleRouter);
 app.use('/api/jobs', jobDocumentsRouter);
 app.use('/api/dashboard', dashboardRouter);
+app.use('/api/notifications', notificationsRouter);
 // crewPortalRouter (self-service, CREW-only) is mounted before the admin-only crewRouter at
 // the same prefix so its specific /me* paths are tried first; anything it doesn't match
 // (the bare roster list/CRUD) falls through to crewRouter unchanged.

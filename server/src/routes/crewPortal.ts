@@ -6,6 +6,7 @@ import { getCurrentRmsConfig } from '../currentRms/config';
 import { fetchPickListSnapshot } from '../currentRms/sync';
 import { plotsDir } from './plots';
 import { uploadDir } from './jobs';
+import { notifyLabelRequestSubmitted } from '../notifications';
 
 /**
  * Self-service data for a logged-in CREW account: their own profile, the jobs they're
@@ -225,6 +226,7 @@ crewPortalRouter.post('/me/jobs/:jobId/label-requests', requireRole('CREW'), asy
     },
   });
   await logActivity('crew_label_request.create', labelType, req.params.jobId, req.user!.id);
+  await notifyLabelRequestSubmitted(req.params.jobId, found.assignment.job.name, req.user!.displayName, labelType);
   res.status(201).json({ ...request, content: JSON.parse(request.contentJson) });
 });
 
