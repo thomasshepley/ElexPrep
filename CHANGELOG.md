@@ -3,6 +3,10 @@
 Newest entries first. Each push/merge gets exactly one entry - see
 `scripts/bump-version.mjs` for how the version number itself advances.
 
+## v1.2.5 - 2026-10-12
+
+- CAD plots now auto-fit their real width instead of a fixed zoom, and added a Save plot button
+
 ## v1.1.5 - 2026-10-12
 
 - Fixed the job logo being zoomed in and cropped in print previews instead of fitting in its box
