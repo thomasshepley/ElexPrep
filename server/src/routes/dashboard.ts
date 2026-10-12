@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { resolveCrewColor } from '@elexprep/shared';
 import { prisma } from '../db';
 
 /**
@@ -16,7 +17,9 @@ dashboardRouter.get('/', async (req, res) => {
       currentRmsOpportunityId: { not: null },
       ...(isAdmin ? {} : { isPublic: true }),
     },
-    include: { _count: { select: { crewAssignments: true } } },
+    include: {
+      crewAssignments: { include: { crewProfile: { include: { user: { select: { displayName: true } } } } } },
+    },
   });
 
   const oppIds = [...new Set(jobs.map((j) => Number(j.currentRmsOpportunityId)))];
@@ -26,6 +29,12 @@ dashboardRouter.get('/', async (req, res) => {
   const orders = jobs
     .map((j) => {
       const opp = oppById.get(j.currentRmsOpportunityId!);
+      const crew = j.crewAssignments.map((a) => ({
+        id: a.crewProfileId,
+        name: a.crewProfile.user.displayName,
+        role: a.role,
+        color: resolveCrewColor(a.crewProfileId, a.crewProfile.color),
+      }));
       return {
         jobId: j.id,
         jobName: j.name,
@@ -34,7 +43,8 @@ dashboardRouter.get('/', async (req, res) => {
         startsAt: opp?.startsAt ?? null,
         endsAt: opp?.endsAt ?? null,
         value: opp?.value ?? null,
-        crewCount: j._count.crewAssignments,
+        crewCount: crew.length,
+        crew,
       };
     })
     .sort((a, b) => {

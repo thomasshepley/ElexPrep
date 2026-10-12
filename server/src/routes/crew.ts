@@ -20,6 +20,7 @@ interface CrewProfileRow {
   id: string;
   userId: string;
   phone: string | null;
+  color: string | null;
   skills: string | null;
   certifications: string | null;
   dayRate: string | null;
@@ -43,6 +44,7 @@ function toCrewDto(p: CrewProfileRow) {
     username: p.user.username,
     displayName: p.user.displayName,
     phone: p.phone,
+    color: p.color,
     skills: p.skills,
     certifications: p.certifications,
     dayRate: p.dayRate,
@@ -67,15 +69,18 @@ crewRouter.get('/', async (_req, res) => {
   res.json(profiles.map(toCrewDto));
 });
 
+const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
+
 crewRouter.post('/', async (req, res) => {
   const {
-    username, password, displayName, phone, skills, certifications, dayRate, notes,
+    username, password, displayName, phone, color, skills, certifications, dayRate, notes,
     gender, address, pronouns, instagramUrl, facebookUrl, otherLinkUrl, bankDetails,
   } = req.body ?? {};
   if (!username || !password) return res.status(400).json({ error: 'username and password are required' });
   if (password.length < MIN_PASSWORD_LENGTH) {
     return res.status(400).json({ error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters` });
   }
+  if (color && !HEX_COLOR.test(color)) return res.status(400).json({ error: 'color must be a hex value like #1E88E5' });
   const existing = await prisma.user.findUnique({ where: { username } });
   if (existing) return res.status(409).json({ error: 'Username already taken' });
 
@@ -90,6 +95,7 @@ crewRouter.post('/', async (req, res) => {
   const profile = await prisma.crewProfile.create({
     data: {
       phone: phone || null,
+      color: color || null,
       skills: skills || null,
       certifications: certifications || null,
       dayRate: dayRate || null,
@@ -120,12 +126,13 @@ crewRouter.post('/', async (req, res) => {
 
 crewRouter.put('/:id', async (req, res) => {
   const {
-    displayName, password, phone, skills, certifications, dayRate, notes, active,
+    displayName, password, phone, color, skills, certifications, dayRate, notes, active,
     gender, address, pronouns, instagramUrl, facebookUrl, otherLinkUrl, bankDetails,
   } = req.body ?? {};
   if (password !== undefined && password.length < MIN_PASSWORD_LENGTH) {
     return res.status(400).json({ error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters` });
   }
+  if (color && !HEX_COLOR.test(color)) return res.status(400).json({ error: 'color must be a hex value like #1E88E5' });
   const existing = await prisma.crewProfile.findUnique({ where: { id: req.params.id } });
   if (!existing) return res.status(404).json({ error: 'Crew member not found' });
 
@@ -155,6 +162,7 @@ crewRouter.put('/:id', async (req, res) => {
     where: { id: req.params.id },
     data: {
       ...(phone !== undefined ? { phone: phone || null } : {}),
+      ...(color !== undefined ? { color: color || null } : {}),
       ...(skills !== undefined ? { skills: skills || null } : {}),
       ...(certifications !== undefined ? { certifications: certifications || null } : {}),
       ...(dayRate !== undefined ? { dayRate: dayRate || null } : {}),

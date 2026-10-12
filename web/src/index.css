@@ -359,6 +359,40 @@ tbody tr:hover {
   box-shadow: var(--shadow-sm);
 }
 
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-5);
+  z-index: 1000;
+}
+
+.modal-panel {
+  width: 100%;
+  max-width: 32rem;
+  max-height: 85vh;
+  overflow-y: auto;
+  margin-bottom: 0;
+  box-shadow: var(--shadow-md);
+}
+
+.crew-swatch-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.crew-swatch-dot {
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.15);
+}
+
 .row {
   display: flex;
   gap: 0.6rem;

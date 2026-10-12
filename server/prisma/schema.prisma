@@ -165,6 +165,12 @@ model CrewProfile {
   userId    String   @unique
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   phone     String?
+  /// Admin-set hex swatch color (e.g. "#1E88E5") shown next to this crew member on the
+  /// schedule calendar popup, so staff can tell who's on which job at a glance. Null = use the
+  /// stable id-derived default from shared/src/crewColors.ts rather than a fixed neutral —
+  /// unlike LocationColorRule's fallback, every crew member should look visually distinct even
+  /// with zero admin setup.
+  color     String?
   /// Free-text list of roles/skills (e.g. "LD, Rigger, Spot Op") — a simple string for now
   /// rather than a separate taxonomy table, since nothing queries or filters by skill yet.
   skills    String?

@@ -35,7 +35,14 @@ export default function CrewSchedulePage() {
 
   const events: CalendarEvent[] = (jobs ?? [])
     .filter((j) => j.startsAt)
-    .map((j) => ({ id: j.jobId, title: j.jobName, startsAt: j.startsAt!, endsAt: j.endsAt, href: `/crew/jobs/${j.jobId}` }));
+    .map((j) => ({
+      id: j.jobId,
+      title: j.jobName,
+      startsAt: j.startsAt!,
+      endsAt: j.endsAt,
+      href: `/crew/jobs/${j.jobId}`,
+      crew: j.crew,
+    }));
 
   return (
     <div>
