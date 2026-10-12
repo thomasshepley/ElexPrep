@@ -425,6 +425,10 @@ model PatchImportCandidate {
   oneDriveItemId   String
   oneDriveItemPath String
   fileName         String
+  /// csv | pdf — csv means an exported patch CSV (reliable); pdf means the rows were lifted
+  /// from the job's CAD PDF via fuzzy table/text extraction (routes/patch.ts's fallback when no
+  /// CSV is found) and deserve extra scrutiny before approval. See oneDrive/patchPdfExtract.ts.
+  extractedFrom    String    @default("csv")
   /// Graph's lastModifiedDateTime for the source file, used to tell "this is the same file
   /// already flagged" from "it changed since" without re-parsing on every scan.
   sourceModifiedAt DateTime

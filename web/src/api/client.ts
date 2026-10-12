@@ -88,6 +88,9 @@ export interface Fixture {
 export interface PatchImportCandidate {
   id: string;
   fileName: string;
+  /// csv | pdf — pdf means the rows were lifted from the CAD PDF via fuzzy table/text
+  /// extraction (no patch CSV was found) and deserve extra scrutiny before approval.
+  extractedFrom: string;
   oneDriveItemPath: string;
   rowCount: number;
   /// PENDING | APPROVED | REJECTED
