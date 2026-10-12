@@ -1,5 +1,8 @@
 import { getOneDriveConfig } from './config';
-import { listChildren, findChildByName } from './client';
+import { listChildren, findChildByName, streamOneDriveFile } from './client';
+import { findSharedCadPdf } from './cad';
+import { extractPatchTableFromPdf } from './patchPdfExtract';
+import { parseWysiwygCsv } from '../patchCsv';
 
 export interface DetectedPatchCsv {
   itemId: string;
@@ -43,4 +46,66 @@ export async function findPatchCsv(job: {
     path: `${job.oneDriveFolderPath ?? ''}/Patch/${newest.name}`,
     modifiedAt: new Date(newest.lastModifiedDateTime!),
   };
+}
+
+export interface PatchScanResult {
+  source: 'csv' | 'pdf';
+  itemId: string;
+  path: string;
+  fileName: string;
+  modifiedAt: Date;
+  headers: string[];
+  rows: Record<string, string>[];
+}
+
+async function collectStreamText(stream: NodeJS.ReadableStream): Promise<Buffer> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  return Buffer.concat(chunks);
+}
+
+/**
+ * The full OneDrive patch-sourcing flow: look for an exported CSV in the job's "Patch"
+ * subfolder first (findPatchCsv); if there isn't one, fall back to extracting a patch table out
+ * of the job's CAD PDF (findSharedCadPdf + patchPdfExtract) — the plan's "if absent, fall back
+ * to parsing the patch table out of the CAD PDF". Both branches end up parsed into the same
+ * header+rows shape, but the CSV path is the reliable one; the PDF path is inherently fuzzy
+ * (see patchPdfExtract.ts), which is why the result carries `source` — routes/patch.ts surfaces
+ * it so a reviewer knows a PDF-sourced candidate deserves extra scrutiny. Returns null when
+ * neither a patch CSV nor a CAD PDF with an extractable table could be found — an ordinary,
+ * expected outcome, not an error.
+ */
+export async function findPatchSource(job: {
+  oneDriveFolderId: string | null;
+  oneDriveFolderPath: string | null;
+}): Promise<PatchScanResult | null> {
+  const config = await getOneDriveConfig();
+  if (!config.enabled || !job.oneDriveFolderId) return null;
+
+  const csv = await findPatchCsv(job);
+  if (csv) {
+    const { stream } = await streamOneDriveFile(config, csv.itemId);
+    const text = (await collectStreamText(stream)).toString('utf-8');
+    const { headers, rows } = parseWysiwygCsv(text);
+    return { source: 'csv', itemId: csv.itemId, path: csv.path, fileName: csv.name, modifiedAt: csv.modifiedAt, headers, rows };
+  }
+
+  const cadPdf = await findSharedCadPdf(job);
+  if (cadPdf) {
+    const { stream } = await streamOneDriveFile(config, cadPdf.itemId);
+    const buffer = await collectStreamText(stream);
+    const { headers, rows } = await extractPatchTableFromPdf(buffer);
+    if (rows.length === 0) return null;
+    return {
+      source: 'pdf',
+      itemId: cadPdf.itemId,
+      path: `${job.oneDriveFolderPath ?? ''}/CAD/${cadPdf.name}`,
+      fileName: cadPdf.name,
+      modifiedAt: cadPdf.modifiedAt ?? new Date(),
+      headers,
+      rows,
+    };
+  }
+
+  return null;
 }

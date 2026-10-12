@@ -34,7 +34,7 @@ export default function PatchImportPanel({ jobId }: { jobId: string }) {
     try {
       const res = await api.patch.scanOneDrive(jobId);
       if (res.candidate) setCandidate(res.candidate);
-      else if (!res.detected) setScanError('No patch CSV found in this job’s OneDrive "Patch" folder.');
+      else if (!res.detected) setScanError('No patch CSV in the "Patch" folder, and no usable table found in the CAD PDF either.');
     } catch (e) {
       setScanError((e as Error).message);
     } finally {
@@ -166,8 +166,9 @@ export default function PatchImportPanel({ jobId }: { jobId: string }) {
           </button>
         </div>
         <p className="muted">
-          Looks for a CSV in this job's OneDrive "Patch" subfolder. Nothing is applied automatically
-          — a detected file sits here for review until approved.
+          Looks for a CSV in this job's OneDrive "Patch" subfolder, falling back to extracting a
+          table from the CAD PDF if there's no CSV. Nothing is applied automatically — a detected
+          file sits here for review until approved.
         </p>
         {scanError && <p className="error">{scanError}</p>}
 
@@ -175,10 +176,17 @@ export default function PatchImportPanel({ jobId }: { jobId: string }) {
           <div className="row panel" style={{ background: 'rgba(255,255,255,0.04)', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
             <div>
               <strong>{candidate.fileName}</strong>
+              {candidate.extractedFrom === 'pdf' && <span className="chip chip-warning"> Extracted from CAD PDF</span>}
               <p className="muted" style={{ margin: 0 }}>
                 {candidate.rowCount} rows &middot; detected {new Date(candidate.detectedAt).toLocaleString()} &middot;{' '}
                 {candidate.oneDriveItemPath}
               </p>
+              {candidate.extractedFrom === 'pdf' && (
+                <p className="error" style={{ margin: '0.3rem 0 0' }}>
+                  No patch CSV was found — these rows were lifted from the CAD PDF by fuzzy table
+                  extraction, not a real export. Check them carefully before approving.
+                </p>
+              )}
             </div>
             <button onClick={approveCandidate} disabled={scanBusy}>
               Approve &amp; import

@@ -5,8 +5,7 @@ import { prisma, logActivity } from '../db';
 import { requirePermission } from '../permissions';
 import { parseWysiwygCsv, buildFixturesFromRows } from '../patchCsv';
 import { getOneDriveConfig } from '../oneDrive/config';
-import { streamOneDriveFile } from '../oneDrive/client';
-import { findPatchCsv } from '../oneDrive/patchDetect';
+import { findPatchSource } from '../oneDrive/patchDetect';
 
 const upload = multer({ storage: multer.memoryStorage() });
 
@@ -88,11 +87,12 @@ patchRouter.post('/:jobId/patch/import', async (req, res) => {
 });
 
 /**
- * Looks for a patch CSV in the job's OneDrive "Patch" subfolder (see oneDrive/patchDetect.ts)
- * and, if found, parses it and stores it as a PENDING candidate for review — never applied
- * directly, unlike the CAD PDF auto-surface. A re-scan that finds the same file (by its Graph
- * lastModifiedDateTime) leaves the existing candidate's status alone; a re-scan that finds a
- * changed or new file overwrites it back to PENDING even if the old one was already reviewed.
+ * Looks for a patch source in the job's OneDrive folder — an exported CSV in the "Patch"
+ * subfolder first, falling back to extracting a table out of the job's CAD PDF when there's no
+ * CSV (see oneDrive/patchDetect.ts's findPatchSource) — and, if found, stores it as a PENDING
+ * candidate for review — never applied directly. A re-scan that finds the same file (by its
+ * Graph lastModifiedDateTime) leaves the existing candidate's status alone; a re-scan that finds
+ * a changed or new file overwrites it back to PENDING even if the old one was already reviewed.
  */
 patchRouter.post('/:jobId/patch/onedrive-scan', requirePermission('manageOneDrive'), async (req, res) => {
   const { jobId } = req.params;
@@ -102,45 +102,41 @@ patchRouter.post('/:jobId/patch/onedrive-scan', requirePermission('manageOneDriv
   if (!config.enabled) return res.status(400).json({ error: 'OneDrive is not configured yet' });
   if (!job.oneDriveFolderId) return res.status(400).json({ error: 'This job has no OneDrive folder linked yet' });
 
-  let detected;
+  let found;
   try {
-    detected = await findPatchCsv(job);
+    found = await findPatchSource(job);
   } catch (err) {
     return res.status(502).json({ error: (err as Error).message });
   }
-  if (!detected) return res.json({ detected: false });
+  if (!found) return res.json({ detected: false });
 
   const existing = await prisma.patchImportCandidate.findUnique({ where: { jobId } });
-  if (existing && existing.sourceModifiedAt.getTime() === detected.modifiedAt.getTime()) {
+  if (existing && existing.sourceModifiedAt.getTime() === found.modifiedAt.getTime()) {
     return res.json({ detected: true, candidate: toCandidateResponse(existing) });
   }
-
-  const { stream } = await streamOneDriveFile(config, detected.itemId);
-  const chunks: Buffer[] = [];
-  for await (const chunk of stream) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-  const text = Buffer.concat(chunks).toString('utf-8');
-  const { headers, rows } = parseWysiwygCsv(text);
-  if (headers.length === 0) {
-    return res.status(400).json({ error: `Could not find a header row in ${detected.name}` });
+  if (found.headers.length === 0) {
+    return res.status(400).json({ error: `Could not find a header row in ${found.fileName}` });
   }
 
   const candidate = await prisma.patchImportCandidate.upsert({
     where: { jobId },
     create: {
       jobId,
-      oneDriveItemId: detected.itemId,
-      oneDriveItemPath: detected.path,
-      fileName: detected.name,
-      sourceModifiedAt: detected.modifiedAt,
-      rowsJson: JSON.stringify(rows),
+      oneDriveItemId: found.itemId,
+      oneDriveItemPath: found.path,
+      fileName: found.fileName,
+      extractedFrom: found.source,
+      sourceModifiedAt: found.modifiedAt,
+      rowsJson: JSON.stringify(found.rows),
       status: 'PENDING',
     },
     update: {
-      oneDriveItemId: detected.itemId,
-      oneDriveItemPath: detected.path,
-      fileName: detected.name,
-      sourceModifiedAt: detected.modifiedAt,
-      rowsJson: JSON.stringify(rows),
+      oneDriveItemId: found.itemId,
+      oneDriveItemPath: found.path,
+      fileName: found.fileName,
+      extractedFrom: found.source,
+      sourceModifiedAt: found.modifiedAt,
+      rowsJson: JSON.stringify(found.rows),
       status: 'PENDING',
       detectedAt: new Date(),
       reviewedAt: null,
@@ -148,7 +144,7 @@ patchRouter.post('/:jobId/patch/onedrive-scan', requirePermission('manageOneDriv
       rejectionNote: null,
     },
   });
-  await logActivity('patch.onedrive_detect', detected.name, jobId, req.user?.id);
+  await logActivity('patch.onedrive_detect', `${found.fileName} (${found.source})`, jobId, req.user?.id);
   res.json({ detected: true, candidate: toCandidateResponse(candidate) });
 });
 
@@ -156,6 +152,7 @@ function toCandidateResponse(c: {
   id: string;
   fileName: string;
   oneDriveItemPath: string;
+  extractedFrom: string;
   rowsJson: string;
   status: string;
   detectedAt: Date;
@@ -167,6 +164,7 @@ function toCandidateResponse(c: {
   return {
     id: c.id,
     fileName: c.fileName,
+    extractedFrom: c.extractedFrom,
     oneDriveItemPath: c.oneDriveItemPath,
     rowCount: rows.length,
     status: c.status,

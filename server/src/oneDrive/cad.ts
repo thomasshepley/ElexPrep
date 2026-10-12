@@ -4,6 +4,10 @@ import { listChildren, findChildByName } from './client';
 export interface CadPdf {
   itemId: string;
   name: string;
+  /** Graph's lastModifiedDateTime for the PDF, if present — used by the patch auto-import
+   * fallback (oneDrive/patchPdfExtract.ts) to tell "this is the same plot already flagged" from
+   * "it changed since", the same way patchDetect.ts does for a patch CSV. */
+  modifiedAt: Date | null;
 }
 
 /**
@@ -26,5 +30,5 @@ export async function findSharedCadPdf(job: { oneDriveFolderId: string | null })
 
   const cadChildren = await listChildren(config, cadFolder.id);
   const pdf = cadChildren.find((c) => c.file && c.name.toLowerCase().endsWith('.pdf'));
-  return pdf ? { itemId: pdf.id, name: pdf.name } : null;
+  return pdf ? { itemId: pdf.id, name: pdf.name, modifiedAt: pdf.lastModifiedDateTime ? new Date(pdf.lastModifiedDateTime) : null } : null;
 }
