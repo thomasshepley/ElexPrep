@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api, type CurrentRmsConfig, type CurrentRmsOpportunity } from '../api/client';
+import PasswordInput from '../components/PasswordInput';
 
 export default function CurrentRmsSettingsPage() {
   const [config, setConfig] = useState<CurrentRmsConfig | null>(null);
@@ -164,8 +165,7 @@ export default function CurrentRmsSettingsPage() {
               </div>
             ) : (
               <div className="row" style={{ marginTop: '0.1rem' }}>
-                <input
-                  type="password"
+                <PasswordInput
                   value={apiKeyInput}
                   placeholder="paste API key"
                   onChange={(e) => setApiKeyInput(e.target.value)}

@@ -21,6 +21,25 @@ export function WhoIcon() {
   );
 }
 
+export function EyeIcon() {
+  return (
+    <svg {...common}>
+      <path d="M1.3 8C2.6 5 5.1 3 8 3s5.4 2 6.7 5c-1.3 3-3.8 5-6.7 5S2.6 11 1.3 8Z" {...stroke} />
+      <circle cx="8" cy="8" r="1.8" {...stroke} />
+    </svg>
+  );
+}
+
+export function EyeOffIcon() {
+  return (
+    <svg {...common}>
+      <path d="M1.3 8C2.6 5 5.1 3 8 3s5.4 2 6.7 5c-1.3 3-3.8 5-6.7 5S2.6 11 1.3 8Z" {...stroke} />
+      <circle cx="8" cy="8" r="1.8" {...stroke} />
+      <path d="M2.3 2.3l11.4 11.4" {...stroke} />
+    </svg>
+  );
+}
+
 export function WhatIcon() {
   return (
     <svg {...common}>

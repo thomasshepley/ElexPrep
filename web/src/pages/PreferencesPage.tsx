@@ -3,12 +3,14 @@ import { api } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import NotificationPreferences from '../components/NotificationPreferences';
 import TwoFactorPanel from '../components/TwoFactorPanel';
+import PasswordInput from '../components/PasswordInput';
 
 export default function PreferencesPage() {
   const { user, setUser } = useAuth();
   const [displayName, setDisplayName] = useState(user?.displayName ?? '');
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -31,10 +33,15 @@ export default function PreferencesPage() {
     e.preventDefault();
     setError(null);
     setMessage(null);
+    if (newPassword !== confirmNewPassword) {
+      setError('New passwords do not match.');
+      return;
+    }
     try {
       await api.auth.updateMe({ password: newPassword, currentPassword });
       setCurrentPassword('');
       setNewPassword('');
+      setConfirmNewPassword('');
       setMessage('Password changed.');
     } catch (err) {
       setError((err as Error).message);
@@ -66,9 +73,8 @@ export default function PreferencesPage() {
         <form className="row" style={{ alignItems: 'flex-end' }} onSubmit={changePassword}>
           <div className="field">
             <label htmlFor="prefs-current-password">Current password</label>
-            <input
+            <PasswordInput
               id="prefs-current-password"
-              type="password"
               value={currentPassword}
               onChange={(e) => setCurrentPassword(e.target.value)}
               required
@@ -76,12 +82,20 @@ export default function PreferencesPage() {
           </div>
           <div className="field">
             <label htmlFor="prefs-new-password">New password</label>
-            <input
+            <PasswordInput
               id="prefs-new-password"
-              type="password"
               placeholder="At least 8 characters"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
+              required
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="prefs-confirm-new-password">Confirm new password</label>
+            <PasswordInput
+              id="prefs-confirm-new-password"
+              value={confirmNewPassword}
+              onChange={(e) => setConfirmNewPassword(e.target.value)}
               required
             />
           </div>

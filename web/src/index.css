@@ -244,6 +244,54 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
   width: 100%;
 }
 
+.password-input-wrap {
+  position: relative;
+  display: inline-block;
+}
+
+.password-input-wrap input {
+  padding-right: 2.25rem;
+}
+
+.field .password-input-wrap {
+  display: block;
+  width: 100%;
+}
+
+.field .password-input-wrap input {
+  width: 100%;
+}
+
+.password-input-eye {
+  position: absolute;
+  right: 0.4rem;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--content-muted);
+  box-shadow: none;
+}
+
+.password-input-eye:hover:not(:disabled) {
+  color: var(--content);
+  background: var(--accent-wash);
+  transform: translateY(-50%);
+  filter: none;
+}
+
+.password-input-eye:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
 /* A themed file picker: a real (themed) button triggers a hidden native input via a ref, so it
    gets ordinary button focus/hover/keyboard behavior for free instead of re-implementing it on
    a label. The native input is removed from the tab order (its own UI is never shown). */

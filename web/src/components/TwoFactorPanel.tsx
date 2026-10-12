@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import QRCode from 'qrcode';
 import { api } from '../api/client';
+import PasswordInput from './PasswordInput';
 
 /**
  * Self-service TOTP enrollment — any signed-in account (admin, user, signage, crew) can set
@@ -190,7 +191,7 @@ export default function TwoFactorPanel() {
           <form onSubmit={regenerate} className="row" style={{ alignItems: 'flex-end', marginTop: '0.5rem' }}>
             <div className="field" style={{ width: '14rem' }}>
               <label htmlFor="totp-regen-password">Current password</label>
-              <input id="totp-regen-password" type="password" value={regenPassword} onChange={(e) => setRegenPassword(e.target.value)} required />
+              <PasswordInput id="totp-regen-password" value={regenPassword} onChange={(e) => setRegenPassword(e.target.value)} required />
             </div>
             <button type="submit" className="secondary" disabled={busy}>
               Regenerate backup codes
@@ -200,7 +201,7 @@ export default function TwoFactorPanel() {
           <form onSubmit={disable} className="row" style={{ alignItems: 'flex-end', marginTop: '0.75rem' }}>
             <div className="field" style={{ width: '14rem' }}>
               <label htmlFor="totp-disable-password">Current password</label>
-              <input id="totp-disable-password" type="password" value={disablePassword} onChange={(e) => setDisablePassword(e.target.value)} required />
+              <PasswordInput id="totp-disable-password" value={disablePassword} onChange={(e) => setDisablePassword(e.target.value)} required />
             </div>
             <button type="submit" className="secondary" disabled={busy}>
               Turn off two-factor authentication

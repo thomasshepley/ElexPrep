@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api, type OneDriveConfig } from '../api/client';
+import PasswordInput from '../components/PasswordInput';
 
 /**
  * Azure app-registration credentials for the Microsoft Graph / OneDrive scaffold (see
@@ -102,8 +103,7 @@ export default function OneDriveSettingsPage() {
           <label>
             Client secret
             <br />
-            <input
-              type="password"
+            <PasswordInput
               value={clientSecret}
               placeholder={config.hasClientSecret ? '•••••••• (set — leave blank to keep)' : 'paste client secret'}
               onChange={(e) => setClientSecret(e.target.value)}

@@ -2,6 +2,7 @@ import { Fragment, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, type AuthedUser, type PermissionKey, type Role } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
+import PasswordInput from '../components/PasswordInput';
 
 const ROLES: Role[] = ['ADMIN', 'USER', 'SIGNAGE'];
 
@@ -11,6 +12,7 @@ export default function UsersPage() {
   const [username, setUsername] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [role, setRole] = useState<Role>('USER');
   const [error, setError] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -33,11 +35,16 @@ export default function UsersPage() {
   const create = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    if (password !== confirmPassword) {
+      setError('Passwords do not match.');
+      return;
+    }
     try {
       await api.users.create({ username, password, displayName: displayName || undefined, role });
       setUsername('');
       setDisplayName('');
       setPassword('');
+      setConfirmPassword('');
       setRole('USER');
       refresh();
     } catch (err) {
@@ -87,11 +94,16 @@ export default function UsersPage() {
         <form className="row" onSubmit={create}>
           <input placeholder="Username" value={username} onChange={(e) => setUsername(e.target.value)} required />
           <input placeholder="Display name" value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
-          <input
-            type="password"
+          <PasswordInput
             placeholder="Password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            required
+          />
+          <PasswordInput
+            placeholder="Confirm password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
             required
           />
           <select value={role} onChange={(e) => setRole(e.target.value as Role)}>

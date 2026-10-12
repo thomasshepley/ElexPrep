@@ -8,6 +8,7 @@ import BankDetailsReveal from '../components/BankDetailsReveal';
 import RateCardEditor from '../components/RateCardEditor';
 import NotificationPreferences from '../components/NotificationPreferences';
 import TwoFactorPanel from '../components/TwoFactorPanel';
+import PasswordInput from '../components/PasswordInput';
 
 /**
  * Crew self-service: the first place a crew member can edit anything about their own account
@@ -32,6 +33,7 @@ export default function CrewAccountPage() {
   const [bankDetails, setBankDetails] = useState<BankDetails | null>(null);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -81,10 +83,15 @@ export default function CrewAccountPage() {
     e.preventDefault();
     setError(null);
     setMessage(null);
+    if (newPassword !== confirmNewPassword) {
+      setError('New passwords do not match.');
+      return;
+    }
     try {
       await api.auth.updateMe({ password: newPassword, currentPassword });
       setCurrentPassword('');
       setNewPassword('');
+      setConfirmNewPassword('');
       setMessage('Password changed.');
     } catch (err) {
       setError((err as Error).message);
@@ -172,9 +179,8 @@ export default function CrewAccountPage() {
         <form className="row" style={{ alignItems: 'flex-end' }} onSubmit={changePassword}>
           <div className="field">
             <label htmlFor="account-current-password">Current password</label>
-            <input
+            <PasswordInput
               id="account-current-password"
-              type="password"
               value={currentPassword}
               onChange={(e) => setCurrentPassword(e.target.value)}
               required
@@ -182,12 +188,20 @@ export default function CrewAccountPage() {
           </div>
           <div className="field">
             <label htmlFor="account-new-password">New password</label>
-            <input
+            <PasswordInput
               id="account-new-password"
-              type="password"
               placeholder="At least 8 characters"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
+              required
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="account-confirm-new-password">Confirm new password</label>
+            <PasswordInput
+              id="account-confirm-new-password"
+              value={confirmNewPassword}
+              onChange={(e) => setConfirmNewPassword(e.target.value)}
               required
             />
           </div>
