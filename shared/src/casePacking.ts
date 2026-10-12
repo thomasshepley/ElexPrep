@@ -34,15 +34,19 @@ export function packFixturesIntoCases(
   rules: FixtureTypeRule[]
 ): CaseGroup[] {
   const ruleByType = new Map(rules.map((r) => [r.name.toLowerCase(), r]));
-  const byType = new Map<string, RawFixtureInput[]>();
+  // Grouped by fixture type AND stage together, so two stages' fixtures of the same type
+  // never end up packed into the same case (see RawFixtureInput.groupId).
+  const byTypeAndGroup = new Map<string, RawFixtureInput[]>();
   for (const f of fixtures) {
-    const key = f.fixtureType;
-    if (!byType.has(key)) byType.set(key, []);
-    byType.get(key)!.push(f);
+    const key = `${f.fixtureType}::${f.groupId ?? ''}`;
+    if (!byTypeAndGroup.has(key)) byTypeAndGroup.set(key, []);
+    byTypeAndGroup.get(key)!.push(f);
   }
 
   const groups: CaseGroup[] = [];
-  for (const [fixtureType, list] of byType) {
+  for (const list of byTypeAndGroup.values()) {
+    const fixtureType = list[0].fixtureType;
+    const groupId = list[0].groupId ?? null;
     const rule = ruleByType.get(fixtureType.toLowerCase());
     const unitsPerCase = rule?.unitsPerCase ?? 1;
     const sorted = [...list].sort((a, b) => a.address - b.address);
@@ -56,6 +60,7 @@ export function packFixturesIntoCases(
         addresses,
         label: formatCaseLabel(addresses, unitsPerCase),
         location: chunk[0]?.location ?? null,
+        groupId,
       });
     }
   }

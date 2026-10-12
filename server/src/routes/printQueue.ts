@@ -38,6 +38,7 @@ printQueueRouter.post('/:jobId/print-queue/build', async (req, res) => {
           labelType: 'FIXTURE',
           sourceType: 'FIXTURE',
           sourceId: f.id,
+          groupId: f.groupId,
           contentJson: JSON.stringify({
             address: f.address,
             mainUniverse: f.mainUniverse,
@@ -65,6 +66,7 @@ printQueueRouter.post('/:jobId/print-queue/build', async (req, res) => {
           labelType: 'PAL',
           sourceType: 'CASE',
           sourceId: c.id,
+          groupId: c.groupId,
           contentJson: JSON.stringify({
             location: c.location ?? '',
             title: c.fixtureType,

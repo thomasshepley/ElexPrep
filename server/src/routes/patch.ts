@@ -36,13 +36,16 @@ async function loadSavedPatchMapping(): Promise<Partial<Record<PatchFieldKey, st
 
 /** The destructive replace shared by the manual-upload import and the OneDrive auto-detect
  * approval flow: wipes the job's existing fixtures and writes the freshly-built set in one
- * transaction. */
-async function replaceFixtures(jobId: string, fixtures: ReturnType<typeof buildFixturesFromRows>) {
+ * transaction. Scoped to one stage (groupId, null meaning "ungrouped") rather than the whole
+ * job, so a multi-stage job can re-import one stage's patch without touching any other
+ * stage's already-imported fixtures - see routes/fixtureGroups.ts for the stage model. */
+async function replaceFixtures(jobId: string, fixtures: ReturnType<typeof buildFixturesFromRows>, groupId: string | null = null) {
   await prisma.$transaction([
-    prisma.fixture.deleteMany({ where: { jobId } }),
+    prisma.fixture.deleteMany({ where: { jobId, groupId } }),
     prisma.fixture.createMany({
       data: fixtures.map((f) => ({
         jobId,
+        groupId,
         address: f.address,
         fixtureType: f.fixtureType,
         mainUniverse: f.mainUniverse ?? null,
@@ -80,9 +83,12 @@ async function addMissingFixtureTypeRules(fixtureTypes: string[]): Promise<strin
 
 patchRouter.post('/:jobId/patch/import', async (req, res) => {
   const { jobId } = req.params;
-  const { mapping, rows } = req.body ?? {};
+  const { mapping, rows, groupId } = req.body ?? {};
   if (!Array.isArray(rows)) {
     return res.status(400).json({ error: 'rows are required' });
+  }
+  if (groupId !== undefined && groupId !== null && typeof groupId !== 'string') {
+    return res.status(400).json({ error: 'groupId must be a string or null' });
   }
   const job = await prisma.job.findUnique({ where: { id: jobId } });
   if (!job) return res.status(404).json({ error: 'job not found' });
@@ -98,7 +104,7 @@ patchRouter.post('/:jobId/patch/import', async (req, res) => {
   }
 
   const fixtures = buildFixturesFromRows(rows as Record<string, string>[], m);
-  await replaceFixtures(jobId, fixtures);
+  await replaceFixtures(jobId, fixtures, groupId ?? null);
   const newFixtureTypes = await addMissingFixtureTypeRules(fixtures.map((f) => f.fixtureType));
 
   await logActivity('patch.import', `${fixtures.length} fixtures`, jobId, req.user?.id);
@@ -273,6 +279,7 @@ const FIXTURE_EDITABLE_FIELDS = [
   'pixAddress',
   'mode',
   'location',
+  'groupId',
 ] as const;
 
 /**

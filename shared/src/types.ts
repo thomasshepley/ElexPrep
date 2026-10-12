@@ -29,6 +29,9 @@ export interface RawFixtureInput {
   subnetMask?: string | null;
   notes?: string | null;
   raw?: Record<string, string>;
+  /// Which stage/area (FixtureGroup) this fixture belongs to - null for a job that doesn't
+  /// use stages, or for a fixture not yet assigned to one.
+  groupId?: string | null;
 }
 
 export interface CaseGroup {
@@ -36,6 +39,9 @@ export interface CaseGroup {
   addresses: number[];
   label: string;
   location?: string | null;
+  /// Inherited from the fixtures packed into this case - packFixturesIntoCases groups by
+  /// (fixtureType, groupId) together, so every fixture in one case always shares one groupId.
+  groupId?: string | null;
 }
 
 /** Canonical CSV column keys a Wysiwyg-style patch export can be mapped onto. */

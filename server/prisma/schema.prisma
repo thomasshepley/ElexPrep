@@ -86,6 +86,32 @@ model Job {
   oneDriveShares OneDriveShare[]
   patchImportCandidate PatchImportCandidate?
   linkedRmsOpportunities JobLinkedRmsOpportunity[]
+  fixtureGroups  FixtureGroup[]
+}
+
+/// A named subdivision of one job's prep - a "stage" at a multi-stage event, or any other
+/// custom split an admin wants (see routes/fixtureGroups.ts). Each stage gets its own patch
+/// import, case packing, and label/print-queue scoping, so two stages' fixtures never collide
+/// even though they share one job. `rmsGroupName` records which Current RMS group-heading
+/// (opportunity_item_type 0 row) this stage was created from, if any, so the admin can re-run
+/// the name-based cross-reference match against newly-imported fixtures later. A job with no
+/// FixtureGroup rows behaves exactly as before this feature existed - every Fixture/
+/// CaseGroupRecord/PrintQueueItem/AdHocLabel's groupId is simply null ("ungrouped").
+model FixtureGroup {
+  id           String   @id @default(cuid())
+  jobId        String
+  job          Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  name         String
+  order        Int      @default(0)
+  rmsGroupName String?
+  createdAt    DateTime @default(now())
+
+  fixtures        Fixture[]
+  cases           CaseGroupRecord[]
+  printQueueItems PrintQueueItem[]
+  adHocLabels     AdHocLabel[]
+
+  @@index([jobId])
 }
 
 /// A OneDrive file or folder an admin has explicitly chosen to share with this job's crew —
@@ -454,8 +480,15 @@ model Fixture {
   subnetMask    String?
   notes         String?
   rawJson       String?
+  /// Which stage/area this fixture belongs to, for jobs subdivided into FixtureGroups (e.g.
+  /// multi-stage festivals) - null means "ungrouped", the default for every job that doesn't
+  /// use stages at all. SetNull (not Cascade) so deleting a stage returns its fixtures to
+  /// ungrouped rather than deleting the fixtures themselves.
+  groupId       String?
+  group         FixtureGroup? @relation(fields: [groupId], references: [id], onDelete: SetNull)
 
   @@index([jobId])
+  @@index([groupId])
 }
 
 /// A patch CSV auto-detected in a job's OneDrive "Patch" subfolder, parsed and held for admin
@@ -500,8 +533,13 @@ model CaseGroupRecord {
   label         String
   location      String?
   addressesJson String
+  /// Same stage/area concept as Fixture.groupId - a case is packed from fixtures all within
+  /// one stage (see shared/src/casePacking.ts), so it inherits that stage here too.
+  groupId       String?
+  group         FixtureGroup? @relation(fields: [groupId], references: [id], onDelete: SetNull)
 
   @@index([jobId])
+  @@index([groupId])
 }
 
 /// labelType is one of: FIXTURE, TRUSS_SPIKE_POSITION, TRUSS_SPIKE_TIP, TRUSS_SPIKE_SACN,
@@ -527,6 +565,11 @@ model AdHocLabel {
   /// member later doesn't delete labels already approved onto the sheet.
   requestedByCrewProfileId String?
   requestedByCrewProfile   CrewProfile? @relation(fields: [requestedByCrewProfileId], references: [id], onDelete: SetNull)
+  /// Manually-assigned stage for this one-off label (ad hoc labels aren't built from a
+  /// Fixture/CaseGroupRecord, so there's nothing to denormalize this from - see
+  /// FixtureGroup). Null = ungrouped, same as everywhere else this field appears.
+  groupId     String?
+  group       FixtureGroup? @relation(fields: [groupId], references: [id], onDelete: SetNull)
   createdAt   DateTime  @default(now())
 }
 
@@ -568,10 +611,16 @@ model PrintQueueItem {
   /// Print-run position, shared with AdHocLabel's `order` across the same
   /// (jobId, labelType) group — determines which physical cell a copy lands in.
   order       Int      @default(0)
+  /// Denormalized from the source Fixture/CaseGroupRecord's own groupId at build time (see
+  /// routes/printQueue.ts's /print-queue/build) - lets the print queue UI filter by stage
+  /// without a join back to the source row.
+  groupId     String?
+  group       FixtureGroup? @relation(fields: [groupId], references: [id], onDelete: SetNull)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   @@index([jobId])
+  @@index([groupId])
 }
 
 /// ipAddress/userAgent are filled in automatically by logActivity() from the current

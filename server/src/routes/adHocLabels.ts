@@ -20,7 +20,7 @@ adHocLabelsRouter.get('/:jobId/adhoc-labels', async (req, res) => {
 });
 
 adHocLabelsRouter.post('/:jobId/adhoc-labels', async (req, res) => {
-  const { labelType, content, quantity } = req.body ?? {};
+  const { labelType, content, quantity, groupId } = req.body ?? {};
   if (!labelType || !content) return res.status(400).json({ error: 'labelType and content are required' });
   const order = await nextOrderStart(req.params.jobId, labelType);
   const item = await prisma.adHocLabel.create({
@@ -29,6 +29,7 @@ adHocLabelsRouter.post('/:jobId/adhoc-labels', async (req, res) => {
       labelType,
       contentJson: JSON.stringify(content),
       quantity: Number.isFinite(quantity) ? quantity : 1,
+      groupId: groupId || null,
       order,
     },
   });
@@ -37,7 +38,7 @@ adHocLabelsRouter.post('/:jobId/adhoc-labels', async (req, res) => {
 });
 
 adHocLabelsRouter.put('/:jobId/adhoc-labels/:id', async (req, res) => {
-  const { content, quantity, labelType, excludeFromPrint } = req.body ?? {};
+  const { content, quantity, labelType, excludeFromPrint, groupId } = req.body ?? {};
   const item = await prisma.adHocLabel.update({
     where: { id: req.params.id },
     data: {
@@ -45,6 +46,7 @@ adHocLabelsRouter.put('/:jobId/adhoc-labels/:id', async (req, res) => {
       ...(quantity !== undefined ? { quantity } : {}),
       ...(labelType !== undefined ? { labelType } : {}),
       ...(excludeFromPrint !== undefined ? { excludeFromPrint } : {}),
+      ...(groupId !== undefined ? { groupId: groupId || null } : {}),
     },
   });
   res.json({ ...item, content: JSON.parse(item.contentJson) });
