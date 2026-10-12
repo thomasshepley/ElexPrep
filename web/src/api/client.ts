@@ -753,6 +753,19 @@ export const api = {
         marginPercent: number | null;
       }>(`/jobs/${jobId}/current-rms/crew-margin`),
   },
+  jobLinkedRmsOpportunities: {
+    list: (jobId: string) =>
+      request<{ id: string; rmsId: number; subject: string | null; createdAt: string }[]>(
+        `/jobs/${jobId}/current-rms/linked-opportunities`
+      ),
+    create: (jobId: string, rmsId: number) =>
+      request<{ id: string; rmsId: number; subject: string | null; createdAt: string }>(
+        `/jobs/${jobId}/current-rms/linked-opportunities`,
+        { method: 'POST', body: JSON.stringify({ rmsId }) }
+      ),
+    remove: (jobId: string, id: string) =>
+      request<void>(`/jobs/${jobId}/current-rms/linked-opportunities/${id}`, { method: 'DELETE' }),
+  },
   permissions: {
     get: () =>
       request<{ permissions: Record<PermissionKey, boolean>; keys: PermissionKey[]; labels: Record<PermissionKey, string> }>(

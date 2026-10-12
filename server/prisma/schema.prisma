@@ -75,6 +75,7 @@ model Job {
   discussionMessages JobDiscussionMessage[]
   oneDriveShares OneDriveShare[]
   patchImportCandidate PatchImportCandidate?
+  linkedRmsOpportunities JobLinkedRmsOpportunity[]
 }
 
 /// A OneDrive file or folder an admin has explicitly chosen to share with this job's crew —
@@ -676,6 +677,27 @@ model Plot {
 /// full API response for a given opportunity — field extraction below is a best-effort
 /// read of the documented conventions, to be verified against a real account once linked;
 /// raw data is never discarded even if a specific field turns out to be named differently.
+/// An explicit, admin-set link from a job to another Current RMS opportunity whose charges
+/// should count toward this job's crew margin — e.g. a separate "<Job> - Crewing" opportunity
+/// that isn't itself worth putting on the portal as a job. Additive to the automatic
+/// same-projectId sibling detection in routes/currentRms.ts's /crew-margin (a job can have
+/// both, and the margin calc de-dupes by rmsId): that detection only catches opportunities
+/// Current RMS itself grouped under one Project, while this covers cases where the two
+/// opportunities were created without a shared Project and need a human to say "these go
+/// together."
+model JobLinkedRmsOpportunity {
+  id        String   @id @default(cuid())
+  jobId     String
+  job       Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  rmsId     Int
+  /// Cached at link time purely for display before the next Current RMS sync populates
+  /// CurrentRmsOpportunity locally — not kept in sync afterward.
+  subject   String?
+  createdAt DateTime @default(now())
+
+  @@unique([jobId, rmsId])
+}
+
 model CurrentRmsOpportunity {
   id           String    @id @default(cuid())
   rmsId        Int       @unique

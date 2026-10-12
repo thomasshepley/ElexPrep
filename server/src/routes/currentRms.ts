@@ -3,7 +3,7 @@ import { prisma, logActivity } from '../db';
 import { requireRole } from '../auth';
 import { requirePermission } from '../permissions';
 import { DEFAULT_CURRENT_RMS_CONFIG, getCurrentRmsConfig, saveCurrentRmsConfig, toPublicConfig } from '../currentRms/config';
-import { testCurrentRmsConnection, fetchOpportunityItems, GROUP_ITEM_TYPE, RawOpportunityItem } from '../currentRms/client';
+import { testCurrentRmsConnection, fetchOpportunity, fetchOpportunityItems, GROUP_ITEM_TYPE, RawOpportunityItem } from '../currentRms/client';
 import {
   runCurrentRmsSync,
   restartCurrentRmsPolling,
@@ -311,6 +311,49 @@ jobCurrentRmsRouter.post('/:jobId/current-rms/acknowledge', async (req, res) => 
   res.json(job);
 });
 
+/**
+ * Explicit, admin-set links from this job to other Current RMS opportunities whose crew
+ * charges should count toward its margin — for a separate "<Job> - Crewing" opportunity that
+ * Current RMS didn't group under the same Project as the main opportunity (see
+ * JobLinkedRmsOpportunity's schema comment). Same sensitivity tier as the margin view itself.
+ */
+jobCurrentRmsRouter.get('/:jobId/current-rms/linked-opportunities', requireRole('ADMIN'), async (req, res) => {
+  const links = await prisma.jobLinkedRmsOpportunity.findMany({
+    where: { jobId: req.params.jobId },
+    orderBy: { createdAt: 'asc' },
+  });
+  res.json(links);
+});
+
+jobCurrentRmsRouter.post('/:jobId/current-rms/linked-opportunities', requireRole('ADMIN'), async (req, res) => {
+  const { jobId } = req.params;
+  const rmsId = Number(req.body?.rmsId);
+  if (!Number.isInteger(rmsId) || rmsId <= 0) return res.status(400).json({ error: 'rmsId must be a positive integer' });
+
+  const config = await getCurrentRmsConfig();
+  if (!config.enabled) return res.status(400).json({ error: 'Current RMS integration is disabled' });
+  const opp = await fetchOpportunity(config, rmsId);
+  if (!opp) return res.status(404).json({ error: `No Current RMS opportunity #${rmsId} found` });
+
+  try {
+    const link = await prisma.jobLinkedRmsOpportunity.create({
+      data: { jobId, rmsId, subject: opp.subject ?? null },
+    });
+    await logActivity('current_rms.link_crew_opportunity', `#${rmsId} (${opp.subject})`, jobId, req.user?.id);
+    res.status(201).json(link);
+  } catch (err) {
+    res.status(409).json({ error: 'This opportunity is already linked to this job' });
+  }
+});
+
+jobCurrentRmsRouter.delete('/:jobId/current-rms/linked-opportunities/:id', requireRole('ADMIN'), async (req, res) => {
+  const link = await prisma.jobLinkedRmsOpportunity.findUnique({ where: { id: req.params.id } });
+  if (!link || link.jobId !== req.params.jobId) return res.status(404).json({ error: 'Link not found' });
+  await prisma.jobLinkedRmsOpportunity.delete({ where: { id: req.params.id } });
+  await logActivity('current_rms.unlink_crew_opportunity', `#${link.rmsId}`, req.params.jobId, req.user?.id);
+  res.status(204).end();
+});
+
 function toMoney(value: string | undefined): number {
   const n = Number(value);
   return Number.isFinite(n) ? n : 0;
@@ -330,9 +373,11 @@ function sumServiceCharge(items: RawOpportunityItem[]): number {
 /**
  * Admin-only crew profit/cost view: what the client is charged for crew (from Current RMS,
  * summed across every opportunity sharing this job's Current RMS "project" — see
- * CurrentRmsOpportunity.projectId — so a separate "<Job> - Crewing" opportunity counts too)
- * against what ElexPrep's own records say crew actually cost on this job (JobCrewAssignment's
- * day rate override, or the crew member's own default, times the assignment's days). This is
+ * CurrentRmsOpportunity.projectId — plus any opportunity manually linked via
+ * JobLinkedRmsOpportunity, so a separate "<Job> - Crewing" opportunity counts too whether
+ * Current RMS grouped it under the same Project or an admin had to say so explicitly) against
+ * what ElexPrep's own records say crew actually cost on this job (JobCrewAssignment's day
+ * rate override, or the crew member's own default, times the assignment's days). This is
  * financial margin data, same sensitivity tier as bank details/compliance documents — ADMIN
  * only, never delegated via the permissions system, and never surfaced in the freelancer-
  * facing crew portal.
@@ -349,19 +394,23 @@ jobCurrentRmsRouter.get('/:jobId/current-rms/crew-margin', requireRole('ADMIN'),
   const siblings = primary?.projectId
     ? await prisma.currentRmsOpportunity.findMany({ where: { projectId: primary.projectId } })
     : [];
+  const manualLinks = await prisma.jobLinkedRmsOpportunity.findMany({ where: { jobId: job.id } });
   // Always include the job's own linked opportunity even if it isn't cached locally yet (a
-  // sync hasn't run since it was linked) — siblings alone would silently drop it.
-  const opportunityIds = [...new Set([primaryRmsId, ...siblings.map((s) => s.rmsId)])];
+  // sync hasn't run since it was linked) — siblings/manual links alone would silently drop it.
+  const opportunityIds = [
+    ...new Set([primaryRmsId, ...siblings.map((s) => s.rmsId), ...manualLinks.map((l) => l.rmsId)]),
+  ];
 
   let chargeBreakdown;
   try {
     chargeBreakdown = await Promise.all(
       opportunityIds.map(async (rmsId) => {
         const items = await fetchOpportunityItems(config, rmsId);
-        const cached = siblings.find((s) => s.rmsId === rmsId) ?? primary;
+        const cached = siblings.find((s) => s.rmsId === rmsId) ?? (rmsId === primaryRmsId ? primary : undefined);
+        const manualLink = manualLinks.find((l) => l.rmsId === rmsId);
         return {
           opportunityId: rmsId,
-          subject: cached?.subject ?? `Opportunity #${rmsId}`,
+          subject: cached?.subject ?? manualLink?.subject ?? `Opportunity #${rmsId}`,
           serviceCharge: sumServiceCharge(items),
         };
       })

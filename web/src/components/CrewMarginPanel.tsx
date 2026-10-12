@@ -37,10 +37,111 @@ export default function CrewMarginPanel({ jobId }: { jobId: string }) {
   }, [jobId]);
 
   return (
+    <div>
+      <LinkedOpportunitiesPanel jobId={jobId} onChanged={load} />
+      <MarginDisplay data={data} error={error} loading={loading} onRefresh={load} />
+    </div>
+  );
+}
+
+/**
+ * Lets an admin explicitly tie another Current RMS opportunity (e.g. a separate "<Job> -
+ * Crewing" quote) into this job's margin calc, for cases where Current RMS didn't group the
+ * two under the same Project and the automatic sibling detection can't catch it.
+ */
+function LinkedOpportunitiesPanel({ jobId, onChanged }: { jobId: string; onChanged: () => void }) {
+  const [links, setLinks] = useState<Awaited<ReturnType<typeof api.jobLinkedRmsOpportunities.list>>>([]);
+  const [rmsId, setRmsId] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const refresh = () => api.jobLinkedRmsOpportunities.list(jobId).then(setLinks).catch((e) => setError(e.message));
+
+  useEffect(() => {
+    refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jobId]);
+
+  const add = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setBusy(true);
+    try {
+      await api.jobLinkedRmsOpportunities.create(jobId, Number(rmsId));
+      setRmsId('');
+      await refresh();
+      onChanged();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const remove = async (id: string) => {
+    await api.jobLinkedRmsOpportunities.remove(jobId, id);
+    await refresh();
+    onChanged();
+  };
+
+  return (
+    <div className="panel">
+      <h3 style={{ margin: 0 }}>Linked crewing opportunities</h3>
+      <p className="muted">
+        Tie another Current RMS opportunity (e.g. a separate "{'{Job}'} - Crewing" quote) into
+        this job's margin calc. Only needed if it isn't already picked up automatically — that
+        happens when Current RMS groups it under the same Project as this job's main
+        opportunity.
+      </p>
+      {links.length > 0 && (
+        <ul style={{ margin: '0.5rem 0' }}>
+          {links.map((l) => (
+            <li key={l.id}>
+              #{l.rmsId} {l.subject ? `— ${l.subject}` : ''}{' '}
+              <button className="secondary" style={{ padding: '0.1rem 0.5rem' }} onClick={() => remove(l.id)}>
+                Remove
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <form onSubmit={add} className="row" style={{ alignItems: 'flex-end', gap: '0.6rem' }}>
+        <div className="field" style={{ width: '10rem' }}>
+          <label htmlFor={`link-rms-id-${jobId}`}>Opportunity #</label>
+          <input
+            id={`link-rms-id-${jobId}`}
+            value={rmsId}
+            onChange={(e) => setRmsId(e.target.value)}
+            placeholder="e.g. 4821"
+            required
+          />
+        </div>
+        <button type="submit" disabled={busy || !rmsId}>
+          Link
+        </button>
+      </form>
+      {error && <p className="error">{error}</p>}
+    </div>
+  );
+}
+
+function MarginDisplay({
+  data,
+  error,
+  loading,
+  onRefresh,
+}: {
+  data: Awaited<ReturnType<typeof api.jobCrewMargin.get>> | null;
+  error: string | null;
+  loading: boolean;
+  onRefresh: () => void;
+}) {
+
+  return (
     <div className="panel" style={{ marginTop: '1rem' }}>
       <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
         <h3 style={{ margin: 0 }}>Crew margin</h3>
-        <button className="secondary" onClick={load} disabled={loading}>
+        <button className="secondary" onClick={onRefresh} disabled={loading}>
           Refresh
         </button>
       </div>
