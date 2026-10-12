@@ -4,6 +4,7 @@ import { api, type BankDetails } from '../api/client';
 import SkillPicker from '../components/SkillPicker';
 import CertificationPicker from '../components/CertificationPicker';
 import BankDetailsForm from '../components/BankDetailsForm';
+import PasswordInput from '../components/PasswordInput';
 
 /**
  * Where an approved OnboardingInvite's one-time link lands — the invitee fills in their own
@@ -18,6 +19,7 @@ export default function OnboardCompletePage() {
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [phone, setPhone] = useState('');
   const [skills, setSkills] = useState('');
@@ -44,8 +46,12 @@ export default function OnboardCompletePage() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!token) return;
-    setBusy(true);
     setError(null);
+    if (password !== confirmPassword) {
+      setError('Passwords do not match.');
+      return;
+    }
+    setBusy(true);
     try {
       await api.onboarding.invite.complete(token, {
         username,
@@ -116,12 +122,20 @@ export default function OnboardCompletePage() {
             </div>
             <div className="field" style={{ flex: '1 1 12rem' }}>
               <label htmlFor="onboard-password">Password</label>
-              <input
+              <PasswordInput
                 id="onboard-password"
-                type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="At least 8 characters"
+                required
+              />
+            </div>
+            <div className="field" style={{ flex: '1 1 12rem' }}>
+              <label htmlFor="onboard-confirm-password">Confirm password</label>
+              <PasswordInput
+                id="onboard-confirm-password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
                 required
               />
             </div>

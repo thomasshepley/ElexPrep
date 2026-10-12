@@ -6,6 +6,7 @@ import CertificationPicker from '../components/CertificationPicker';
 import BankDetailsForm from '../components/BankDetailsForm';
 import BankDetailsReveal from '../components/BankDetailsReveal';
 import WhatsAppButton from '../components/WhatsAppButton';
+import PasswordInput from '../components/PasswordInput';
 
 const DOCUMENT_SLOTS = [
   { field: 'idDocument', label: 'Photo ID' },
@@ -17,6 +18,7 @@ export default function CrewPage() {
   const [username, setUsername] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [phone, setPhone] = useState('');
   const [skills, setSkills] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -31,6 +33,10 @@ export default function CrewPage() {
   const create = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    if (password !== confirmPassword) {
+      setError('Passwords do not match.');
+      return;
+    }
     try {
       await api.crew.create({
         username,
@@ -42,6 +48,7 @@ export default function CrewPage() {
       setUsername('');
       setDisplayName('');
       setPassword('');
+      setConfirmPassword('');
       setPhone('');
       setSkills('');
       refresh();
@@ -96,12 +103,20 @@ export default function CrewPage() {
             </div>
             <div className="field" style={{ width: '12rem' }}>
               <label htmlFor="crew-password">Password</label>
-              <input
+              <PasswordInput
                 id="crew-password"
-                type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="At least 8 characters"
+                required
+              />
+            </div>
+            <div className="field" style={{ width: '12rem' }}>
+              <label htmlFor="crew-confirm-password">Confirm password</label>
+              <PasswordInput
+                id="crew-confirm-password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
                 required
               />
             </div>

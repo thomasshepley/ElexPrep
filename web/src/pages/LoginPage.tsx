@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
+import PasswordInput from '../components/PasswordInput';
 
 export default function LoginPage() {
   const { user, setUser } = useAuth();
@@ -9,6 +10,7 @@ export default function LoginPage() {
   const [needsSetup, setNeedsSetup] = useState(false);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -29,8 +31,12 @@ export default function LoginPage() {
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setBusy(true);
     setError(null);
+    if (needsSetup && password !== confirmPassword) {
+      setError('Passwords do not match.');
+      return;
+    }
+    setBusy(true);
     try {
       const authed = needsSetup
         ? await api.auth.setup({ username, password, displayName: displayName || undefined })
@@ -135,14 +141,24 @@ export default function LoginPage() {
           )}
           <div className="field">
             <label htmlFor="login-password">Password</label>
-            <input
+            <PasswordInput
               id="login-password"
-              type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
             />
           </div>
+          {needsSetup && (
+            <div className="field">
+              <label htmlFor="login-confirm-password">Confirm password</label>
+              <PasswordInput
+                id="login-confirm-password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                required
+              />
+            </div>
+          )}
           {error && <p className="error">{error}</p>}
           <button type="submit" disabled={busy}>
             {needsSetup ? 'Create admin account' : 'Sign in'}

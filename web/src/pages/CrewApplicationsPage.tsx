@@ -3,6 +3,7 @@ import { api, type CrewApplicationDetail, type CrewApplicationSummary } from '..
 import { useAuth } from '../auth/AuthContext';
 import BankDetailsReveal from '../components/BankDetailsReveal';
 import WhatsAppButton from '../components/WhatsAppButton';
+import PasswordInput from '../components/PasswordInput';
 
 const STATUS_FILTERS = ['PENDING', 'APPROVED', 'REJECTED', 'ALL'] as const;
 type StatusFilter = (typeof STATUS_FILTERS)[number];
@@ -235,6 +236,7 @@ function ApproveForm({
   const [showForm, setShowForm] = useState(false);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [displayName, setDisplayName] = useState(fullName);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -252,8 +254,12 @@ function ApproveForm({
 
   const approve = async (e: React.FormEvent) => {
     e.preventDefault();
-    setBusy(true);
     setError(null);
+    if (password !== confirmPassword) {
+      setError('Passwords do not match.');
+      return;
+    }
+    setBusy(true);
     try {
       await api.crewApplications.approve(applicationId, { username, password, displayName: displayName || undefined });
       onDone();
@@ -277,12 +283,20 @@ function ApproveForm({
       </div>
       <div className="field" style={{ width: '10rem' }}>
         <label htmlFor={`approve-password-${applicationId}`}>Password</label>
-        <input
+        <PasswordInput
           id={`approve-password-${applicationId}`}
-          type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           placeholder="At least 8 characters"
+          required
+        />
+      </div>
+      <div className="field" style={{ width: '10rem' }}>
+        <label htmlFor={`approve-confirm-password-${applicationId}`}>Confirm password</label>
+        <PasswordInput
+          id={`approve-confirm-password-${applicationId}`}
+          value={confirmPassword}
+          onChange={(e) => setConfirmPassword(e.target.value)}
           required
         />
       </div>
