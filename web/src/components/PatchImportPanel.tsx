@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PATCH_FIELD_LABELS, type PatchFieldKey } from '@elexprep/shared';
 import { api, type Fixture } from '../api/client';
@@ -16,6 +16,11 @@ export default function PatchImportPanel({ jobId }: { jobId: string }) {
   const [bulkLocation, setBulkLocation] = useState('');
 
   const loadFixtures = () => api.patch.fixtures(jobId).then(setFixtures);
+
+  useEffect(() => {
+    loadFixtures();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jobId]);
 
   const toggleSelected = (id: string) => {
     setSelected((s) => {
