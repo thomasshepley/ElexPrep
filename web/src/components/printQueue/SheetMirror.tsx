@@ -25,11 +25,17 @@ function textColor(el: { color: LabelElementColor }, resolved: ReturnType<typeof
   return contrastingTextIsWhite(resolved.color) ? '#fff' : '#000';
 }
 
+export interface LogoUrls {
+  left?: string;
+  middle?: string;
+  right?: string;
+}
+
 export interface SheetMirrorProps {
   template: LabelTypeTemplate;
   item: unknown;
   locationColors: LocationColorMap;
-  logoUrl?: string;
+  logoUrls?: LogoUrls;
   editable?: boolean;
   selectedId?: string | null;
   onSelect?: (id: string | null) => void;
@@ -41,7 +47,7 @@ export default function SheetMirror({
   template,
   item,
   locationColors,
-  logoUrl,
+  logoUrls,
   editable = false,
   selectedId,
   onSelect,
@@ -131,13 +137,22 @@ export default function SheetMirror({
         }
 
         if (el.type === 'image') {
+          const urls = [logoUrls?.left, logoUrls?.middle, logoUrls?.right].filter((u): u is string => Boolean(u));
           return (
             <div
               key={el.id}
               style={{ ...boxStyle, border: '1px solid #ccc', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
               onPointerDown={beginDrag(el, 'move')}
             >
-              {logoUrl ? <LogoImg src={logoUrl} placeholder={el.placeholder} /> : <span style={{ color: '#999', fontSize: 11 }}>{el.placeholder}</span>}
+              {urls.length > 0 ? (
+                urls.map((u, i) => (
+                  <div key={i} style={{ flex: 1, height: '100%', minWidth: 0 }}>
+                    <LogoImg src={u} placeholder={el.placeholder} />
+                  </div>
+                ))
+              ) : (
+                <span style={{ color: '#999', fontSize: 11 }}>{el.placeholder}</span>
+              )}
               {editable && selectedId === el.id && <ResizeHandle onPointerDown={beginDrag(el, 'resize')} />}
             </div>
           );

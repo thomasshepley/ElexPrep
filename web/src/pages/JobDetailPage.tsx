@@ -107,10 +107,20 @@ function JobSettingsPanel({ job, onUpdate }: { job: Job; onUpdate: (j: Job) => v
     onUpdate(updated);
   };
 
-  const uploadLogo = async (file: File) => {
+  const uploadLogo = async (file: File, slot: 'left' | 'middle' | 'right') => {
     setLogoBusy(true);
     try {
-      const updated = await api.jobs.uploadLogo(job.id, file);
+      const updated = await api.jobs.uploadLogo(job.id, file, slot);
+      onUpdate(updated);
+    } finally {
+      setLogoBusy(false);
+    }
+  };
+
+  const removeLogo = async (slot: 'left' | 'middle' | 'right') => {
+    setLogoBusy(true);
+    try {
+      const updated = await api.jobs.removeLogo(job.id, slot);
       onUpdate(updated);
     } finally {
       setLogoBusy(false);
@@ -183,9 +193,31 @@ function JobSettingsPanel({ job, onUpdate }: { job: Job; onUpdate: (j: Job) => v
 
       <div style={{ marginTop: '1.25rem' }}>
         <h4>Job logo</h4>
-        <p className="muted">Used on PAL/generic labels and prep displays.</p>
-        {job.logoPath && <img src={api.jobs.logoUrl(job.id)} alt="Job logo" style={{ maxHeight: 80, display: 'block', marginBottom: '0.5rem' }} />}
-        <FileInput accept="image/*" disabled={logoBusy} onFile={uploadLogo} label="Choose image" />
+        <p className="muted">
+          Used on PAL/generic labels and prep displays. Up to three logos print side by side
+          across the label's logo bar - most jobs just use the middle slot.
+        </p>
+        <div className="row" style={{ gap: '1.5rem', flexWrap: 'wrap' }}>
+          {(['left', 'middle', 'right'] as const).map((slot) => {
+            const path = slot === 'left' ? job.logoPathLeft : slot === 'right' ? job.logoPathRight : job.logoPath;
+            return (
+              <div key={slot}>
+                <p className="muted" style={{ margin: '0 0 0.3rem', textTransform: 'capitalize' }}>
+                  {slot}
+                </p>
+                {path && (
+                  <div>
+                    <img src={api.jobs.logoUrl(job.id, slot)} alt={`Job logo (${slot})`} style={{ maxHeight: 60, display: 'block', marginBottom: '0.3rem' }} />
+                    <button type="button" className="secondary" disabled={logoBusy} onClick={() => removeLogo(slot)} style={{ marginBottom: '0.3rem' }}>
+                      Remove
+                    </button>
+                  </div>
+                )}
+                <FileInput accept="image/*" disabled={logoBusy} onFile={(file) => uploadLogo(file, slot)} label={path ? 'Replace' : 'Choose image'} />
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       <div style={{ marginTop: '1.25rem' }}>

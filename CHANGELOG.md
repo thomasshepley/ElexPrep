@@ -3,6 +3,10 @@
 Newest entries first. Each push/merge gets exactly one entry - see
 `scripts/bump-version.mjs` for how the version number itself advances.
 
+## v1.7.7 - 2026-10-12
+
+- Added support for up to 3 logos printed side by side on labels
+
 ## v1.6.7 - 2026-10-12
 
 - Added search to the pick list and imported fixtures list, plus a category filter on the pick list

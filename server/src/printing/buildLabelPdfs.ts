@@ -5,7 +5,7 @@ import { LabelType, PAL_AVERY_SHEET } from '@elexprep/shared';
 import { prisma } from '../db';
 import { uploadDir } from '../routes/jobs';
 import { loadLocationColorMap, LocationColorMap } from '../pdf/locationColors';
-import { renderLabelTypeGeneric } from '../pdf/genericRenderer';
+import { renderLabelTypeGeneric, type LogoImages } from '../pdf/genericRenderer';
 import { loadMergedTemplate } from '../routes/labelTemplates';
 
 export type LabelContentByType = Record<string, unknown[]>;
@@ -64,14 +64,32 @@ export async function collectPendingContent(jobId: string): Promise<LabelContent
   return buildOrderedByType([...pending, ...adHoc]);
 }
 
-async function loadJobLogo(jobId: string): Promise<{ bytes: Uint8Array; kind: 'png' | 'jpg' } | undefined> {
-  const job = await prisma.job.findUnique({ where: { id: jobId } });
-  if (!job?.logoPath) return undefined;
-  const ext = path.extname(job.logoPath).toLowerCase();
+function loadLogoFile(logoPath: string | null): { bytes: Uint8Array; kind: 'png' | 'jpg' } | undefined {
+  if (!logoPath) return undefined;
+  const ext = path.extname(logoPath).toLowerCase();
   const kind = ext === '.png' ? 'png' : ext === '.jpg' || ext === '.jpeg' ? 'jpg' : null;
-  const filePath = path.join(uploadDir, job.logoPath);
+  const filePath = path.join(uploadDir, logoPath);
   if (!kind || !fs.existsSync(filePath)) return undefined;
   return { bytes: fs.readFileSync(filePath), kind };
+}
+
+/** The job's up-to-three logo slots (left/middle/right - see routes/jobs.ts's LOGO_SLOT_FIELDS),
+ * embedded as pdf-lib images ready to hand to renderLabelTypeGeneric. Most jobs only ever set
+ * the legacy single "middle" slot. */
+async function loadJobLogos(doc: PDFDocument, jobId: string): Promise<LogoImages> {
+  const job = await prisma.job.findUnique({ where: { id: jobId } });
+  if (!job) return {};
+  const embed = async (logoPath: string | null) => {
+    const file = loadLogoFile(logoPath);
+    if (!file) return undefined;
+    return file.kind === 'png' ? doc.embedPng(file.bytes) : doc.embedJpg(file.bytes);
+  };
+  const [left, middle, right] = await Promise.all([
+    embed(job.logoPathLeft),
+    embed(job.logoPath),
+    embed(job.logoPathRight),
+  ]);
+  return { left, middle, right };
 }
 
 export async function renderLabelType(
@@ -83,9 +101,8 @@ export async function renderLabelType(
 ): Promise<void> {
   const template = await loadMergedTemplate(jobId, labelType as LabelType);
   if (!template) throw new Error(`Unknown label type: ${labelType}`);
-  const logo = template.labelType === 'PAL' ? await loadJobLogo(jobId) : undefined;
-  const logoImage = logo ? await (logo.kind === 'png' ? doc.embedPng(logo.bytes) : doc.embedJpg(logo.bytes)) : undefined;
-  return renderLabelTypeGeneric(doc, template, items, locationColors, logoImage);
+  const logos = template.labelType === 'PAL' ? await loadJobLogos(doc, jobId) : {};
+  return renderLabelTypeGeneric(doc, template, items, locationColors, logos);
 }
 
 /** One PDF per label type - the unit a print job (and its tray selection) operates on. */
@@ -130,8 +147,7 @@ export async function buildPalAverySheetPdf(jobId: string, items: unknown[]): Pr
   const doc = await PDFDocument.create();
   const template = await loadMergedTemplate(jobId, 'PAL');
   const averyTemplate = { ...template, sheet: PAL_AVERY_SHEET };
-  const logo = await loadJobLogo(jobId);
-  const logoImage = logo ? await (logo.kind === 'png' ? doc.embedPng(logo.bytes) : doc.embedJpg(logo.bytes)) : undefined;
-  await renderLabelTypeGeneric(doc, averyTemplate, items, locationColors, logoImage);
+  const logos = await loadJobLogos(doc, jobId);
+  await renderLabelTypeGeneric(doc, averyTemplate, items, locationColors, logos);
   return Buffer.from(await doc.save());
 }

@@ -1,4 +1,4 @@
-import { PDFDocument, PDFImage, StandardFonts, rgb } from 'pdf-lib';
+import { PDFDocument, PDFImage, PDFPage, StandardFonts, rgb } from 'pdf-lib';
 import {
   DMX_CABLE_WIDTH_FACTOR,
   LabelTypeTemplate,
@@ -30,6 +30,26 @@ function textColorsFor(resolved: ResolvedLocationColor): { fill: ReturnType<type
   return { fill, outline: isWhite ? rgb(0, 0, 0) : rgb(1, 1, 1) };
 }
 
+/** Up to three logos drawn side by side across a label's logo-bar image element - see
+ * routes/jobs.ts's LOGO_SLOT_FIELDS for how each slot maps to a job's uploaded files. */
+export interface LogoImages {
+  left?: PDFImage;
+  middle?: PDFImage;
+  right?: PDFImage;
+}
+
+/** Draws whichever logo slots are set, splitting the rect into equal columns only across the
+ * slots actually in use - a single logo (the common case) still gets the full rect, matching
+ * the pre-multi-logo behavior exactly, while two or three share it evenly left to right. */
+function drawLogoBar(page: PDFPage, rect: CellRectPt, logos: LogoImages) {
+  const present = [logos.left, logos.middle, logos.right].filter((img): img is PDFImage => Boolean(img));
+  if (present.length === 0) return;
+  const colWidth = rect.wPt / present.length;
+  present.forEach((img, i) => {
+    drawImageContain(page, img, { ...rect, xPt: rect.xPt + colWidth * i, wPt: colWidth });
+  });
+}
+
 /**
  * Renders one label type's sheets from its declarative template: fill/image/text/stackedText
  * elements are walked in template order, scaled from the template's reference cell width to
@@ -42,9 +62,10 @@ export async function renderLabelTypeGeneric(
   template: LabelTypeTemplate,
   items: unknown[],
   locationColors: LocationColorMap = new Map(),
-  logoImage?: PDFImage
+  logos: LogoImages = {}
 ): Promise<void> {
   const { bold, regular } = await fonts(doc);
+  const hasAnyLogo = Boolean(logos.left || logos.middle || logos.right);
 
   await renderSheets(doc, template.sheet, items, (page, cell, item) => {
     const scale = cell.wPt / inPt(template.referenceCellWidthIn);
@@ -68,8 +89,8 @@ export async function renderLabelTypeGeneric(
 
       if (el.type === 'image') {
         drawCellOutline(page, elRect);
-        if (logoImage) {
-          drawImageContain(page, logoImage, elRect);
+        if (hasAnyLogo) {
+          drawLogoBar(page, elRect, logos);
         } else {
           centerText(page, el.placeholder, regular, 10, elRect, elRect.hPt / 2 - inPt(0.05), rgb(0.6, 0.6, 0.6));
         }

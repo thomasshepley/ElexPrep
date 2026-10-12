@@ -28,7 +28,12 @@ model Job {
   /// section on both the admin and crew job pages).
   startsAt    DateTime?
   endsAt      DateTime?
-  logoPath    String?
+  /// The main/legacy logo slot — rendered centered (or alone) in the label sheet's logo bar.
+  /// Predates logoPathLeft/logoPathRight, kept as the "middle" slot so an existing job with
+  /// just one logo uploaded keeps rendering exactly as before.
+  logoPath      String?
+  logoPathLeft  String?
+  logoPathRight String?
   /// Visible to USER/SIGNAGE roles only when true; ADMIN always sees every job.
   isPublic    Boolean  @default(false)
 

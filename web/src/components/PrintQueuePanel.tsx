@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { toLocationColorMapEntry, type LocationColorMap } from '@elexprep/shared';
-import { api, type PrintQueueItem, type AdHocLabel, type PrintJob, type PrintMethod } from '../api/client';
+import { api, type Job, type PrintQueueItem, type AdHocLabel, type PrintJob, type PrintMethod } from '../api/client';
 import LabelTypeSection, { summarize } from './printQueue/LabelTypeSection';
 
 export default function PrintQueuePanel({ jobId }: { jobId: string }) {
@@ -14,6 +14,7 @@ export default function PrintQueuePanel({ jobId }: { jobId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [locationColors, setLocationColors] = useState<LocationColorMap>(new Map());
+  const [job, setJob] = useState<Job | null>(null);
 
   const refresh = () =>
     api.printQueue.list(jobId).then(({ queue, adHoc }) => {
@@ -27,6 +28,7 @@ export default function PrintQueuePanel({ jobId }: { jobId: string }) {
   useEffect(() => {
     refresh();
     refreshPrintJobs();
+    api.jobs.get(jobId).then(setJob).catch(() => {});
     api.printQueue.printerConfig(jobId).then((c) => {
       setTrayMap(c.trayMap);
       setMethod(c.method);
@@ -166,7 +168,15 @@ export default function PrintQueuePanel({ jobId }: { jobId: string }) {
           onToggleSelect={toggle}
           locationColors={locationColors}
           onRefresh={refresh}
-          logoUrl={labelType === 'PAL' ? api.jobs.logoUrl(jobId) : undefined}
+          logoUrls={
+            labelType === 'PAL' && job
+              ? {
+                  left: job.logoPathLeft ? api.jobs.logoUrl(jobId, 'left') : undefined,
+                  middle: job.logoPath ? api.jobs.logoUrl(jobId, 'middle') : undefined,
+                  right: job.logoPathRight ? api.jobs.logoUrl(jobId, 'right') : undefined,
+                }
+              : undefined
+          }
         />
       ))}
 

@@ -4,7 +4,7 @@ import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } 
 import { CSS } from '@dnd-kit/utilities';
 import { DEFAULT_LABEL_TEMPLATES, mergeTemplate, type LabelElementDef, type LabelType, type LabelTypeTemplate, type LocationColorMap } from '@elexprep/shared';
 import { api, type AdHocLabel, type PrintQueueItem } from '../../api/client';
-import SheetMirror from './SheetMirror';
+import SheetMirror, { type LogoUrls } from './SheetMirror';
 
 export function summarize(labelType: string, content: Record<string, unknown>): string {
   switch (labelType) {
@@ -44,7 +44,7 @@ export default function LabelTypeSection({
   onToggleSelect,
   locationColors,
   onRefresh,
-  logoUrl,
+  logoUrls,
 }: {
   jobId: string;
   labelType: string;
@@ -54,7 +54,7 @@ export default function LabelTypeSection({
   onToggleSelect: (id: string) => void;
   locationColors: LocationColorMap;
   onRefresh: () => void;
-  logoUrl?: string;
+  logoUrls?: LogoUrls;
 }) {
   const rows: Row[] = useMemo(() => {
     const combined = [
@@ -210,7 +210,7 @@ export default function LabelTypeSection({
             template={displayTemplate}
             item={previewItem}
             locationColors={locationColors}
-            logoUrl={logoUrl}
+            logoUrls={logoUrls}
             editable={customizing}
             selectedId={selectedElementId}
             onSelect={setSelectedElementId}

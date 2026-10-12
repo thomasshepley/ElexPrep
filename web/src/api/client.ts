@@ -46,6 +46,8 @@ export interface Job {
   startsAt: string | null;
   endsAt: string | null;
   logoPath: string | null;
+  logoPathLeft: string | null;
+  logoPathRight: string | null;
   isPublic: boolean;
   currentRmsOpportunityId: string | null;
   rmsAlertAt: string | null;
@@ -850,12 +852,14 @@ export const api = {
       }
     ) => request<Job>(`/jobs/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     remove: (id: string) => request<void>(`/jobs/${id}`, { method: 'DELETE' }),
-    uploadLogo: async (id: string, file: File) => {
+    uploadLogo: async (id: string, file: File, slot: 'left' | 'middle' | 'right' = 'middle') => {
       const form = new FormData();
       form.append('logo', file);
-      return request<Job>(`/jobs/${id}/logo`, { method: 'POST', body: form });
+      return request<Job>(`/jobs/${id}/logo/${slot}`, { method: 'POST', body: form });
     },
-    logoUrl: (id: string) => `${BASE}/jobs/${id}/logo`,
+    removeLogo: (id: string, slot: 'left' | 'middle' | 'right' = 'middle') =>
+      request<Job>(`/jobs/${id}/logo/${slot}`, { method: 'DELETE' }),
+    logoUrl: (id: string, slot: 'left' | 'middle' | 'right' = 'middle') => `${BASE}/jobs/${id}/logo/${slot}`,
   },
   fixtureTypeRules: {
     list: () => request<FixtureTypeRule[]>('/fixture-type-rules'),

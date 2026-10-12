@@ -97,6 +97,8 @@ jobsRouter.delete('/:id', requirePermission('deleteJobs'), async (req, res) => {
 
   const filesToRemove = [
     ...(job.logoPath ? [path.join(uploadDir, job.logoPath)] : []),
+    ...(job.logoPathLeft ? [path.join(uploadDir, job.logoPathLeft)] : []),
+    ...(job.logoPathRight ? [path.join(uploadDir, job.logoPathRight)] : []),
     ...plots.map((p) => path.join(uploadDir, 'plots', p.fileName)),
     ...printJobs.map((pj) => path.join(uploadDir, 'print-jobs', pj.fileName)),
   ];
@@ -106,21 +108,54 @@ jobsRouter.delete('/:id', requirePermission('deleteJobs'), async (req, res) => {
   res.status(204).end();
 });
 
-jobsRouter.post('/:id/logo', upload.single('logo'), async (req, res) => {
+/** The three logo slots drawn left/middle/right across a label sheet's logo bar when more than
+ * one is set (see genericRenderer.ts) - "logo" field names map to the legacy single-logo
+ * column so an existing job's one uploaded logo keeps working exactly as before. */
+const LOGO_SLOT_FIELDS = {
+  left: 'logoPathLeft',
+  middle: 'logoPath',
+  right: 'logoPathRight',
+} as const;
+type LogoSlot = keyof typeof LOGO_SLOT_FIELDS;
+
+function resolveLogoSlot(raw: string | undefined): LogoSlot {
+  return raw === 'left' || raw === 'right' ? raw : 'middle';
+}
+
+jobsRouter.post('/:id/logo/:slot?', upload.single('logo'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'logo file is required' });
+  const slot = resolveLogoSlot(req.params.slot);
+  const field = LOGO_SLOT_FIELDS[slot];
   const job = await prisma.job.update({
     where: { id: req.params.id },
-    data: { logoPath: req.file.filename },
+    data: { [field]: req.file.filename },
   });
-  await logActivity('job.logo_upload', req.file.originalname, job.id, req.user?.id);
+  await logActivity('job.logo_upload', `${req.file.originalname} (${slot})`, job.id, req.user?.id);
   res.json(job);
 });
 
-jobsRouter.get('/:id/logo', async (req, res) => {
+jobsRouter.delete('/:id/logo/:slot?', async (req, res) => {
+  const slot = resolveLogoSlot(req.params.slot);
+  const field = LOGO_SLOT_FIELDS[slot];
+  const existing = await prisma.job.findUnique({ where: { id: req.params.id } });
+  const existingPath = existing?.[field];
+  const job = await prisma.job.update({
+    where: { id: req.params.id },
+    data: { [field]: null },
+  });
+  if (existingPath) await fs.promises.unlink(path.join(uploadDir, existingPath)).catch(() => {});
+  await logActivity('job.logo_remove', slot, job.id, req.user?.id);
+  res.json(job);
+});
+
+jobsRouter.get('/:id/logo/:slot?', async (req, res) => {
+  const slot = resolveLogoSlot(req.params.slot);
+  const field = LOGO_SLOT_FIELDS[slot];
   const job = await prisma.job.findUnique({ where: { id: req.params.id } });
-  if (!job?.logoPath) return res.status(404).end();
+  const logoPath = job?.[field];
+  if (!logoPath) return res.status(404).end();
   if (!job.isPublic && req.user?.role !== 'ADMIN') return res.status(404).end();
-  res.sendFile(path.join(uploadDir, job.logoPath));
+  res.sendFile(path.join(uploadDir, logoPath));
 });
 
 export { uploadDir, upload };
