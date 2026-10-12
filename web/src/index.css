@@ -1180,6 +1180,28 @@ tbody tr:hover {
   padding: 0 0.2rem;
 }
 
+.month-calendar-day-crew {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.2rem;
+  margin-top: auto;
+  padding: 0.15rem 0.2rem 0 0;
+}
+
+.month-calendar-crew-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.month-calendar-crew-more {
+  font-size: 0.62rem;
+  color: var(--content-muted);
+}
+
 /* DayTimeline - a single-day Google-Calendar-style vertical agenda for a job's schedule,
    positioned proportionally to time-of-day rather than just a flat list. */
 .day-timeline {

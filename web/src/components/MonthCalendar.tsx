@@ -22,7 +22,19 @@ export interface CalendarEvent {
 
 const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const MAX_VISIBLE_PER_DAY = 3;
+const MAX_VISIBLE_CREW_PER_DAY = 6;
 const MAX_SPAN_DAYS = 60; // guards against a bad/unbounded endsAt expanding the bucket forever
+
+/** Every crew member working any event on this day, deduped by id across overlapping jobs. */
+function uniqueCrew(dayEvents: CalendarEvent[]): CalendarEventCrew[] {
+  const seen = new Map<string, CalendarEventCrew>();
+  for (const ev of dayEvents) {
+    for (const c of ev.crew ?? []) {
+      if (!seen.has(c.id)) seen.set(c.id, c);
+    }
+  }
+  return [...seen.values()];
+}
 
 function dateKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -105,6 +117,9 @@ export default function MonthCalendar({ events, initialMonth }: { events: Calend
           const dayEvents = buckets.get(key) ?? [];
           const visible = dayEvents.slice(0, MAX_VISIBLE_PER_DAY);
           const overflow = dayEvents.length - visible.length;
+          const dayCrew = uniqueCrew(dayEvents);
+          const visibleCrew = dayCrew.slice(0, MAX_VISIBLE_CREW_PER_DAY);
+          const crewOverflow = dayCrew.length - visibleCrew.length;
           return (
             <div
               key={key}
@@ -126,6 +141,19 @@ export default function MonthCalendar({ events, initialMonth }: { events: Calend
                 })}
                 {overflow > 0 && <span className="month-calendar-event-more">+{overflow} more</span>}
               </div>
+              {dayCrew.length > 0 && (
+                <div className="month-calendar-day-crew">
+                  {visibleCrew.map((c) => (
+                    <span
+                      key={c.id}
+                      className="month-calendar-crew-dot"
+                      style={{ background: c.color }}
+                      title={`${c.name} · ${c.role}`}
+                    />
+                  ))}
+                  {crewOverflow > 0 && <span className="month-calendar-crew-more">+{crewOverflow}</span>}
+                </div>
+              )}
             </div>
           );
         })}
