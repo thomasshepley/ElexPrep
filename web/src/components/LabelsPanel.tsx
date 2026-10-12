@@ -9,7 +9,7 @@ import { WhoIcon } from './Icons';
  * same physical die-cut stock as fixture labels. A "Requested labels" review queue sits above
  * them for anything a crew member has asked for via the Why section's label creator.
  */
-export default function LabelsPanel({ jobId }: { jobId: string }) {
+export default function LabelsPanel({ jobId, groupId = null }: { jobId: string; groupId?: string | null }) {
   const [items, setItems] = useState<AdHocLabel[]>([]);
 
   const refresh = () => api.adHocLabels.list(jobId).then(setItems);
@@ -19,31 +19,36 @@ export default function LabelsPanel({ jobId }: { jobId: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [jobId]);
 
+  const stageItems = items.filter((i) => (i.groupId ?? null) === groupId);
+
   return (
     <div>
       <RequestedLabelsPanel jobId={jobId} onChanged={refresh} />
       <LabelSection
         jobId={jobId}
+        groupId={groupId}
         title="PAL"
         description="Generic PAL case labels - personal Peli cases, one-off equipment cases."
         types={['PAL']}
-        items={items}
+        items={stageItems}
         onChanged={refresh}
       />
       <LabelSection
         jobId={jobId}
+        groupId={groupId}
         title="Cables"
         description="Cable and circuit run labels, including narrow DMX labels with a fold/cut line."
         types={['CABLE']}
-        items={items}
+        items={stageItems}
         onChanged={refresh}
       />
       <LabelSection
         jobId={jobId}
+        groupId={groupId}
         title="Truss Spikes and Fixture Labels"
         description="Truss/spike position, tip warning and sACN node labels, plus rack labels - all print on the same die-cut sheet stock as fixture labels."
         types={['TRUSS_SPIKE_POSITION', 'TRUSS_SPIKE_TIP', 'TRUSS_SPIKE_SACN', 'RACK']}
-        items={items}
+        items={stageItems}
         onChanged={refresh}
       />
     </div>
@@ -190,6 +195,7 @@ function RequestedLabelsPanel({ jobId, onChanged }: { jobId: string; onChanged: 
 
 function LabelSection({
   jobId,
+  groupId,
   title,
   description,
   types,
@@ -197,6 +203,7 @@ function LabelSection({
   onChanged,
 }: {
   jobId: string;
+  groupId: string | null;
   title: string;
   description: string;
   types: AdHocType[];
@@ -206,7 +213,7 @@ function LabelSection({
   const sectionItems = items.filter((i) => types.includes(i.labelType as AdHocType));
 
   const create = async (labelType: AdHocType, content: Record<string, unknown>, quantity: number) => {
-    await api.adHocLabels.create(jobId, { labelType, content, quantity });
+    await api.adHocLabels.create(jobId, { labelType, content, quantity, groupId });
     onChanged();
   };
 

@@ -3,6 +3,10 @@
 Newest entries first. Each push/merge gets exactly one entry - see
 `scripts/bump-version.mjs` for how the version number itself advances.
 
+## v2.4.1 - 2026-10-12
+
+- Added stage tabs across patch import, cases, labels and the print queue
+
 ## v2.3.1 - 2026-10-12
 
 - Added stages to subdivide a job's patch import, cases and labels (backend)

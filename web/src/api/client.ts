@@ -86,6 +86,21 @@ export interface Fixture {
   pixAddress: number | null;
   mode: string | null;
   location: string | null;
+  groupId: string | null;
+}
+
+export interface FixtureGroup {
+  id: string;
+  jobId: string;
+  name: string;
+  order: number;
+  rmsGroupName: string | null;
+  createdAt: string;
+}
+
+export interface RmsHeadingGroup {
+  name: string;
+  itemNames: string[];
 }
 
 export interface PatchImportCandidate {
@@ -110,6 +125,7 @@ export interface CaseGroup {
   label: string;
   location: string | null;
   addresses: number[];
+  groupId: string | null;
 }
 
 export interface PrintQueueItem {
@@ -120,6 +136,7 @@ export interface PrintQueueItem {
   status: 'PENDING' | 'CONFIRMED' | 'PRINTED';
   order: number;
   content: Record<string, unknown>;
+  groupId: string | null;
 }
 
 export interface AdHocLabel {
@@ -131,6 +148,7 @@ export interface AdHocLabel {
   content: Record<string, unknown>;
   /** Set when this label was approved from a crew member's label request. */
   requestedByDisplayName: string | null;
+  groupId: string | null;
 }
 
 export interface CrewLabelRequest {
@@ -932,10 +950,10 @@ export const api = {
         missingColumns: { field: string; column: string }[];
       }>(`/jobs/${jobId}/patch/preview`, { method: 'POST', body: form });
     },
-    import: (jobId: string, rows: Record<string, string>[], mapping?: Record<string, string>) =>
+    import: (jobId: string, rows: Record<string, string>[], mapping?: Record<string, string>, groupId?: string | null) =>
       request<{ imported: number; newFixtureTypes: string[] }>(`/jobs/${jobId}/patch/import`, {
         method: 'POST',
-        body: JSON.stringify(mapping ? { mapping, rows } : { rows }),
+        body: JSON.stringify({ ...(mapping ? { mapping } : {}), rows, groupId: groupId ?? null }),
       }),
     fixtures: (jobId: string) => request<Fixture[]>(`/jobs/${jobId}/fixtures`),
     updateFixture: (jobId: string, id: string, data: Partial<Omit<Fixture, 'id'>>) =>
@@ -962,11 +980,12 @@ export const api = {
       }),
   },
   cases: {
-    generate: (jobId: string) => request<{ generated: number }>(`/jobs/${jobId}/cases/generate`, { method: 'POST' }),
+    generate: (jobId: string, groupId?: string | null) =>
+      request<{ generated: number }>(`/jobs/${jobId}/cases/generate`, { method: 'POST', body: JSON.stringify({ groupId: groupId ?? null }) }),
     list: (jobId: string) => request<CaseGroup[]>(`/jobs/${jobId}/cases`),
-    create: (jobId: string, data: { fixtureType: string; label: string; location?: string; addresses?: number[] }) =>
+    create: (jobId: string, data: { fixtureType: string; label: string; location?: string; addresses?: number[]; groupId?: string | null }) =>
       request<CaseGroup>(`/jobs/${jobId}/cases`, { method: 'POST', body: JSON.stringify(data) }),
-    update: (jobId: string, id: string, data: Partial<{ fixtureType: string; label: string; location: string }>) =>
+    update: (jobId: string, id: string, data: Partial<{ fixtureType: string; label: string; location: string; groupId: string | null }>) =>
       request<CaseGroup>(`/jobs/${jobId}/cases/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     remove: (jobId: string, id: string) => request<void>(`/jobs/${jobId}/cases/${id}`, { method: 'DELETE' }),
     bulkSetLocation: (jobId: string, ids: string[], location: string) =>
@@ -976,15 +995,32 @@ export const api = {
   },
   adHocLabels: {
     list: (jobId: string) => request<AdHocLabel[]>(`/jobs/${jobId}/adhoc-labels`),
-    create: (jobId: string, data: { labelType: string; content: Record<string, unknown>; quantity: number }) =>
+    create: (jobId: string, data: { labelType: string; content: Record<string, unknown>; quantity: number; groupId?: string | null }) =>
       request<AdHocLabel>(`/jobs/${jobId}/adhoc-labels`, { method: 'POST', body: JSON.stringify(data) }),
     update: (
       jobId: string,
       id: string,
-      data: Partial<{ content: Record<string, unknown>; quantity: number; excludeFromPrint: boolean }>
+      data: Partial<{ content: Record<string, unknown>; quantity: number; excludeFromPrint: boolean; groupId: string | null }>
     ) => request<AdHocLabel>(`/jobs/${jobId}/adhoc-labels/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     remove: (jobId: string, id: string) =>
       request<void>(`/jobs/${jobId}/adhoc-labels/${id}`, { method: 'DELETE' }),
+  },
+  fixtureGroups: {
+    list: (jobId: string) => request<FixtureGroup[]>(`/jobs/${jobId}/fixture-groups`),
+    create: (jobId: string, name: string) =>
+      request<FixtureGroup>(`/jobs/${jobId}/fixture-groups`, { method: 'POST', body: JSON.stringify({ name }) }),
+    update: (jobId: string, id: string, data: Partial<{ name: string; order: number }>) =>
+      request<FixtureGroup>(`/jobs/${jobId}/fixture-groups/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    remove: (jobId: string, id: string) =>
+      request<void>(`/jobs/${jobId}/fixture-groups/${id}`, { method: 'DELETE' }),
+    rmsHeadings: (jobId: string) => request<RmsHeadingGroup[]>(`/jobs/${jobId}/fixture-groups/rms-headings`),
+    createFromRms: (jobId: string, names: string[]) =>
+      request<{ groups: { id: string; name: string; matched: number }[]; totalMatched: number }>(
+        `/jobs/${jobId}/fixture-groups/from-rms`,
+        { method: 'POST', body: JSON.stringify({ names }) }
+      ),
+    rematch: (jobId: string, id: string) =>
+      request<{ matched: number }>(`/jobs/${jobId}/fixture-groups/${id}/rematch`, { method: 'POST' }),
   },
   printQueue: {
     build: (jobId: string, opts: { includeFixtureLabels?: boolean; includePalLabels?: boolean }) =>

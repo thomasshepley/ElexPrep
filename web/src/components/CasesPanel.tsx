@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, type CaseGroup } from '../api/client';
 
-export default function CasesPanel({ jobId }: { jobId: string }) {
+export default function CasesPanel({ jobId, groupId = null }: { jobId: string; groupId?: string | null }) {
   const [cases, setCases] = useState<CaseGroup[]>([]);
   const [busy, setBusy] = useState(false);
   const [newType, setNewType] = useState('');
@@ -17,18 +17,20 @@ export default function CasesPanel({ jobId }: { jobId: string }) {
     refresh();
   }, [jobId]);
 
+  const stageCases = cases.filter((c) => (c.groupId ?? null) === groupId);
+
   const generate = async () => {
     if (
-      cases.length > 0 &&
+      stageCases.length > 0 &&
       !confirm(
-        `This replaces all ${cases.length} case row(s) below with a fresh set built from the current patch and case rules - any manual edits or additions will be lost. Continue?`
+        `This replaces all ${stageCases.length} case row(s) below with a fresh set built from the current patch and case rules - any manual edits or additions will be lost. Continue?`
       )
     ) {
       return;
     }
     setBusy(true);
     try {
-      await api.cases.generate(jobId);
+      await api.cases.generate(jobId, groupId);
       setSelected(new Set());
       await refresh();
     } finally {
@@ -63,7 +65,7 @@ export default function CasesPanel({ jobId }: { jobId: string }) {
   };
 
   const toggleSelectAll = () => {
-    setSelected((s) => (s.size === cases.length ? new Set() : new Set(cases.map((c) => c.id))));
+    setSelected((s) => (s.size === stageCases.length ? new Set() : new Set(stageCases.map((c) => c.id))));
   };
 
   const bulkSetLocation = async () => {
@@ -88,7 +90,7 @@ export default function CasesPanel({ jobId }: { jobId: string }) {
       return;
     }
     try {
-      await api.cases.create(jobId, { fixtureType: newType, label: newLabel, location: newLocation || undefined });
+      await api.cases.create(jobId, { fixtureType: newType, label: newLabel, location: newLocation || undefined, groupId });
       setNewType('');
       setNewLabel('');
       setNewLocation('');
@@ -112,8 +114,8 @@ export default function CasesPanel({ jobId }: { jobId: string }) {
         importing a new patch or editing case rules - it replaces every row here, so add any
         one-off cases below afterwards rather than before.
       </p>
-      {cases.length === 0 && <p className="muted">No cases yet - generate from the patch, or add one below.</p>}
-      {cases.length > 0 && (
+      {stageCases.length === 0 && <p className="muted">No cases yet - generate from the patch, or add one below.</p>}
+      {stageCases.length > 0 && (
         <>
           {selected.size > 0 && (
             <div className="row panel" style={{ background: 'rgba(255,255,255,0.04)', alignItems: 'center', gap: '0.6rem' }}>
@@ -139,7 +141,7 @@ export default function CasesPanel({ jobId }: { jobId: string }) {
                 <th>
                   <input
                     type="checkbox"
-                    checked={selected.size === cases.length && cases.length > 0}
+                    checked={selected.size === stageCases.length && stageCases.length > 0}
                     onChange={toggleSelectAll}
                   />
                 </th>
@@ -150,7 +152,7 @@ export default function CasesPanel({ jobId }: { jobId: string }) {
               </tr>
             </thead>
             <tbody>
-              {cases.map((c) => (
+              {stageCases.map((c) => (
                 <tr key={c.id}>
                   <td>
                     <input type="checkbox" checked={selected.has(c.id)} onChange={() => toggleSelected(c.id)} />

@@ -5,7 +5,7 @@ import { api, type Job, type PrintQueueItem, type AdHocLabel, type PrintJob, typ
 import LabelTypeSection, { summarize } from './printQueue/LabelTypeSection';
 import PrintConfirmModal from './printQueue/PrintConfirmModal';
 
-export default function PrintQueuePanel({ jobId }: { jobId: string }) {
+export default function PrintQueuePanel({ jobId, groupId = null }: { jobId: string; groupId?: string | null }) {
   const [queue, setQueue] = useState<PrintQueueItem[]>([]);
   const [adHoc, setAdHoc] = useState<AdHocLabel[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -22,10 +22,16 @@ export default function PrintQueuePanel({ jobId }: { jobId: string }) {
     api.printQueue.list(jobId).then(({ queue, adHoc }) => {
       setQueue(queue);
       setAdHoc(adHoc);
-      setSelected(new Set(queue.filter((q) => q.status === 'PENDING').map((q) => q.id)));
     });
 
   const refreshPrintJobs = () => api.printJobs.list(jobId).then(setPrintJobs);
+
+  // Re-selects "every pending item in the current stage" whenever the queue is refreshed or
+  // the stage tab changes - selection is scoped to what's actually visible, so confirming
+  // never silently includes another stage's items that aren't shown here.
+  useEffect(() => {
+    setSelected(new Set(queue.filter((q) => q.status === 'PENDING' && (q.groupId ?? null) === groupId).map((q) => q.id)));
+  }, [queue, groupId]);
 
   useEffect(() => {
     refresh();
@@ -109,15 +115,17 @@ export default function PrintQueuePanel({ jobId }: { jobId: string }) {
     }
   };
 
-  const pendingItems = queue.filter((q) => q.status === 'PENDING');
-  const confirmedOrPrinted = queue.filter((q) => q.status !== 'PENDING');
+  const stageQueue = queue.filter((q) => (q.groupId ?? null) === groupId);
+  const stageAdHoc = adHoc.filter((a) => (a.groupId ?? null) === groupId);
+  const pendingItems = stageQueue.filter((q) => q.status === 'PENDING');
+  const confirmedOrPrinted = stageQueue.filter((q) => q.status !== 'PENDING');
 
   const labelTypes = useMemo(() => {
     const types = new Set<string>();
     for (const item of pendingItems) types.add(item.labelType);
-    for (const item of adHoc) types.add(item.labelType);
+    for (const item of stageAdHoc) types.add(item.labelType);
     return [...types];
-  }, [pendingItems, adHoc]);
+  }, [pendingItems, stageAdHoc]);
 
   return (
     <div>
@@ -140,20 +148,20 @@ export default function PrintQueuePanel({ jobId }: { jobId: string }) {
           </button>
         </div>
 
-        {pendingItems.length === 0 && adHoc.length === 0 && (
+        {pendingItems.length === 0 && stageAdHoc.length === 0 && (
           <p className="muted">Nothing queued yet - build from patch/cases or add ad hoc labels.</p>
         )}
 
         {error && <p className="error">{error}</p>}
 
         <div className="row" style={{ marginTop: '1rem' }}>
-          <button onClick={() => setConfirmingPrint(true)} disabled={busy || (pendingItems.length === 0 && adHoc.length === 0)}>
+          <button onClick={() => setConfirmingPrint(true)} disabled={busy || (pendingItems.length === 0 && stageAdHoc.length === 0)}>
             Confirm &amp; send to printer
           </button>
           <button
             className="secondary"
             onClick={confirmAndDownload}
-            disabled={busy || (pendingItems.length === 0 && adHoc.length === 0)}
+            disabled={busy || (pendingItems.length === 0 && stageAdHoc.length === 0)}
           >
             Confirm &amp; download PDF
           </button>
@@ -170,7 +178,7 @@ export default function PrintQueuePanel({ jobId }: { jobId: string }) {
           jobId={jobId}
           labelType={labelType}
           queueItems={pendingItems.filter((q) => q.labelType === labelType)}
-          adHocItems={adHoc.filter((a) => a.labelType === labelType)}
+          adHocItems={stageAdHoc.filter((a) => a.labelType === labelType)}
           selected={selected}
           onToggleSelect={toggle}
           locationColors={locationColors}

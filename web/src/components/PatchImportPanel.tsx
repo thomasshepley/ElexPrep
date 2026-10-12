@@ -14,7 +14,7 @@ function announceNewFixtureTypes(showToast: ReturnType<typeof useToast>['showToa
   );
 }
 
-export default function PatchImportPanel({ jobId }: { jobId: string }) {
+export default function PatchImportPanel({ jobId, groupId = null }: { jobId: string; groupId?: string | null }) {
   const { showToast } = useToast();
   const [rows, setRows] = useState<Record<string, string>[]>([]);
   const [savedMapping, setSavedMapping] = useState<Record<string, string> | null>(null);
@@ -93,12 +93,13 @@ export default function PatchImportPanel({ jobId }: { jobId: string }) {
     });
   };
 
+  const stageFixtures = (fixtures ?? []).filter((f) => (f.groupId ?? null) === groupId);
+
   const toggleSelectAll = () => {
-    if (!fixtures) return;
-    setSelected((s) => (s.size === fixtures.length ? new Set() : new Set(fixtures.map((f) => f.id))));
+    setSelected((s) => (s.size === stageFixtures.length ? new Set() : new Set(stageFixtures.map((f) => f.id))));
   };
 
-  const searchedFixtures = (fixtures ?? []).filter((f) => {
+  const searchedFixtures = stageFixtures.filter((f) => {
     if (!fixtureSearch.trim()) return true;
     const haystack = `${f.address} ${f.fixtureType} ${f.location ?? ''} ${f.mode ?? ''}`.toLowerCase();
     return haystack.includes(fixtureSearch.trim().toLowerCase());
@@ -173,7 +174,7 @@ export default function PatchImportPanel({ jobId }: { jobId: string }) {
     setBusy(true);
     setError(null);
     try {
-      const res = await api.patch.import(jobId, rows);
+      const res = await api.patch.import(jobId, rows, undefined, groupId);
       await loadFixtures();
       setRows([]);
       setFileName(null);
@@ -204,6 +205,7 @@ export default function PatchImportPanel({ jobId }: { jobId: string }) {
           Looks for a CSV in this job's OneDrive "Patch" subfolder, falling back to extracting a
           table from the CAD PDF if there's no CSV. Nothing is applied automatically - a detected
           file sits here for review until approved.
+          {groupId !== null && ' This always imports into "Ungrouped" - use the CSV upload below to import straight into the current stage.'}
         </p>
         {scanError && <p className="error">{scanError}</p>}
 
@@ -319,8 +321,8 @@ export default function PatchImportPanel({ jobId }: { jobId: string }) {
           </button>
         </div>
         {!fixtures && <p className="muted">Not loaded yet.</p>}
-        {fixtures && fixtures.length === 0 && <p className="muted">No fixtures imported yet.</p>}
-        {fixtures && fixtures.length > 0 && (
+        {fixtures && stageFixtures.length === 0 && <p className="muted">No fixtures imported for this stage yet.</p>}
+        {fixtures && stageFixtures.length > 0 && (
           <>
             <p className="muted">Every field is editable in place (click and type, saves on blur).</p>
             <input
@@ -353,7 +355,7 @@ export default function PatchImportPanel({ jobId }: { jobId: string }) {
                   <th>
                     <input
                       type="checkbox"
-                      checked={selected.size === fixtures.length && fixtures.length > 0}
+                      checked={selected.size === stageFixtures.length && stageFixtures.length > 0}
                       onChange={toggleSelectAll}
                     />
                   </th>
