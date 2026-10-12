@@ -85,6 +85,19 @@ export interface Fixture {
   location: string | null;
 }
 
+export interface PatchImportCandidate {
+  id: string;
+  fileName: string;
+  oneDriveItemPath: string;
+  rowCount: number;
+  /// PENDING | APPROVED | REJECTED
+  status: string;
+  detectedAt: string;
+  reviewedAt: string | null;
+  reviewedBy: string | null;
+  rejectionNote: string | null;
+}
+
 export interface CaseGroup {
   id: string;
   fixtureType: string;
@@ -804,6 +817,19 @@ export const api = {
       request<{ updated: number }>(`/jobs/${jobId}/fixtures/bulk`, { method: 'PUT', body: JSON.stringify({ ids, location }) }),
     bulkRemoveFixtures: (jobId: string, ids: string[]) =>
       request<{ deleted: number }>(`/jobs/${jobId}/fixtures/bulk`, { method: 'DELETE', body: JSON.stringify({ ids }) }),
+    scanOneDrive: (jobId: string) =>
+      request<{ detected: boolean; candidate?: PatchImportCandidate }>(`/jobs/${jobId}/patch/onedrive-scan`, { method: 'POST' }),
+    getOneDriveCandidate: (jobId: string) =>
+      request<PatchImportCandidate | null>(`/jobs/${jobId}/patch/onedrive-candidate`),
+    approveOneDriveCandidate: (jobId: string) =>
+      request<{ imported: number; candidate: PatchImportCandidate }>(`/jobs/${jobId}/patch/onedrive-candidate/approve`, {
+        method: 'POST',
+      }),
+    rejectOneDriveCandidate: (jobId: string, note?: string) =>
+      request<{ candidate: PatchImportCandidate }>(`/jobs/${jobId}/patch/onedrive-candidate/reject`, {
+        method: 'POST',
+        body: JSON.stringify({ note }),
+      }),
   },
   cases: {
     generate: (jobId: string) => request<{ generated: number }>(`/jobs/${jobId}/cases/generate`, { method: 'POST' }),

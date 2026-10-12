@@ -74,6 +74,7 @@ model Job {
   labelRequests  CrewLabelRequest[]
   discussionMessages JobDiscussionMessage[]
   oneDriveShares OneDriveShare[]
+  patchImportCandidate PatchImportCandidate?
 }
 
 /// A OneDrive file or folder an admin has explicitly chosen to share with this job's crew —
@@ -402,6 +403,34 @@ model Fixture {
   rawJson       String?
 
   @@index([jobId])
+}
+
+/// A patch CSV auto-detected in a job's OneDrive "Patch" subfolder, parsed and held for admin
+/// review before being applied — unlike the CAD plot (auto-surfaced read-only, see
+/// oneDrive/cad.ts), importing patch data destructively replaces every Fixture row for the job
+/// (see routes/patch.ts), so it needs an explicit approval step rather than a silent auto-apply.
+/// One row per job: a re-scan that finds the same file (by sourceModifiedAt) leaves this record
+/// alone; a re-scan that finds a changed or new file overwrites it back to PENDING, even if the
+/// previous one had already been approved or rejected.
+model PatchImportCandidate {
+  id               String    @id @default(cuid())
+  jobId            String    @unique
+  job              Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  oneDriveItemId   String
+  oneDriveItemPath String
+  fileName         String
+  /// Graph's lastModifiedDateTime for the source file, used to tell "this is the same file
+  /// already flagged" from "it changed since" without re-parsing on every scan.
+  sourceModifiedAt DateTime
+  /// Parsed rows (header -> cell), ready to run back through the saved column mapping at
+  /// approval time — same shape /patch/preview returns for the manual upload flow.
+  rowsJson         String
+  /// PENDING | APPROVED | REJECTED
+  status           String    @default("PENDING")
+  detectedAt       DateTime  @default(now())
+  reviewedAt       DateTime?
+  reviewedBy       String?
+  rejectionNote    String?
 }
 
 /// A generated case grouping (e.g. "AstraBlade 201 + 202"). Regenerated whenever the

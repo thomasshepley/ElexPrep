@@ -1,35 +1,16 @@
 import { Router } from 'express';
-import Papa from 'papaparse';
 import multer from 'multer';
-import { PATCH_FIELD_KEYS, PatchFieldKey, RawFixtureInput, findHeaderRowIndex, splitUniverseAddress } from '@elexprep/shared';
+import { PATCH_FIELD_KEYS, PatchFieldKey } from '@elexprep/shared';
 import { prisma, logActivity } from '../db';
+import { requirePermission } from '../permissions';
+import { parseWysiwygCsv, buildFixturesFromRows } from '../patchCsv';
+import { getOneDriveConfig } from '../oneDrive/config';
+import { streamOneDriveFile } from '../oneDrive/client';
+import { findPatchCsv } from '../oneDrive/patchDetect';
 
 const upload = multer({ storage: multer.memoryStorage() });
 
 export const patchRouter = Router();
-
-/**
- * Real patch exports (e.g. CAST Wysiwyg's patch report) often have a few title/metadata rows
- * before the real column header row, plus blank rows and "Type: X" sub-group marker rows mixed
- * in with the data further down — so the header row can't just be assumed to be row 1.
- */
-function parseWysiwygCsv(text: string): { headers: string[]; rows: Record<string, string>[] } {
-  const raw = Papa.parse<string[]>(text, { skipEmptyLines: false });
-  const allRows = raw.data as string[][];
-  const headerRowIndex = findHeaderRowIndex(allRows);
-  const headerRow = (allRows[headerRowIndex] ?? []).map((h) => (h ?? '').trim());
-  const rows = allRows
-    .slice(headerRowIndex + 1)
-    .filter((r) => r.some((c) => (c ?? '').trim() !== ''))
-    .map((r) => {
-      const obj: Record<string, string> = {};
-      headerRow.forEach((h, i) => {
-        if (h) obj[h] = (r[i] ?? '').trim();
-      });
-      return obj;
-    });
-  return { headers: headerRow.filter(Boolean), rows };
-}
 
 patchRouter.post('/:jobId/patch/preview', upload.single('file'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'CSV file is required' });
@@ -49,61 +30,15 @@ patchRouter.post('/:jobId/patch/preview', upload.single('file'), async (req, res
   res.json({ headers, rows, fieldKeys: PATCH_FIELD_KEYS, savedMapping, missingColumns });
 });
 
-function toInt(v: string | undefined | null): number | null {
-  if (v === undefined || v === null || v.trim() === '') return null;
-  const n = parseInt(v, 10);
-  return Number.isFinite(n) ? n : null;
+async function loadSavedPatchMapping(): Promise<Partial<Record<PatchFieldKey, string>> | null> {
+  const saved = await prisma.appSetting.findUnique({ where: { key: 'patchMapping' } });
+  return saved ? JSON.parse(saved.valueJson) : null;
 }
 
-patchRouter.post('/:jobId/patch/import', async (req, res) => {
-  const { jobId } = req.params;
-  const { mapping, rows } = req.body ?? {};
-  if (!Array.isArray(rows)) {
-    return res.status(400).json({ error: 'rows are required' });
-  }
-  const job = await prisma.job.findUnique({ where: { id: jobId } });
-  if (!job) return res.status(404).json({ error: 'job not found' });
-
-  // Column mapping is configured once in Settings; an explicit mapping in the request
-  // overrides it for one-off imports with a different layout.
-  let m = mapping as Partial<Record<PatchFieldKey, string>> | undefined;
-  if (!m) {
-    const saved = await prisma.appSetting.findUnique({ where: { key: 'patchMapping' } });
-    if (saved) m = JSON.parse(saved.valueJson);
-  }
-  if (!m || !m.address || !m.fixtureType) {
-    return res.status(400).json({
-      error:
-        'No column mapping available — set the CSV column mapping in Settings → Import Mapping (address and fixture type are required)',
-    });
-  }
-
-  const fixtures: RawFixtureInput[] = [];
-  for (const row of rows as Record<string, string>[]) {
-    const address = toInt(row[m.address]);
-    const fixtureType = (row[m.fixtureType] ?? '').trim();
-    if (address === null || !fixtureType) continue;
-    // Some patch software (e.g. Wysiwyg) exports a single "universe.address" column instead
-    // of two separate ones — split it when that mapping is used, otherwise fall back to the
-    // separately-mapped universe/address columns.
-    const mainSplit = m.mainUniverseAddress ? splitUniverseAddress(row[m.mainUniverseAddress]) : null;
-    const pixSplit = m.pixUniverseAddress ? splitUniverseAddress(row[m.pixUniverseAddress]) : null;
-    fixtures.push({
-      address,
-      fixtureType,
-      mainUniverse: mainSplit ? mainSplit.universe : m.mainUniverse ? toInt(row[m.mainUniverse]) : null,
-      mainAddress: mainSplit ? mainSplit.address : m.mainAddress ? toInt(row[m.mainAddress]) : null,
-      pixUniverse: pixSplit ? pixSplit.universe : m.pixUniverse ? toInt(row[m.pixUniverse]) : null,
-      pixAddress: pixSplit ? pixSplit.address : m.pixAddress ? toInt(row[m.pixAddress]) : null,
-      mode: m.mode ? row[m.mode] ?? null : null,
-      location: m.location ? row[m.location] ?? null : null,
-      ipAddress: m.ipAddress ? row[m.ipAddress] ?? null : null,
-      subnetMask: m.subnetMask ? row[m.subnetMask] ?? null : null,
-      notes: m.notes ? row[m.notes] ?? null : null,
-      raw: row,
-    });
-  }
-
+/** The destructive replace shared by the manual-upload import and the OneDrive auto-detect
+ * approval flow: wipes the job's existing fixtures and writes the freshly-built set in one
+ * transaction. */
+async function replaceFixtures(jobId: string, fixtures: ReturnType<typeof buildFixturesFromRows>) {
   await prisma.$transaction([
     prisma.fixture.deleteMany({ where: { jobId } }),
     prisma.fixture.createMany({
@@ -124,9 +59,177 @@ patchRouter.post('/:jobId/patch/import', async (req, res) => {
       })),
     }),
   ]);
+}
+
+patchRouter.post('/:jobId/patch/import', async (req, res) => {
+  const { jobId } = req.params;
+  const { mapping, rows } = req.body ?? {};
+  if (!Array.isArray(rows)) {
+    return res.status(400).json({ error: 'rows are required' });
+  }
+  const job = await prisma.job.findUnique({ where: { id: jobId } });
+  if (!job) return res.status(404).json({ error: 'job not found' });
+
+  // Column mapping is configured once in Settings; an explicit mapping in the request
+  // overrides it for one-off imports with a different layout.
+  const m = (mapping as Partial<Record<PatchFieldKey, string>> | undefined) ?? (await loadSavedPatchMapping());
+  if (!m || !m.address || !m.fixtureType) {
+    return res.status(400).json({
+      error:
+        'No column mapping available — set the CSV column mapping in Settings → Import Mapping (address and fixture type are required)',
+    });
+  }
+
+  const fixtures = buildFixturesFromRows(rows as Record<string, string>[], m);
+  await replaceFixtures(jobId, fixtures);
 
   await logActivity('patch.import', `${fixtures.length} fixtures`, jobId, req.user?.id);
   res.json({ imported: fixtures.length });
+});
+
+/**
+ * Looks for a patch CSV in the job's OneDrive "Patch" subfolder (see oneDrive/patchDetect.ts)
+ * and, if found, parses it and stores it as a PENDING candidate for review — never applied
+ * directly, unlike the CAD PDF auto-surface. A re-scan that finds the same file (by its Graph
+ * lastModifiedDateTime) leaves the existing candidate's status alone; a re-scan that finds a
+ * changed or new file overwrites it back to PENDING even if the old one was already reviewed.
+ */
+patchRouter.post('/:jobId/patch/onedrive-scan', requirePermission('manageOneDrive'), async (req, res) => {
+  const { jobId } = req.params;
+  const job = await prisma.job.findUnique({ where: { id: jobId } });
+  if (!job) return res.status(404).json({ error: 'job not found' });
+  const config = await getOneDriveConfig();
+  if (!config.enabled) return res.status(400).json({ error: 'OneDrive is not configured yet' });
+  if (!job.oneDriveFolderId) return res.status(400).json({ error: 'This job has no OneDrive folder linked yet' });
+
+  let detected;
+  try {
+    detected = await findPatchCsv(job);
+  } catch (err) {
+    return res.status(502).json({ error: (err as Error).message });
+  }
+  if (!detected) return res.json({ detected: false });
+
+  const existing = await prisma.patchImportCandidate.findUnique({ where: { jobId } });
+  if (existing && existing.sourceModifiedAt.getTime() === detected.modifiedAt.getTime()) {
+    return res.json({ detected: true, candidate: toCandidateResponse(existing) });
+  }
+
+  const { stream } = await streamOneDriveFile(config, detected.itemId);
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  const text = Buffer.concat(chunks).toString('utf-8');
+  const { headers, rows } = parseWysiwygCsv(text);
+  if (headers.length === 0) {
+    return res.status(400).json({ error: `Could not find a header row in ${detected.name}` });
+  }
+
+  const candidate = await prisma.patchImportCandidate.upsert({
+    where: { jobId },
+    create: {
+      jobId,
+      oneDriveItemId: detected.itemId,
+      oneDriveItemPath: detected.path,
+      fileName: detected.name,
+      sourceModifiedAt: detected.modifiedAt,
+      rowsJson: JSON.stringify(rows),
+      status: 'PENDING',
+    },
+    update: {
+      oneDriveItemId: detected.itemId,
+      oneDriveItemPath: detected.path,
+      fileName: detected.name,
+      sourceModifiedAt: detected.modifiedAt,
+      rowsJson: JSON.stringify(rows),
+      status: 'PENDING',
+      detectedAt: new Date(),
+      reviewedAt: null,
+      reviewedBy: null,
+      rejectionNote: null,
+    },
+  });
+  await logActivity('patch.onedrive_detect', detected.name, jobId, req.user?.id);
+  res.json({ detected: true, candidate: toCandidateResponse(candidate) });
+});
+
+function toCandidateResponse(c: {
+  id: string;
+  fileName: string;
+  oneDriveItemPath: string;
+  rowsJson: string;
+  status: string;
+  detectedAt: Date;
+  reviewedAt: Date | null;
+  reviewedBy: string | null;
+  rejectionNote: string | null;
+}) {
+  const rows = JSON.parse(c.rowsJson) as Record<string, string>[];
+  return {
+    id: c.id,
+    fileName: c.fileName,
+    oneDriveItemPath: c.oneDriveItemPath,
+    rowCount: rows.length,
+    status: c.status,
+    detectedAt: c.detectedAt,
+    reviewedAt: c.reviewedAt,
+    reviewedBy: c.reviewedBy,
+    rejectionNote: c.rejectionNote,
+  };
+}
+
+patchRouter.get('/:jobId/patch/onedrive-candidate', requirePermission('manageOneDrive'), async (req, res) => {
+  const candidate = await prisma.patchImportCandidate.findUnique({ where: { jobId: req.params.jobId } });
+  res.json(candidate ? toCandidateResponse(candidate) : null);
+});
+
+patchRouter.post('/:jobId/patch/onedrive-candidate/approve', requirePermission('manageOneDrive'), async (req, res) => {
+  const { jobId } = req.params;
+  const candidate = await prisma.patchImportCandidate.findUnique({ where: { jobId } });
+  if (!candidate) return res.status(404).json({ error: 'No pending OneDrive patch import for this job' });
+  if (candidate.status !== 'PENDING') {
+    return res.status(409).json({ error: `This import was already ${candidate.status.toLowerCase()}` });
+  }
+
+  const m = await loadSavedPatchMapping();
+  if (!m || !m.address || !m.fixtureType) {
+    return res.status(400).json({
+      error:
+        'No column mapping available — set the CSV column mapping in Settings → Import Mapping (address and fixture type are required)',
+    });
+  }
+
+  const rows = JSON.parse(candidate.rowsJson) as Record<string, string>[];
+  const fixtures = buildFixturesFromRows(rows, m);
+  await replaceFixtures(jobId, fixtures);
+  const updated = await prisma.patchImportCandidate.update({
+    where: { jobId },
+    data: { status: 'APPROVED', reviewedAt: new Date(), reviewedBy: req.user?.id ?? null },
+  });
+
+  await logActivity('patch.onedrive_import', `${fixtures.length} fixtures from ${candidate.fileName}`, jobId, req.user?.id);
+  res.json({ imported: fixtures.length, candidate: toCandidateResponse(updated) });
+});
+
+patchRouter.post('/:jobId/patch/onedrive-candidate/reject', requirePermission('manageOneDrive'), async (req, res) => {
+  const { jobId } = req.params;
+  const { note } = req.body ?? {};
+  const candidate = await prisma.patchImportCandidate.findUnique({ where: { jobId } });
+  if (!candidate) return res.status(404).json({ error: 'No pending OneDrive patch import for this job' });
+  if (candidate.status !== 'PENDING') {
+    return res.status(409).json({ error: `This import was already ${candidate.status.toLowerCase()}` });
+  }
+
+  const updated = await prisma.patchImportCandidate.update({
+    where: { jobId },
+    data: {
+      status: 'REJECTED',
+      reviewedAt: new Date(),
+      reviewedBy: req.user?.id ?? null,
+      rejectionNote: typeof note === 'string' && note.trim() ? note.trim() : null,
+    },
+  });
+  await logActivity('patch.onedrive_reject', candidate.fileName, jobId, req.user?.id);
+  res.json({ candidate: toCandidateResponse(updated) });
 });
 
 patchRouter.get('/:jobId/fixtures', async (req, res) => {
