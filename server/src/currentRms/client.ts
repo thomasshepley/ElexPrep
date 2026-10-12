@@ -80,6 +80,9 @@ export interface RawOpportunity {
   // Not present on a real account's list/show response (only member_id is) — kept in case
   // a future API version or an `include`-style param ever embeds it.
   member?: { name?: string; business_name?: string } | null;
+  // Current RMS's own "Project" id, grouping several opportunities together (verified against
+  // a real account) — e.g. a job's main rental opportunity plus a separate crewing one.
+  project_id?: number | null;
   [key: string]: unknown;
 }
 
@@ -200,6 +203,14 @@ export interface RawOpportunityItem {
   // line items, not physical kit to prep).
   transaction_type?: number;
   transaction_type_name?: string;
+  // Verified against a real account: money fields come back as decimal strings (e.g. "6300.0"),
+  // not numbers. charge_excluding_tax_total is what's actually billed for this line (quantity x
+  // rate x chargeable days, pre-tax) — used by the admin-only crew margin view to total what a
+  // Service (labour) line charges the client, separate entirely from Current RMS's own per-
+  // asset `opportunity_cost` (what's paid out), which this app doesn't read — margin is
+  // computed against ElexPrep's own crew pay rates instead (see routes/currentRms.ts).
+  charge_excluding_tax_total?: string;
+  charge_total?: string;
   [key: string]: unknown;
 }
 

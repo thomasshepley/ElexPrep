@@ -315,6 +315,11 @@ model JobCrewAssignment {
   crewProfile   CrewProfile @relation(fields: [crewProfileId], references: [id], onDelete: Cascade)
   role          String
   dayRate       String?
+  /// How many days this assignment is booked for on this job — multiplied by dayRate (or the
+  /// profile's default) to get this assignment's cost, for the admin-only crew margin view
+  /// (routes/currentRms.ts's /crew-margin). Null is treated as 1 day, so existing assignments
+  /// made before this field existed still cost out sensibly.
+  days          String?
   xeroContactId String?
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
@@ -683,6 +688,12 @@ model CurrentRmsOpportunity {
   /// against a real account's /opportunities response, so this can be null even when the
   /// opportunity does have a value Current RMS just doesn't expose in a field we recognize yet.
   value        Float?
+  /// Current RMS's own "Project" id (verified against a real account), which groups several
+  /// opportunities together — e.g. a job's main rental opportunity plus a separate "<Job> -
+  /// Crewing" opportunity for its labour. Used by the admin-only crew margin view
+  /// (routes/currentRms.ts's /crew-margin) to sum crew charges across every opportunity
+  /// sharing this job's project, not just the one it's directly linked to.
+  projectId    Int?
   startsAt     DateTime?
   endsAt       DateTime?
   rmsUpdatedAt DateTime?
@@ -690,4 +701,5 @@ model CurrentRmsOpportunity {
   syncedAt     DateTime  @updatedAt
 
   @@index([rmsId])
+  @@index([projectId])
 }

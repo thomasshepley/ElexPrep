@@ -3,7 +3,7 @@ import { prisma, logActivity } from '../db';
 import { requireRole } from '../auth';
 import { requirePermission } from '../permissions';
 import { DEFAULT_CURRENT_RMS_CONFIG, getCurrentRmsConfig, saveCurrentRmsConfig, toPublicConfig } from '../currentRms/config';
-import { testCurrentRmsConnection, fetchOpportunityItems, GROUP_ITEM_TYPE } from '../currentRms/client';
+import { testCurrentRmsConnection, fetchOpportunityItems, GROUP_ITEM_TYPE, RawOpportunityItem } from '../currentRms/client';
 import {
   runCurrentRmsSync,
   restartCurrentRmsPolling,
@@ -309,4 +309,93 @@ jobCurrentRmsRouter.post('/:jobId/current-rms/unlink', requirePermission('linkCu
 jobCurrentRmsRouter.post('/:jobId/current-rms/acknowledge', async (req, res) => {
   const job = await prisma.job.update({ where: { id: req.params.jobId }, data: { rmsAlertAt: null } });
   res.json(job);
+});
+
+function toMoney(value: string | undefined): number {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+}
+
+/** What one opportunity charges the client for crew/labour — the sum of every Service-type
+ * line's pre-tax charge (not a Group row's own total, and not Current RMS's own per-asset
+ * opportunity_cost, which this app doesn't read; see RawOpportunityItem). Service is this
+ * account's existing convention for labour/setup lines (already relied on by the pick list's
+ * Rentals-only default), so this reuses it rather than looking for a specifically-named group. */
+function sumServiceCharge(items: RawOpportunityItem[]): number {
+  return items
+    .filter((i) => i.opportunity_item_type !== GROUP_ITEM_TYPE && i.transaction_type_name === 'Service')
+    .reduce((sum, i) => sum + toMoney(i.charge_excluding_tax_total ?? i.charge_total), 0);
+}
+
+/**
+ * Admin-only crew profit/cost view: what the client is charged for crew (from Current RMS,
+ * summed across every opportunity sharing this job's Current RMS "project" — see
+ * CurrentRmsOpportunity.projectId — so a separate "<Job> - Crewing" opportunity counts too)
+ * against what ElexPrep's own records say crew actually cost on this job (JobCrewAssignment's
+ * day rate override, or the crew member's own default, times the assignment's days). This is
+ * financial margin data, same sensitivity tier as bank details/compliance documents — ADMIN
+ * only, never delegated via the permissions system, and never surfaced in the freelancer-
+ * facing crew portal.
+ */
+jobCurrentRmsRouter.get('/:jobId/current-rms/crew-margin', requireRole('ADMIN'), async (req, res) => {
+  const job = await prisma.job.findUnique({ where: { id: req.params.jobId } });
+  if (!job) return res.status(404).json({ error: 'not found' });
+  if (!job.currentRmsOpportunityId) return res.status(400).json({ error: 'Job is not linked to a Current RMS opportunity' });
+  const config = await getCurrentRmsConfig();
+  if (!config.enabled) return res.status(400).json({ error: 'Current RMS integration is disabled' });
+
+  const primaryRmsId = Number(job.currentRmsOpportunityId);
+  const primary = await prisma.currentRmsOpportunity.findUnique({ where: { rmsId: primaryRmsId } });
+  const siblings = primary?.projectId
+    ? await prisma.currentRmsOpportunity.findMany({ where: { projectId: primary.projectId } })
+    : [];
+  // Always include the job's own linked opportunity even if it isn't cached locally yet (a
+  // sync hasn't run since it was linked) — siblings alone would silently drop it.
+  const opportunityIds = [...new Set([primaryRmsId, ...siblings.map((s) => s.rmsId)])];
+
+  let chargeBreakdown;
+  try {
+    chargeBreakdown = await Promise.all(
+      opportunityIds.map(async (rmsId) => {
+        const items = await fetchOpportunityItems(config, rmsId);
+        const cached = siblings.find((s) => s.rmsId === rmsId) ?? primary;
+        return {
+          opportunityId: rmsId,
+          subject: cached?.subject ?? `Opportunity #${rmsId}`,
+          serviceCharge: sumServiceCharge(items),
+        };
+      })
+    );
+  } catch (err) {
+    return res.status(502).json({ error: (err as Error).message });
+  }
+  const chargeTotal = chargeBreakdown.reduce((sum, b) => sum + b.serviceCharge, 0);
+
+  const assignments = await prisma.jobCrewAssignment.findMany({
+    where: { jobId: job.id },
+    include: { crewProfile: { include: { user: { select: { displayName: true } } } } },
+  });
+  const costBreakdown = assignments.map((a) => {
+    const rate = toMoney(a.dayRate ?? a.crewProfile.dayRate ?? undefined);
+    const days = a.days ? toMoney(a.days) || 1 : 1;
+    return {
+      crewProfileId: a.crewProfileId,
+      name: a.crewProfile.user.displayName,
+      role: a.role,
+      dayRate: rate,
+      days,
+      cost: rate * days,
+    };
+  });
+  const costTotal = costBreakdown.reduce((sum, b) => sum + b.cost, 0);
+
+  const margin = chargeTotal - costTotal;
+  res.json({
+    chargeTotal,
+    chargeBreakdown,
+    costTotal,
+    costBreakdown,
+    margin,
+    marginPercent: chargeTotal > 0 ? (margin / chargeTotal) * 100 : null,
+  });
 });

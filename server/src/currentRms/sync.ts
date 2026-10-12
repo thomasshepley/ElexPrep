@@ -75,6 +75,13 @@ function extractValue(raw: RawOpportunity): number | null {
   return typeof num === 'number' && Number.isFinite(num) ? num : null;
 }
 
+/** Current RMS's "Project" id, verified against a real account — groups several opportunities
+ * together (e.g. a job's main rental plus a separate "<Job> - Crewing" opportunity). */
+function extractProjectId(raw: RawOpportunity): number | null {
+  const value = raw.project_id;
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
 /**
  * The opportunities list endpoint doesn't embed the customer record (just `member_id`) on
  * a real account, so this is usually null from sync alone — see fetchOpportunityMemberName
@@ -156,6 +163,7 @@ export async function runCurrentRmsSync(): Promise<SyncResult> {
           kind: extractKind(raw),
           memberName: extractMemberName(raw),
           value: extractValue(raw),
+          projectId: extractProjectId(raw),
           startsAt: toDate(raw.starts_at),
           endsAt: toDate(raw.ends_at),
           rmsUpdatedAt: newUpdatedAt,
@@ -167,6 +175,7 @@ export async function runCurrentRmsSync(): Promise<SyncResult> {
           kind: extractKind(raw),
           memberName: extractMemberName(raw),
           value: extractValue(raw),
+          projectId: extractProjectId(raw),
           startsAt: toDate(raw.starts_at),
           endsAt: toDate(raw.ends_at),
           rmsUpdatedAt: newUpdatedAt,
