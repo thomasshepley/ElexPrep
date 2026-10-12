@@ -14,18 +14,10 @@ export default function CurrentRmsPanel({ jobId }: { jobId: string }) {
   const [linkInput, setLinkInput] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-
-  const refresh = () =>
-    api.jobCurrentRms.get(jobId).then((res) => {
-      setLinked(res.linked);
-      setOpportunity(res.opportunity);
-      setRmsAlertAt(res.rmsAlertAt ?? null);
-    });
-
-  useEffect(() => {
-    refresh();
-    setItems(null);
-  }, [jobId]);
+  // Current RMS's "Service" line items are typically labour/setup, not physical kit to prep —
+  // defaulting to Rentals-only keeps the pick list focused on what crew actually need to pull.
+  const [showAllTypes, setShowAllTypes] = useState(false);
+  const [hiddenIds, setHiddenIds] = useState<Set<number>>(new Set());
 
   const loadPickList = async () => {
     setPickListError(null);
@@ -37,6 +29,23 @@ export default function CurrentRmsPanel({ jobId }: { jobId: string }) {
     }
   };
 
+  const refresh = () =>
+    api.jobCurrentRms.get(jobId).then((res) => {
+      setLinked(res.linked);
+      setOpportunity(res.opportunity);
+      setRmsAlertAt(res.rmsAlertAt ?? null);
+      return res;
+    });
+
+  useEffect(() => {
+    setItems(null);
+    setHiddenIds(new Set());
+    refresh().then((res) => {
+      if (res.linked) loadPickList();
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jobId]);
+
   const link = async () => {
     setError(null);
     const rmsId = Number(linkInput);
@@ -46,12 +55,20 @@ export default function CurrentRmsPanel({ jobId }: { jobId: string }) {
       await api.jobCurrentRms.link(jobId, rmsId);
       setLinkInput('');
       await refresh();
+      await loadPickList();
     } catch (e) {
       setError((e as Error).message);
     } finally {
       setBusy(false);
     }
   };
+
+  const hideItem = (id: number) => setHiddenIds((prev) => new Set(prev).add(id));
+  const unhideAll = () => setHiddenIds(new Set());
+
+  const isNonRental = (i: CurrentRmsPickItem) => !i.isGroup && !!i.transaction_type_name && i.transaction_type_name !== 'Rental';
+  const visibleItems = (items ?? []).filter((i) => !hiddenIds.has(i.id) && (showAllTypes || !isNonRental(i)));
+  const hiddenByTypeCount = (items ?? []).filter((i) => !hiddenIds.has(i.id) && isNonRental(i)).length;
 
   const unlink = async () => {
     if (!confirm('Unlink this job from its Current RMS opportunity?')) return;
@@ -152,53 +169,92 @@ export default function CurrentRmsPanel({ jobId }: { jobId: string }) {
             <div className="row" style={{ justifyContent: 'space-between' }}>
               <h4 style={{ margin: 0 }}>Pick list</h4>
               <button className="secondary" onClick={loadPickList}>
-                {items ? 'Refresh' : 'Load pick list'}
+                Refresh
               </button>
             </div>
             {pickListError && <p className="error">{pickListError}</p>}
             {items && items.length === 0 && <p className="muted">No items returned.</p>}
             {items && items.length > 0 && (
-              <table>
-                <thead>
-                  <tr>
-                    <th>Item</th>
-                    <th>Qty</th>
-                    <th>Current RMS status</th>
-                    <th>Prepped</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {items.map((i) =>
-                    i.isGroup ? (
-                      <tr key={i.id}>
-                        <td colSpan={4} style={{ fontWeight: 700, paddingTop: '0.75rem' }}>
-                          {i.name ?? i.product_name ?? i.description ?? `#${i.id}`}
-                        </td>
-                      </tr>
-                    ) : (
-                      <tr key={i.id}>
-                        <td>{i.name ?? i.product_name ?? i.description ?? `#${i.id}`}</td>
-                        <td>{i.quantity ?? ''}</td>
-                        <td>
-                          <span
-                            style={{
-                              fontSize: '0.85rem',
-                              fontWeight: 600,
-                              padding: '0.15rem 0.5rem',
-                              borderRadius: 999,
-                              background: i.bookedOut ? '#1FA34C' : '#555',
-                              color: '#fff',
-                            }}
-                          >
-                            {i.status_name ?? (i.bookedOut ? 'Booked out' : 'Not booked out')}
-                          </span>
-                        </td>
-                        <td>{i.prepped ? '✓' : ''}</td>
-                      </tr>
-                    )
+              <>
+                <p className="muted" style={{ fontSize: '0.85rem' }}>
+                  {!showAllTypes && hiddenByTypeCount > 0 && (
+                    <>
+                      Showing Rentals only — {hiddenByTypeCount} Service/Sale item{hiddenByTypeCount === 1 ? '' : 's'} hidden.{' '}
+                      <button type="button" className="link-button" onClick={() => setShowAllTypes(true)}>
+                        Show all types
+                      </button>
+                    </>
                   )}
-                </tbody>
-              </table>
+                  {showAllTypes && (
+                    <button type="button" className="link-button" onClick={() => setShowAllTypes(false)}>
+                      Show Rentals only
+                    </button>
+                  )}
+                  {hiddenIds.size > 0 && (
+                    <>
+                      {(!showAllTypes && hiddenByTypeCount > 0) || showAllTypes ? ' · ' : ''}
+                      {hiddenIds.size} item{hiddenIds.size === 1 ? '' : 's'} manually hidden.{' '}
+                      <button type="button" className="link-button" onClick={unhideAll}>
+                        Show hidden
+                      </button>
+                    </>
+                  )}
+                </p>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Item</th>
+                      <th>Qty</th>
+                      <th>Current RMS status</th>
+                      <th>Prepped</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {visibleItems.map((i) =>
+                      i.isGroup ? (
+                        <tr key={i.id}>
+                          <td colSpan={5} style={{ fontWeight: 700, paddingTop: '0.75rem' }}>
+                            {i.name ?? i.product_name ?? i.description ?? `#${i.id}`}
+                          </td>
+                        </tr>
+                      ) : (
+                        <tr key={i.id}>
+                          <td>
+                            {i.name ?? i.product_name ?? i.description ?? `#${i.id}`}
+                            {i.transaction_type_name && i.transaction_type_name !== 'Rental' && (
+                              <span className="chip chip-neutral" style={{ marginLeft: '0.4rem' }}>
+                                {i.transaction_type_name}
+                              </span>
+                            )}
+                          </td>
+                          <td>{i.quantity ?? ''}</td>
+                          <td>
+                            <span
+                              style={{
+                                fontSize: '0.85rem',
+                                fontWeight: 600,
+                                padding: '0.15rem 0.5rem',
+                                borderRadius: 999,
+                                background: i.bookedOut ? '#1FA34C' : '#555',
+                                color: '#fff',
+                              }}
+                            >
+                              {i.status_name ?? (i.bookedOut ? 'Booked out' : 'Not booked out')}
+                            </span>
+                          </td>
+                          <td>{i.prepped ? '✓' : ''}</td>
+                          <td>
+                            <button type="button" className="link-button" onClick={() => hideItem(i.id)}>
+                              Hide
+                            </button>
+                          </td>
+                        </tr>
+                      )
+                    )}
+                  </tbody>
+                </table>
+              </>
             )}
           </div>
         </div>
