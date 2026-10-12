@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { api, type JobOneDriveStatus, type OneDriveItem } from '../api/client';
-import InlinePdfViewer from './InlinePdfViewer';
 
 /**
  * The admin side of the OneDrive integration on a job's Plots/CAD tab: shows whether this
@@ -10,7 +9,7 @@ import InlinePdfViewer from './InlinePdfViewer';
  * until real Azure credentials are added in Settings -> OneDrive, `enabled` stays false and
  * this renders a clear "not connected yet" state rather than a broken file browser.
  */
-export default function OneDriveFilesPanel({ jobId }: { jobId: string }) {
+export default function OneDriveFilesPanel({ jobId, onChange }: { jobId: string; onChange?: () => void }) {
   const [status, setStatus] = useState<JobOneDriveStatus | null>(null);
   const [crumbs, setCrumbs] = useState<{ id: string | undefined; name: string }[]>([{ id: undefined, name: 'Project folder' }]);
   const [items, setItems] = useState<OneDriveItem[]>([]);
@@ -18,7 +17,14 @@ export default function OneDriveFilesPanel({ jobId }: { jobId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const load = () => api.jobOneDrive.get(jobId).then(setStatus).catch((e) => setError(e.message));
+  const load = () =>
+    api.jobOneDrive
+      .get(jobId)
+      .then((s) => {
+        setStatus(s);
+        onChange?.();
+      })
+      .catch((e) => setError(e.message));
 
   useEffect(() => {
     load();
@@ -98,6 +104,18 @@ export default function OneDriveFilesPanel({ jobId }: { jobId: string }) {
     }
   };
 
+  const setCadPlot = async (shareId: string, isCadPlot: boolean) => {
+    setBusy(true);
+    try {
+      await api.jobOneDrive.setCadPlot(jobId, shareId, isCadPlot);
+      await load();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   if (!status) return null;
 
   if (!status.enabled) {
@@ -149,16 +167,6 @@ export default function OneDriveFilesPanel({ jobId }: { jobId: string }) {
               Set folder
             </button>
           </form>
-        </div>
-      )}
-
-      {status.cadPdf && (
-        <div style={{ marginBottom: '1.25rem' }}>
-          <h4>CAD plan (auto-detected)</h4>
-          <p className="muted" style={{ marginTop: 0 }}>
-            First PDF found in this project's "CAD" folder — automatically visible to crew.
-          </p>
-          <InlinePdfViewer url={api.jobOneDrive.fileUrl(jobId, status.cadPdf.itemId)} title={status.cadPdf.name} />
         </div>
       )}
 
@@ -231,10 +239,18 @@ export default function OneDriveFilesPanel({ jobId }: { jobId: string }) {
               <div key={s.id} className="row" style={{ justifyContent: 'space-between' }}>
                 <span>
                   {s.isFolder ? '📁' : '📄'} {s.itemPath}
+                  {s.isCadPlot && <span className="chip chip-accent" style={{ marginLeft: '0.4rem' }}>CAD plot</span>}
                 </span>
-                <button type="button" className="secondary" onClick={() => unshare(s.id)} disabled={busy}>
-                  Unshare
-                </button>
+                <div className="row" style={{ gap: '0.4rem' }}>
+                  {!s.isFolder && (
+                    <button type="button" className="secondary" onClick={() => setCadPlot(s.id, !s.isCadPlot)} disabled={busy}>
+                      {s.isCadPlot ? 'Unmark CAD plot' : 'Mark as CAD plot'}
+                    </button>
+                  )}
+                  <button type="button" className="secondary" onClick={() => unshare(s.id)} disabled={busy}>
+                    Unshare
+                  </button>
+                </div>
               </div>
             ))}
           </div>

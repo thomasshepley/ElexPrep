@@ -1,7 +1,16 @@
 import { prisma } from '../db';
 import { DriveItem } from './client';
 
-export function toShareDto(s: { id: string; jobId: string; itemId: string; itemName: string; itemPath: string; isFolder: boolean; sharedAt: Date }) {
+export function toShareDto(s: {
+  id: string;
+  jobId: string;
+  itemId: string;
+  itemName: string;
+  itemPath: string;
+  isFolder: boolean;
+  isCadPlot: boolean;
+  sharedAt: Date;
+}) {
   return {
     id: s.id,
     jobId: s.jobId,
@@ -9,6 +18,7 @@ export function toShareDto(s: { id: string; jobId: string; itemId: string; itemN
     itemName: s.itemName,
     itemPath: s.itemPath,
     isFolder: s.isFolder,
+    isCadPlot: s.isCadPlot,
     sharedAt: s.sharedAt,
   };
 }
@@ -42,6 +52,13 @@ export async function shareItemWithJob(
     update: { itemName: item.name, itemPath, isFolder: Boolean(item.folder) },
   });
   return toShareDto(share);
+}
+
+export async function setShareCadPlot(jobId: string, shareId: string, isCadPlot: boolean) {
+  const share = await prisma.oneDriveShare.findUnique({ where: { id: shareId } });
+  if (!share || share.jobId !== jobId) return null;
+  const updated = await prisma.oneDriveShare.update({ where: { id: shareId }, data: { isCadPlot } });
+  return toShareDto(updated);
 }
 
 export async function unshareItem(jobId: string, shareId: string): Promise<boolean> {

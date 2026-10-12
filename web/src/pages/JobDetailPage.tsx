@@ -6,8 +6,7 @@ import PatchImportPanel from '../components/PatchImportPanel';
 import CasesPanel from '../components/CasesPanel';
 import LabelsPanel from '../components/LabelsPanel';
 import PrintQueuePanel from '../components/PrintQueuePanel';
-import PlotsPanel from '../components/PlotsPanel';
-import OneDriveFilesPanel from '../components/OneDriveFilesPanel';
+import JobPlotsTab from '../components/JobPlotsTab';
 import JobSchedulePanel from '../components/JobSchedulePanel';
 import JobDocumentsPanel from '../components/JobDocumentsPanel';
 import CurrentRmsPanel from '../components/CurrentRmsPanel';
@@ -48,12 +47,7 @@ export default function JobDetailPage() {
       {tab === 'Cases' && <CasesPanel jobId={jobId} />}
       {tab === 'Labels' && <LabelsPanel jobId={jobId} />}
       {tab === 'Print Queue' && <PrintQueuePanel jobId={jobId} />}
-      {tab === 'Plots' && (
-        <>
-          <OneDriveFilesPanel jobId={jobId} />
-          <PlotsPanel jobId={jobId} />
-        </>
-      )}
+      {tab === 'Plots' && <JobPlotsTab jobId={jobId} />}
       {tab === 'Schedule' && <JobSchedulePanel jobId={jobId} />}
       {tab === 'Documents' && <JobDocumentsPanel jobId={jobId} />}
       {tab === 'Crew' && <JobCrewPanel jobId={jobId} />}

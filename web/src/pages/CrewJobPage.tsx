@@ -6,7 +6,7 @@ import DayTimeline from '../components/DayTimeline';
 import { WhoIcon, WhatIcon, WhenIcon, WhereIcon, WhyIcon, DiscussionIcon } from '../components/Icons';
 import LabelTypeForm, { AD_HOC_TYPES, type AdHocType } from '../components/LabelTypeForm';
 import JobDiscussionThread from '../components/JobDiscussionThread';
-import InlinePdfViewer from '../components/InlinePdfViewer';
+import CadPlotsViewer from '../components/CadPlotsViewer';
 
 const NO_DATE = 'No date set yet';
 const NO_VENUE = 'No venue set yet';
@@ -103,7 +103,6 @@ export default function CrewJobPage() {
   const [plots, setPlots] = useState<Plot[]>([]);
   const [cadPdf, setCadPdf] = useState<{ itemId: string; name: string } | null>(null);
   const [sharedFiles, setSharedFiles] = useState<OneDriveShare[]>([]);
-  const [viewingCad, setViewingCad] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -183,30 +182,25 @@ export default function CrewJobPage() {
           </WhySubsection>
 
           <WhySubsection title="CAD">
-            {cadPdf && (
-              <div style={{ marginBottom: '0.75rem' }}>
-                {viewingCad ? (
-                  <InlinePdfViewer url={api.crewPortal.oneDriveFileUrl(jobId, cadPdf.itemId)} title={cadPdf.name} />
-                ) : (
-                  <button type="button" onClick={() => setViewingCad(true)}>
-                    View {cadPdf.name}
-                  </button>
-                )}
-              </div>
-            )}
-            {plots.length === 0 && sharedFiles.length === 0 && !cadPdf && <p className="muted">No CAD files uploaded yet.</p>}
-            {(plots.length > 0 || sharedFiles.length > 0) && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                {plots.map((p) => (
-                  <a key={p.id} href={api.crewPortal.plotUrl(jobId, p.id)} target="_blank" rel="noreferrer">
-                    {p.originalName}
-                  </a>
-                ))}
-                {sharedFiles.map((s) => (
-                  <a key={s.id} href={api.crewPortal.oneDriveFileUrl(jobId, s.itemId)} target="_blank" rel="noreferrer">
-                    {s.isFolder ? '📁' : '📄'} {s.itemName}
-                  </a>
-                ))}
+            <CadPlotsViewer
+              candidates={[
+                ...(cadPdf ? [{ key: 'auto', label: cadPdf.name, url: api.crewPortal.oneDriveFileUrl(jobId, cadPdf.itemId), badge: 'Auto-detected' }] : []),
+                ...plots.map((p) => ({ key: `plot:${p.id}`, label: p.originalName, url: api.crewPortal.plotUrl(jobId, p.id) })),
+                ...sharedFiles
+                  .filter((s) => s.isCadPlot)
+                  .map((s) => ({ key: `share:${s.id}`, label: s.itemName, url: api.crewPortal.oneDriveFileUrl(jobId, s.itemId) })),
+              ]}
+            />
+            {sharedFiles.some((s) => !s.isCadPlot) && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '0.75rem' }}>
+                <p className="muted" style={{ margin: 0 }}>Other shared files</p>
+                {sharedFiles
+                  .filter((s) => !s.isCadPlot)
+                  .map((s) => (
+                    <a key={s.id} href={api.crewPortal.oneDriveFileUrl(jobId, s.itemId)} target="_blank" rel="noreferrer">
+                      {s.isFolder ? '📁' : '📄'} {s.itemName}
+                    </a>
+                  ))}
               </div>
             )}
           </WhySubsection>

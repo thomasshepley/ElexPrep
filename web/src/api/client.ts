@@ -368,6 +368,7 @@ export interface OneDriveShare {
   itemName: string;
   itemPath: string;
   isFolder: boolean;
+  isCadPlot: boolean;
   sharedAt: string;
 }
 
@@ -926,6 +927,8 @@ export const api = {
     share: (jobId: string, item: { itemId: string; itemName: string; itemPath: string; isFolder: boolean }) =>
       request<OneDriveShare>(`/jobs/${jobId}/onedrive/share`, { method: 'POST', body: JSON.stringify(item) }),
     unshare: (jobId: string, shareId: string) => request<void>(`/jobs/${jobId}/onedrive/share/${shareId}`, { method: 'DELETE' }),
+    setCadPlot: (jobId: string, shareId: string, isCadPlot: boolean) =>
+      request<OneDriveShare>(`/jobs/${jobId}/onedrive/share/${shareId}`, { method: 'PATCH', body: JSON.stringify({ isCadPlot }) }),
     fileUrl: (jobId: string, itemId: string) => `${BASE}/jobs/${jobId}/onedrive/file/${itemId}`,
   },
   portalSettings: {
