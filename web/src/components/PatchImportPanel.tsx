@@ -25,6 +25,7 @@ export default function PatchImportPanel({ jobId }: { jobId: string }) {
   const [busy, setBusy] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkLocation, setBulkLocation] = useState('');
+  const [fixtureSearch, setFixtureSearch] = useState('');
 
   const [candidate, setCandidate] = useState<PatchImportCandidate | null>(null);
   const [scanError, setScanError] = useState<string | null>(null);
@@ -97,10 +98,16 @@ export default function PatchImportPanel({ jobId }: { jobId: string }) {
     setSelected((s) => (s.size === fixtures.length ? new Set() : new Set(fixtures.map((f) => f.id))));
   };
 
+  const searchedFixtures = (fixtures ?? []).filter((f) => {
+    if (!fixtureSearch.trim()) return true;
+    const haystack = `${f.address} ${f.fixtureType} ${f.location ?? ''} ${f.mode ?? ''}`.toLowerCase();
+    return haystack.includes(fixtureSearch.trim().toLowerCase());
+  });
+
   /** Groups fixtures by type (sorted alphabetically, address order preserved within each
    * group) so a patch with many fixture types reads as sections instead of one long flat
    * list sorted only by address. */
-  const fixtureGroups = (fixtures ?? []).reduce<{ type: string; items: Fixture[] }[]>((groups, f) => {
+  const fixtureGroups = searchedFixtures.reduce<{ type: string; items: Fixture[] }[]>((groups, f) => {
     const type = f.fixtureType || 'Unlabeled';
     let group = groups.find((g) => g.type === type);
     if (!group) {
@@ -316,6 +323,12 @@ export default function PatchImportPanel({ jobId }: { jobId: string }) {
         {fixtures && fixtures.length > 0 && (
           <>
             <p className="muted">Every field is editable in place (click and type, saves on blur).</p>
+            <input
+              placeholder="Search fixtures…"
+              value={fixtureSearch}
+              onChange={(e) => setFixtureSearch(e.target.value)}
+              style={{ width: '16rem', marginBottom: '0.6rem' }}
+            />
             {selected.size > 0 && (
               <div className="row panel" style={{ background: 'rgba(255,255,255,0.04)', alignItems: 'center', gap: '0.6rem' }}>
                 <strong>{selected.size} selected</strong>

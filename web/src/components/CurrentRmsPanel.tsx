@@ -26,6 +26,8 @@ export default function CurrentRmsPanel({ jobId }: { jobId: string }) {
   // defaulting to Rentals-only keeps the pick list focused on what crew actually need to pull.
   const [showAllTypes, setShowAllTypes] = useState(false);
   const [hiddenIds, setHiddenIds] = useState<Set<number>>(new Set());
+  const [search, setSearch] = useState('');
+  const [category, setCategory] = useState('');
 
   const loadPickList = async () => {
     setPickListError(null);
@@ -96,8 +98,27 @@ export default function CurrentRmsPanel({ jobId }: { jobId: string }) {
     return !!type && type !== 'Rental';
   };
   const allItems = items ?? [];
-  const visibleItems = allItems.filter((i, idx) => !hiddenIds.has(i.id) && (showAllTypes || !isNonRental(allItems, i, idx)));
+  const typeFilteredItems = allItems.filter((i, idx) => !hiddenIds.has(i.id) && (showAllTypes || !isNonRental(allItems, i, idx)));
   const hiddenByTypeCount = allItems.filter((i, idx) => !hiddenIds.has(i.id) && isNonRental(allItems, i, idx)).length;
+
+  // Current RMS's own product category, when the account's data actually carries one on the
+  // line item (it isn't guaranteed to - this account's opportunity_items responses haven't been
+  // confirmed to include it) - the filter row below only appears once there's something to
+  // filter by, rather than always showing an empty "All categories" control.
+  const categoryOf = (i: CurrentRmsPickItem): string | null => {
+    const raw = i.category_name ?? i.product_category_name ?? i.category;
+    return typeof raw === 'string' && raw.trim() ? raw : null;
+  };
+  const categories = [...new Set(typeFilteredItems.map(categoryOf).filter((c): c is string => c !== null))].sort();
+
+  const matchesSearch = (i: CurrentRmsPickItem) => {
+    if (!search.trim()) return true;
+    const haystack = `${i.name ?? ''} ${i.product_name ?? ''} ${i.description ?? ''}`.toLowerCase();
+    return haystack.includes(search.trim().toLowerCase());
+  };
+  const visibleItems = typeFilteredItems.filter(
+    (i) => i.isGroup || (matchesSearch(i) && (!category || categoryOf(i) === category))
+  );
 
   const unlink = async () => {
     if (!confirm('Unlink this job from its Current RMS opportunity?')) return;
@@ -205,6 +226,24 @@ export default function CurrentRmsPanel({ jobId }: { jobId: string }) {
             {items && items.length === 0 && <p className="muted">No items returned.</p>}
             {items && items.length > 0 && (
               <>
+                <div className="row" style={{ gap: '0.6rem', margin: '0.5rem 0', flexWrap: 'wrap' }}>
+                  <input
+                    placeholder="Search items…"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    style={{ width: '14rem' }}
+                  />
+                  {categories.length > 0 && (
+                    <select value={category} onChange={(e) => setCategory(e.target.value)}>
+                      <option value="">All categories</option>
+                      {categories.map((c) => (
+                        <option key={c} value={c}>
+                          {c}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
                 <p className="muted" style={{ fontSize: '0.85rem' }}>
                   {!showAllTypes && hiddenByTypeCount > 0 && (
                     <>
