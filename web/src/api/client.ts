@@ -737,7 +737,12 @@ export const api = {
     get: (jobId: string) =>
       request<{
         chargeTotal: number;
-        chargeBreakdown: { opportunityId: number; subject: string; serviceCharge: number }[];
+        chargeBreakdown: {
+          opportunityId: number;
+          subject: string;
+          serviceCharge: number;
+          lines: { name: string; quantity: number; rate: number; total: number }[];
+        }[];
         costTotal: number;
         costBreakdown: {
           crewProfileId: string;

@@ -364,10 +364,28 @@ function toMoney(value: string | undefined): number {
  * opportunity_cost, which this app doesn't read; see RawOpportunityItem). Service is this
  * account's existing convention for labour/setup lines (already relied on by the pick list's
  * Rentals-only default), so this reuses it rather than looking for a specifically-named group. */
+function serviceItems(items: RawOpportunityItem[]): RawOpportunityItem[] {
+  return items.filter((i) => i.opportunity_item_type !== GROUP_ITEM_TYPE && i.transaction_type_name === 'Service');
+}
+
 function sumServiceCharge(items: RawOpportunityItem[]): number {
-  return items
-    .filter((i) => i.opportunity_item_type !== GROUP_ITEM_TYPE && i.transaction_type_name === 'Service')
-    .reduce((sum, i) => sum + toMoney(i.charge_excluding_tax_total ?? i.charge_total), 0);
+  return serviceItems(items).reduce((sum, i) => sum + toMoney(i.charge_excluding_tax_total ?? i.charge_total), 0);
+}
+
+/** Per-line detail behind sumServiceCharge's total, for the side-by-side CRM-vs-ElexPrep
+ * cross-reference on the crew margin view — lets an admin see e.g. "3x Lighting Technician"
+ * on the Current RMS side next to their own crew assignments, to sanity-check man days. */
+function serviceLineItems(items: RawOpportunityItem[]): { name: string; quantity: number; rate: number; total: number }[] {
+  return serviceItems(items).map((i) => {
+    const total = toMoney(i.charge_excluding_tax_total ?? i.charge_total);
+    const quantity = i.quantity && i.quantity > 0 ? i.quantity : 1;
+    return {
+      name: i.name ?? i.product_name ?? i.description ?? 'Service item',
+      quantity,
+      rate: total / quantity,
+      total,
+    };
+  });
 }
 
 /**
@@ -412,6 +430,7 @@ jobCurrentRmsRouter.get('/:jobId/current-rms/crew-margin', requireRole('ADMIN'),
           opportunityId: rmsId,
           subject: cached?.subject ?? manualLink?.subject ?? `Opportunity #${rmsId}`,
           serviceCharge: sumServiceCharge(items),
+          lines: serviceLineItems(items),
         };
       })
     );
