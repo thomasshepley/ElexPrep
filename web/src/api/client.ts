@@ -879,7 +879,7 @@ export const api = {
       }>(`/jobs/${jobId}/patch/preview`, { method: 'POST', body: form });
     },
     import: (jobId: string, rows: Record<string, string>[], mapping?: Record<string, string>) =>
-      request<{ imported: number }>(`/jobs/${jobId}/patch/import`, {
+      request<{ imported: number; newFixtureTypes: string[] }>(`/jobs/${jobId}/patch/import`, {
         method: 'POST',
         body: JSON.stringify(mapping ? { mapping, rows } : { rows }),
       }),
@@ -897,9 +897,10 @@ export const api = {
     getOneDriveCandidate: (jobId: string) =>
       request<PatchImportCandidate | null>(`/jobs/${jobId}/patch/onedrive-candidate`),
     approveOneDriveCandidate: (jobId: string) =>
-      request<{ imported: number; candidate: PatchImportCandidate }>(`/jobs/${jobId}/patch/onedrive-candidate/approve`, {
-        method: 'POST',
-      }),
+      request<{ imported: number; newFixtureTypes: string[]; candidate: PatchImportCandidate }>(
+        `/jobs/${jobId}/patch/onedrive-candidate/approve`,
+        { method: 'POST' }
+      ),
     rejectOneDriveCandidate: (jobId: string, note?: string) =>
       request<{ candidate: PatchImportCandidate }>(`/jobs/${jobId}/patch/onedrive-candidate/reject`, {
         method: 'POST',

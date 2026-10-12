@@ -60,6 +60,24 @@ async function replaceFixtures(jobId: string, fixtures: ReturnType<typeof buildF
   ]);
 }
 
+/**
+ * Auto-adds a default (1 unit/case, no label override) global case rule for any fixture type
+ * just imported that doesn't already have one (matched case-insensitively, same as
+ * casePacking.ts's own lookup) - so a case rule always exists to tweak later instead of the
+ * fixture silently packing as a 1-per-case default with nothing to find in Settings. Returns
+ * the names actually created, for the import response to flag to the admin.
+ */
+async function addMissingFixtureTypeRules(fixtureTypes: string[]): Promise<string[]> {
+  const distinct = [...new Set(fixtureTypes.filter(Boolean))];
+  if (distinct.length === 0) return [];
+  const existing = await prisma.fixtureTypeRule.findMany({ select: { name: true } });
+  const have = new Set(existing.map((r) => r.name.toLowerCase()));
+  const missing = distinct.filter((t) => !have.has(t.toLowerCase()));
+  if (missing.length === 0) return [];
+  await prisma.fixtureTypeRule.createMany({ data: missing.map((name) => ({ name })) });
+  return missing;
+}
+
 patchRouter.post('/:jobId/patch/import', async (req, res) => {
   const { jobId } = req.params;
   const { mapping, rows } = req.body ?? {};
@@ -81,9 +99,13 @@ patchRouter.post('/:jobId/patch/import', async (req, res) => {
 
   const fixtures = buildFixturesFromRows(rows as Record<string, string>[], m);
   await replaceFixtures(jobId, fixtures);
+  const newFixtureTypes = await addMissingFixtureTypeRules(fixtures.map((f) => f.fixtureType));
 
   await logActivity('patch.import', `${fixtures.length} fixtures`, jobId, req.user?.id);
-  res.json({ imported: fixtures.length });
+  if (newFixtureTypes.length > 0) {
+    await logActivity('fixture_type_rules.auto_create', newFixtureTypes.join(', '), jobId, req.user?.id);
+  }
+  res.json({ imported: fixtures.length, newFixtureTypes });
 });
 
 /**
@@ -199,13 +221,17 @@ patchRouter.post('/:jobId/patch/onedrive-candidate/approve', requirePermission('
   const rows = JSON.parse(candidate.rowsJson) as Record<string, string>[];
   const fixtures = buildFixturesFromRows(rows, m);
   await replaceFixtures(jobId, fixtures);
+  const newFixtureTypes = await addMissingFixtureTypeRules(fixtures.map((f) => f.fixtureType));
   const updated = await prisma.patchImportCandidate.update({
     where: { jobId },
     data: { status: 'APPROVED', reviewedAt: new Date(), reviewedBy: req.user?.id ?? null },
   });
 
   await logActivity('patch.onedrive_import', `${fixtures.length} fixtures from ${candidate.fileName}`, jobId, req.user?.id);
-  res.json({ imported: fixtures.length, candidate: toCandidateResponse(updated) });
+  if (newFixtureTypes.length > 0) {
+    await logActivity('fixture_type_rules.auto_create', newFixtureTypes.join(', '), jobId, req.user?.id);
+  }
+  res.json({ imported: fixtures.length, newFixtureTypes, candidate: toCandidateResponse(updated) });
 });
 
 patchRouter.post('/:jobId/patch/onedrive-candidate/reject', requirePermission('manageOneDrive'), async (req, res) => {

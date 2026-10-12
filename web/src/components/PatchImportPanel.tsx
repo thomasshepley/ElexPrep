@@ -3,8 +3,19 @@ import { Link } from 'react-router-dom';
 import { PATCH_FIELD_LABELS, type PatchFieldKey } from '@elexprep/shared';
 import { api, type Fixture, type PatchImportCandidate } from '../api/client';
 import FileInput from './FileInput';
+import { useToast } from './Toast';
+
+function announceNewFixtureTypes(showToast: ReturnType<typeof useToast>['showToast'], types: string[]) {
+  if (types.length === 0) return;
+  const list = types.length <= 3 ? types.join(', ') : `${types.slice(0, 3).join(', ')} +${types.length - 3} more`;
+  showToast(
+    `${types.length === 1 ? 'New fixture type' : 'New fixture types'} added to case rules: ${list}`,
+    'info'
+  );
+}
 
 export default function PatchImportPanel({ jobId }: { jobId: string }) {
+  const { showToast } = useToast();
   const [rows, setRows] = useState<Record<string, string>[]>([]);
   const [savedMapping, setSavedMapping] = useState<Record<string, string> | null>(null);
   const [missingColumns, setMissingColumns] = useState<{ field: string; column: string }[]>([]);
@@ -49,6 +60,8 @@ export default function PatchImportPanel({ jobId }: { jobId: string }) {
       const res = await api.patch.approveOneDriveCandidate(jobId);
       setCandidate(res.candidate);
       await loadFixtures();
+      showToast(`Imported ${res.imported} fixtures`);
+      announceNewFixtureTypes(showToast, res.newFixtureTypes);
     } catch (e) {
       setScanError((e as Error).message);
     } finally {
@@ -157,7 +170,8 @@ export default function PatchImportPanel({ jobId }: { jobId: string }) {
       await loadFixtures();
       setRows([]);
       setFileName(null);
-      alert(`Imported ${res.imported} fixtures`);
+      showToast(`Imported ${res.imported} fixtures`);
+      announceNewFixtureTypes(showToast, res.newFixtureTypes);
     } catch (e) {
       setError((e as Error).message);
     } finally {

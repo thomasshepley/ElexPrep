@@ -376,6 +376,54 @@ tbody tr:hover {
   z-index: 1000;
 }
 
+.toast-stack {
+  position: fixed;
+  top: 1.25rem;
+  right: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  z-index: 1100;
+  max-width: 22rem;
+}
+
+.toast {
+  padding: 0.7rem 1rem;
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-md);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  cursor: pointer;
+  animation: toast-in 160ms ease;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.toast-success {
+  background: var(--success);
+  color: var(--on-success);
+}
+
+.toast-info {
+  background: var(--surface-raised);
+  color: var(--content);
+  border: 1px solid var(--border);
+}
+
+.toast-error {
+  background: var(--danger);
+  color: #fff;
+}
+
 .modal-panel {
   width: 100%;
   max-width: 32rem;

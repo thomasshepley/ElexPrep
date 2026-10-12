@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api, type LocationColorPattern, type LocationColorRule } from '../api/client';
+import { useToast } from '../components/Toast';
 
 function contrastingText(hex: string): string {
   const clean = hex.replace('#', '');
@@ -24,6 +25,7 @@ function swatchBackground(rule: Pick<LocationColorRule, 'color' | 'pattern' | 's
 }
 
 export default function LocationColorsPage() {
+  const { showToast } = useToast();
   const [rules, setRules] = useState<LocationColorRule[]>([]);
   const [location, setLocation] = useState('');
   const [color, setColor] = useState('#1FA34C');
@@ -50,6 +52,7 @@ export default function LocationColorsPage() {
       setLocation('');
       setPattern('SOLID');
       refresh();
+      showToast(`Added "${location}" to location colors`);
     } catch (e) {
       setError((e as Error).message);
     }
@@ -76,6 +79,7 @@ export default function LocationColorsPage() {
   const remove = async (id: string) => {
     await api.locationColorRules.remove(id);
     refresh();
+    showToast('Location color removed', 'info');
   };
 
   return (
