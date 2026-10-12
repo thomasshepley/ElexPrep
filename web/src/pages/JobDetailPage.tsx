@@ -156,6 +156,11 @@ function JobSettingsPanel({ job, onUpdate }: { job: Job; onUpdate: (j: Job) => v
             <input type="datetime-local" value={endsAt} onChange={(e) => setEndsAt(e.target.value)} />
           </label>
         </div>
+        <p className="muted" style={{ margin: 0 }}>
+          These can extend earlier or later than the linked Current RMS opportunity's own dates -
+          e.g. to cover a prep day before the hire actually starts. Leave blank to fall back to
+          the opportunity's dates.
+        </p>
         <button type="submit">Save</button>
       </form>
 

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, type JobScheduleItem } from '../api/client';
 import DayTimeline from './DayTimeline';
+import { useToast } from './Toast';
 
 // The native datetime-local spinner/scroll-wheel snaps to this step, so picking a time quickly
 // moves in 15-minute jumps - typing a value directly (e.g. 09:07) is still unrestricted, so an
@@ -27,6 +28,7 @@ function plusOneHour(datetimeLocal: string): string {
 }
 
 export default function JobSchedulePanel({ jobId }: { jobId: string }) {
+  const { showToast } = useToast();
   const [items, setItems] = useState<JobScheduleItem[]>([]);
   const [title, setTitle] = useState('');
   const [startsAt, setStartsAt] = useState(defaultStartsAt);
@@ -71,6 +73,7 @@ export default function JobSchedulePanel({ jobId }: { jobId: string }) {
       setEndsAtTouched(false);
       setNotes('');
       refresh();
+      showToast(`Added "${title}" to the schedule`);
     } catch (err) {
       setError((err as Error).message);
     }
@@ -79,16 +82,21 @@ export default function JobSchedulePanel({ jobId }: { jobId: string }) {
   const remove = async (id: string) => {
     await api.jobSchedule.remove(jobId, id);
     refresh();
+    showToast('Schedule entry removed', 'info');
   };
 
   return (
     <div>
       <div className="panel">
         <h3>Add schedule entry</h3>
+        <p className="muted" style={{ marginTop: 0 }}>
+          Not limited to the Current RMS opportunity's own dates - add a Prep entry on an
+          earlier day if kit needs building before the hire starts.
+        </p>
         <form onSubmit={create} className="row" style={{ flexWrap: 'wrap', alignItems: 'flex-end', gap: '0.9rem' }}>
           <div className="field" style={{ width: '14rem' }}>
             <label htmlFor="sched-title">Title</label>
-            <input id="sched-title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Load in" required />
+            <input id="sched-title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Load in / Prep" required />
           </div>
           <div className="field" style={{ width: '13rem' }}>
             <label htmlFor="sched-starts">Starts</label>
