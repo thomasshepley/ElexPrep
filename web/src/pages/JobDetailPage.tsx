@@ -10,6 +10,7 @@ import JobDocumentsPanel from '../components/JobDocumentsPanel';
 import CurrentRmsPanel from '../components/CurrentRmsPanel';
 import JobLocationColorsPanel from '../components/JobLocationColorsPanel';
 import JobCrewPanel from '../components/JobCrewPanel';
+import CrewMarginPanel from '../components/CrewMarginPanel';
 import JobDiscussionThread from '../components/JobDiscussionThread';
 import FileInput from '../components/FileInput';
 
@@ -46,7 +47,12 @@ export default function JobDetailPage() {
           {tab === 'Plots' && <JobPlotsTab jobId={jobId} />}
           {tab === 'Schedule' && <JobSchedulePanel jobId={jobId} />}
           {tab === 'Documents' && <JobDocumentsPanel jobId={jobId} />}
-          {tab === 'Crew' && <JobCrewPanel jobId={jobId} />}
+          {tab === 'Crew' && (
+            <>
+              <JobCrewPanel jobId={jobId} />
+              <CrewMarginPanel jobId={jobId} />
+            </>
+          )}
           {tab === 'Discussion' && (
             <div className="panel">
               <JobDiscussionThread jobId={jobId} scope="staff" />

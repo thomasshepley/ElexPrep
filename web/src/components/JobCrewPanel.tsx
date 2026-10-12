@@ -17,6 +17,7 @@ export default function JobCrewPanel({ jobId }: { jobId: string }) {
   const [crewProfileId, setCrewProfileId] = useState('');
   const [role, setRole] = useState('');
   const [dayRate, setDayRate] = useState('');
+  const [days, setDays] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   const refresh = () => api.jobCrewAssignments.list(jobId).then(setAssignments).catch((e) => setError(e.message));
@@ -34,10 +35,11 @@ export default function JobCrewPanel({ jobId }: { jobId: string }) {
     e.preventDefault();
     setError(null);
     try {
-      await api.jobCrewAssignments.create(jobId, { crewProfileId, role, dayRate: dayRate || undefined });
+      await api.jobCrewAssignments.create(jobId, { crewProfileId, role, dayRate: dayRate || undefined, days: days || undefined });
       setCrewProfileId('');
       setRole('');
       setDayRate('');
+      setDays('');
       refresh();
     } catch (err) {
       setError((err as Error).message);
@@ -46,6 +48,11 @@ export default function JobCrewPanel({ jobId }: { jobId: string }) {
 
   const updateRole = async (a: JobCrewAssignment, value: string) => {
     await api.jobCrewAssignments.update(jobId, a.id, { role: value });
+    refresh();
+  };
+
+  const updateDays = async (a: JobCrewAssignment, value: string) => {
+    await api.jobCrewAssignments.update(jobId, a.id, { days: value });
     refresh();
   };
 
@@ -83,6 +90,10 @@ export default function JobCrewPanel({ jobId }: { jobId: string }) {
                 <label htmlFor="assign-day-rate">Day rate override</label>
                 <input id="assign-day-rate" value={dayRate} onChange={(e) => setDayRate(e.target.value)} placeholder="Optional" />
               </div>
+              <div className="field" style={{ width: '6rem' }}>
+                <label htmlFor="assign-days">Days</label>
+                <input id="assign-days" value={days} onChange={(e) => setDays(e.target.value)} placeholder="1" />
+              </div>
               <button type="submit" disabled={!crewProfileId}>
                 Add to job
               </button>
@@ -105,6 +116,7 @@ export default function JobCrewPanel({ jobId }: { jobId: string }) {
               <th>Name</th>
               <th>Role</th>
               <th>Day rate</th>
+              <th>Days</th>
               <th></th>
               {canManage && <th></th>}
             </tr>
@@ -124,6 +136,18 @@ export default function JobCrewPanel({ jobId }: { jobId: string }) {
                   )}
                 </td>
                 <td>{a.dayRate ?? a.profileDayRate ?? '—'}</td>
+                <td>
+                  {canManage ? (
+                    <input
+                      defaultValue={a.days ?? ''}
+                      placeholder="1"
+                      style={{ width: '3.5rem' }}
+                      onBlur={(e) => updateDays(a, e.target.value)}
+                    />
+                  ) : (
+                    a.days ?? '1'
+                  )}
+                </td>
                 <td>
                   <WhatsAppButton phone={a.phone} label="WhatsApp" />
                 </td>
