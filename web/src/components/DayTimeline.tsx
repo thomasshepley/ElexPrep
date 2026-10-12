@@ -1,3 +1,5 @@
+import { useMemo, useState } from 'react';
+
 export interface TimelineItem {
   id: string;
   title: string;
@@ -17,6 +19,10 @@ function formatTime(d: Date): string {
   return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
 }
 
+function dateKey(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 interface TimedItem extends TimelineItem {
   startMin: number;
   endMin: number;
@@ -30,7 +36,10 @@ interface LaidOutItem extends TimedItem {
 /**
  * Assigns each item a column (and the column count of its overlap cluster) so entries whose
  * times overlap render side by side instead of stacked on top of each other — the same
- * layout Google Calendar's day view uses. `items` must already be sorted by start time.
+ * layout Google Calendar's day view uses. `items` must already be sorted by start time, and
+ * must all belong to the same calendar day — see DayTimeline below, which groups by date
+ * before calling this, since two items on different days are never really "overlapping" even
+ * if they happen to share the same time-of-day.
  */
 function layoutColumns(items: TimedItem[]): LaidOutItem[] {
   // Split into overlap clusters first: a sweep over start-sorted items where an item starting
@@ -71,12 +80,10 @@ function layoutColumns(items: TimedItem[]): LaidOutItem[] {
   return result;
 }
 
-/** A Google-Calendar-day-view-style vertical timeline for a job's schedule entries. */
-export default function DayTimeline({ items }: { items: TimelineItem[] }) {
-  if (items.length === 0) {
-    return <p className="muted">No schedule has been set for this job yet.</p>;
-  }
-
+/** A single day's Google-Calendar-day-view-style vertical timeline. `items` must all fall on
+ * the same calendar day — DayTimeline (below) handles splitting a multi-day job's items into
+ * one of these per day. */
+function SingleDayTimeline({ items }: { items: TimelineItem[] }) {
   const sorted = [...items].sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
   const timed: TimedItem[] = sorted.map((item) => {
     const startMin = minutesSinceMidnight(new Date(item.startsAt));
@@ -128,6 +135,54 @@ export default function DayTimeline({ items }: { items: TimelineItem[] }) {
           );
         })}
       </div>
+    </div>
+  );
+}
+
+/**
+ * A job's day-by-day schedule, split into one calendar day per tab. Items are laid out by
+ * minutes-since-midnight within a day (see SingleDayTimeline/layoutColumns), which only makes
+ * sense when every item being compared actually falls on the same date — grouping by date
+ * first (rather than rendering every item from every day on one shared time axis, as this
+ * component used to) is what stops a multi-day job's entries from appearing to overlap just
+ * because e.g. "Load in" on day 1 and "Show" on day 2 both start at 09:00.
+ */
+export default function DayTimeline({ items }: { items: TimelineItem[] }) {
+  const days = useMemo(() => {
+    const map = new Map<string, TimelineItem[]>();
+    for (const item of items) {
+      const key = dateKey(new Date(item.startsAt));
+      const bucket = map.get(key) ?? [];
+      bucket.push(item);
+      map.set(key, bucket);
+    }
+    return [...map.entries()].sort(([a], [b]) => a.localeCompare(b));
+  }, [items]);
+
+  const [selected, setSelected] = useState<string | null>(null);
+  const activeKey = selected && days.some(([key]) => key === selected) ? selected : days[0]?.[0] ?? null;
+  const activeItems = days.find(([key]) => key === activeKey)?.[1] ?? [];
+
+  if (items.length === 0) {
+    return <p className="muted">No schedule has been set for this job yet.</p>;
+  }
+
+  return (
+    <div>
+      {days.length > 1 && (
+        <div className="row" style={{ gap: '0.4rem', marginBottom: '0.75rem', flexWrap: 'wrap' }}>
+          {days.map(([key]) => (
+            <button
+              key={key}
+              className={key === activeKey ? '' : 'secondary'}
+              onClick={() => setSelected(key)}
+            >
+              {new Date(`${key}T00:00:00`).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}
+            </button>
+          ))}
+        </div>
+      )}
+      {activeKey && <SingleDayTimeline items={activeItems} />}
     </div>
   );
 }
