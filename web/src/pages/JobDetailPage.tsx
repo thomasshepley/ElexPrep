@@ -7,6 +7,7 @@ import JobPlotsTab from '../components/JobPlotsTab';
 import LocationLinks from '../components/LocationLinks';
 import JobSchedulePanel from '../components/JobSchedulePanel';
 import JobDocumentsPanel from '../components/JobDocumentsPanel';
+import JobContactsPanel from '../components/JobContactsPanel';
 import CurrentRmsPanel from '../components/CurrentRmsPanel';
 import JobLocationColorsPanel from '../components/JobLocationColorsPanel';
 import JobCrewPanel from '../components/JobCrewPanel';
@@ -14,7 +15,7 @@ import CrewMarginPanel from '../components/CrewMarginPanel';
 import JobDiscussionThread from '../components/JobDiscussionThread';
 import FileInput from '../components/FileInput';
 
-const TABS = ['Prep', 'Plots', 'Schedule', 'Documents', 'Crew', 'Discussion', 'Current RMS', 'Job Settings'] as const;
+const TABS = ['Prep', 'Plots', 'Schedule', 'Documents', 'Contacts', 'Crew', 'Discussion', 'Current RMS', 'Job Settings'] as const;
 type Tab = (typeof TABS)[number];
 
 export default function JobDetailPage() {
@@ -47,6 +48,7 @@ export default function JobDetailPage() {
           {tab === 'Plots' && <JobPlotsTab jobId={jobId} />}
           {tab === 'Schedule' && <JobSchedulePanel jobId={jobId} />}
           {tab === 'Documents' && <JobDocumentsPanel jobId={jobId} />}
+          {tab === 'Contacts' && <JobContactsPanel jobId={jobId} />}
           {tab === 'Crew' && (
             <>
               <JobCrewPanel jobId={jobId} />

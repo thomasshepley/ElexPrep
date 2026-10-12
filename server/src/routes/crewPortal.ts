@@ -312,6 +312,18 @@ crewPortalRouter.get('/me/jobs/:jobId/documents/:docId/file', requireRole('CREW'
   res.sendFile(path.join(uploadDir, 'job-documents', document.fileName));
 });
 
+crewPortalRouter.get('/me/jobs/:jobId/contacts', requireRole('CREW'), async (req, res) => {
+  const found = await requireAssignedJob(req.user!.id, req.params.jobId);
+  if (!found) return res.status(404).json({ error: 'Job not found' });
+  const features = await resolveCrewFeatures(found.assignment.job);
+  if (!features.contacts) return res.json([]);
+  const contacts = await prisma.jobContact.findMany({
+    where: { jobId: req.params.jobId },
+    orderBy: { createdAt: 'asc' },
+  });
+  res.json(contacts);
+});
+
 crewPortalRouter.get('/me/jobs/:jobId/plots', requireRole('CREW'), async (req, res) => {
   const found = await requireAssignedJob(req.user!.id, req.params.jobId);
   if (!found) return res.status(404).json({ error: 'Job not found' });

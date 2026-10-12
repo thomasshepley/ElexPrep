@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { useParams } from 'react-router-dom';
-import { api, type CrewJobDetail, type JobScheduleItem, type KitListItem, type JobDocument, type Plot, type OneDriveShare } from '../api/client';
+import { api, type CrewJobDetail, type JobScheduleItem, type KitListItem, type JobDocument, type JobContact, type Plot, type OneDriveShare } from '../api/client';
 import Chevron from '../components/Chevron';
 import DayTimeline from '../components/DayTimeline';
 import { WhoIcon, WhatIcon, WhenIcon, WhereIcon, WhyIcon, DiscussionIcon } from '../components/Icons';
@@ -8,6 +8,7 @@ import LabelTypeForm, { AD_HOC_TYPES, type AdHocType } from '../components/Label
 import JobDiscussionThread from '../components/JobDiscussionThread';
 import CadPlotsViewer from '../components/CadPlotsViewer';
 import LocationLinks from '../components/LocationLinks';
+import WhatsAppButton from '../components/WhatsAppButton';
 
 const NO_DATE = 'No date set yet';
 const NO_VENUE = 'No venue set yet';
@@ -119,6 +120,7 @@ export default function CrewJobPage() {
   const [schedule, setSchedule] = useState<JobScheduleItem[]>([]);
   const [kitList, setKitList] = useState<KitListItem[]>([]);
   const [documents, setDocuments] = useState<JobDocument[]>([]);
+  const [contacts, setContacts] = useState<JobContact[]>([]);
   const [plots, setPlots] = useState<Plot[]>([]);
   const [cadPdf, setCadPdf] = useState<{ itemId: string; name: string } | null>(null);
   const [sharedFiles, setSharedFiles] = useState<OneDriveShare[]>([]);
@@ -130,6 +132,7 @@ export default function CrewJobPage() {
     api.crewPortal.schedule(jobId).then(setSchedule).catch(() => {});
     api.crewPortal.kitList(jobId).then((r) => setKitList(r.items)).catch(() => {});
     api.crewPortal.documents(jobId).then(setDocuments).catch(() => {});
+    api.crewPortal.contacts(jobId).then(setContacts).catch(() => {});
     api.crewPortal.plots(jobId).then(setPlots).catch(() => {});
     api.crewPortal
       .oneDrive(jobId)
@@ -252,6 +255,25 @@ export default function CrewJobPage() {
                 </div>
               )}
             </WhySubsection>
+
+            {contacts.length > 0 && (
+              <WhySubsection title="Important contacts">
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                  {contacts.map((c) => (
+                    <div key={c.id}>
+                      <strong>{c.name}</strong>
+                      {c.role && <span className="muted"> - {c.role}</span>}
+                      <div className="row" style={{ gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.15rem' }}>
+                        {c.phone && <span>{c.phone}</span>}
+                        {c.email && <a href={`mailto:${c.email}`}>{c.email}</a>}
+                        <WhatsAppButton phone={c.phone} label="WhatsApp" />
+                      </div>
+                      {c.notes && <p className="muted" style={{ margin: '0.15rem 0 0' }}>{c.notes}</p>}
+                    </div>
+                  ))}
+                </div>
+              </WhySubsection>
+            )}
           </div>
 
           <WhySubsection title="Need something prepped?">

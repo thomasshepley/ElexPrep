@@ -71,6 +71,7 @@ model Job {
   crewAssignments JobCrewAssignment[]
   scheduleItems  JobScheduleItem[]
   documents      JobDocument[]
+  contacts       JobContact[]
   labelRequests  CrewLabelRequest[]
   discussionMessages JobDiscussionMessage[]
   oneDriveShares OneDriveShare[]
@@ -151,6 +152,24 @@ model JobDocument {
   fileName     String
   mimeType     String
   createdAt    DateTime @default(now())
+
+  @@index([jobId])
+}
+
+/// A venue/client/production contact worth having on hand for a job - name, role (free text,
+/// e.g. "Venue Manager"), and how to reach them. Same visibility posture as JobDocument: reads
+/// open to any signed-in staff account and to crew assigned to the job, writes admin-only.
+model JobContact {
+  id        String   @id @default(cuid())
+  jobId     String
+  job       Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  name      String
+  role      String?
+  phone     String?
+  email     String?
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([jobId])
 }

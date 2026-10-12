@@ -437,6 +437,17 @@ export interface JobDocument {
   createdAt: string;
 }
 
+export interface JobContact {
+  id: string;
+  jobId: string;
+  name: string;
+  role: string | null;
+  phone: string | null;
+  email: string | null;
+  notes: string | null;
+  createdAt: string;
+}
+
 export interface KitListItem {
   id: number;
   name: string;
@@ -677,6 +688,7 @@ export const api = {
     kitList: (jobId: string) => request<{ items: KitListItem[] }>(`/crew/me/jobs/${jobId}/kit-list`),
     documents: (jobId: string) => request<JobDocument[]>(`/crew/me/jobs/${jobId}/documents`),
     documentUrl: (jobId: string, docId: string) => `${BASE}/crew/me/jobs/${jobId}/documents/${docId}/file`,
+    contacts: (jobId: string) => request<JobContact[]>(`/crew/me/jobs/${jobId}/contacts`),
     plots: (jobId: string) => request<Plot[]>(`/crew/me/jobs/${jobId}/plots`),
     plotUrl: (jobId: string, plotId: string) => `${BASE}/crew/me/jobs/${jobId}/plots/${plotId}/file`,
     oneDrive: (jobId: string) =>
@@ -723,6 +735,17 @@ export const api = {
     },
     fileUrl: (jobId: string, id: string) => `${BASE}/jobs/${jobId}/documents/${id}/file`,
     remove: (jobId: string, id: string) => request<void>(`/jobs/${jobId}/documents/${id}`, { method: 'DELETE' }),
+  },
+  jobContacts: {
+    list: (jobId: string) => request<JobContact[]>(`/jobs/${jobId}/contacts`),
+    create: (jobId: string, data: { name: string; role?: string; phone?: string; email?: string; notes?: string }) =>
+      request<JobContact>(`/jobs/${jobId}/contacts`, { method: 'POST', body: JSON.stringify(data) }),
+    update: (
+      jobId: string,
+      id: string,
+      data: Partial<{ name: string; role: string; phone: string; email: string; notes: string }>
+    ) => request<JobContact>(`/jobs/${jobId}/contacts/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    remove: (jobId: string, id: string) => request<void>(`/jobs/${jobId}/contacts/${id}`, { method: 'DELETE' }),
   },
   dashboard: {
     get: () => request<{ orders: DashboardOrder[] }>('/dashboard'),
