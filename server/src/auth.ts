@@ -106,7 +106,12 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
   // login page itself can render. /api/agent/* authenticates with its own static token
   // (see routes/agent.ts), not a session.
   if (!req.path.startsWith('/api/')) return next();
-  if (req.path === '/api/health' || req.path.startsWith('/api/auth/') || req.path.startsWith('/api/agent/')) {
+  if (
+    req.path === '/api/health' ||
+    req.path === '/api/version' ||
+    req.path.startsWith('/api/auth/') ||
+    req.path.startsWith('/api/agent/')
+  ) {
     return next();
   }
   // The one public write in the whole app: submitting a crew application needs no login (the

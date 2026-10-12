@@ -501,6 +501,10 @@ export interface LoginRequiresTotp {
 }
 
 export const api = {
+  version: {
+    get: () =>
+      request<{ version: string; changelog: { version: string; date: string; notes: string[] }[] }>('/version'),
+  },
   auth: {
     status: () => request<{ needsSetup: boolean }>('/auth/status'),
     setup: (data: { username: string; password: string; displayName?: string }) =>

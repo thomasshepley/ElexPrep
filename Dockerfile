@@ -30,6 +30,10 @@ COPY --from=build /app/shared/dist shared/dist
 COPY --from=build /app/server/dist server/dist
 COPY --from=build /app/server/prisma server/prisma
 COPY --from=build /app/web/dist web/dist
+# server/src/version.ts resolves these relative to its own location (two levels up from
+# server/dist), so they need to land at the image's repo root, not inside server/. Copied
+# straight from the build context (not --from=build) since they need no build step.
+COPY VERSION CHANGELOG.md ./
 
 ENV DATABASE_URL="file:/data/elexprep.db"
 ENV UPLOADS_DIR="/data/uploads"

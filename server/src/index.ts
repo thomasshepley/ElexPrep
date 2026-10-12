@@ -9,6 +9,7 @@ import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import multer from 'multer';
 import { authMiddleware } from './auth';
+import { getVersionInfo } from './version';
 import { requestContextMiddleware } from './requestContext';
 import { authRouter } from './routes/auth';
 import { twoFactorRouter } from './routes/twoFactor';
@@ -65,6 +66,7 @@ app.use(requestContextMiddleware);
 app.use(authMiddleware);
 
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
+app.get('/api/version', (_req, res) => res.json(getVersionInfo()));
 
 app.use('/api/auth', authRouter);
 app.use('/api/2fa', twoFactorRouter);

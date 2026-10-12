@@ -3,6 +3,7 @@ import { useAuth } from '../auth/AuthContext';
 import { JobsIcon, SettingsIcon, SignOutIcon } from '../components/Icons';
 import ThemeToggle from '../components/ThemeToggle';
 import NotificationBell from '../components/NotificationBell';
+import VersionBadge from '../components/VersionBadge';
 
 /**
  * Shell for the whole crew portal (/crew/*) — a sibling to the admin/prep App shell and the
@@ -57,6 +58,7 @@ export default function CrewLayout() {
               <SignOutIcon />
               <span>Sign out</span>
             </button>
+            <VersionBadge />
           </div>
         </div>
       </aside>

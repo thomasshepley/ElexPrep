@@ -3,6 +3,7 @@ import { useAuth } from './auth/AuthContext'
 import { DashboardIcon, JobsIcon, SettingsIcon, SignageIcon, SignOutIcon } from './components/Icons'
 import ThemeToggle from './components/ThemeToggle'
 import NotificationBell from './components/NotificationBell'
+import VersionBadge from './components/VersionBadge'
 import './App.css'
 
 function App() {
@@ -59,6 +60,7 @@ function App() {
               <SignOutIcon />
               <span>Sign out</span>
             </button>
+            <VersionBadge />
           </div>
         </div>
       </aside>
