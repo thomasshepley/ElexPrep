@@ -2,6 +2,14 @@ import { useEffect, useState } from 'react';
 import { api, type CurrentRmsOpportunity, type CurrentRmsPickItem } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 
+/** Current RMS sends quantity as a decimal string (e.g. "12.0"), same quirk as its money
+ * fields — Number() strips the trailing .0 for a whole number while still showing real
+ * fractional quantities (e.g. "1.5") as-is. */
+function formatQuantity(q: unknown): string {
+  const n = Number(q);
+  return Number.isFinite(n) ? String(n) : '';
+}
+
 export default function CurrentRmsPanel({ jobId }: { jobId: string }) {
   const { user } = useAuth();
   const isAdmin = user?.role === 'ADMIN';
@@ -66,9 +74,30 @@ export default function CurrentRmsPanel({ jobId }: { jobId: string }) {
   const hideItem = (id: number) => setHiddenIds((prev) => new Set(prev).add(id));
   const unhideAll = () => setHiddenIds(new Set());
 
-  const isNonRental = (i: CurrentRmsPickItem) => !i.isGroup && !!i.transaction_type_name && i.transaction_type_name !== 'Rental';
-  const visibleItems = (items ?? []).filter((i) => !hiddenIds.has(i.id) && (showAllTypes || !isNonRental(i)));
-  const hiddenByTypeCount = (items ?? []).filter((i) => !hiddenIds.has(i.id) && isNonRental(i)).length;
+  // An Accessory row (opportunity_item_type 2) frequently carries no transaction_type_name of
+  // its own in Current RMS's response — it inherits its Principal's. Treating a blank as
+  // "Rental" by default let Service accessory lines (e.g. a crew member's sub-line items)
+  // leak through the Rentals-only filter, so look back to the nearest preceding Principal row
+  // (type 1) for the type instead of trusting a missing field. A Group row (type 0) ends the
+  // lookback — it starts a new section.
+  const effectiveTransactionType = (all: CurrentRmsPickItem[], i: CurrentRmsPickItem, idx: number): string | undefined => {
+    if (i.transaction_type_name) return i.transaction_type_name;
+    if (i.opportunity_item_type !== 2) return i.transaction_type_name;
+    for (let j = idx - 1; j >= 0; j--) {
+      const prev = all[j];
+      if (prev.opportunity_item_type === 1) return prev.transaction_type_name;
+      if (prev.opportunity_item_type === 0) break;
+    }
+    return i.transaction_type_name;
+  };
+  const isNonRental = (all: CurrentRmsPickItem[], i: CurrentRmsPickItem, idx: number) => {
+    if (i.isGroup) return false;
+    const type = effectiveTransactionType(all, i, idx);
+    return !!type && type !== 'Rental';
+  };
+  const allItems = items ?? [];
+  const visibleItems = allItems.filter((i, idx) => !hiddenIds.has(i.id) && (showAllTypes || !isNonRental(allItems, i, idx)));
+  const hiddenByTypeCount = allItems.filter((i, idx) => !hiddenIds.has(i.id) && isNonRental(allItems, i, idx)).length;
 
   const unlink = async () => {
     if (!confirm('Unlink this job from its Current RMS opportunity?')) return;
@@ -204,7 +233,6 @@ export default function CurrentRmsPanel({ jobId }: { jobId: string }) {
                   <thead>
                     <tr>
                       <th>Item</th>
-                      <th>Qty</th>
                       <th>Current RMS status</th>
                       <th>Prepped</th>
                       <th></th>
@@ -214,13 +242,16 @@ export default function CurrentRmsPanel({ jobId }: { jobId: string }) {
                     {visibleItems.map((i) =>
                       i.isGroup ? (
                         <tr key={i.id}>
-                          <td colSpan={5} style={{ fontWeight: 700, paddingTop: '0.75rem' }}>
+                          <td colSpan={4} style={{ fontWeight: 700, paddingTop: '0.75rem' }}>
                             {i.name ?? i.product_name ?? i.description ?? `#${i.id}`}
                           </td>
                         </tr>
                       ) : (
                         <tr key={i.id}>
                           <td>
+                            <span className="muted" style={{ display: 'inline-block', minWidth: '2.5rem', textAlign: 'left' }}>
+                              {formatQuantity(i.quantity)}×
+                            </span>
                             {i.name ?? i.product_name ?? i.description ?? `#${i.id}`}
                             {i.transaction_type_name && i.transaction_type_name !== 'Rental' && (
                               <span className="chip chip-neutral" style={{ marginLeft: '0.4rem' }}>
@@ -228,7 +259,6 @@ export default function CurrentRmsPanel({ jobId }: { jobId: string }) {
                               </span>
                             )}
                           </td>
-                          <td>{i.quantity ?? ''}</td>
                           <td>
                             <span
                               style={{

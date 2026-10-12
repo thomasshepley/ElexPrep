@@ -1,4 +1,4 @@
-import { NavLink, Outlet } from 'react-router-dom';
+import { Navigate, NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { JobsIcon, SettingsIcon, SignOutIcon } from '../components/Icons';
 import ThemeToggle from '../components/ThemeToggle';
@@ -10,10 +10,21 @@ import NotificationBell from '../components/NotificationBell';
  * already use (see App.tsx). Reuses the same sidebar shell classes (App.css) for visual
  * consistency, just with its own (currently single-item) nav. The schedule (index route) and a
  * job's Who/What/When/Where page render below it via Outlet.
+ *
+ * Needs its own loading/logged-out/wrong-role guard, same as App.tsx — this route isn't nested
+ * inside App, so App's guard never runs for it. Without this, signing out (which just clears
+ * the in-memory user) left the shell rendering as if nothing happened, with individual panels
+ * underneath failing their own API calls and showing a small "not authenticated" error instead
+ * of the whole page redirecting to /login.
  */
 export default function CrewLayout() {
-  const { user, logout } = useAuth();
-  const initial = user?.displayName?.trim().charAt(0).toUpperCase() ?? '?';
+  const { user, loading, logout } = useAuth();
+
+  if (loading) return null;
+  if (!user) return <Navigate to="/login" replace />;
+  if (user.role !== 'CREW') return <Navigate to="/" replace />;
+
+  const initial = user.displayName.trim().charAt(0).toUpperCase() || '?';
 
   return (
     <div className="shell">
@@ -36,8 +47,8 @@ export default function CrewLayout() {
           <div className="sidebar-user">
             <div className="sidebar-user-row">
               <span className="avatar">{initial}</span>
-              <NavLink to="/crew/account" className="sidebar-username" aria-label={`${user?.displayName} — account`}>
-                {user?.displayName}
+              <NavLink to="/crew/account" className="sidebar-username" aria-label={`${user.displayName} — account`}>
+                {user.displayName}
               </NavLink>
             </div>
             <NotificationBell />

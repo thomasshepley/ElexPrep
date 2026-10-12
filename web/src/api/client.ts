@@ -488,6 +488,10 @@ export interface CurrentRmsPickItem {
   isGroup?: boolean;
   /** Current RMS's own classification — "Rental", "Sale", or "Service". */
   transaction_type_name?: string;
+  /** 0 = Group, 1 = Principal, 2 = Accessory. An Accessory row often carries no
+   * transaction_type_name of its own — see isNonRental in CurrentRmsPanel, which inherits it
+   * from the nearest preceding Principal row instead of treating a blank as "Rental". */
+  opportunity_item_type?: number;
   [key: string]: unknown;
 }
 
