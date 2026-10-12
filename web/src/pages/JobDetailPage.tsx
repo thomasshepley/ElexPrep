@@ -88,6 +88,12 @@ function JobSettingsPanel({ job, onUpdate }: { job: Job; onUpdate: (j: Job) => v
   const [startsAt, setStartsAt] = useState(toDatetimeLocal(job.startsAt));
   const [endsAt, setEndsAt] = useState(toDatetimeLocal(job.endsAt));
   const [logoBusy, setLogoBusy] = useState(false);
+  const [oneDriveLogo, setOneDriveLogo] = useState<{ itemId: string; name: string } | null>(null);
+
+  useEffect(() => {
+    if (!job.oneDriveFolderId) return;
+    api.jobs.logoOneDriveCandidate(job.id).then(setOneDriveLogo).catch(() => setOneDriveLogo(null));
+  }, [job.id, job.oneDriveFolderId]);
 
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -126,6 +132,21 @@ function JobSettingsPanel({ job, onUpdate }: { job: Job; onUpdate: (j: Job) => v
       setLogoBusy(false);
     }
   };
+
+  const applyOneDriveLogo = async (slot: 'left' | 'middle' | 'right') => {
+    setLogoBusy(true);
+    try {
+      const updated = await api.jobs.applyLogoOneDriveCandidate(job.id, slot);
+      onUpdate(updated);
+      setOneDriveLogo(null);
+    } finally {
+      setLogoBusy(false);
+    }
+  };
+
+  // The first still-empty slot, in the order most jobs would want it filled - used so the
+  // OneDrive suggestion below has one obvious default action instead of asking which slot.
+  const emptyLogoSlot = !job.logoPath ? 'middle' : !job.logoPathLeft ? 'left' : !job.logoPathRight ? 'right' : null;
 
   return (
     <div className="panel">
@@ -197,6 +218,16 @@ function JobSettingsPanel({ job, onUpdate }: { job: Job; onUpdate: (j: Job) => v
           Used on PAL/generic labels and prep displays. Up to three logos print side by side
           across the label's logo bar - most jobs just use the middle slot.
         </p>
+        {oneDriveLogo && emptyLogoSlot && (
+          <div className="panel onedrive-logo-suggestion" style={{ marginBottom: '0.9rem' }}>
+            <p style={{ margin: 0 }}>
+              Found a logo in this job's OneDrive folder: <strong>{oneDriveLogo.name}</strong>
+            </p>
+            <button type="button" disabled={logoBusy} onClick={() => applyOneDriveLogo(emptyLogoSlot)} style={{ marginTop: '0.5rem' }}>
+              Use as {emptyLogoSlot} logo
+            </button>
+          </div>
+        )}
         <div className="row" style={{ gap: '1.5rem', flexWrap: 'wrap' }}>
           {(['left', 'middle', 'right'] as const).map((slot) => {
             const path = slot === 'left' ? job.logoPathLeft : slot === 'right' ? job.logoPathRight : job.logoPath;

@@ -5,6 +5,9 @@ import fs from 'fs';
 import { prisma, logActivity } from '../db';
 import { requirePermission, resolvePermissionsForUser } from '../permissions';
 import { normalizeCrewFeaturesPatch } from '../crewFeatures';
+import { findLogoCandidate } from '../oneDrive/logo';
+import { getOneDriveConfig } from '../oneDrive/config';
+import { streamOneDriveFile } from '../oneDrive/client';
 
 const uploadDir = process.env.UPLOADS_DIR
   ? path.resolve(process.env.UPLOADS_DIR)
@@ -156,6 +159,39 @@ jobsRouter.get('/:id/logo/:slot?', async (req, res) => {
   if (!logoPath) return res.status(404).end();
   if (!job.isPublic && req.user?.role !== 'ADMIN') return res.status(404).end();
   res.sendFile(path.join(uploadDir, logoPath));
+});
+
+// The automatic fallback alongside manual upload: if the job's matched OneDrive folder has
+// an obvious logo image sitting in it, surface it as a one-click suggestion rather than
+// making the admin download and re-upload it by hand (see JobDetailPage.tsx's Logo panel).
+jobsRouter.get('/:id/logo/onedrive-candidate', requirePermission('manageOneDrive'), async (req, res) => {
+  const job = await prisma.job.findUnique({ where: { id: req.params.id }, select: { oneDriveFolderId: true } });
+  if (!job) return res.status(404).json({ error: 'Job not found' });
+  res.json(await findLogoCandidate(job));
+});
+
+jobsRouter.post('/:id/logo/onedrive-candidate/apply', requirePermission('manageOneDrive'), async (req, res) => {
+  const slot = resolveLogoSlot(typeof req.body?.slot === 'string' ? req.body.slot : undefined);
+  const field = LOGO_SLOT_FIELDS[slot];
+  const job = await prisma.job.findUnique({ where: { id: req.params.id }, select: { oneDriveFolderId: true } });
+  if (!job) return res.status(404).json({ error: 'Job not found' });
+  const candidate = await findLogoCandidate(job);
+  if (!candidate) return res.status(404).json({ error: "No logo found in this job's OneDrive folder" });
+
+  const config = await getOneDriveConfig();
+  const { stream, fileName } = await streamOneDriveFile(config, candidate.itemId);
+  const savedName = `${Date.now()}-${Math.round(Math.random() * 1e9)}${path.extname(fileName) || '.png'}`;
+  await new Promise<void>((resolve, reject) => {
+    const writeStream = fs.createWriteStream(path.join(uploadDir, savedName));
+    stream.pipe(writeStream);
+    writeStream.on('finish', resolve);
+    writeStream.on('error', reject);
+    stream.on('error', reject);
+  });
+
+  const updated = await prisma.job.update({ where: { id: req.params.id }, data: { [field]: savedName } });
+  await logActivity('job.logo_onedrive_import', `${candidate.name} (${slot})`, updated.id, req.user?.id);
+  res.json(updated);
 });
 
 export { uploadDir, upload };

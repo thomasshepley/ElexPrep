@@ -55,6 +55,7 @@ export interface Job {
   oneDriveFolderPath: string | null;
   oneDriveMatchStatus: 'MATCHED' | 'MANUAL' | null;
   crewFeaturesJson: string | null;
+  discussionLocked: boolean;
   createdAt: string;
 }
 
@@ -883,6 +884,9 @@ export const api = {
     removeLogo: (id: string, slot: 'left' | 'middle' | 'right' = 'middle') =>
       request<Job>(`/jobs/${id}/logo/${slot}`, { method: 'DELETE' }),
     logoUrl: (id: string, slot: 'left' | 'middle' | 'right' = 'middle') => `${BASE}/jobs/${id}/logo/${slot}`,
+    logoOneDriveCandidate: (id: string) => request<{ itemId: string; name: string } | null>(`/jobs/${id}/logo/onedrive-candidate`),
+    applyLogoOneDriveCandidate: (id: string, slot: 'left' | 'middle' | 'right' = 'middle') =>
+      request<Job>(`/jobs/${id}/logo/onedrive-candidate/apply`, { method: 'POST', body: JSON.stringify({ slot }) }),
   },
   fixtureTypeRules: {
     list: () => request<FixtureTypeRule[]>('/fixture-type-rules'),

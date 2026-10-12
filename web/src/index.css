@@ -365,6 +365,14 @@ tbody tr:hover {
   overflow-x: auto;
 }
 
+/* A dismissable-feeling suggestion banner (e.g. "found a logo in OneDrive") - a .panel with
+   an accent tint instead of the neutral surface, so it reads as "action available" rather
+   than just another content section. */
+.onedrive-logo-suggestion {
+  background: var(--accent-wash);
+  border-color: var(--accent);
+}
+
 .modal-backdrop {
   position: fixed;
   inset: 0;

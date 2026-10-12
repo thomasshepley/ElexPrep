@@ -3,6 +3,10 @@
 Newest entries first. Each push/merge gets exactly one entry - see
 `scripts/bump-version.mjs` for how the version number itself advances.
 
+## v2.2.1 - 2026-10-12
+
+- Job logos can now be auto-detected from OneDrive with one click to apply
+
 ## v2.1.1 - 2026-10-12
 
 - Discussion threads can now be edited, locked, and removed messages leave an audit trail
