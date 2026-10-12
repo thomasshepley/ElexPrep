@@ -139,8 +139,9 @@ export function drawImageContain(page: PDFPage, image: PDFImage, rect: CellRectP
 }
 
 /**
- * Fills a rect with a resolved location color - a plain solid fill, or classic 45-degree
- * hazard-tape stripes (e.g. red/white for Spare, yellow/black for Rigging) when the rule
+ * Fills a rect with a resolved location color - a plain solid fill, classic 45-degree
+ * hazard-tape stripes (e.g. red/white for Spare, yellow/black for Rigging), or a rainbow band
+ * (the "Everywhere" location, for items that aren't tied to one specific spot) when the rule
  * says so.
  */
 export function drawLocationFill(page: PDFPage, rect: CellRectPt, resolved: ResolvedLocationColor) {
@@ -148,8 +149,28 @@ export function drawLocationFill(page: PDFPage, rect: CellRectPt, resolved: Reso
     drawDiagonalStripeFill(page, rect, resolved.color, resolved.secondaryColor);
     return;
   }
+  if (resolved.pattern === 'RAINBOW') {
+    drawRainbowFill(page, rect);
+    return;
+  }
   const { r, g, b } = hexToRgbFractions(resolved.color);
   page.drawRectangle({ x: rect.xPt, y: rect.yPt, width: rect.wPt, height: rect.hPt, color: rgb(r, g, b) });
+}
+
+const RAINBOW_BAND_COLORS = ['#D32F2F', '#F57C00', '#F5C400', '#1FA34C', '#1976D2', '#4B0082'];
+
+function drawRainbowFill(page: PDFPage, rect: CellRectPt) {
+  const bandWidth = rect.wPt / RAINBOW_BAND_COLORS.length;
+  RAINBOW_BAND_COLORS.forEach((hex, i) => {
+    const { r, g, b } = hexToRgbFractions(hex);
+    page.drawRectangle({
+      x: rect.xPt + bandWidth * i,
+      y: rect.yPt,
+      width: bandWidth,
+      height: rect.hPt,
+      color: rgb(r, g, b),
+    });
+  });
 }
 
 function drawDiagonalStripeFill(page: PDFPage, rect: CellRectPt, colorAHex: string, colorBHex: string) {

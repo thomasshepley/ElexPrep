@@ -152,6 +152,6 @@ process.on('SIGINT', () => shutdown('SIGINT'));
 
 restartCurrentRmsPolling().catch((err) => console.error('Could not start Current RMS polling:', err));
 seedDefaultLocationColorsIfEmpty().catch((err) => console.error('Could not seed location colors:', err));
-seedNewDefaultLocationColorsIfMissing(['Spare', 'Rigging']).catch((err) =>
+seedNewDefaultLocationColorsIfMissing(['Spare', 'Rigging', 'Everywhere']).catch((err) =>
   console.error('Could not top up new default location colors:', err)
 );

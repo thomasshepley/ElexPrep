@@ -11,8 +11,12 @@ function contrastingText(hex: string): string {
   return luminance < 0.55 ? '#fff' : '#000';
 }
 
-/** CSS approximation of the PDF's diagonal hazard stripes, for the in-browser preview swatch. */
+const RAINBOW_CSS = 'linear-gradient(90deg, #D32F2F, #F57C00, #F5C400, #1FA34C, #1976D2, #4B0082)';
+
+/** CSS approximation of the PDF's diagonal hazard stripes / rainbow band, for the in-browser
+ * preview swatch. */
 function swatchBackground(rule: Pick<LocationColorRule, 'color' | 'pattern' | 'secondaryColor'>): string {
+  if (rule.pattern === 'RAINBOW') return RAINBOW_CSS;
   if (rule.pattern === 'DIAGONAL_STRIPES' && rule.secondaryColor) {
     return `repeating-linear-gradient(45deg, ${rule.color}, ${rule.color} 10px, ${rule.secondaryColor} 10px, ${rule.secondaryColor} 20px)`;
   }
@@ -86,10 +90,11 @@ export default function LocationColorsPage() {
         <h3>Add rule</h3>
         <form className="row" onSubmit={create}>
           <input placeholder="Location (e.g. Downstage)" value={location} onChange={(e) => setLocation(e.target.value)} required />
-          <input type="color" value={color} onChange={(e) => setColor(e.target.value)} />
+          {pattern !== 'RAINBOW' && <input type="color" value={color} onChange={(e) => setColor(e.target.value)} />}
           <select value={pattern} onChange={(e) => setPattern(e.target.value as LocationColorPattern)}>
             <option value="SOLID">Solid</option>
             <option value="DIAGONAL_STRIPES">Diagonal stripes (hazard)</option>
+            <option value="RAINBOW">Rainbow (not tied to one spot)</option>
           </select>
           {pattern === 'DIAGONAL_STRIPES' && (
             <input type="color" value={secondaryColor} onChange={(e) => setSecondaryColor(e.target.value)} title="Second stripe color" />
@@ -114,7 +119,7 @@ export default function LocationColorsPage() {
             <tr key={r.id}>
               <td>{r.location}</td>
               <td className="row" style={{ gap: '0.3rem' }}>
-                <input type="color" value={r.color} onChange={(e) => updateColor(r, e.target.value)} />
+                {r.pattern !== 'RAINBOW' && <input type="color" value={r.color} onChange={(e) => updateColor(r, e.target.value)} />}
                 {r.pattern === 'DIAGONAL_STRIPES' && (
                   <input
                     type="color"
@@ -123,11 +128,13 @@ export default function LocationColorsPage() {
                     onChange={(e) => updateSecondaryColor(r, e.target.value)}
                   />
                 )}
+                {r.pattern === 'RAINBOW' && <span className="muted">(fixed colors)</span>}
               </td>
               <td>
                 <select value={r.pattern} onChange={(e) => updatePattern(r, e.target.value as LocationColorPattern)}>
                   <option value="SOLID">Solid</option>
                   <option value="DIAGONAL_STRIPES">Diagonal stripes</option>
+                  <option value="RAINBOW">Rainbow</option>
                 </select>
               </td>
               <td>
@@ -137,7 +144,8 @@ export default function LocationColorsPage() {
                     padding: '0.25rem 0.75rem',
                     borderRadius: 4,
                     background: swatchBackground(r),
-                    color: contrastingText(r.color),
+                    color: r.pattern === 'RAINBOW' ? '#fff' : contrastingText(r.color),
+                    textShadow: r.pattern === 'RAINBOW' ? '0 1px 2px rgba(0,0,0,0.8)' : undefined,
                     fontWeight: 600,
                   }}
                 >

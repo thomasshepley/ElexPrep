@@ -63,7 +63,7 @@ export interface FixtureTypeRule {
   caseLabelOverride: string | null;
 }
 
-export type LocationColorPattern = 'SOLID' | 'DIAGONAL_STRIPES';
+export type LocationColorPattern = 'SOLID' | 'DIAGONAL_STRIPES' | 'RAINBOW';
 
 export interface LocationColorRule {
   id: string;
