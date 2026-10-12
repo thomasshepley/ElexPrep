@@ -116,14 +116,20 @@ currentRmsRouter.post('/opportunities/:rmsId/import', requirePermission('onboard
   if (existingJob) return res.status(409).json({ error: 'A job is already linked to this opportunity', job: existingJob });
 
   const venue = await resolveAndCacheMemberName(await getCurrentRmsConfig(), opp);
-  const { crewFeatures, oneDriveFolderPath } = req.body ?? {};
+  const { crewFeatures, oneDriveFolderPath, name, description, address, startsAt, endsAt } = req.body ?? {};
   const oneDrive = await resolveOneDriveFolderForOnboarding(opp, oneDriveFolderPath || undefined);
   const crewFeaturesJson = crewFeatures ? JSON.stringify(normalizeCrewFeaturesPatch(crewFeatures)) : null;
 
+  // The review step on the dashboard pre-fills these from the opportunity and lets the admin
+  // override before the job is actually created — see JobsListPage's OnboardingOptionsForm.
   const job = await prisma.job.create({
     data: {
-      name: opp.subject,
+      name: name || opp.subject,
       venue,
+      description: description || null,
+      address: address || null,
+      startsAt: startsAt ? new Date(startsAt) : opp.startsAt,
+      endsAt: endsAt ? new Date(endsAt) : opp.endsAt,
       currentRmsOpportunityId: String(rmsId),
       crewFeaturesJson,
       ...oneDrive,

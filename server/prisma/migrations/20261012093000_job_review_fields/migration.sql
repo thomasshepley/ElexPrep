@@ -1,0 +1,5 @@
+-- AlterTable
+ALTER TABLE "Job" ADD COLUMN "description" TEXT;
+ALTER TABLE "Job" ADD COLUMN "address" TEXT;
+ALTER TABLE "Job" ADD COLUMN "startsAt" DATETIME;
+ALTER TABLE "Job" ADD COLUMN "endsAt" DATETIME;

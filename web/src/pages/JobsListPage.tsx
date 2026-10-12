@@ -10,6 +10,14 @@ import {
 } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { SearchIcon, WhereIcon } from '../components/Icons';
+import LocationLinks from '../components/LocationLinks';
+
+function toDatetimeLocal(iso: string | null): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
 
 const KIND_CHIP_CLASS: Record<string, string> = {
   QUOTE: 'chip-neutral',
@@ -28,19 +36,34 @@ function OpportunityKindChip({ kind }: { kind: CurrentRmsOpportunity['kind'] }) 
  * manual-folder override only makes sense for a single job (a batch can't all share one path),
  * so it's hidden when onboarding more than one at once.
  */
+export interface OnboardingReviewOpts {
+  name?: string;
+  description?: string;
+  address?: string;
+  startsAt?: string;
+  endsAt?: string;
+}
+
 function OnboardingOptionsForm({
   count,
+  opportunity,
   onCancel,
   onConfirm,
   busy,
 }: {
   count: number;
+  opportunity?: CurrentRmsOpportunity;
   onCancel: () => void;
-  onConfirm: (opts: { crewFeatures: Partial<CrewFeatures>; oneDriveFolderPath?: string }) => void;
+  onConfirm: (opts: { crewFeatures: Partial<CrewFeatures>; oneDriveFolderPath?: string } & OnboardingReviewOpts) => void;
   busy: boolean;
 }) {
   const [features, setFeatures] = useState<CrewFeatures | null>(null);
   const [folderPath, setFolderPath] = useState('');
+  const [name, setName] = useState(opportunity?.subject ?? '');
+  const [description, setDescription] = useState('');
+  const [address, setAddress] = useState('');
+  const [startsAt, setStartsAt] = useState(toDatetimeLocal(opportunity?.startsAt ?? null));
+  const [endsAt, setEndsAt] = useState(toDatetimeLocal(opportunity?.endsAt ?? null));
 
   useEffect(() => {
     api.portalSettings
@@ -52,6 +75,64 @@ function OnboardingOptionsForm({
   return (
     <div className="panel">
       <h3>{count === 1 ? 'Onboard this job' : `Onboard ${count} jobs`}</h3>
+
+      {opportunity && (
+        <div style={{ marginBottom: '1.25rem' }}>
+          <p className="muted">
+            Review and override the details below before this job is created — everything here
+            stays editable afterward too, from the job's Job Settings tab.
+          </p>
+
+          <h4>Who</h4>
+          <p className="muted" style={{ marginTop: 0 }}>You'll assign crew once this job is onboarded, from its Crew tab.</p>
+
+          <h4>What</h4>
+          <div className="field" style={{ maxWidth: '32rem' }}>
+            <label htmlFor="onboard-name">Job name</label>
+            <input id="onboard-name" value={name} onChange={(e) => setName(e.target.value)} />
+          </div>
+          <div className="field" style={{ maxWidth: '32rem' }}>
+            <label htmlFor="onboard-description">Description (optional)</label>
+            <textarea id="onboard-description" value={description} onChange={(e) => setDescription(e.target.value)} rows={2} />
+          </div>
+
+          <h4>When</h4>
+          <div className="row" style={{ gap: '1rem' }}>
+            <div className="field">
+              <label htmlFor="onboard-starts">Starts</label>
+              <input id="onboard-starts" type="datetime-local" value={startsAt} onChange={(e) => setStartsAt(e.target.value)} />
+            </div>
+            <div className="field">
+              <label htmlFor="onboard-ends">Ends</label>
+              <input id="onboard-ends" type="datetime-local" value={endsAt} onChange={(e) => setEndsAt(e.target.value)} />
+            </div>
+          </div>
+          {!opportunity.startsAt && (
+            <p className="muted" style={{ fontSize: '0.8rem' }}>
+              Current RMS has no dates cached for this opportunity yet — set them here or later from the Schedule tab.
+            </p>
+          )}
+
+          <h4>Where</h4>
+          <div className="field" style={{ maxWidth: '32rem' }}>
+            <label htmlFor="onboard-address">Address (optional)</label>
+            <input
+              id="onboard-address"
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              placeholder="Street, city, postcode"
+            />
+          </div>
+          {address && <LocationLinks address={address} showMap={false} />}
+
+          <h4>Why</h4>
+          <p className="muted" style={{ marginTop: 0 }}>
+            Day schedule, CAD plots, kit list, and documents are all set up after onboarding, from
+            this job's own tabs.
+          </p>
+        </div>
+      )}
+
       <p className="muted">
         Sets which crew-portal sections are visible to this job's crew. Starts from the portal
         defaults (Settings → Crew Portal) — override any of them just for this job below.
@@ -88,7 +169,21 @@ function OnboardingOptionsForm({
       <div className="row">
         <button
           type="button"
-          onClick={() => onConfirm({ crewFeatures: features ?? {}, oneDriveFolderPath: folderPath || undefined })}
+          onClick={() =>
+            onConfirm({
+              crewFeatures: features ?? {},
+              oneDriveFolderPath: folderPath || undefined,
+              ...(opportunity
+                ? {
+                    name: name || undefined,
+                    description: description || undefined,
+                    address: address || undefined,
+                    startsAt: startsAt ? new Date(startsAt).toISOString() : undefined,
+                    endsAt: endsAt ? new Date(endsAt).toISOString() : undefined,
+                  }
+                : {}),
+            })
+          }
           disabled={busy}
         >
           {busy ? 'Onboarding…' : count === 1 ? 'Onboard job' : `Onboard ${count} jobs`}
@@ -131,7 +226,7 @@ function OnboardOpportunitiesPanel({ existingOppIds, onOnboarded }: { existingOp
     });
   };
 
-  const confirmSingle = async (opts: { crewFeatures: Partial<CrewFeatures>; oneDriveFolderPath?: string }) => {
+  const confirmSingle = async (opts: { crewFeatures: Partial<CrewFeatures>; oneDriveFolderPath?: string } & OnboardingReviewOpts) => {
     if (!pendingSingle) return;
     setBusy(true);
     setError(null);
@@ -172,7 +267,13 @@ function OnboardOpportunitiesPanel({ existingOppIds, onOnboarded }: { existingOp
       {error && <p className="error">{error}</p>}
 
       {pendingSingle && (
-        <OnboardingOptionsForm count={1} busy={busy} onCancel={() => setPendingSingle(null)} onConfirm={confirmSingle} />
+        <OnboardingOptionsForm
+          count={1}
+          opportunity={pendingSingle}
+          busy={busy}
+          onCancel={() => setPendingSingle(null)}
+          onConfirm={confirmSingle}
+        />
       )}
       {pendingBulk && (
         <OnboardingOptionsForm count={selected.size} busy={busy} onCancel={() => setPendingBulk(false)} onConfirm={confirmBulk} />
