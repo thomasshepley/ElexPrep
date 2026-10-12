@@ -63,6 +63,24 @@ function InfoCard({
   );
 }
 
+/**
+ * A plain, always-expanded card - no trigger button or chevron, unlike InfoCard above. Used
+ * for Who/What/When/Where (so they read as a permanent at-a-glance row rather than something
+ * crew have to click open every visit) and for the Why section's own outer wrapper (it's
+ * effectively this page's main body, not a collapsible aside).
+ */
+function StaticCard({ icon, label, children }: { icon: ReactNode; label: string; children: ReactNode }) {
+  return (
+    <div className="panel">
+      <h2 className="info-card-heading" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+        <span className="info-card-icon">{icon}</span>
+        <span className="info-card-label">{label}</span>
+      </h2>
+      <div className="info-card-detail">{children}</div>
+    </div>
+  );
+}
+
 function WhySubsection({ title, children }: { title: string; children: ReactNode }) {
   return (
     <div style={{ marginBottom: '1.25rem' }}>
@@ -130,7 +148,7 @@ export default function CrewJobPage() {
       <h1>{detail.what.jobName}</h1>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '0.9rem', marginTop: '1.25rem' }}>
-        <InfoCard id="who" icon={<WhoIcon />} label="Who" summary={`You: ${detail.who.you.role}`}>
+        <StaticCard icon={<WhoIcon />} label="Who">
           <p className="muted" style={{ margin: '0 0 0.5rem' }}>
             You
           </p>
@@ -150,101 +168,96 @@ export default function CrewJobPage() {
               </div>
             </>
           )}
-        </InfoCard>
+        </StaticCard>
 
-        <InfoCard id="what" icon={<WhatIcon />} label="What" summary={detail.what.jobName}>
-          <p>{detail.what.description ?? 'No further description yet.'}</p>
-        </InfoCard>
+        <StaticCard icon={<WhatIcon />} label="What">
+          <p style={{ margin: 0 }}>{detail.what.jobName}</p>
+          <p className="muted">{detail.what.description ?? 'No further description yet.'}</p>
+        </StaticCard>
 
-        <InfoCard id="when" icon={<WhenIcon />} label="When" summary={formatDateTime(detail.when.startsAt)}>
-          <p>
+        <StaticCard icon={<WhenIcon />} label="When">
+          <p style={{ margin: 0 }}>
             Starts: {formatDateTime(detail.when.startsAt)}
             <br />
             Ends: {formatDateTime(detail.when.endsAt)}
           </p>
           {!detail.when.startsAt && <p className="muted">A day schedule will show here once one's set for this job.</p>}
-        </InfoCard>
+        </StaticCard>
 
-        <InfoCard id="where" icon={<WhereIcon />} label="Where" summary={detail.where.venue ?? NO_VENUE}>
-          <p>{detail.where.venue ?? NO_VENUE}</p>
+        <StaticCard icon={<WhereIcon />} label="Where">
+          <p style={{ margin: 0 }}>{detail.where.venue ?? NO_VENUE}</p>
           <LocationLinks address={detail.where.address} />
-        </InfoCard>
+        </StaticCard>
       </div>
 
       <div style={{ marginTop: '0.9rem' }}>
-        <InfoCard
-          id="why"
-          icon={<WhyIcon />}
-          label="Why"
-          summary="Day schedule, CAD, kit list, documents, and requests"
-        >
-          <WhySubsection title="Day schedule">
-            {schedule.length > 0 ? <DayTimeline items={schedule} /> : <p className="muted">No schedule has been set for this job yet.</p>}
-          </WhySubsection>
+        <StaticCard icon={<WhyIcon />} label="Why">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))', gap: '1.5rem 2rem' }}>
+            <WhySubsection title="Day schedule">
+              {schedule.length > 0 ? <DayTimeline items={schedule} /> : <p className="muted">No schedule has been set for this job yet.</p>}
+            </WhySubsection>
 
-          <WhySubsection title="CAD">
-            <CadPlotsViewer
-              candidates={[
-                ...(cadPdf ? [{ key: 'auto', label: cadPdf.name, url: api.crewPortal.oneDriveFileUrl(jobId, cadPdf.itemId), badge: 'Auto-detected' }] : []),
-                ...plots.map((p) => ({ key: `plot:${p.id}`, label: p.originalName, url: api.crewPortal.plotUrl(jobId, p.id) })),
-                ...sharedFiles
-                  .filter((s) => s.isCadPlot)
-                  .map((s) => ({ key: `share:${s.id}`, label: s.itemName, url: api.crewPortal.oneDriveFileUrl(jobId, s.itemId) })),
-              ]}
-            />
-            {sharedFiles.some((s) => !s.isCadPlot) && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '0.75rem' }}>
-                <p className="muted" style={{ margin: 0 }}>Other shared files</p>
-                {sharedFiles
-                  .filter((s) => !s.isCadPlot)
-                  .map((s) => (
-                    <a key={s.id} href={api.crewPortal.oneDriveFileUrl(jobId, s.itemId)} target="_blank" rel="noreferrer">
-                      {s.isFolder ? '📁' : '📄'} {s.itemName}
+            <WhySubsection title="CAD">
+              <CadPlotsViewer
+                candidates={[
+                  ...(cadPdf ? [{ key: 'auto', label: cadPdf.name, url: api.crewPortal.oneDriveFileUrl(jobId, cadPdf.itemId), badge: 'Auto-detected' }] : []),
+                  ...plots.map((p) => ({ key: `plot:${p.id}`, label: p.originalName, url: api.crewPortal.plotUrl(jobId, p.id) })),
+                  ...sharedFiles
+                    .filter((s) => s.isCadPlot)
+                    .map((s) => ({ key: `share:${s.id}`, label: s.itemName, url: api.crewPortal.oneDriveFileUrl(jobId, s.itemId) })),
+                ]}
+              />
+            </WhySubsection>
+
+            <WhySubsection title="Kit list">
+              {kitList.length === 0 && <p className="muted">No kit list available for this job.</p>}
+              {kitList.length > 0 && (
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Item</th>
+                      <th>Qty</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {kitList.map((item) => (
+                      <tr key={item.id}>
+                        <td>{item.name}</td>
+                        <td>{item.quantity}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </WhySubsection>
+
+            <WhySubsection title="Documents & files">
+              {documents.length === 0 && sharedFiles.filter((s) => !s.isCadPlot).length === 0 && (
+                <p className="muted">No documents or shared files yet.</p>
+              )}
+              {(documents.length > 0 || sharedFiles.some((s) => !s.isCadPlot)) && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                  {documents.map((d) => (
+                    <a key={`doc:${d.id}`} href={api.crewPortal.documentUrl(jobId, d.id)} target="_blank" rel="noreferrer">
+                      📄 {d.originalName}
                     </a>
                   ))}
-              </div>
-            )}
-          </WhySubsection>
-
-          <WhySubsection title="Kit list">
-            {kitList.length === 0 && <p className="muted">No kit list available for this job.</p>}
-            {kitList.length > 0 && (
-              <table>
-                <thead>
-                  <tr>
-                    <th>Item</th>
-                    <th>Qty</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {kitList.map((item) => (
-                    <tr key={item.id}>
-                      <td>{item.name}</td>
-                      <td>{item.quantity}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </WhySubsection>
-
-          <WhySubsection title="Documents">
-            {documents.length === 0 && <p className="muted">No documents uploaded yet.</p>}
-            {documents.length > 0 && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                {documents.map((d) => (
-                  <a key={d.id} href={api.crewPortal.documentUrl(jobId, d.id)} target="_blank" rel="noreferrer">
-                    {d.originalName}
-                  </a>
-                ))}
-              </div>
-            )}
-          </WhySubsection>
+                  {sharedFiles
+                    .filter((s) => !s.isCadPlot)
+                    .map((s) => (
+                      <a key={`share:${s.id}`} href={api.crewPortal.oneDriveFileUrl(jobId, s.itemId)} target="_blank" rel="noreferrer">
+                        {s.isFolder ? '📁' : '📄'} {s.itemName}
+                      </a>
+                    ))}
+                </div>
+              )}
+            </WhySubsection>
+          </div>
 
           <WhySubsection title="Need something prepped?">
             <RequestLabelForm jobId={jobId} />
           </WhySubsection>
-        </InfoCard>
+        </StaticCard>
       </div>
 
       <div style={{ marginTop: '0.9rem' }}>

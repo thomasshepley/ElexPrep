@@ -152,9 +152,12 @@
   padding: 2.75rem 3rem;
 }
 
+/* Used to cap at 1080px and center, which on a wide desktop screen left large empty margins
+   on both sides and pushed secondary sidebars (e.g. Settings' .secondary-nav) away from the
+   main sidebar instead of sitting right next to it. Just fills .shell-main's padded width now;
+   .shell-main's own 3rem padding is what keeps content off the viewport edges. */
 .shell-main-inner {
-  max-width: 1080px;
-  margin: 0 auto;
+  width: 100%;
 }
 
 @media (max-width: 760px) {
