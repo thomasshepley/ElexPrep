@@ -357,6 +357,12 @@ tbody tr:hover {
   padding: var(--space-4) var(--space-5);
   margin-bottom: var(--space-5);
   box-shadow: var(--shadow-sm);
+  /* A wide table (lots of narrow fixed-width inputs, e.g. the imported-fixtures editor) could
+     render wider than the panel and spill past its border/background with nothing to contain
+     it, instead of the panel just scrolling. This also keeps a table's row/column borders
+     clipped consistently at the panel edge instead of bleeding out unevenly depending on what
+     else is on the page. */
+  overflow-x: auto;
 }
 
 .modal-backdrop {

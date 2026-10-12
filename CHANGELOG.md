@@ -3,6 +3,10 @@
 Newest entries first. Each push/merge gets exactly one entry - see
 `scripts/bump-version.mjs` for how the version number itself advances.
 
+## v1.1.4 - 2026-10-12
+
+- Fixed wide tables spilling out of their panel instead of scrolling, and widened some fixture columns so text doesn't get cut off
+
 ## v1.1.3 - 2026-10-12
 
 - Widened the desktop layout and reworked the crew job page so Who, What, When and Where are always visible

@@ -344,7 +344,7 @@ export default function PatchImportPanel({ jobId }: { jobId: string }) {
                     <td>
                       <input
                         defaultValue={f.fixtureType}
-                        style={{ width: 120 }}
+                        style={{ width: 150 }}
                         onBlur={(e) => updateFixture(f, 'fixtureType', e.target.value)}
                       />
                     </td>
@@ -383,14 +383,14 @@ export default function PatchImportPanel({ jobId }: { jobId: string }) {
                     <td>
                       <input
                         defaultValue={f.mode ?? ''}
-                        style={{ width: 100 }}
+                        style={{ width: 120 }}
                         onBlur={(e) => updateFixture(f, 'mode', e.target.value)}
                       />
                     </td>
                     <td>
                       <input
                         defaultValue={f.location ?? ''}
-                        style={{ width: 90 }}
+                        style={{ width: 120 }}
                         onBlur={(e) => updateFixture(f, 'location', e.target.value)}
                       />
                     </td>
