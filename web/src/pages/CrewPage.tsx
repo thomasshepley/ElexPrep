@@ -8,6 +8,7 @@ import BankDetailsForm from '../components/BankDetailsForm';
 import BankDetailsReveal from '../components/BankDetailsReveal';
 import WhatsAppButton from '../components/WhatsAppButton';
 import PasswordInput from '../components/PasswordInput';
+import Avatar from '../components/Avatar';
 
 const DOCUMENT_SLOTS = [
   { field: 'idDocument', label: 'Photo ID' },
@@ -159,6 +160,7 @@ export default function CrewPage() {
               <tr>
                 <td>
                   <div className="row" style={{ gap: '0.4rem' }}>
+                    <Avatar userId={c.userId} displayName={c.displayName} hasAvatar={c.hasAvatar} size={28} />
                     <span
                       className="crew-swatch-dot"
                       style={{ background: resolveCrewColor(c.id, c.color) }}

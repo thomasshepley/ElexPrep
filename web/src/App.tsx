@@ -4,6 +4,7 @@ import { DashboardIcon, JobsIcon, SettingsIcon, SignageIcon, SignOutIcon } from 
 import ThemeToggle from './components/ThemeToggle'
 import NotificationBell from './components/NotificationBell'
 import VersionBadge from './components/VersionBadge'
+import Avatar from './components/Avatar'
 import './App.css'
 
 function App() {
@@ -18,8 +19,6 @@ function App() {
   if (user.role === 'CREW' && location.pathname !== '/crew') {
     return <Navigate to="/crew" replace />
   }
-
-  const initial = user.displayName.trim().charAt(0).toUpperCase() || '?'
 
   return (
     <div className="shell">
@@ -49,7 +48,7 @@ function App() {
           </nav>
           <div className="sidebar-user">
             <div className="sidebar-user-row">
-              <span className="avatar">{initial}</span>
+              <Avatar userId={user.id} displayName={user.displayName} hasAvatar={Boolean(user.avatarPath)} />
               <NavLink to="/settings/preferences" className="sidebar-username" aria-label={`${user.displayName} - preferences`}>
                 {user.displayName}
               </NavLink>

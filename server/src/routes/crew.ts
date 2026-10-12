@@ -37,7 +37,7 @@ interface CrewProfileRow {
   bankDetailsCiphertext: string | null;
   active: boolean;
   createdAt: Date;
-  user: { username: string; displayName: string; role: string };
+  user: { username: string; displayName: string; role: string; avatarPath: string | null };
 }
 
 function toCrewDto(p: CrewProfileRow) {
@@ -46,6 +46,7 @@ function toCrewDto(p: CrewProfileRow) {
     userId: p.userId,
     username: p.user.username,
     displayName: p.user.displayName,
+    hasAvatar: Boolean(p.user.avatarPath),
     // ADMIN here means this crew profile belongs to a staff admin account also assigned as
     // crew (see POST /from-admin below), not a freelancer - the web UI uses this to hide
     // login-affecting controls (reset password, full delete) that don't make sense from the
@@ -94,7 +95,7 @@ crewRouter.put('/default-rate', async (req, res) => {
 
 crewRouter.get('/', async (_req, res) => {
   const profiles = await prisma.crewProfile.findMany({
-    include: { user: { select: { username: true, displayName: true, role: true } } },
+    include: { user: { select: { username: true, displayName: true, role: true, avatarPath: true } } },
     orderBy: { createdAt: 'desc' },
   });
   res.json(profiles.map(toCrewDto));
@@ -131,7 +132,7 @@ crewRouter.post('/from-admin', async (req, res) => {
 
   const profile = await prisma.crewProfile.create({
     data: { userId },
-    include: { user: { select: { username: true, displayName: true, role: true } } },
+    include: { user: { select: { username: true, displayName: true, role: true, avatarPath: true } } },
   });
   await logActivity('crew.add_admin', user.username, undefined, req.user!.id);
   res.status(201).json(toCrewDto(profile));
@@ -186,7 +187,7 @@ crewRouter.post('/', async (req, res) => {
         },
       },
     },
-    include: { user: { select: { username: true, displayName: true, role: true } } },
+    include: { user: { select: { username: true, displayName: true, role: true, avatarPath: true } } },
   });
   await logActivity('crew.create', `${username}`, undefined, req.user!.id);
   res.status(201).json(toCrewDto(profile));
@@ -244,7 +245,7 @@ crewRouter.put('/:id', async (req, res) => {
       ...(active !== undefined ? { active: Boolean(active) } : {}),
       ...bankPatch,
     },
-    include: { user: { select: { username: true, displayName: true, role: true } } },
+    include: { user: { select: { username: true, displayName: true, role: true, avatarPath: true } } },
   });
   await logActivity('crew.update', profile.user.username, undefined, req.user!.id);
   res.json(toCrewDto(profile));

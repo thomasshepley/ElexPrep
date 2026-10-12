@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { api, type AuthedUser, type PermissionKey, type Role } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import PasswordInput from '../components/PasswordInput';
+import Avatar from '../components/Avatar';
 
 const ROLES: Role[] = ['ADMIN', 'USER', 'SIGNAGE'];
 
@@ -148,8 +149,11 @@ export default function UsersPage() {
             <Fragment key={u.id}>
               <tr>
                 <td>
-                  {u.username}
-                  {u.id === me?.id && <span className="muted"> (you)</span>}
+                  <div className="row" style={{ gap: '0.4rem', alignItems: 'center' }}>
+                    <Avatar userId={u.id} displayName={u.displayName} hasAvatar={Boolean(u.avatarPath)} size={24} />
+                    {u.username}
+                    {u.id === me?.id && <span className="muted"> (you)</span>}
+                  </div>
                 </td>
                 <td>{u.displayName}</td>
                 <td>

@@ -9,6 +9,8 @@ import RateCardEditor from '../components/RateCardEditor';
 import NotificationPreferences from '../components/NotificationPreferences';
 import TwoFactorPanel from '../components/TwoFactorPanel';
 import PasswordInput from '../components/PasswordInput';
+import Avatar from '../components/Avatar';
+import FileInput from '../components/FileInput';
 
 /**
  * Crew self-service: the first place a crew member can edit anything about their own account
@@ -18,8 +20,9 @@ import PasswordInput from '../components/PasswordInput';
  * preferences is the exact same shared component both shells use.
  */
 export default function CrewAccountPage() {
-  const { user } = useAuth();
+  const { user, setUser } = useAuth();
   const [me, setMe] = useState<CrewMe | null>(null);
+  const [avatarBusy, setAvatarBusy] = useState(false);
   const [phone, setPhone] = useState('');
   const [skills, setSkills] = useState('');
   const [certifications, setCertifications] = useState('');
@@ -98,6 +101,26 @@ export default function CrewAccountPage() {
     }
   };
 
+  const uploadAvatar = async (file: File) => {
+    setAvatarBusy(true);
+    try {
+      setUser(await api.auth.uploadAvatar(file));
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setAvatarBusy(false);
+    }
+  };
+
+  const removeAvatar = async () => {
+    setAvatarBusy(true);
+    try {
+      setUser(await api.auth.removeAvatar());
+    } finally {
+      setAvatarBusy(false);
+    }
+  };
+
   if (!me) return <p className="muted">Loading…</p>;
 
   return (
@@ -108,6 +131,19 @@ export default function CrewAccountPage() {
 
       <div className="panel">
         <h3>Profile</h3>
+        {user && (
+          <div className="row" style={{ alignItems: 'center', gap: '0.9rem', marginBottom: '0.9rem' }}>
+            <Avatar userId={user.id} displayName={user.displayName} hasAvatar={Boolean(user.avatarPath)} size={56} />
+            <div>
+              <FileInput accept="image/*" disabled={avatarBusy} onFile={uploadAvatar} label={user.avatarPath ? 'Replace picture' : 'Upload picture'} />
+              {user.avatarPath && (
+                <button type="button" className="secondary" disabled={avatarBusy} onClick={removeAvatar} style={{ marginLeft: '0.5rem' }}>
+                  Remove
+                </button>
+              )}
+            </div>
+          </div>
+        )}
         <form onSubmit={saveProfile}>
           <div className="row" style={{ alignItems: 'flex-end', flexWrap: 'wrap', gap: '0.9rem' }}>
             <div className="field" style={{ width: '12rem' }}>

@@ -4,6 +4,7 @@ import { JobsIcon, SettingsIcon, SignOutIcon } from '../components/Icons';
 import ThemeToggle from '../components/ThemeToggle';
 import NotificationBell from '../components/NotificationBell';
 import VersionBadge from '../components/VersionBadge';
+import Avatar from '../components/Avatar';
 
 /**
  * Shell for the whole crew portal (/crew/*) - a sibling to the admin/prep App shell and the
@@ -25,8 +26,6 @@ export default function CrewLayout() {
   if (!user) return <Navigate to="/login" replace />;
   if (user.role !== 'CREW') return <Navigate to="/" replace />;
 
-  const initial = user.displayName.trim().charAt(0).toUpperCase() || '?';
-
   return (
     <div className="shell">
       <aside className="sidebar">
@@ -47,7 +46,7 @@ export default function CrewLayout() {
           </nav>
           <div className="sidebar-user">
             <div className="sidebar-user-row">
-              <span className="avatar">{initial}</span>
+              <Avatar userId={user.id} displayName={user.displayName} hasAvatar={Boolean(user.avatarPath)} />
               <NavLink to="/crew/account" className="sidebar-username" aria-label={`${user.displayName} - account`}>
                 {user.displayName}
               </NavLink>

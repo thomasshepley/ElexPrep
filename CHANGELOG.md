@@ -3,6 +3,10 @@
 Newest entries first. Each push/merge gets exactly one entry - see
 `scripts/bump-version.mjs` for how the version number itself advances.
 
+## v2.0.0 - 2026-10-12
+
+- Added profile pictures for crew and staff accounts
+
 ## v1.9.8 - 2026-10-12
 
 - Added a confirmation screen before sending to the printer, with an inline preview and a typed CONFIRM gate

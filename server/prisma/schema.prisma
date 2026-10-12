@@ -597,6 +597,11 @@ model User {
   passwordHash String
   role         String    @default("USER")
   prefsJson    String    @default("{}")
+  /// Self-service profile picture, any role - stored the same way as other unencrypted
+  /// uploads (job logos, plots), served through a dedicated route rather than the static
+  /// uploads mount so visibility can stay "any signed-in account" without exposing the
+  /// whole uploads directory.
+  avatarPath   String?
   /// Per-user override of the role-level permissions baseline (see permissions.ts's
   /// loadRolePermissions/PERMISSION_KEYS) — null means "use the shared USER-role baseline
   /// unmodified", same posture as JobCrewAssignment.dayRate falling back to CrewProfile.dayRate.

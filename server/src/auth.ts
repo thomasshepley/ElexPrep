@@ -11,6 +11,7 @@ export interface AuthedUser {
   displayName: string;
   role: Role;
   prefs: Record<string, unknown>;
+  avatarPath: string | null;
 }
 
 declare global {
@@ -51,6 +52,7 @@ export function toAuthedUser(u: {
   displayName: string;
   role: string;
   prefsJson: string;
+  avatarPath?: string | null;
 }): AuthedUser {
   let prefs: Record<string, unknown> = {};
   try {
@@ -58,7 +60,7 @@ export function toAuthedUser(u: {
   } catch {
     // corrupted prefs shouldn't lock the account out
   }
-  return { id: u.id, username: u.username, displayName: u.displayName, role: u.role as Role, prefs };
+  return { id: u.id, username: u.username, displayName: u.displayName, role: u.role as Role, prefs, avatarPath: u.avatarPath ?? null };
 }
 
 // The one deliberate, narrow write exception for the otherwise read-only SIGNAGE role: prep
@@ -76,6 +78,8 @@ const SIGNAGE_WRITE_ALLOWLIST = [/^\/api\/jobs\/[^/]+\/current-rms\/pick-list\/[
 // whatever a plain USER could do.
 const CREW_ALLOWLIST = [
   /^\/api\/auth\/me$/,
+  /^\/api\/auth\/me\/avatar$/,
+  /^\/api\/auth\/users\/[^/]+\/avatar$/,
   /^\/api\/2fa(\/.*)?$/,
   /^\/api\/crew\/me$/,
   /^\/api\/crew\/me\/bank-details$/,

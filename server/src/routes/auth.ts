@@ -1,6 +1,10 @@
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
 import { prisma, logActivity } from '../db';
+import { uploadDir } from './jobs';
 import {
   MIN_PASSWORD_LENGTH,
   SESSION_COOKIE,
@@ -16,6 +20,20 @@ import { decryptTotpSecret, consumeBackupCode } from '../twoFactor';
 import { createPendingLogin, checkPendingLogin, consumePendingLogin } from '../pendingTotpLogins';
 
 export const authRouter = Router();
+
+const avatarsDir = path.join(uploadDir, 'avatars');
+fs.mkdirSync(avatarsDir, { recursive: true });
+const avatarUpload = multer({
+  storage: multer.diskStorage({
+    destination: avatarsDir,
+    filename: (_req, file, cb) => {
+      const ext = path.extname(file.originalname) || '';
+      cb(null, `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`);
+    },
+  }),
+  fileFilter: (_req, file, cb) => cb(null, file.mimetype.startsWith('image/')),
+  limits: { fileSize: 5 * 1024 * 1024 },
+});
 
 // COOKIE_SECURE opts in for HTTPS deployments; left off by default since a common
 // deployment here is a LAN/home box over plain HTTP, where a secure cookie would silently
@@ -157,4 +175,32 @@ authRouter.put('/me', async (req, res) => {
 
   const updated = await prisma.user.update({ where: { id: req.user.id }, data });
   res.json(await authedUserWithPermissions(toAuthedUser(updated)));
+});
+
+authRouter.post('/me/avatar', avatarUpload.single('avatar'), async (req, res) => {
+  if (!req.user) return res.status(401).json({ error: 'Not signed in' });
+  if (!req.file) return res.status(400).json({ error: 'avatar file is required' });
+  const existing = await prisma.user.findUnique({ where: { id: req.user.id } });
+  const updated = await prisma.user.update({ where: { id: req.user.id }, data: { avatarPath: req.file.filename } });
+  if (existing?.avatarPath) await fs.promises.unlink(path.join(avatarsDir, existing.avatarPath)).catch(() => {});
+  await logActivity('user.avatar_upload', req.file.originalname, undefined, req.user.id);
+  res.json(await authedUserWithPermissions(toAuthedUser(updated)));
+});
+
+authRouter.delete('/me/avatar', async (req, res) => {
+  if (!req.user) return res.status(401).json({ error: 'Not signed in' });
+  const existing = await prisma.user.findUnique({ where: { id: req.user.id } });
+  const updated = await prisma.user.update({ where: { id: req.user.id }, data: { avatarPath: null } });
+  if (existing?.avatarPath) await fs.promises.unlink(path.join(avatarsDir, existing.avatarPath)).catch(() => {});
+  res.json(await authedUserWithPermissions(toAuthedUser(updated)));
+});
+
+/** Any signed-in account can view any other account's avatar (same posture as a job logo once
+ * public) - there's nothing sensitive in a profile picture, and showing crew/staff avatars
+ * next to their name elsewhere needs this to work for users other than yourself. */
+authRouter.get('/users/:id/avatar', async (req, res) => {
+  if (!req.user) return res.status(401).end();
+  const user = await prisma.user.findUnique({ where: { id: req.params.id } });
+  if (!user?.avatarPath) return res.status(404).end();
+  res.sendFile(path.join(avatarsDir, user.avatarPath));
 });

@@ -176,6 +176,7 @@ export interface AuthedUser {
   displayName: string;
   role: Role;
   prefs: Record<string, unknown>;
+  avatarPath: string | null;
   permissions?: Record<PermissionKey, boolean>;
 }
 
@@ -184,6 +185,7 @@ export interface CrewMember {
   userId: string;
   username: string;
   displayName: string;
+  hasAvatar: boolean;
   /// ADMIN means this row is a staff admin's own account also assigned as crew (see
   /// api.crew.fromAdmin), not a freelancer - their login/password lives on the Users page.
   userRole: Role;
@@ -534,6 +536,13 @@ export const api = {
       currentPassword?: string;
       prefs?: Record<string, unknown>;
     }) => request<AuthedUser>('/auth/me', { method: 'PUT', body: JSON.stringify(data) }),
+    uploadAvatar: async (file: File) => {
+      const form = new FormData();
+      form.append('avatar', file);
+      return request<AuthedUser>('/auth/me/avatar', { method: 'POST', body: form });
+    },
+    removeAvatar: () => request<AuthedUser>('/auth/me/avatar', { method: 'DELETE' }),
+    avatarUrl: (userId: string) => `${BASE}/auth/users/${userId}/avatar`,
   },
   twoFactor: {
     status: () => request<{ enabled: boolean; verifiedAt: string | null; backupCodesRemaining: number }>('/2fa/status'),
