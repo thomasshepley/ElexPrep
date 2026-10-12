@@ -16,6 +16,7 @@ export default function UsersPage() {
   const [role, setRole] = useState<Role>('USER');
   const [error, setError] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [showBaseline, setShowBaseline] = useState(false);
 
   // CREW accounts are real rows from GET /api/users (it's unfiltered), but this page's own
   // role <select> only ever offers ADMIN/USER/SIGNAGE — a CREW row would render a dropdown
@@ -89,6 +90,21 @@ export default function UsersPage() {
         view-only login for prep-bay TV screens. Freelance crew accounts are managed separately
         on the <Link to="/settings/crew">Crew</Link> page.
       </p>
+
+      <div className="panel">
+        <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+          <h3 style={{ margin: 0 }}>Role permissions baseline</h3>
+          <button className="secondary" onClick={() => setShowBaseline((s) => !s)}>
+            {showBaseline ? 'Hide' : 'Show'}
+          </button>
+        </div>
+        <p className="muted" style={{ marginBottom: showBaseline ? undefined : 0 }}>
+          What every USER account can do beyond day-to-day prep, before any per-account override
+          below.
+        </p>
+        {showBaseline && <RoleBaselinePanel />}
+      </div>
+
       <div className="panel">
         <h3>Add user</h3>
         <form className="row" onSubmit={create}>
@@ -234,8 +250,8 @@ function UserPermissionsPanel({ userId }: { userId: string }) {
         )}
       </div>
       <p className="muted" style={{ marginTop: '0.3rem' }}>
-        Starts from the shared USER baseline (set on the Permissions page); toggling here overrides it for this
-        account only.
+        Starts from the shared USER baseline (the "Role permissions baseline" panel above);
+        toggling here overrides it for this account only.
       </p>
       {error && <p className="error">{error}</p>}
       {!permissions && <p className="muted">Loading…</p>}
@@ -258,6 +274,61 @@ function UserPermissionsPanel({ userId }: { userId: string }) {
           </tbody>
         </table>
       )}
+    </div>
+  );
+}
+
+/** The shared USER-role baseline (what every USER account can do by default) — formerly its
+ * own top-level Settings page; folded in here so permissions live in one "Users" tab, with the
+ * per-account override (UserPermissionsPanel, above) right below it as the next layer down. */
+function RoleBaselinePanel() {
+  const [permissions, setPermissions] = useState<Record<PermissionKey, boolean> | null>(null);
+  const [keys, setKeys] = useState<PermissionKey[]>([]);
+  const [labels, setLabels] = useState<Record<string, string>>({});
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    api.permissions.get().then((res) => {
+      setPermissions(res.permissions);
+      setKeys(res.keys);
+      setLabels(res.labels);
+    });
+  }, []);
+
+  const toggle = async (key: PermissionKey, value: boolean) => {
+    setSaved(false);
+    setPermissions((p) => (p ? { ...p, [key]: value } : p));
+    const res = await api.permissions.update({ [key]: value });
+    setPermissions(res.permissions);
+    setSaved(true);
+  };
+
+  return (
+    <div style={{ paddingTop: '0.5rem' }}>
+      {!permissions && <p className="muted">Loading…</p>}
+      {permissions && (
+        <table>
+          <tbody>
+            {keys.map((key) => (
+              <tr key={key}>
+                <td>{labels[key] ?? key}</td>
+                <td style={{ textAlign: 'right' }}>
+                  <label className="switch">
+                    <input
+                      type="checkbox"
+                      checked={permissions[key]}
+                      onChange={(e) => toggle(key, e.target.checked)}
+                    />
+                    <span className="switch-track" />
+                    {permissions[key] ? 'Allowed' : 'Not allowed'}
+                  </label>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      {saved && <p className="muted">Saved ✓</p>}
     </div>
   );
 }
