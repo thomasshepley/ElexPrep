@@ -3,6 +3,10 @@
 Newest entries first. Each push/merge gets exactly one entry - see
 `scripts/bump-version.mjs` for how the version number itself advances.
 
+## v1.1.5 - 2026-10-12
+
+- Fixed the job logo being zoomed in and cropped in print previews instead of fitting in its box
+
 ## v1.1.4 - 2026-10-12
 
 - Fixed wide tables spilling out of their panel instead of scrolling, and widened some fixture columns so text doesn't get cut off

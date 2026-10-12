@@ -9,7 +9,7 @@ import {
   resolveLocationColor,
   contrastingTextIsWhite,
 } from '@elexprep/shared';
-import { CellRectPt, centerText, drawCellOutline, drawImageCover, drawLocationFill, fitTextToWidth, inPt, renderSheets } from './pdfBuilder';
+import { CellRectPt, centerText, drawCellOutline, drawImageContain, drawLocationFill, fitTextToWidth, inPt, renderSheets } from './pdfBuilder';
 
 async function fonts(doc: PDFDocument) {
   return {
@@ -69,7 +69,7 @@ export async function renderLabelTypeGeneric(
       if (el.type === 'image') {
         drawCellOutline(page, elRect);
         if (logoImage) {
-          drawImageCover(page, logoImage, elRect);
+          drawImageContain(page, logoImage, elRect);
         } else {
           centerText(page, el.placeholder, regular, 10, elRect, elRect.hPt / 2 - inPt(0.05), rgb(0.6, 0.6, 0.6));
         }

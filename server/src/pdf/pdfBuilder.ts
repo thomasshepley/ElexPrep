@@ -123,6 +123,22 @@ export function drawImageCover(page: PDFPage, image: PDFImage, rect: CellRectPt)
 }
 
 /**
+ * Draws an image scaled to fit entirely within a rect (like CSS `object-fit: contain`):
+ * scales down to whichever dimension is the tighter constraint, preserving aspect ratio, and
+ * centers it with no cropping. Used for a job's logo - unlike drawImageCover (a banner-style
+ * slot that should never show gaps), a logo whose aspect ratio differs from its slot needs to
+ * stay fully visible rather than being zoomed in and cropped to fill the box edge-to-edge.
+ */
+export function drawImageContain(page: PDFPage, image: PDFImage, rect: CellRectPt) {
+  const scale = Math.min(rect.wPt / image.width, rect.hPt / image.height);
+  const drawWidth = image.width * scale;
+  const drawHeight = image.height * scale;
+  const x = rect.xPt + (rect.wPt - drawWidth) / 2;
+  const y = rect.yPt + (rect.hPt - drawHeight) / 2;
+  page.drawImage(image, { x, y, width: drawWidth, height: drawHeight });
+}
+
+/**
  * Fills a rect with a resolved location color - a plain solid fill, or classic 45-degree
  * hazard-tape stripes (e.g. red/white for Spare, yellow/black for Rigging) when the rule
  * says so.
