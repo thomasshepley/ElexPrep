@@ -70,6 +70,7 @@ export default function LabelTypeSection({
   const [customizing, setCustomizing] = useState(false);
   const [draft, setDraft] = useState<Record<string, Partial<LabelElementDef>>>({});
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
+  const [previewIndex, setPreviewIndex] = useState(0);
   const [editingRow, setEditingRow] = useState<string | null>(null);
 
   useEffect(() => {
@@ -166,7 +167,8 @@ export default function LabelTypeSection({
 
   if (!template || rows.length === 0) return null;
 
-  const previewItem = rows[0].content;
+  const clampedPreviewIndex = Math.min(previewIndex, rows.length - 1);
+  const previewItem = rows[clampedPreviewIndex].content;
   const displayTemplate = customizing ? mergeTemplate(template, draft) : template;
   const selectedElement = selectedElementId ? displayTemplate.elements.find((e) => e.id === selectedElementId) : null;
 
@@ -217,6 +219,29 @@ export default function LabelTypeSection({
             onSelect={setSelectedElementId}
             onChangeElement={onChangeElement}
           />
+          {rows.length > 1 && (
+            <div className="row" style={{ gap: '0.5rem', alignItems: 'center', marginTop: '0.4rem' }}>
+              <button
+                type="button"
+                className="secondary"
+                disabled={clampedPreviewIndex <= 0}
+                onClick={() => setPreviewIndex((i) => Math.max(0, i - 1))}
+              >
+                Previous
+              </button>
+              <span className="muted" style={{ fontSize: 'var(--text-sm)' }}>
+                Preview {clampedPreviewIndex + 1} of {rows.length}
+              </span>
+              <button
+                type="button"
+                className="secondary"
+                disabled={clampedPreviewIndex >= rows.length - 1}
+                onClick={() => setPreviewIndex((i) => Math.min(rows.length - 1, i + 1))}
+              >
+                Next
+              </button>
+            </div>
+          )}
           {customizing && (
             <>
               <p className="muted" style={{ maxWidth: 320, fontSize: 'var(--text-sm)' }}>

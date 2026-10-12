@@ -3,6 +3,10 @@
 Newest entries first. Each push/merge gets exactly one entry - see
 `scripts/bump-version.mjs` for how the version number itself advances.
 
+## v1.8.8 - 2026-10-12
+
+- Added Previous/Next cycling through every item's preview in the print queue
+
 ## v1.8.7 - 2026-10-12
 
 - Added per-element font size editing to the label template customizer
