@@ -41,6 +41,10 @@ export interface Job {
   id: string;
   name: string;
   venue: string | null;
+  description: string | null;
+  address: string | null;
+  startsAt: string | null;
+  endsAt: string | null;
   logoPath: string | null;
   isPublic: boolean;
   currentRmsOpportunityId: string | null;
@@ -288,6 +292,7 @@ export interface CrewJobDetail {
   };
   where: {
     venue: string | null;
+    address: string | null;
   };
 }
 
@@ -729,7 +734,9 @@ export const api = {
     get: (id: string) => request<Job>(`/jobs/${id}`),
     update: (
       id: string,
-      data: Partial<Pick<Job, 'name' | 'venue' | 'isPublic'>> & { crewFeatures?: Partial<CrewFeatures> | null }
+      data: Partial<Pick<Job, 'name' | 'venue' | 'description' | 'address' | 'startsAt' | 'endsAt' | 'isPublic'>> & {
+        crewFeatures?: Partial<CrewFeatures> | null;
+      }
     ) => request<Job>(`/jobs/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     remove: (id: string) => request<void>(`/jobs/${id}`, { method: 'DELETE' }),
     uploadLogo: async (id: string, file: File) => {
@@ -899,8 +906,18 @@ export const api = {
     sync: () => request<{ pulled: number; alertsRaised: number; error: string | null }>('/current-rms/sync', { method: 'POST' }),
     listOpportunities: (q?: string) =>
       request<CurrentRmsOpportunity[]>(`/current-rms/opportunities${q ? `?q=${encodeURIComponent(q)}` : ''}`),
-    importOpportunity: (rmsId: number, data?: { crewFeatures?: Partial<CrewFeatures>; oneDriveFolderPath?: string }) =>
-      request<Job>(`/current-rms/opportunities/${rmsId}/import`, { method: 'POST', body: JSON.stringify(data ?? {}) }),
+    importOpportunity: (
+      rmsId: number,
+      data?: {
+        crewFeatures?: Partial<CrewFeatures>;
+        oneDriveFolderPath?: string;
+        name?: string;
+        description?: string;
+        address?: string;
+        startsAt?: string;
+        endsAt?: string;
+      }
+    ) => request<Job>(`/current-rms/opportunities/${rmsId}/import`, { method: 'POST', body: JSON.stringify(data ?? {}) }),
     bulkImport: (rmsIds: number[], crewFeatures?: Partial<CrewFeatures>) =>
       request<{ created: Job[]; skipped: { rmsId: number; reason: string }[] }>('/current-rms/opportunities/bulk-import', {
         method: 'POST',

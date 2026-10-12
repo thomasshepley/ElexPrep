@@ -15,6 +15,19 @@ model Job {
   id          String   @id @default(cuid())
   name        String
   venue       String?
+  /// Free-text description — the "What" review field at onboarding, editable afterward from
+  /// Job Settings. Distinct from `name`: at import time `name` defaults to the Current RMS
+  /// opportunity's subject, while this starts blank for the admin to fill in if they want one.
+  description String?
+  /// The actual postal address for this job's location — distinct from `venue` (a display
+  /// name/label, often the customer's name as pulled from Current RMS). Drives the "Where"
+  /// map preview and Maps-app deep links (see web/src/components/LocationLinks.tsx).
+  address     String?
+  /// Admin-set override of the job's start/end, reviewed at onboarding and editable afterward.
+  /// Falls back to the linked Current RMS opportunity's own dates when null (see the "When"
+  /// section on both the admin and crew job pages).
+  startsAt    DateTime?
+  endsAt      DateTime?
   logoPath    String?
   /// Visible to USER/SIGNAGE roles only when true; ADMIN always sees every job.
   isPublic    Boolean  @default(false)

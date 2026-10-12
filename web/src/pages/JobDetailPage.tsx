@@ -7,6 +7,7 @@ import CasesPanel from '../components/CasesPanel';
 import LabelsPanel from '../components/LabelsPanel';
 import PrintQueuePanel from '../components/PrintQueuePanel';
 import JobPlotsTab from '../components/JobPlotsTab';
+import LocationLinks from '../components/LocationLinks';
 import JobSchedulePanel from '../components/JobSchedulePanel';
 import JobDocumentsPanel from '../components/JobDocumentsPanel';
 import CurrentRmsPanel from '../components/CurrentRmsPanel';
@@ -62,17 +63,37 @@ export default function JobDetailPage() {
   );
 }
 
+/** Formats an ISO datetime string for a <input type="datetime-local"> value (local time, no
+ * seconds/timezone) — undefined/null becomes '' so the field renders empty rather than crashing. */
+function toDatetimeLocal(iso: string | null): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 function JobSettingsPanel({ job, onUpdate }: { job: Job; onUpdate: (j: Job) => void }) {
   const { user } = useAuth();
   const isAdmin = user?.role === 'ADMIN';
   const canPublish = isAdmin || Boolean(user?.permissions?.publishJobs);
   const [name, setName] = useState(job.name);
   const [venue, setVenue] = useState(job.venue ?? '');
+  const [description, setDescription] = useState(job.description ?? '');
+  const [address, setAddress] = useState(job.address ?? '');
+  const [startsAt, setStartsAt] = useState(toDatetimeLocal(job.startsAt));
+  const [endsAt, setEndsAt] = useState(toDatetimeLocal(job.endsAt));
   const [logoBusy, setLogoBusy] = useState(false);
 
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
-    const updated = await api.jobs.update(job.id, { name, venue });
+    const updated = await api.jobs.update(job.id, {
+      name,
+      venue,
+      description: description || null,
+      address: address || null,
+      startsAt: startsAt ? new Date(startsAt).toISOString() : null,
+      endsAt: endsAt ? new Date(endsAt).toISOString() : null,
+    });
     onUpdate(updated);
   };
 
@@ -105,6 +126,33 @@ function JobSettingsPanel({ job, onUpdate }: { job: Job; onUpdate: (j: Job) => v
           <br />
           <input value={venue} onChange={(e) => setVenue(e.target.value)} />
         </label>
+        <label style={{ width: '100%', maxWidth: '32rem' }}>
+          Description
+          <br />
+          <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} style={{ width: '100%' }} />
+        </label>
+        <label style={{ width: '100%', maxWidth: '32rem' }}>
+          Address
+          <br />
+          <input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Street, city, postcode" style={{ width: '100%' }} />
+        </label>
+        {address && (
+          <div style={{ width: '100%', maxWidth: '32rem' }}>
+            <LocationLinks address={address} />
+          </div>
+        )}
+        <div className="row" style={{ gap: '1rem' }}>
+          <label>
+            Starts
+            <br />
+            <input type="datetime-local" value={startsAt} onChange={(e) => setStartsAt(e.target.value)} />
+          </label>
+          <label>
+            Ends
+            <br />
+            <input type="datetime-local" value={endsAt} onChange={(e) => setEndsAt(e.target.value)} />
+          </label>
+        </div>
         <button type="submit">Save</button>
       </form>
 

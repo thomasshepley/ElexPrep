@@ -248,14 +248,15 @@ crewPortalRouter.get('/me/jobs/:jobId', requireRole('CREW'), async (req, res) =>
     },
     what: {
       jobName: assignment.job.name,
-      description: opp?.subject ?? null,
+      description: assignment.job.description ?? opp?.subject ?? null,
     },
     when: {
-      startsAt: opp?.startsAt ?? null,
-      endsAt: opp?.endsAt ?? null,
+      startsAt: assignment.job.startsAt ?? opp?.startsAt ?? null,
+      endsAt: assignment.job.endsAt ?? opp?.endsAt ?? null,
     },
     where: {
       venue: assignment.job.venue,
+      address: assignment.job.address,
     },
   });
 });

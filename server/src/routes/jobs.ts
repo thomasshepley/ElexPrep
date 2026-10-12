@@ -46,7 +46,7 @@ jobsRouter.get('/:id', async (req, res) => {
 });
 
 jobsRouter.put('/:id', async (req, res) => {
-  const { name, venue, isPublic, crewFeatures } = req.body ?? {};
+  const { name, venue, description, address, startsAt, endsAt, isPublic, crewFeatures } = req.body ?? {};
   if (isPublic !== undefined && req.user?.role !== 'ADMIN') {
     const perms = req.user?.role === 'USER' ? await resolvePermissionsForUser(req.user.id, 'USER') : null;
     if (!perms?.publishJobs) {
@@ -68,6 +68,10 @@ jobsRouter.put('/:id', async (req, res) => {
     data: {
       ...(name !== undefined ? { name } : {}),
       ...(venue !== undefined ? { venue } : {}),
+      ...(description !== undefined ? { description } : {}),
+      ...(address !== undefined ? { address } : {}),
+      ...(startsAt !== undefined ? { startsAt: startsAt ? new Date(startsAt) : null } : {}),
+      ...(endsAt !== undefined ? { endsAt: endsAt ? new Date(endsAt) : null } : {}),
       ...(isPublic !== undefined ? { isPublic } : {}),
       ...(crewFeaturesJson !== undefined ? { crewFeaturesJson } : {}),
     },

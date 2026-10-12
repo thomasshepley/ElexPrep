@@ -7,6 +7,7 @@ import { WhoIcon, WhatIcon, WhenIcon, WhereIcon, WhyIcon, DiscussionIcon } from 
 import LabelTypeForm, { AD_HOC_TYPES, type AdHocType } from '../components/LabelTypeForm';
 import JobDiscussionThread from '../components/JobDiscussionThread';
 import CadPlotsViewer from '../components/CadPlotsViewer';
+import LocationLinks from '../components/LocationLinks';
 
 const NO_DATE = 'No date set yet';
 const NO_VENUE = 'No venue set yet';
@@ -166,7 +167,7 @@ export default function CrewJobPage() {
 
         <InfoCard id="where" icon={<WhereIcon />} label="Where" summary={detail.where.venue ?? NO_VENUE}>
           <p>{detail.where.venue ?? NO_VENUE}</p>
-          <p className="muted">Access notes, parking, and load-in info will show here once that's added.</p>
+          <LocationLinks address={detail.where.address} />
         </InfoCard>
       </div>
 
