@@ -179,6 +179,9 @@ export interface CrewMember {
   userId: string;
   username: string;
   displayName: string;
+  /// ADMIN means this row is a staff admin's own account also assigned as crew (see
+  /// api.crew.fromAdmin), not a freelancer — their login/password lives on the Users page.
+  userRole: Role;
   phone: string | null;
   color: string | null;
   skills: string | null;
@@ -521,6 +524,8 @@ export const api = {
   },
   crew: {
     list: () => request<CrewMember[]>('/crew'),
+    adminCandidates: () => request<{ id: string; username: string; displayName: string }[]>('/crew/admin-candidates'),
+    fromAdmin: (userId: string) => request<CrewMember>('/crew/from-admin', { method: 'POST', body: JSON.stringify({ userId }) }),
     create: (data: {
       username: string;
       password: string;
