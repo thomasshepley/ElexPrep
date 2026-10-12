@@ -2,10 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { api, type Job, type CrewFeatures, CREW_FEATURE_KEYS, CREW_FEATURE_LABELS } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
-import PatchImportPanel from '../components/PatchImportPanel';
-import CasesPanel from '../components/CasesPanel';
-import LabelsPanel from '../components/LabelsPanel';
-import PrintQueuePanel from '../components/PrintQueuePanel';
+import JobPrepTab from '../components/JobPrepTab';
 import JobPlotsTab from '../components/JobPlotsTab';
 import LocationLinks from '../components/LocationLinks';
 import JobSchedulePanel from '../components/JobSchedulePanel';
@@ -16,13 +13,13 @@ import JobCrewPanel from '../components/JobCrewPanel';
 import JobDiscussionThread from '../components/JobDiscussionThread';
 import FileInput from '../components/FileInput';
 
-const TABS = ['Patch Import', 'Cases', 'Labels', 'Print Queue', 'Plots', 'Schedule', 'Documents', 'Crew', 'Discussion', 'Current RMS', 'Job Settings'] as const;
+const TABS = ['Prep', 'Plots', 'Schedule', 'Documents', 'Crew', 'Discussion', 'Current RMS', 'Job Settings'] as const;
 type Tab = (typeof TABS)[number];
 
 export default function JobDetailPage() {
   const { jobId } = useParams<{ jobId: string }>();
   const [job, setJob] = useState<Job | null>(null);
-  const [tab, setTab] = useState<Tab>('Patch Import');
+  const [tab, setTab] = useState<Tab>('Prep');
 
   useEffect(() => {
     if (jobId) api.jobs.get(jobId).then(setJob);
@@ -35,30 +32,30 @@ export default function JobDetailPage() {
       <h1>{job?.name ?? 'Job'}</h1>
       {job?.venue && <p className="muted">{job.venue}</p>}
 
-      <div className="tabs">
-        {TABS.map((t) => (
-          <button key={t} className={t === tab ? 'active' : ''} onClick={() => setTab(t)}>
-            {t}
-            {t === 'Current RMS' && job?.rmsAlertAt && ' •'}
-          </button>
-        ))}
-      </div>
-
-      {tab === 'Patch Import' && <PatchImportPanel jobId={jobId} />}
-      {tab === 'Cases' && <CasesPanel jobId={jobId} />}
-      {tab === 'Labels' && <LabelsPanel jobId={jobId} />}
-      {tab === 'Print Queue' && <PrintQueuePanel jobId={jobId} />}
-      {tab === 'Plots' && <JobPlotsTab jobId={jobId} />}
-      {tab === 'Schedule' && <JobSchedulePanel jobId={jobId} />}
-      {tab === 'Documents' && <JobDocumentsPanel jobId={jobId} />}
-      {tab === 'Crew' && <JobCrewPanel jobId={jobId} />}
-      {tab === 'Discussion' && (
-        <div className="panel">
-          <JobDiscussionThread jobId={jobId} scope="staff" />
+      <div className="secondary-shell">
+        <nav className="secondary-nav">
+          {TABS.map((t) => (
+            <button key={t} className={t === tab ? 'active' : ''} onClick={() => setTab(t)}>
+              {t}
+              {t === 'Current RMS' && job?.rmsAlertAt && ' •'}
+            </button>
+          ))}
+        </nav>
+        <div className="secondary-content" key={tab}>
+          {tab === 'Prep' && <JobPrepTab jobId={jobId} />}
+          {tab === 'Plots' && <JobPlotsTab jobId={jobId} />}
+          {tab === 'Schedule' && <JobSchedulePanel jobId={jobId} />}
+          {tab === 'Documents' && <JobDocumentsPanel jobId={jobId} />}
+          {tab === 'Crew' && <JobCrewPanel jobId={jobId} />}
+          {tab === 'Discussion' && (
+            <div className="panel">
+              <JobDiscussionThread jobId={jobId} scope="staff" />
+            </div>
+          )}
+          {tab === 'Current RMS' && <CurrentRmsPanel jobId={jobId} />}
+          {tab === 'Job Settings' && job && <JobSettingsPanel job={job} onUpdate={setJob} />}
         </div>
-      )}
-      {tab === 'Current RMS' && <CurrentRmsPanel jobId={jobId} />}
-      {tab === 'Job Settings' && job && <JobSettingsPanel job={job} onUpdate={setJob} />}
+      </div>
     </div>
   );
 }
