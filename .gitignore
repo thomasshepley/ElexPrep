@@ -11,9 +11,12 @@ web/dist/
 data/elexprep.db
 /data/uploads
 
-# Local agent/skill tooling (installed via `npx skills add`), not project code
+# Local agent/skill tooling (installed via `npx skills add`), not project code — but
+# .claude/settings.json itself IS committed (see below): it's what lets a cloud session's
+# permissions.allow rules actually take effect, which requires the file to be in the repo.
 .agents/
-.claude/
+.claude/*
+!.claude/settings.json
 skills-lock.json
 
 # Windows print agent's real config (holds the agent token) and its log directory
