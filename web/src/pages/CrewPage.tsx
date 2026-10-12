@@ -71,7 +71,11 @@ export default function CrewPage() {
   };
 
   const remove = async (c: CrewMember) => {
-    if (!confirm(`Delete crew member ${c.displayName}? This removes their login and any job assignments.`)) return;
+    const confirmMessage =
+      c.userRole === 'ADMIN'
+        ? `Remove ${c.displayName} from the crew roster? Their admin login is unaffected.`
+        : `Delete crew member ${c.displayName}? This removes their login and any job assignments.`;
+    if (!confirm(confirmMessage)) return;
     setError(null);
     try {
       await api.crew.remove(c.id);
@@ -135,6 +139,8 @@ export default function CrewPage() {
         {error && <p className="error">{error}</p>}
       </div>
 
+      <AddAdminAsCrewPanel onAdded={refresh} />
+
       <table>
         <thead>
           <tr>
@@ -157,6 +163,7 @@ export default function CrewPage() {
                       title="Schedule swatch color"
                     />
                     <div style={{ fontWeight: 600 }}>{c.displayName}</div>
+                    {c.userRole === 'ADMIN' && <span className="chip chip-role">Staff</span>}
                   </div>
                   <span className="muted">{c.username}</span>
                 </td>
@@ -178,11 +185,13 @@ export default function CrewPage() {
                   <button className="secondary" onClick={() => setExpandedId(expandedId === c.id ? null : c.id)}>
                     Details
                   </button>
-                  <button className="secondary" onClick={() => resetPassword(c)}>
-                    Reset password
-                  </button>
+                  {c.userRole !== 'ADMIN' && (
+                    <button className="secondary" onClick={() => resetPassword(c)}>
+                      Reset password
+                    </button>
+                  )}
                   <button className="secondary" onClick={() => remove(c)}>
-                    Delete
+                    {c.userRole === 'ADMIN' ? 'Remove from crew' : 'Delete'}
                   </button>
                 </td>
               </tr>
@@ -426,6 +435,73 @@ function CrewDocumentsPanel({ crewId }: { crewId: string }) {
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+/**
+ * Lets an ADMIN who also works shifts show up as assignable crew without a second login —
+ * picks from admin accounts that don't already have a crew profile (see
+ * api.crew.adminCandidates), then calls api.crew.fromAdmin to attach a bare CrewProfile to
+ * their existing User row.
+ */
+function AddAdminAsCrewPanel({ onAdded }: { onAdded: () => void }) {
+  const [candidates, setCandidates] = useState<{ id: string; username: string; displayName: string }[]>([]);
+  const [selected, setSelected] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const refresh = () => api.crew.adminCandidates().then(setCandidates).catch((e) => setError(e.message));
+
+  useEffect(() => {
+    refresh();
+  }, []);
+
+  if (candidates.length === 0) return null;
+
+  const add = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selected) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await api.crew.fromAdmin(selected);
+      setSelected('');
+      refresh();
+      onAdded();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="panel">
+      <h3>Add an admin as crew</h3>
+      <p className="muted">
+        For staff who also work shifts — this makes their existing login assignable to jobs
+        without creating a second account.
+      </p>
+      <form onSubmit={add} className="row" style={{ alignItems: 'flex-end', gap: '0.6rem' }}>
+        <div className="field" style={{ width: '14rem' }}>
+          <label htmlFor="admin-as-crew-select">Admin account</label>
+          <select id="admin-as-crew-select" value={selected} onChange={(e) => setSelected(e.target.value)} required>
+            <option value="" disabled>
+              Choose an admin…
+            </option>
+            {candidates.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.displayName} ({c.username})
+              </option>
+            ))}
+          </select>
+        </div>
+        <button type="submit" disabled={busy || !selected}>
+          Add as crew
+        </button>
+      </form>
+      {error && <p className="error">{error}</p>}
     </div>
   );
 }
