@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { toLocationColorMapEntry, type LocationColorMap } from '@elexprep/shared';
 import { api, type Job, type PrintQueueItem, type AdHocLabel, type PrintJob, type PrintMethod } from '../api/client';
 import LabelTypeSection, { summarize } from './printQueue/LabelTypeSection';
+import PrintConfirmModal from './printQueue/PrintConfirmModal';
 
 export default function PrintQueuePanel({ jobId }: { jobId: string }) {
   const [queue, setQueue] = useState<PrintQueueItem[]>([]);
@@ -15,6 +16,7 @@ export default function PrintQueuePanel({ jobId }: { jobId: string }) {
   const [busy, setBusy] = useState(false);
   const [locationColors, setLocationColors] = useState<LocationColorMap>(new Map());
   const [job, setJob] = useState<Job | null>(null);
+  const [confirmingPrint, setConfirmingPrint] = useState(false);
 
   const refresh = () =>
     api.printQueue.list(jobId).then(({ queue, adHoc }) => {
@@ -99,6 +101,7 @@ export default function PrintQueuePanel({ jobId }: { jobId: string }) {
       await api.printQueue.send(jobId);
       await refresh();
       await refreshPrintJobs();
+      setConfirmingPrint(false);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -144,7 +147,7 @@ export default function PrintQueuePanel({ jobId }: { jobId: string }) {
         {error && <p className="error">{error}</p>}
 
         <div className="row" style={{ marginTop: '1rem' }}>
-          <button onClick={confirmAndSend} disabled={busy || (pendingItems.length === 0 && adHoc.length === 0)}>
+          <button onClick={() => setConfirmingPrint(true)} disabled={busy || (pendingItems.length === 0 && adHoc.length === 0)}>
             Confirm &amp; send to printer
           </button>
           <button
@@ -156,6 +159,10 @@ export default function PrintQueuePanel({ jobId }: { jobId: string }) {
           </button>
         </div>
       </div>
+
+      {confirmingPrint && (
+        <PrintConfirmModal jobId={jobId} busy={busy} onClose={() => setConfirmingPrint(false)} onConfirm={confirmAndSend} />
+      )}
 
       {labelTypes.map((labelType) => (
         <LabelTypeSection
