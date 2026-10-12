@@ -126,11 +126,12 @@ export default function LabelTypeSection({
       for (const el of template.elements) {
         const baseEl = base.elements.find((b) => b.id === el.id);
         if (!baseEl) continue;
-        const patch: Partial<Pick<LabelElementDef, 'x' | 'y' | 'w' | 'h'>> = {};
+        const patch: Partial<LabelElementDef> = {};
         if (el.x !== baseEl.x) patch.x = el.x;
         if (el.y !== baseEl.y) patch.y = el.y;
         if (el.w !== baseEl.w) patch.w = el.w;
         if (el.h !== baseEl.h) patch.h = el.h;
+        if ('size' in el && 'size' in baseEl && el.size !== baseEl.size) patch.size = el.size;
         if (Object.keys(patch).length > 0) seeded[el.id] = patch;
       }
     }
@@ -159,7 +160,7 @@ export default function LabelTypeSection({
     cancelCustomizing();
   };
 
-  const onChangeElement = (id: string, patch: Partial<Pick<LabelElementDef, 'x' | 'y' | 'w' | 'h'>>) => {
+  const onChangeElement = (id: string, patch: Partial<LabelElementDef>) => {
     setDraft((d) => ({ ...d, [id]: { ...d[id], ...patch } }));
   };
 
@@ -381,7 +382,8 @@ function ContentEditor({ content, onSave }: { content: Record<string, unknown>; 
   );
 }
 
-function ElementInspector({ element, onChange }: { element: LabelElementDef; onChange: (patch: Partial<Pick<LabelElementDef, 'x' | 'y' | 'w' | 'h'>>) => void }) {
+function ElementInspector({ element, onChange }: { element: LabelElementDef; onChange: (patch: Partial<LabelElementDef>) => void }) {
+  const hasFontSize = element.type === 'text' || element.type === 'stackedText';
   return (
     <div className="panel" style={{ marginTop: '0.5rem', padding: '0.75rem', background: 'var(--surface-sunken)' }}>
       <p className="muted" style={{ marginTop: 0 }}>
@@ -399,6 +401,18 @@ function ElementInspector({ element, onChange }: { element: LabelElementDef; onC
             />
           </label>
         ))}
+        {hasFontSize && (
+          <label className="field" style={{ minWidth: 70 }}>
+            <span>font size</span>
+            <input
+              type="number"
+              step={1}
+              min={4}
+              value={element.size}
+              onChange={(e) => onChange({ size: Number(e.target.value) })}
+            />
+          </label>
+        )}
       </div>
     </div>
   );
