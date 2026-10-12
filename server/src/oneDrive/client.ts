@@ -27,6 +27,9 @@ export interface DriveItem {
   file?: { mimeType: string };
   size?: number;
   webUrl?: string;
+  /// Graph returns this by default on every item; typed here so callers (e.g. the patch
+  /// auto-detect, which picks the most recently modified CSV) don't have to request it specially.
+  lastModifiedDateTime?: string;
 }
 
 function assertConfigured(config: Pick<OneDriveConfig, 'enabled' | 'tenantId' | 'clientId' | 'clientSecret' | 'driveId'>) {

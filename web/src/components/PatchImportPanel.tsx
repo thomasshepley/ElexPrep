@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PATCH_FIELD_LABELS, type PatchFieldKey } from '@elexprep/shared';
-import { api, type Fixture } from '../api/client';
+import { api, type Fixture, type PatchImportCandidate } from '../api/client';
 import FileInput from './FileInput';
 
 export default function PatchImportPanel({ jobId }: { jobId: string }) {
@@ -15,12 +15,60 @@ export default function PatchImportPanel({ jobId }: { jobId: string }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkLocation, setBulkLocation] = useState('');
 
+  const [candidate, setCandidate] = useState<PatchImportCandidate | null>(null);
+  const [scanError, setScanError] = useState<string | null>(null);
+  const [scanBusy, setScanBusy] = useState(false);
+
   const loadFixtures = () => api.patch.fixtures(jobId).then(setFixtures);
+  const loadCandidate = () => api.patch.getOneDriveCandidate(jobId).then(setCandidate);
 
   useEffect(() => {
     loadFixtures();
+    loadCandidate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [jobId]);
+
+  const scanOneDrive = async () => {
+    setScanBusy(true);
+    setScanError(null);
+    try {
+      const res = await api.patch.scanOneDrive(jobId);
+      if (res.candidate) setCandidate(res.candidate);
+      else if (!res.detected) setScanError('No patch CSV found in this job’s OneDrive "Patch" folder.');
+    } catch (e) {
+      setScanError((e as Error).message);
+    } finally {
+      setScanBusy(false);
+    }
+  };
+
+  const approveCandidate = async () => {
+    setScanBusy(true);
+    setScanError(null);
+    try {
+      const res = await api.patch.approveOneDriveCandidate(jobId);
+      setCandidate(res.candidate);
+      await loadFixtures();
+    } catch (e) {
+      setScanError((e as Error).message);
+    } finally {
+      setScanBusy(false);
+    }
+  };
+
+  const rejectCandidate = async () => {
+    const note = prompt('Rejection note (optional):') ?? '';
+    setScanBusy(true);
+    setScanError(null);
+    try {
+      const res = await api.patch.rejectOneDriveCandidate(jobId, note || undefined);
+      setCandidate(res.candidate);
+    } catch (e) {
+      setScanError((e as Error).message);
+    } finally {
+      setScanBusy(false);
+    }
+  };
 
   const toggleSelected = (id: string) => {
     setSelected((s) => {
@@ -110,6 +158,49 @@ export default function PatchImportPanel({ jobId }: { jobId: string }) {
 
   return (
     <div>
+      <div className="panel">
+        <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+          <h3>OneDrive patch import</h3>
+          <button className="secondary" onClick={scanOneDrive} disabled={scanBusy}>
+            Scan OneDrive for patch file
+          </button>
+        </div>
+        <p className="muted">
+          Looks for a CSV in this job's OneDrive "Patch" subfolder. Nothing is applied automatically
+          — a detected file sits here for review until approved.
+        </p>
+        {scanError && <p className="error">{scanError}</p>}
+
+        {candidate && candidate.status === 'PENDING' && (
+          <div className="row panel" style={{ background: 'rgba(255,255,255,0.04)', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+            <div>
+              <strong>{candidate.fileName}</strong>
+              <p className="muted" style={{ margin: 0 }}>
+                {candidate.rowCount} rows &middot; detected {new Date(candidate.detectedAt).toLocaleString()} &middot;{' '}
+                {candidate.oneDriveItemPath}
+              </p>
+            </div>
+            <button onClick={approveCandidate} disabled={scanBusy}>
+              Approve &amp; import
+            </button>
+            <button className="secondary" onClick={rejectCandidate} disabled={scanBusy}>
+              Reject
+            </button>
+          </div>
+        )}
+        {candidate && candidate.status === 'APPROVED' && (
+          <p className="muted">
+            Last approved: {candidate.fileName} ({candidate.rowCount} rows), {new Date(candidate.reviewedAt ?? candidate.detectedAt).toLocaleString()}.
+          </p>
+        )}
+        {candidate && candidate.status === 'REJECTED' && (
+          <p className="muted">
+            Last detected file ({candidate.fileName}) was rejected
+            {candidate.rejectionNote ? `: ${candidate.rejectionNote}` : '.'}
+          </p>
+        )}
+      </div>
+
       <div className="panel">
         <h3>Upload Wysiwyg patch CSV</h3>
         <p className="muted">
