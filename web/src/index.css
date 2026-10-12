@@ -566,6 +566,103 @@ tbody tr:hover {
   font-size: var(--text-sm);
 }
 
+/* A page's internal tabs rendered as a vertical secondary nav to the right of the main sidebar
+   (replaces a horizontal .tabs row for pages with enough sections that wrapping gets messy —
+   e.g. Settings, a job's detail page). Collapses back to a horizontal scrollable row on narrow
+   viewports, same as .tabs already does. */
+.secondary-shell {
+  display: flex;
+  align-items: flex-start;
+  gap: 2rem;
+}
+
+.secondary-nav {
+  flex: 0 0 180px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  position: sticky;
+  top: 1.5rem;
+}
+
+.secondary-nav a,
+.secondary-nav button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--content-muted);
+  border: none;
+  box-shadow: none;
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease;
+}
+
+.secondary-nav a:hover,
+.secondary-nav button:hover:not(:disabled) {
+  background: var(--accent-wash);
+  color: var(--content);
+  transform: none;
+}
+
+.secondary-nav a.active,
+.secondary-nav button.active {
+  background: var(--accent-wash);
+  color: var(--content);
+  font-weight: 600;
+}
+
+.secondary-content {
+  flex: 1;
+  min-width: 0;
+  animation: secondary-content-in 160ms ease;
+}
+
+@keyframes secondary-content-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .secondary-content {
+    animation: none;
+  }
+}
+
+@media (max-width: 760px) {
+  .secondary-shell {
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .secondary-nav {
+    flex: none;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    position: static;
+    width: 100%;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 0.4rem;
+  }
+
+  .secondary-nav a,
+  .secondary-nav button {
+    flex: none;
+    white-space: nowrap;
+  }
+}
+
 /*
  * Chip — the app's one signature element. Rather than a generic badge, it reuses the exact
  * color language already used on physical printed labels (the location-color system: Floor,

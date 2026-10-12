@@ -1,4 +1,4 @@
-import { NavLink, Outlet } from 'react-router-dom';
+import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import type { PermissionKey } from '../api/client';
 
@@ -29,6 +29,7 @@ const SECTIONS: SettingsSection[] = [
 
 export default function SettingsLayout() {
   const { user } = useAuth();
+  const { pathname } = useLocation();
   const isAdmin = user?.role === 'ADMIN';
   const sections = SECTIONS.filter((s) => {
     if (s.adminOnly) return isAdmin;
@@ -39,14 +40,18 @@ export default function SettingsLayout() {
   return (
     <div>
       <h1>Settings</h1>
-      <div className="tabs">
-        {sections.map((s) => (
-          <NavLink key={s.to} to={s.to} className={({ isActive }) => (isActive ? 'active' : '')}>
-            {s.label}
-          </NavLink>
-        ))}
+      <div className="secondary-shell">
+        <nav className="secondary-nav">
+          {sections.map((s) => (
+            <NavLink key={s.to} to={s.to} className={({ isActive }) => (isActive ? 'active' : '')}>
+              {s.label}
+            </NavLink>
+          ))}
+        </nav>
+        <div className="secondary-content" key={pathname}>
+          <Outlet />
+        </div>
       </div>
-      <Outlet />
     </div>
   );
 }
