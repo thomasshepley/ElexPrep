@@ -3,6 +3,10 @@
 Newest entries first. Each push/merge gets exactly one entry - see
 `scripts/bump-version.mjs` for how the version number itself advances.
 
+## v1.3.6 - 2026-10-12
+
+- Grouped the imported fixtures list by fixture type instead of one long flat list
+
 ## v1.3.5 - 2026-10-12
 
 - Added a rainbow Everywhere location color for items that aren't tied to one spot

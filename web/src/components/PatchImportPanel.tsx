@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PATCH_FIELD_LABELS, type PatchFieldKey } from '@elexprep/shared';
 import { api, type Fixture, type PatchImportCandidate } from '../api/client';
@@ -83,6 +83,20 @@ export default function PatchImportPanel({ jobId }: { jobId: string }) {
     if (!fixtures) return;
     setSelected((s) => (s.size === fixtures.length ? new Set() : new Set(fixtures.map((f) => f.id))));
   };
+
+  /** Groups fixtures by type (sorted alphabetically, address order preserved within each
+   * group) so a patch with many fixture types reads as sections instead of one long flat
+   * list sorted only by address. */
+  const fixtureGroups = (fixtures ?? []).reduce<{ type: string; items: Fixture[] }[]>((groups, f) => {
+    const type = f.fixtureType || 'Unlabeled';
+    let group = groups.find((g) => g.type === type);
+    if (!group) {
+      group = { type, items: [] };
+      groups.push(group);
+    }
+    group.items.push(f);
+    return groups;
+  }, []).sort((a, b) => a.type.localeCompare(b.type));
 
   const bulkSetLocation = async () => {
     await api.patch.bulkSetLocation(jobId, [...selected], bulkLocation);
@@ -328,7 +342,14 @@ export default function PatchImportPanel({ jobId }: { jobId: string }) {
                 </tr>
               </thead>
               <tbody>
-                {fixtures.map((f) => (
+                {fixtureGroups.map((group) => (
+                  <Fragment key={group.type}>
+                    <tr>
+                      <td colSpan={10} style={{ fontWeight: 700, paddingTop: '0.75rem' }}>
+                        {group.type} <span className="muted" style={{ fontWeight: 400 }}>({group.items.length})</span>
+                      </td>
+                    </tr>
+                    {group.items.map((f) => (
                   <tr key={f.id}>
                     <td>
                       <input type="checkbox" checked={selected.has(f.id)} onChange={() => toggleSelected(f.id)} />
@@ -400,6 +421,8 @@ export default function PatchImportPanel({ jobId }: { jobId: string }) {
                       </button>
                     </td>
                   </tr>
+                    ))}
+                  </Fragment>
                 ))}
               </tbody>
             </table>
