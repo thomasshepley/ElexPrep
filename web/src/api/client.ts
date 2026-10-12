@@ -478,6 +478,14 @@ export interface DiscussionMessage {
   authorRole: string;
   body: string;
   createdAt: string;
+  editedAt: string | null;
+  deletedAt: string | null;
+  deletedByName: string | null;
+}
+
+export interface DiscussionThreadData {
+  locked: boolean;
+  messages: DiscussionMessage[];
 }
 
 export interface AppNotification {
@@ -708,9 +716,11 @@ export const api = {
     submitLabelRequest: (jobId: string, data: { labelType: string; content: Record<string, unknown>; quantity?: number }) =>
       request<CrewLabelRequest>(`/crew/me/jobs/${jobId}/label-requests`, { method: 'POST', body: JSON.stringify(data) }),
     discussion: {
-      list: (jobId: string) => request<DiscussionMessage[]>(`/crew/me/jobs/${jobId}/discussion`),
+      list: (jobId: string) => request<DiscussionThreadData>(`/crew/me/jobs/${jobId}/discussion`),
       send: (jobId: string, body: string) =>
         request<DiscussionMessage>(`/crew/me/jobs/${jobId}/discussion`, { method: 'POST', body: JSON.stringify({ body }) }),
+      edit: (jobId: string, messageId: string, body: string) =>
+        request<DiscussionMessage>(`/crew/me/jobs/${jobId}/discussion/${messageId}`, { method: 'PUT', body: JSON.stringify({ body }) }),
       remove: (jobId: string, messageId: string) =>
         request<void>(`/crew/me/jobs/${jobId}/discussion/${messageId}`, { method: 'DELETE' }),
     },
@@ -732,10 +742,14 @@ export const api = {
     remove: (jobId: string, id: string) => request<void>(`/jobs/${jobId}/schedule/${id}`, { method: 'DELETE' }),
   },
   jobDiscussion: {
-    list: (jobId: string) => request<DiscussionMessage[]>(`/jobs/${jobId}/discussion`),
+    list: (jobId: string) => request<DiscussionThreadData>(`/jobs/${jobId}/discussion`),
     send: (jobId: string, body: string) =>
       request<DiscussionMessage>(`/jobs/${jobId}/discussion`, { method: 'POST', body: JSON.stringify({ body }) }),
+    edit: (jobId: string, messageId: string, body: string) =>
+      request<DiscussionMessage>(`/jobs/${jobId}/discussion/${messageId}`, { method: 'PUT', body: JSON.stringify({ body }) }),
     remove: (jobId: string, messageId: string) => request<void>(`/jobs/${jobId}/discussion/${messageId}`, { method: 'DELETE' }),
+    setLocked: (jobId: string, locked: boolean) =>
+      request<{ locked: boolean }>(`/jobs/${jobId}/discussion-lock`, { method: 'PUT', body: JSON.stringify({ locked }) }),
   },
   jobDocuments: {
     list: (jobId: string) => request<JobDocument[]>(`/jobs/${jobId}/documents`),

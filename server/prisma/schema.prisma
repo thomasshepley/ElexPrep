@@ -61,6 +61,10 @@ model Job {
   /// onto the global default (see server/src/crewFeatures.ts). Null = use the default as-is;
   /// set at onboarding time, editable later from Job Settings.
   crewFeaturesJson     String?
+  /// Admin/moderator-set freeze on this job's discussion thread - while true, only an account
+  /// with the moderateDiscussion permission can post a new message. Existing messages keep
+  /// their normal edit/delete rules either way.
+  discussionLocked     Boolean  @default(false)
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -114,15 +118,22 @@ model OneDriveShare {
 /// Visible/postable by any ADMIN/USER staff account and by crew assigned to the job (see
 /// routes/jobDiscussion.ts for staff, routes/crewPortal.ts's /me/jobs/:jobId/discussion for
 /// crew — two route surfaces over the same table, matching how schedule/documents/kit-list
-/// already work). No edit/delete yet — admin moderation is a later milestone.
+/// already work). An author can edit their own message (editedAt records when); a moderator
+/// removing someone else's message soft-deletes it (deletedAt/deletedByName set, body left in
+/// place but never sent to clients) rather than hard-deleting, so the removal itself shows up
+/// as a placeholder in the thread instead of disappearing without a trace. Deleting your own
+/// message stays a hard delete — there's no moderation story to preserve there.
 model JobDiscussionMessage {
-  id           String   @id @default(cuid())
-  jobId        String
-  job          Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
-  authorUserId String
-  authorUser   User     @relation(fields: [authorUserId], references: [id], onDelete: Cascade)
-  body         String
-  createdAt    DateTime @default(now())
+  id             String    @id @default(cuid())
+  jobId          String
+  job            Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  authorUserId   String
+  authorUser     User      @relation(fields: [authorUserId], references: [id], onDelete: Cascade)
+  body           String
+  createdAt      DateTime  @default(now())
+  editedAt       DateTime?
+  deletedAt      DateTime?
+  deletedByName  String?
 
   @@index([jobId])
 }

@@ -446,6 +446,9 @@ function toDiscussionMessageDto(m: {
   authorUserId: string;
   body: string;
   createdAt: Date;
+  editedAt: Date | null;
+  deletedAt: Date | null;
+  deletedByName: string | null;
   authorUser: { displayName: string; role: string };
 }) {
   return {
@@ -454,24 +457,30 @@ function toDiscussionMessageDto(m: {
     authorUserId: m.authorUserId,
     authorName: m.authorUser.displayName,
     authorRole: m.authorUser.role,
-    body: m.body,
+    body: m.deletedAt ? '' : m.body,
     createdAt: m.createdAt,
+    editedAt: m.editedAt,
+    deletedAt: m.deletedAt,
+    deletedByName: m.deletedByName,
   };
 }
 
+const DISCUSSION_MESSAGE_INCLUDE = { authorUser: { select: { displayName: true, role: true } } } as const;
+
 // Same thread staff see on the job's Discussion tab (routes/jobDiscussion.ts), scoped here to
-// a job the caller is actually assigned to.
+// a job the caller is actually assigned to. Crew have no moderateDiscussion permission, so
+// `locked` here only ever disables the compose box - there's no unlock control on this side.
 crewPortalRouter.get('/me/jobs/:jobId/discussion', requireRole('CREW'), async (req, res) => {
   const found = await requireAssignedJob(req.user!.id, req.params.jobId);
   if (!found) return res.status(404).json({ error: 'Job not found' });
   const features = await resolveCrewFeatures(found.assignment.job);
-  if (!features.discussion) return res.json([]);
+  if (!features.discussion) return res.json({ locked: false, messages: [] });
   const messages = await prisma.jobDiscussionMessage.findMany({
     where: { jobId: req.params.jobId },
-    include: { authorUser: { select: { displayName: true, role: true } } },
+    include: DISCUSSION_MESSAGE_INCLUDE,
     orderBy: { createdAt: 'asc' },
   });
-  res.json(messages.map(toDiscussionMessageDto));
+  res.json({ locked: found.assignment.job.discussionLocked, messages: messages.map(toDiscussionMessageDto) });
 });
 
 crewPortalRouter.post('/me/jobs/:jobId/discussion', requireRole('CREW'), async (req, res) => {
@@ -479,25 +488,44 @@ crewPortalRouter.post('/me/jobs/:jobId/discussion', requireRole('CREW'), async (
   if (!found) return res.status(404).json({ error: 'Job not found' });
   const features = await resolveCrewFeatures(found.assignment.job);
   if (!features.discussion) return res.status(403).json({ error: 'Discussion is not enabled for this job' });
+  if (found.assignment.job.discussionLocked) return res.status(403).json({ error: 'This discussion is locked' });
   const { body } = req.body ?? {};
   if (!body || typeof body !== 'string' || !body.trim()) return res.status(400).json({ error: 'body is required' });
 
   const message = await prisma.jobDiscussionMessage.create({
     data: { jobId: req.params.jobId, authorUserId: req.user!.id, body: body.trim() },
-    include: { authorUser: { select: { displayName: true, role: true } } },
+    include: DISCUSSION_MESSAGE_INCLUDE,
   });
   await logActivity('job_discussion.create', req.params.jobId, req.params.jobId, req.user!.id);
   await notifyDiscussionMessage(req.params.jobId, found.assignment.job.name, req.user!.id, req.user!.displayName, message.body);
   res.status(201).json(toDiscussionMessageDto(message));
 });
 
-// A crew member can only ever delete their own message - no moderation permission applies on
-// this side, matching routes/jobDiscussion.ts's staff-side moderateDiscussion check.
+// A crew member can edit or delete only their own message - no moderation permission applies
+// on this side, matching routes/jobDiscussion.ts's staff-side moderateDiscussion check.
+crewPortalRouter.put('/me/jobs/:jobId/discussion/:messageId', requireRole('CREW'), async (req, res) => {
+  const found = await requireAssignedJob(req.user!.id, req.params.jobId);
+  if (!found) return res.status(404).json({ error: 'Job not found' });
+  const { body } = req.body ?? {};
+  if (!body || typeof body !== 'string' || !body.trim()) return res.status(400).json({ error: 'body is required' });
+  const message = await prisma.jobDiscussionMessage.findUnique({ where: { id: req.params.messageId } });
+  if (!message || message.jobId !== req.params.jobId || message.deletedAt) return res.status(404).json({ error: 'Message not found' });
+  if (message.authorUserId !== req.user!.id) return res.status(403).json({ error: 'You can only edit your own messages' });
+
+  const updated = await prisma.jobDiscussionMessage.update({
+    where: { id: message.id },
+    data: { body: body.trim(), editedAt: new Date() },
+    include: DISCUSSION_MESSAGE_INCLUDE,
+  });
+  await logActivity('job_discussion.edit', req.params.jobId, req.params.jobId, req.user!.id);
+  res.json(toDiscussionMessageDto(updated));
+});
+
 crewPortalRouter.delete('/me/jobs/:jobId/discussion/:messageId', requireRole('CREW'), async (req, res) => {
   const found = await requireAssignedJob(req.user!.id, req.params.jobId);
   if (!found) return res.status(404).json({ error: 'Job not found' });
   const message = await prisma.jobDiscussionMessage.findUnique({ where: { id: req.params.messageId } });
-  if (!message || message.jobId !== req.params.jobId) return res.status(404).json({ error: 'Message not found' });
+  if (!message || message.jobId !== req.params.jobId || message.deletedAt) return res.status(404).json({ error: 'Message not found' });
   if (message.authorUserId !== req.user!.id) return res.status(403).json({ error: 'You can only delete your own messages' });
   await prisma.jobDiscussionMessage.delete({ where: { id: message.id } });
   await logActivity('job_discussion.delete', req.params.jobId, req.params.jobId, req.user!.id);
