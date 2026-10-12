@@ -29,7 +29,6 @@ import CurrentRmsSettingsPage from './pages/CurrentRmsSettingsPage'
 import OneDriveSettingsPage from './pages/OneDriveSettingsPage'
 import CrewPortalSettingsPage from './pages/CrewPortalSettingsPage'
 import ActivityLogPage from './pages/ActivityLogPage'
-import PermissionsPage from './pages/PermissionsPage'
 import OnboardingPage from './pages/OnboardingPage'
 
 createRoot(document.getElementById('root')!).render(
@@ -60,7 +59,6 @@ createRoot(document.getElementById('root')!).render(
               <Route path="crew" element={<CrewPage />} />
               <Route path="crew-applications" element={<CrewApplicationsPage />} />
               <Route path="onboarding" element={<OnboardingPage />} />
-              <Route path="permissions" element={<PermissionsPage />} />
               <Route path="printer" element={<PrinterSettingsPage />} />
               <Route path="current-rms" element={<CurrentRmsSettingsPage />} />
               <Route path="onedrive" element={<OneDriveSettingsPage />} />
