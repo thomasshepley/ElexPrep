@@ -555,6 +555,17 @@ tbody tr:hover {
   font-weight: 600;
 }
 
+/* A secondary, nested tab row (e.g. switching between a job's CAD plots) — same behavior as
+   .tabs, smaller so it doesn't visually compete with the page's primary tab row. */
+.tabs-sub {
+  margin-bottom: var(--space-3);
+}
+
+.tabs-sub button {
+  padding: 0.3rem 0.7rem;
+  font-size: var(--text-sm);
+}
+
 /*
  * Chip — the app's one signature element. Rather than a generic badge, it reuses the exact
  * color language already used on physical printed labels (the location-color system: Floor,

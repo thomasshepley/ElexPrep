@@ -6,7 +6,7 @@ import { getOneDriveConfig, saveOneDriveConfig, toPublicOneDriveConfig, DEFAULT_
 import { testOneDriveConnection, listChildren, getItemByPath, streamOneDriveFile } from '../oneDrive/client';
 import { matchJobFolder } from '../oneDrive/matcher';
 import { findSharedCadPdf } from '../oneDrive/cad';
-import { listJobShares, shareItemWithJob, unshareItem } from '../oneDrive/shares';
+import { listJobShares, shareItemWithJob, unshareItem, setShareCadPlot } from '../oneDrive/shares';
 
 /** Global OneDrive config — ADMIN-only, holds the Azure app secret. */
 export const oneDriveRouter = Router();
@@ -167,6 +167,15 @@ jobOneDriveRouter.post('/:jobId/onedrive/share', requirePermission('manageOneDri
   );
   await logActivity('onedrive.share', itemName, req.params.jobId, req.user?.id);
   res.status(201).json(share);
+});
+
+jobOneDriveRouter.patch('/:jobId/onedrive/share/:shareId', requirePermission('manageOneDrive'), async (req, res) => {
+  const { isCadPlot } = req.body ?? {};
+  if (typeof isCadPlot !== 'boolean') return res.status(400).json({ error: 'isCadPlot (boolean) is required' });
+  const share = await setShareCadPlot(req.params.jobId, req.params.shareId, isCadPlot);
+  if (!share) return res.status(404).json({ error: 'Share not found' });
+  await logActivity(isCadPlot ? 'onedrive.mark_cad' : 'onedrive.unmark_cad', share.itemName, req.params.jobId, req.user?.id);
+  res.json(share);
 });
 
 jobOneDriveRouter.delete('/:jobId/onedrive/share/:shareId', requirePermission('manageOneDrive'), async (req, res) => {

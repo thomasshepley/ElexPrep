@@ -78,6 +78,10 @@ model OneDriveShare {
   itemName     String
   itemPath     String
   isFolder     Boolean
+  /// Admin-flagged alongside sharing: this shared item is one of the job's CAD plots, so it's
+  /// grouped with the rest of the CAD set (uploaded Plot PDFs + the auto-detected one) instead of
+  /// the generic "Shared with crew" list — see CadPlotsViewer on the web side.
+  isCadPlot    Boolean  @default(false)
   sharedAt     DateTime @default(now())
   sharedByUserId String?
 
