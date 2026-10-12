@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useState } from 'react';
+import { resolveCrewColor } from '@elexprep/shared';
 import { api, type BankDetails, type CrewMember, type CrewDocumentSummary, type CrewRateLine } from '../api/client';
 import FileInput from '../components/FileInput';
 import SkillPicker from '../components/SkillPicker';
@@ -149,7 +150,14 @@ export default function CrewPage() {
             <Fragment key={c.id}>
               <tr>
                 <td>
-                  <div style={{ fontWeight: 600 }}>{c.displayName}</div>
+                  <div className="row" style={{ gap: '0.4rem' }}>
+                    <span
+                      className="crew-swatch-dot"
+                      style={{ background: resolveCrewColor(c.id, c.color) }}
+                      title="Schedule swatch color"
+                    />
+                    <div style={{ fontWeight: 600 }}>{c.displayName}</div>
+                  </div>
                   <span className="muted">{c.username}</span>
                 </td>
                 <td>
@@ -196,6 +204,7 @@ export default function CrewPage() {
 }
 
 function ProfileEditPanel({ crew, onChanged }: { crew: CrewMember; onChanged: () => void }) {
+  const [color, setColor] = useState(resolveCrewColor(crew.id, crew.color));
   const [certifications, setCertifications] = useState(crew.certifications ?? '');
   const [gender, setGender] = useState(crew.gender ?? '');
   const [address, setAddress] = useState(crew.address ?? '');
@@ -213,6 +222,7 @@ function ProfileEditPanel({ crew, onChanged }: { crew: CrewMember; onChanged: ()
     setSaved(false);
     try {
       await api.crew.update(crew.id, {
+        color,
         certifications,
         gender,
         address,
@@ -236,6 +246,16 @@ function ProfileEditPanel({ crew, onChanged }: { crew: CrewMember; onChanged: ()
       {error && <p className="error">{error}</p>}
       <form onSubmit={save}>
         <div className="row" style={{ flexWrap: 'wrap', gap: '0.9rem' }}>
+          <div className="field" style={{ width: '6rem' }}>
+            <label htmlFor={`profile-color-${crew.id}`}>Schedule swatch</label>
+            <input
+              id={`profile-color-${crew.id}`}
+              type="color"
+              value={color}
+              onChange={(e) => setColor(e.target.value)}
+              style={{ width: '100%', height: '2.2rem', padding: '0.15rem' }}
+            />
+          </div>
           <div className="field" style={{ width: '10rem' }}>
             <label htmlFor={`profile-pronouns-${crew.id}`}>Pronouns</label>
             <input id={`profile-pronouns-${crew.id}`} value={pronouns} onChange={(e) => setPronouns(e.target.value)} placeholder="they/them" />

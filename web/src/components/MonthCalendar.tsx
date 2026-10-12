@@ -1,5 +1,14 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import Modal from './Modal';
+import CrewSwatch from './CrewSwatch';
+
+export interface CalendarEventCrew {
+  id: string;
+  name: string;
+  role: string;
+  color: string;
+}
 
 export interface CalendarEvent {
   id: string;
@@ -8,6 +17,7 @@ export interface CalendarEvent {
   endsAt?: string | null;
   tone?: 'accent' | 'success' | 'warning' | 'neutral';
   href?: string;
+  crew?: CalendarEventCrew[];
 }
 
 const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -62,6 +72,8 @@ export default function MonthCalendar({ events, initialMonth }: { events: Calend
   const gridDays = useMemo(() => buildGridDays(year, month), [year, month]);
   const buckets = useMemo(() => bucketEvents(events), [events]);
   const todayKey = dateKey(today);
+  const [openDayKey, setOpenDayKey] = useState<string | null>(null);
+  const openDayEvents = openDayKey ? buckets.get(openDayKey) ?? [] : [];
 
   return (
     <div className="panel month-calendar">
@@ -94,13 +106,18 @@ export default function MonthCalendar({ events, initialMonth }: { events: Calend
           const visible = dayEvents.slice(0, MAX_VISIBLE_PER_DAY);
           const overflow = dayEvents.length - visible.length;
           return (
-            <div key={key} className={`month-calendar-day${inMonth ? '' : ' is-outside'}${key === todayKey ? ' is-today' : ''}`}>
+            <div
+              key={key}
+              className={`month-calendar-day${inMonth ? '' : ' is-outside'}${key === todayKey ? ' is-today' : ''}`}
+              onClick={() => dayEvents.length > 0 && setOpenDayKey(key)}
+              style={dayEvents.length > 0 ? { cursor: 'pointer' } : undefined}
+            >
               <span className="month-calendar-day-number">{d.getDate()}</span>
               <div className="month-calendar-events">
                 {visible.map((ev) => {
                   const chip = <span className={`month-calendar-event chip chip-${ev.tone ?? 'accent'}`}>{ev.title}</span>;
                   return ev.href ? (
-                    <Link key={ev.id} to={ev.href} className="month-calendar-event-link">
+                    <Link key={ev.id} to={ev.href} className="month-calendar-event-link" onClick={(e) => e.stopPropagation()}>
                       {chip}
                     </Link>
                   ) : (
@@ -113,6 +130,38 @@ export default function MonthCalendar({ events, initialMonth }: { events: Calend
           );
         })}
       </div>
+
+      {openDayKey && (
+        <Modal
+          title={new Date(`${openDayKey}T00:00:00`).toLocaleDateString(undefined, {
+            weekday: 'long',
+            day: 'numeric',
+            month: 'long',
+          })}
+          onClose={() => setOpenDayKey(null)}
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
+            {openDayEvents.map((ev) => (
+              <div key={ev.id}>
+                {ev.href ? (
+                  <Link to={ev.href} onClick={() => setOpenDayKey(null)} style={{ fontWeight: 600 }}>
+                    {ev.title}
+                  </Link>
+                ) : (
+                  <strong>{ev.title}</strong>
+                )}
+                <div style={{ marginTop: '0.4rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                  {!ev.crew || ev.crew.length === 0 ? (
+                    <span className="muted">No crew assigned yet.</span>
+                  ) : (
+                    ev.crew.map((c) => <CrewSwatch key={c.id} name={c.name} role={c.role} color={c.color} />)
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

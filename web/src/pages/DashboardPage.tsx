@@ -39,6 +39,7 @@ export default function DashboardPage() {
       startsAt: o.startsAt!,
       endsAt: o.endsAt,
       href: `/jobs/${o.jobId}`,
+      crew: o.crew,
     }));
 
   const totalValue = (orders ?? []).reduce((sum, o) => sum + (o.value ?? 0), 0);

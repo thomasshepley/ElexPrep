@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import path from 'path';
+import { resolveCrewColor } from '@elexprep/shared';
 import { prisma, logActivity } from '../db';
 import { requireRole } from '../auth';
 import { getCurrentRmsConfig } from '../currentRms/config';
@@ -189,7 +190,13 @@ crewPortalRouter.get('/me/jobs', requireRole('CREW'), async (req, res) => {
 
   const assignments = await prisma.jobCrewAssignment.findMany({
     where: { crewProfileId: profile.id },
-    include: { job: true },
+    include: {
+      job: {
+        include: {
+          crewAssignments: { include: { crewProfile: { include: { user: { select: { displayName: true } } } } } },
+        },
+      },
+    },
   });
   const opportunities = await loadOpportunitiesFor(assignments.map((a) => a.job));
 
@@ -203,6 +210,14 @@ crewPortalRouter.get('/me/jobs', requireRole('CREW'), async (req, res) => {
         role: a.role,
         startsAt: opp?.startsAt ?? null,
         endsAt: opp?.endsAt ?? null,
+        // The full crew roster for this job (not just the caller), so the crew schedule
+        // calendar can show per-crew swatches for everyone working the same day.
+        crew: a.job.crewAssignments.map((ca) => ({
+          id: ca.crewProfileId,
+          name: ca.crewProfile.user.displayName,
+          role: ca.role,
+          color: resolveCrewColor(ca.crewProfileId, ca.crewProfile.color),
+        })),
       };
     })
     // Dated jobs first (soonest first), undated jobs after, so a crew member's upcoming work

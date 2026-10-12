@@ -180,6 +180,7 @@ export interface CrewMember {
   username: string;
   displayName: string;
   phone: string | null;
+  color: string | null;
   skills: string | null;
   certifications: string | null;
   dayRate: string | null;
@@ -280,6 +281,13 @@ export interface CrewMe {
   hasBankDetails: boolean;
 }
 
+export interface CrewScheduleSwatch {
+  id: string;
+  name: string;
+  role: string;
+  color: string;
+}
+
 export interface CrewMyJob {
   jobId: string;
   jobName: string;
@@ -287,6 +295,7 @@ export interface CrewMyJob {
   role: string;
   startsAt: string | null;
   endsAt: string | null;
+  crew: CrewScheduleSwatch[];
 }
 
 export interface CrewJobDetail {
@@ -431,6 +440,7 @@ export interface DashboardOrder {
   endsAt: string | null;
   value: number | null;
   crewCount: number;
+  crew: CrewScheduleSwatch[];
 }
 
 export interface DiscussionMessage {
@@ -516,6 +526,7 @@ export const api = {
       password: string;
       displayName?: string;
       phone?: string;
+      color?: string;
       skills?: string;
       certifications?: string;
       dayRate?: string;
@@ -534,6 +545,7 @@ export const api = {
         displayName: string;
         password: string;
         phone: string;
+        color: string;
         skills: string;
         certifications: string;
         dayRate: string;
