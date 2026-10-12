@@ -320,6 +320,10 @@ model JobCrewAssignment {
   /// (routes/currentRms.ts's /crew-margin). Null is treated as 1 day, so existing assignments
   /// made before this field existed still cost out sensibly.
   days          String?
+  /// Explicitly costs this assignment at zero regardless of dayRate/profile/global defaults —
+  /// distinct from just leaving dayRate blank (which means "use the default", not "free"), for
+  /// e.g. zero-rating an owner/business partner out of the margin calculation.
+  zeroRated     Boolean     @default(false)
   xeroContactId String?
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt

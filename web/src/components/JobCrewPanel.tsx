@@ -18,6 +18,7 @@ export default function JobCrewPanel({ jobId }: { jobId: string }) {
   const [role, setRole] = useState('');
   const [dayRate, setDayRate] = useState('');
   const [days, setDays] = useState('');
+  const [zeroRated, setZeroRated] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const refresh = () => api.jobCrewAssignments.list(jobId).then(setAssignments).catch((e) => setError(e.message));
@@ -35,11 +36,18 @@ export default function JobCrewPanel({ jobId }: { jobId: string }) {
     e.preventDefault();
     setError(null);
     try {
-      await api.jobCrewAssignments.create(jobId, { crewProfileId, role, dayRate: dayRate || undefined, days: days || undefined });
+      await api.jobCrewAssignments.create(jobId, {
+        crewProfileId,
+        role,
+        dayRate: dayRate || undefined,
+        days: days || undefined,
+        zeroRated,
+      });
       setCrewProfileId('');
       setRole('');
       setDayRate('');
       setDays('');
+      setZeroRated(false);
       refresh();
     } catch (err) {
       setError((err as Error).message);
@@ -53,6 +61,11 @@ export default function JobCrewPanel({ jobId }: { jobId: string }) {
 
   const updateDays = async (a: JobCrewAssignment, value: string) => {
     await api.jobCrewAssignments.update(jobId, a.id, { days: value });
+    refresh();
+  };
+
+  const updateZeroRated = async (a: JobCrewAssignment, value: boolean) => {
+    await api.jobCrewAssignments.update(jobId, a.id, { zeroRated: value });
     refresh();
   };
 
@@ -94,6 +107,17 @@ export default function JobCrewPanel({ jobId }: { jobId: string }) {
                 <label htmlFor="assign-days">Days</label>
                 <input id="assign-days" value={days} onChange={(e) => setDays(e.target.value)} placeholder="1" />
               </div>
+              <div className="field" style={{ width: 'auto' }}>
+                <label htmlFor="assign-zero-rated" className="row" style={{ gap: '0.4rem', alignItems: 'center' }}>
+                  <input
+                    id="assign-zero-rated"
+                    type="checkbox"
+                    checked={zeroRated}
+                    onChange={(e) => setZeroRated(e.target.checked)}
+                  />
+                  Zero-rate
+                </label>
+              </div>
               <button type="submit" disabled={!crewProfileId}>
                 Add to job
               </button>
@@ -117,6 +141,7 @@ export default function JobCrewPanel({ jobId }: { jobId: string }) {
               <th>Role</th>
               <th>Day rate</th>
               <th>Days</th>
+              <th>Zero-rate</th>
               <th></th>
               {canManage && <th></th>}
             </tr>
@@ -135,7 +160,7 @@ export default function JobCrewPanel({ jobId }: { jobId: string }) {
                     <span className="chip chip-role">{a.role}</span>
                   )}
                 </td>
-                <td>{a.dayRate ?? a.profileDayRate ?? '—'}</td>
+                <td>{a.zeroRated ? <span className="muted">Zero-rated</span> : a.dayRate ?? a.profileDayRate ?? '—'}</td>
                 <td>
                   {canManage ? (
                     <input
@@ -146,6 +171,13 @@ export default function JobCrewPanel({ jobId }: { jobId: string }) {
                     />
                   ) : (
                     a.days ?? '1'
+                  )}
+                </td>
+                <td>
+                  {canManage ? (
+                    <input type="checkbox" checked={a.zeroRated} onChange={(e) => updateZeroRated(a, e.target.checked)} />
+                  ) : (
+                    a.zeroRated ? 'Yes' : ''
                   )}
                 </td>
                 <td>

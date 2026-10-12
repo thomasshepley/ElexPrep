@@ -375,14 +375,25 @@ jobCurrentRmsRouter.get('/:jobId/current-rms/crew-margin', requireRole('ADMIN'),
     where: { jobId: job.id },
     include: { crewProfile: { include: { user: { select: { displayName: true } } } } },
   });
+  const defaultRateSetting = await prisma.appSetting.findUnique({ where: { key: 'defaultCrewDayRate' } });
+  const globalDefaultRate = defaultRateSetting
+    ? toMoney((JSON.parse(defaultRateSetting.valueJson) as { dayRate: string | null }).dayRate ?? undefined)
+    : 0;
   const costBreakdown = assignments.map((a) => {
-    const rate = toMoney(a.dayRate ?? a.crewProfile.dayRate ?? undefined);
+    // "Suggested" = what rate would apply if this assignment had no explicit override and
+    // wasn't zero-rated — the job's own day-rate field, falling back through the crew
+    // member's profile default to the portal-wide default. Shown to admins hovering the
+    // day-rate cell so they can see what's actually driving the number vs. what they typed.
+    const suggestedRate = toMoney(a.crewProfile.dayRate ?? undefined) || globalDefaultRate;
+    const rate = a.zeroRated ? 0 : toMoney(a.dayRate ?? undefined) || suggestedRate;
     const days = a.days ? toMoney(a.days) || 1 : 1;
     return {
       crewProfileId: a.crewProfileId,
       name: a.crewProfile.user.displayName,
       role: a.role,
       dayRate: rate,
+      suggestedRate,
+      zeroRated: a.zeroRated,
       days,
       cost: rate * days,
     };

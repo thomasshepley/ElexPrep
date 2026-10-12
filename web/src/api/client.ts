@@ -270,6 +270,9 @@ export interface JobCrewAssignment {
   /// How many days this assignment is booked for — null means 1 (see server's JobCrewAssignment
   /// comment). Used to compute this assignment's cost on the admin-only crew margin view.
   days: string | null;
+  /// Explicitly costs this assignment at zero regardless of dayRate/profile/global defaults —
+  /// distinct from leaving dayRate blank (which means "use the default").
+  zeroRated: boolean;
   active: boolean;
 }
 
@@ -590,6 +593,9 @@ export const api = {
       remove: (crewId: string, lineId: string) =>
         request<void>(`/crew/${crewId}/rate-lines/${lineId}`, { method: 'DELETE' }),
     },
+    getDefaultRate: () => request<{ dayRate: string | null }>('/crew/default-rate'),
+    setDefaultRate: (dayRate: string | null) =>
+      request<{ dayRate: string | null }>('/crew/default-rate', { method: 'PUT', body: JSON.stringify({ dayRate }) }),
   },
   crewApplications: {
     submit: (form: FormData) => request<{ id: string }>('/crew-applications', { method: 'POST', body: form }),
@@ -721,9 +727,9 @@ export const api = {
   },
   jobCrewAssignments: {
     list: (jobId: string) => request<JobCrewAssignment[]>(`/jobs/${jobId}/crew`),
-    create: (jobId: string, data: { crewProfileId: string; role: string; dayRate?: string; days?: string }) =>
+    create: (jobId: string, data: { crewProfileId: string; role: string; dayRate?: string; days?: string; zeroRated?: boolean }) =>
       request<JobCrewAssignment>(`/jobs/${jobId}/crew`, { method: 'POST', body: JSON.stringify(data) }),
-    update: (jobId: string, id: string, data: Partial<{ role: string; dayRate: string; days: string }>) =>
+    update: (jobId: string, id: string, data: Partial<{ role: string; dayRate: string; days: string; zeroRated: boolean }>) =>
       request<JobCrewAssignment>(`/jobs/${jobId}/crew/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     remove: (jobId: string, id: string) => request<void>(`/jobs/${jobId}/crew/${id}`, { method: 'DELETE' }),
   },
@@ -733,7 +739,16 @@ export const api = {
         chargeTotal: number;
         chargeBreakdown: { opportunityId: number; subject: string; serviceCharge: number }[];
         costTotal: number;
-        costBreakdown: { crewProfileId: string; name: string; role: string; dayRate: number; days: number; cost: number }[];
+        costBreakdown: {
+          crewProfileId: string;
+          name: string;
+          role: string;
+          dayRate: number;
+          suggestedRate: number;
+          zeroRated: boolean;
+          days: number;
+          cost: number;
+        }[];
         margin: number;
         marginPercent: number | null;
       }>(`/jobs/${jobId}/current-rms/crew-margin`),

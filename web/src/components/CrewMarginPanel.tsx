@@ -112,7 +112,9 @@ export default function CrewMarginPanel({ jobId }: { jobId: string }) {
                     <tr key={b.crewProfileId}>
                       <td>{b.name}</td>
                       <td>{b.role}</td>
-                      <td>{formatMoney(b.dayRate)}</td>
+                      <td title={`Suggested rate (profile/global default): ${formatMoney(b.suggestedRate)}`}>
+                        {b.zeroRated ? <span className="muted">Zero-rated</span> : formatMoney(b.dayRate)}
+                      </td>
                       <td>{b.days}</td>
                       <td>{formatMoney(b.cost)}</td>
                     </tr>

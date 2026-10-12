@@ -69,6 +69,29 @@ function toCrewDto(p: CrewProfileRow) {
   };
 }
 
+const DEFAULT_RATE_SETTING_KEY = 'defaultCrewDayRate';
+
+/** The portal-wide default day rate — the last fallback in the chain (job assignment override
+ * -> crew member's own profile default -> this) when nothing more specific is set. Lives here
+ * rather than the generic settings router since it's crew-financial data, same ADMIN-only
+ * posture as the rest of this file. */
+crewRouter.get('/default-rate', async (_req, res) => {
+  const setting = await prisma.appSetting.findUnique({ where: { key: DEFAULT_RATE_SETTING_KEY } });
+  res.json({ dayRate: setting ? (JSON.parse(setting.valueJson) as { dayRate: string | null }).dayRate : null });
+});
+
+crewRouter.put('/default-rate', async (req, res) => {
+  const { dayRate } = req.body ?? {};
+  const value = { dayRate: dayRate || null };
+  await prisma.appSetting.upsert({
+    where: { key: DEFAULT_RATE_SETTING_KEY },
+    create: { key: DEFAULT_RATE_SETTING_KEY, valueJson: JSON.stringify(value) },
+    update: { valueJson: JSON.stringify(value) },
+  });
+  await logActivity('crew.default_rate_update', value.dayRate ?? '(cleared)', undefined, req.user!.id);
+  res.json(value);
+});
+
 crewRouter.get('/', async (_req, res) => {
   const profiles = await prisma.crewProfile.findMany({
     include: { user: { select: { username: true, displayName: true, role: true } } },

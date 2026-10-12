@@ -19,6 +19,7 @@ interface AssignmentRow {
   role: string;
   dayRate: string | null;
   days: string | null;
+  zeroRated: boolean;
   xeroContactId: string | null;
   crewProfile: {
     id: string;
@@ -40,6 +41,7 @@ function toAssignmentDto(a: AssignmentRow) {
     dayRate: a.dayRate,
     profileDayRate: a.crewProfile.dayRate,
     days: a.days,
+    zeroRated: a.zeroRated,
     active: a.crewProfile.active,
   };
 }
@@ -59,7 +61,7 @@ jobCrewAssignmentsRouter.get('/:jobId/crew', async (req, res) => {
 
 jobCrewAssignmentsRouter.post('/:jobId/crew', requirePermission('manageCrewAssignments'), async (req, res) => {
   const { jobId } = req.params;
-  const { crewProfileId, role, dayRate, days } = req.body ?? {};
+  const { crewProfileId, role, dayRate, days, zeroRated } = req.body ?? {};
   if (!crewProfileId || typeof crewProfileId !== 'string') {
     return res.status(400).json({ error: 'crewProfileId is required' });
   }
@@ -74,7 +76,7 @@ jobCrewAssignmentsRouter.post('/:jobId/crew', requirePermission('manageCrewAssig
   if (existing) return res.status(409).json({ error: 'This crew member is already assigned to this job' });
 
   const assignment = await prisma.jobCrewAssignment.create({
-    data: { jobId, crewProfileId, role, dayRate: dayRate || null, days: days || null },
+    data: { jobId, crewProfileId, role, dayRate: dayRate || null, days: days || null, zeroRated: Boolean(zeroRated) },
     include: assignmentInclude,
   });
   await logActivity('crew_assignment.create', `${assignment.crewProfile.user.username} as ${role}`, jobId, req.user?.id);
@@ -84,13 +86,14 @@ jobCrewAssignmentsRouter.post('/:jobId/crew', requirePermission('manageCrewAssig
 });
 
 jobCrewAssignmentsRouter.put('/:jobId/crew/:id', requirePermission('manageCrewAssignments'), async (req, res) => {
-  const { role, dayRate, days } = req.body ?? {};
+  const { role, dayRate, days, zeroRated } = req.body ?? {};
   const assignment = await prisma.jobCrewAssignment.update({
     where: { id: req.params.id },
     data: {
       ...(role !== undefined ? { role } : {}),
       ...(dayRate !== undefined ? { dayRate: dayRate || null } : {}),
       ...(days !== undefined ? { days: days || null } : {}),
+      ...(zeroRated !== undefined ? { zeroRated: Boolean(zeroRated) } : {}),
     },
     include: assignmentInclude,
   });

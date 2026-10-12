@@ -139,6 +139,8 @@ export default function CrewPage() {
         {error && <p className="error">{error}</p>}
       </div>
 
+      <DefaultRatePanel />
+
       <AddAdminAsCrewPanel onAdded={refresh} />
 
       <table>
@@ -435,6 +437,51 @@ function CrewDocumentsPanel({ crewId }: { crewId: string }) {
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+/**
+ * Portal-wide fallback day rate — applied on the crew margin calculator when a job
+ * assignment has no rate override and the crew member has no profile default of their own.
+ */
+function DefaultRatePanel() {
+  const [dayRate, setDayRate] = useState('');
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    api.crew.getDefaultRate().then((r) => setDayRate(r.dayRate ?? '')).catch((e) => setError(e.message));
+  }, []);
+
+  const save = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setSaved(false);
+    try {
+      await api.crew.setDefaultRate(dayRate || null);
+      setSaved(true);
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  };
+
+  return (
+    <div className="panel">
+      <h3>Default day rate</h3>
+      <p className="muted">
+        Used on the crew margin calculator when a job assignment has no rate override and the
+        crew member's own profile has no default day rate set either.
+      </p>
+      <form onSubmit={save} className="row" style={{ alignItems: 'flex-end', gap: '0.6rem' }}>
+        <div className="field" style={{ width: '9rem' }}>
+          <label htmlFor="default-day-rate">Day rate</label>
+          <input id="default-day-rate" value={dayRate} onChange={(e) => setDayRate(e.target.value)} placeholder="e.g. 200" />
+        </div>
+        <button type="submit">Save</button>
+        {saved && <span className="muted">Saved ✓</span>}
+      </form>
+      {error && <p className="error">{error}</p>}
     </div>
   );
 }
