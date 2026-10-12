@@ -17,14 +17,14 @@ function formatDateRange(startsAt: string | null, endsAt: string | null): string
 }
 
 /**
- * The crew member's list-style schedule — every job they're assigned to, soonest first (jobs
- * without a synced date sort to the bottom rather than being hidden, since not every job is
- * linked to a Current RMS opportunity yet).
+ * The crew member's schedule — a month calendar plus every job they're assigned to listed
+ * below it (soonest first; jobs without a synced date sort to the bottom rather than being
+ * hidden, since not every job is linked to a Current RMS opportunity yet), mirroring the
+ * admin dashboard's calendar-plus-list layout rather than making List a separate tab.
  */
 export default function CrewSchedulePage() {
   const [jobs, setJobs] = useState<CrewMyJob[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [view, setView] = useState<'calendar' | 'list'>('calendar');
 
   useEffect(() => {
     api.crewPortal
@@ -39,51 +39,44 @@ export default function CrewSchedulePage() {
 
   return (
     <div>
-      <div className="row" style={{ justifyContent: 'space-between' }}>
-        <h1>Your schedule</h1>
-        <div className="tabs" style={{ marginBottom: 0 }}>
-          <button className={view === 'calendar' ? 'active' : undefined} onClick={() => setView('calendar')}>
-            Calendar
-          </button>
-          <button className={view === 'list' ? 'active' : undefined} onClick={() => setView('list')}>
-            List
-          </button>
-        </div>
-      </div>
+      <h1>Your schedule</h1>
       {error && <p className="error">{error}</p>}
       {jobs === null && !error && <p className="muted">Loading…</p>}
       {jobs !== null && jobs.length === 0 && <p className="muted">You're not assigned to any jobs yet.</p>}
 
-      {jobs !== null && jobs.length > 0 && view === 'calendar' && (
-        <div style={{ marginTop: '1rem' }}>
-          <MonthCalendar events={events} />
-        </div>
-      )}
+      {jobs !== null && jobs.length > 0 && (
+        <>
+          <div style={{ marginTop: '1rem' }}>
+            <MonthCalendar events={events} />
+          </div>
 
-      {jobs !== null && jobs.length > 0 && view === 'list' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '1rem' }}>
-          {jobs.map((j) => {
-            const dateRange = formatDateRange(j.startsAt, j.endsAt);
-            return (
-              <Link key={j.jobId} to={`/crew/jobs/${j.jobId}`} className="job-card">
-                <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <div>
-                    <h3 style={{ margin: 0 }}>{j.jobName}</h3>
-                    <div className="row" style={{ marginTop: '0.5rem', gap: '0.5rem' }}>
-                      <span className="chip chip-role">{j.role}</span>
-                      {j.venue && (
-                        <span className="row muted" style={{ gap: '0.3rem', fontSize: 'var(--text-xs)' }}>
-                          <WhereIcon /> {j.venue}
-                        </span>
-                      )}
+          <div className="panel" style={{ marginTop: '1.25rem' }}>
+            <h3>Your jobs</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              {jobs.map((j) => {
+                const dateRange = formatDateRange(j.startsAt, j.endsAt);
+                return (
+                  <Link key={j.jobId} to={`/crew/jobs/${j.jobId}`} className="job-card">
+                    <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <div>
+                        <h3 style={{ margin: 0 }}>{j.jobName}</h3>
+                        <div className="row" style={{ marginTop: '0.5rem', gap: '0.5rem' }}>
+                          <span className="chip chip-role">{j.role}</span>
+                          {j.venue && (
+                            <span className="row muted" style={{ gap: '0.3rem', fontSize: 'var(--text-xs)' }}>
+                              <WhereIcon /> {j.venue}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <span className={dateRange === NO_DATE ? 'chip chip-neutral' : 'chip chip-accent'}>{dateRange}</span>
                     </div>
-                  </div>
-                  <span className={dateRange === NO_DATE ? 'chip chip-neutral' : 'chip chip-accent'}>{dateRange}</span>
-                </div>
-              </Link>
-            );
-          })}
-        </div>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        </>
       )}
     </div>
   );
