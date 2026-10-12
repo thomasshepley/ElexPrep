@@ -89,12 +89,12 @@ export default function ActivityLogPage() {
                 {e.jobId && e.jobName ? (
                   <Link to={`/jobs/${e.jobId}`}>{e.jobName}</Link>
                 ) : (
-                  <span className="muted">—</span>
+                  <span className="muted">-</span>
                 )}
               </td>
               <td>{prettifyAction(e.action)}</td>
               <td>{e.detail}</td>
-              <td className="muted" title={e.userAgent ?? undefined}>{e.ipAddress ?? '—'}</td>
+              <td className="muted" title={e.userAgent ?? undefined}>{e.ipAddress ?? '-'}</td>
             </tr>
           ))}
         </tbody>

@@ -3,7 +3,7 @@ import { prisma, logActivity } from '../db';
 
 export const settingsRouter = Router();
 
-/** Setting keys the API will accept — stops arbitrary keys accumulating in the table. */
+/** Setting keys the API will accept - stops arbitrary keys accumulating in the table. */
 const ALLOWED_KEYS = new Set(['patchMapping']);
 
 settingsRouter.get('/:key', async (req, res) => {

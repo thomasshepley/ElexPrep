@@ -5,17 +5,17 @@ const METHODS: { value: PrintMethod; label: string; help: string }[] = [
   {
     value: 'DRY_RUN',
     label: 'Dry run (no printing)',
-    help: 'Print jobs are created and marked sent without touching any hardware — use this for testing and in Docker until the printer is wired up.',
+    help: 'Print jobs are created and marked sent without touching any hardware - use this for testing and in Docker until the printer is wired up.',
   },
   {
     value: 'DIRECT_9100',
     label: 'Direct network (port 9100)',
-    help: 'The server sends PJL-wrapped PDF straight to the printer IP — no Windows machine needed, but PJL tray values must match the device firmware.',
+    help: 'The server sends PJL-wrapped PDF straight to the printer IP - no Windows machine needed, but PJL tray values must match the device firmware.',
   },
   {
     value: 'AGENT',
     label: 'Windows agent (SumatraPDF)',
-    help: 'Jobs queue on the server and the agent on the office Windows machine prints them through the real driver — most reliable tray selection. See agent/README.md.',
+    help: 'Jobs queue on the server and the agent on the office Windows machine prints them through the real driver - most reliable tray selection. See agent/README.md.',
   },
 ];
 
@@ -69,7 +69,7 @@ export default function PrinterSettingsPage() {
     if (!confirm('Generate a new agent token? The current token stops working immediately.')) return;
     const updated = await api.printerSettings.regenerateToken();
     setSettings(updated);
-    setMessage('New token generated — update agent-config.json on the print machine.');
+    setMessage('New token generated - update agent-config.json on the print machine.');
   };
 
   return (
@@ -142,7 +142,7 @@ export default function PrinterSettingsPage() {
             {settings.agent.token ? (
               <code style={{ userSelect: 'all' }}>{settings.agent.token}</code>
             ) : (
-              <p className="muted">No token yet — generate one and paste it into agent-config.json.</p>
+              <p className="muted">No token yet - generate one and paste it into agent-config.json.</p>
             )}
             <div style={{ marginTop: '0.5rem' }}>
               <button className="secondary" onClick={regenerateToken}>

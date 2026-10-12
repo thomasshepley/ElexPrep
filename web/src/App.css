@@ -1,8 +1,8 @@
 /*
- * Sidebar-based shell — replaces the earlier top-nav-bar layout. Shared by the admin/prep
+ * Sidebar-based shell - replaces the earlier top-nav-bar layout. Shared by the admin/prep
  * shell (App.tsx) and the crew portal shell (CrewLayout.tsx); both import this file once via
  * App.tsx, and since Vite's CSS isn't scoped, the classes are available globally once either
- * route has loaded — consistent with how the old top-nav classes already worked across both.
+ * route has loaded - consistent with how the old top-nav classes already worked across both.
  */
 
 .shell {
@@ -11,7 +11,7 @@
 }
 
 /* Two layers: .sidebar is a plain flex item with no height of its own, so it stretches (the
-   flex row's default align-items: stretch) to match .shell-main's actual content height —
+   flex row's default align-items: stretch) to match .shell-main's actual content height -
    its background/border read as full page height for pages taller than one screen, rather
    than stopping after the first viewport. .sidebar-sticky is what actually pins to the
    viewport while scrolling, so the nav stays reachable without the whole page needing a

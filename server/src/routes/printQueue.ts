@@ -95,7 +95,7 @@ printQueueRouter.get('/:jobId/print-queue', async (req, res) => {
 });
 
 /**
- * Bulk-reorders items within one label type's print-run sequence — the shared `order` field
+ * Bulk-reorders items within one label type's print-run sequence - the shared `order` field
  * spans both PrintQueueItem and AdHocLabel rows, so dragging an ad hoc label above/below a
  * patch-sourced item (or vice versa) is a single write across both tables, not two separate
  * per-table operations.
@@ -122,8 +122,8 @@ printQueueRouter.put('/:jobId/print-queue/reorder', async (req, res) => {
 });
 
 /**
- * Renders the current PENDING queue + ad hoc labels — i.e. exactly what "Confirm & send to
- * printer" / "Confirm & download PDF" are about to act on — as an actual PDF, so the browser
+ * Renders the current PENDING queue + ad hoc labels - i.e. exactly what "Confirm & send to
+ * printer" / "Confirm & download PDF" are about to act on - as an actual PDF, so the browser
  * shows the real print output (colors, logo, layout) rather than a text summary. Read-only:
  * no status changes, safe to hit on every edit.
  */
@@ -142,10 +142,10 @@ printQueueRouter.get('/:jobId/print-queue/preview.pdf', async (req, res) => {
 
 /**
  * PAL labels collated 4-up onto an Avery 105x148-R sheet (A4 landscape) instead of PAL's
- * usual one-per-page direct-to-label-printer layout — for printing on plain paper with Avery
+ * usual one-per-page direct-to-label-printer layout - for printing on plain paper with Avery
  * self-adhesive stock through an ordinary office printer. Reads the currently-queued PAL
  * items (pending + ad hoc, same source as the live preview) rather than requiring them to be
- * confirmed first, and doesn't touch queue status — this is a separate export, not part of
+ * confirmed first, and doesn't touch queue status - this is a separate export, not part of
  * the confirm/send-to-printer lifecycle.
  */
 printQueueRouter.get('/:jobId/print-queue/pal/avery.pdf', async (req, res) => {

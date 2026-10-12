@@ -16,7 +16,7 @@ function formatDateRange(startsAt: string | null, endsAt: string | null): string
 }
 
 function formatValue(value: number | null): string {
-  if (value === null) return '—';
+  if (value === null) return '-';
   return `£${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
@@ -83,13 +83,13 @@ export default function DashboardPage() {
                   <td>
                     <Link to={`/jobs/${o.jobId}`}>{o.jobName}</Link>
                   </td>
-                  <td>{o.venue ?? '—'}</td>
+                  <td>{o.venue ?? '-'}</td>
                   <td>
                     <span className={o.startsAt ? 'chip chip-accent' : 'chip chip-neutral'}>
                       {formatDateRange(o.startsAt, o.endsAt)}
                     </span>
                   </td>
-                  <td className="muted">{o.status ?? '—'}</td>
+                  <td className="muted">{o.status ?? '-'}</td>
                   <td>{o.crewCount}</td>
                   <td>{formatValue(o.value)}</td>
                 </tr>

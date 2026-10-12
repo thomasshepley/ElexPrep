@@ -8,9 +8,9 @@ function formatMoney(n: number): string {
 
 /**
  * Admin-only crew profit/cost: what the client is charged for crew (from Current RMS, summed
- * across every opportunity sharing this job's Current RMS "project" — see
+ * across every opportunity sharing this job's Current RMS "project" - see
  * server/src/routes/currentRms.ts's /crew-margin) against what ElexPrep's own records say crew
- * actually cost on this job. Deliberately never rendered in the freelancer-facing crew portal —
+ * actually cost on this job. Deliberately never rendered in the freelancer-facing crew portal -
  * same sensitivity tier as bank details/compliance documents.
  */
 export default function CrewMarginPanel({ jobId }: { jobId: string }) {
@@ -89,7 +89,7 @@ function LinkedOpportunitiesPanel({ jobId, onChanged }: { jobId: string; onChang
       <h3 style={{ margin: 0 }}>Linked crewing opportunities</h3>
       <p className="muted">
         Tie another Current RMS opportunity (e.g. a separate "{'{Job}'} - Crewing" quote) into
-        this job's margin calc. Only needed if it isn't already picked up automatically — that
+        this job's margin calc. Only needed if it isn't already picked up automatically - that
         happens when Current RMS groups it under the same Project as this job's main
         opportunity.
       </p>
@@ -97,7 +97,7 @@ function LinkedOpportunitiesPanel({ jobId, onChanged }: { jobId: string; onChang
         <ul style={{ margin: '0.5rem 0' }}>
           {links.map((l) => (
             <li key={l.id}>
-              #{l.rmsId} {l.subject ? `— ${l.subject}` : ''}{' '}
+              #{l.rmsId} {l.subject ? `- ${l.subject}` : ''}{' '}
               <button className="secondary" style={{ padding: '0.1rem 0.5rem' }} onClick={() => remove(l.id)}>
                 Remove
               </button>
@@ -149,7 +149,7 @@ function MarginDisplay({
         Charge is what Current RMS says the client is billed for crew/labour, across this job's
         linked opportunity and any other opportunity sharing its Current RMS project (e.g. a
         separate crewing quote). Cost is this job's crew assignments (day rate × days). Admin-only
-        — never shown to crew.
+        - never shown to crew.
       </p>
       {error && <p className="error">{error}</p>}
       {loading && !data && <p className="muted">Loading…</p>}
@@ -180,11 +180,11 @@ function MarginDisplay({
           </div>
 
           <h4 style={{ marginTop: '1rem', marginBottom: '0.3rem' }}>
-            Current RMS vs. ElexPrep — cross-reference man days
+            Current RMS vs. ElexPrep - cross-reference man days
           </h4>
           <p className="muted" style={{ marginTop: 0 }}>
             What Current RMS's Service lines say is charged for crew, side by side with what
-            ElexPrep's own crew assignments say they cost — same columns on both sides so you
+            ElexPrep's own crew assignments say they cost - same columns on both sides so you
             can spot a mismatch in man days or rate at a glance.
           </p>
           <div className="row" style={{ gap: '1.5rem', flexWrap: 'wrap', alignItems: 'flex-start' }}>

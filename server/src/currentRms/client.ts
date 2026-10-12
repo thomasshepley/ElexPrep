@@ -77,11 +77,11 @@ export interface RawOpportunity {
   ends_at?: string;
   updated_at?: string;
   member_id?: number | null;
-  // Not present on a real account's list/show response (only member_id is) — kept in case
+  // Not present on a real account's list/show response (only member_id is) - kept in case
   // a future API version or an `include`-style param ever embeds it.
   member?: { name?: string; business_name?: string } | null;
   // Current RMS's own "Project" id, grouping several opportunities together (verified against
-  // a real account) — e.g. a job's main rental opportunity plus a separate crewing one.
+  // a real account) - e.g. a job's main rental opportunity plus a separate crewing one.
   project_id?: number | null;
   [key: string]: unknown;
 }
@@ -96,7 +96,7 @@ export async function testCurrentRmsConnection(config: Pick<CurrentRmsConfig, 's
 }
 
 // GET /opportunities' own documented cap is 25 (lower than the general 100/page rule
-// elsewhere in the API — "this endpoint can return a lot of data"). Requesting more than the
+// elsewhere in the API - "this endpoint can return a lot of data"). Requesting more than the
 // endpoint honors would silently truncate each page while our pagination-termination check
 // (items.length < perPage) still compared against the larger requested value, so it would
 // stop after the very first page and quietly miss anything beyond the first 25.
@@ -110,7 +110,7 @@ export async function fetchOpportunitiesPage(
   const params: Record<string, string | number | undefined> = {
     page: opts.page,
     per_page: opts.perPage ?? OPPORTUNITIES_PER_PAGE,
-    // Explicit rather than relying on whatever this endpoint defaults to when omitted — we
+    // Explicit rather than relying on whatever this endpoint defaults to when omitted - we
     // want every opportunity cached (including completed/cancelled ones still worth
     // browsing), not just whatever a narrower default filtermode would return.
     filtermode: 'all',
@@ -164,7 +164,7 @@ export interface RawMember {
 
 /**
  * Looked up on demand (e.g. when importing an opportunity as a job) rather than during bulk
- * sync — the opportunities list only returns `member_id`, not an embedded record, and
+ * sync - the opportunities list only returns `member_id`, not an embedded record, and
  * resolving every one during a sync of hundreds of opportunities would burn through the
  * 60-req/60s rate limit for little benefit.
  */
@@ -190,24 +190,24 @@ export interface RawOpportunityItem {
   product_name?: string;
   description?: string;
   quantity?: number;
-  // Current RMS's own line-item status (e.g. 5 = "Reserved") — informational only; ElexPrep
+  // Current RMS's own line-item status (e.g. 5 = "Reserved") - informational only; ElexPrep
   // tracks its own crew-facing prepped/pulled checkbox independently of this (see signage).
   status?: number;
   status_name?: string;
-  // 0 = Group (a section heading, e.g. "Lighting - Moving Lights" — not a pickable item),
+  // 0 = Group (a section heading, e.g. "Lighting - Moving Lights" - not a pickable item),
   // 1 = Principal, 2 = Accessory. Per Current RMS's own API reference.
   opportunity_item_type?: number;
   opportunity_item_type_name?: string;
-  // 1 = Rental, 2 = Sale, 3 = Service. Per Current RMS's own API reference — used by the pick
+  // 1 = Rental, 2 = Sale, 3 = Service. Per Current RMS's own API reference - used by the pick
   // list UI to default to showing only Rental items (Service entries are typically labour/setup
   // line items, not physical kit to prep).
   transaction_type?: number;
   transaction_type_name?: string;
   // Verified against a real account: money fields come back as decimal strings (e.g. "6300.0"),
   // not numbers. charge_excluding_tax_total is what's actually billed for this line (quantity x
-  // rate x chargeable days, pre-tax) — used by the admin-only crew margin view to total what a
+  // rate x chargeable days, pre-tax) - used by the admin-only crew margin view to total what a
   // Service (labour) line charges the client, separate entirely from Current RMS's own per-
-  // asset `opportunity_cost` (what's paid out), which this app doesn't read — margin is
+  // asset `opportunity_cost` (what's paid out), which this app doesn't read - margin is
   // computed against ElexPrep's own crew pay rates instead (see routes/currentRms.ts).
   charge_excluding_tax_total?: string;
   charge_total?: string;
@@ -225,7 +225,7 @@ interface OpportunityItemsPage {
 const MAX_ITEM_PAGES = 20; // hard cap so a misbehaving API can't loop forever
 
 /**
- * Line items for an opportunity — Current RMS calls these "opportunity items". Per Current
+ * Line items for an opportunity - Current RMS calls these "opportunity items". Per Current
  * RMS's own API reference, these are nested under the opportunity rather than a flat
  * filterable collection: GET /opportunities/{opportunity_id}/opportunity_items, paginated at
  * up to 100 per page like the rest of the API.

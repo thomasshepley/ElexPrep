@@ -5,7 +5,7 @@ import { api, type JobOneDriveStatus, type OneDriveItem } from '../api/client';
  * The admin side of the OneDrive integration on a job's Plots/CAD tab: shows whether this
  * job's project folder matched automatically, lets an admin browse it and choose individual
  * files or whole folders to share with crew, and previews the auto-detected CAD PDF inline.
- * Entirely scaffolded against the real Microsoft Graph API shape (see server/src/oneDrive/) —
+ * Entirely scaffolded against the real Microsoft Graph API shape (see server/src/oneDrive/) -
  * until real Azure credentials are added in Settings -> OneDrive, `enabled` stays false and
  * this renders a clear "not connected yet" state rather than a broken file browser.
  */

@@ -4,7 +4,7 @@ import { DMX_CABLE_WIDTH_FACTOR, contrastingTextIsWhite, labelItemLocation, reso
 
 /**
  * CSS px per authored inch. The mirror approximates text layout with simple centered flexbox
- * boxes rather than reproducing pdf-lib's baseline math — exact pixel fidelity already lives
+ * boxes rather than reproducing pdf-lib's baseline math - exact pixel fidelity already lives
  * in the real PDF (verified separately via the preview/download actions); this view only needs
  * to be faithful enough to make positioning and sizing decisions on.
  */
@@ -36,7 +36,7 @@ export interface SheetMirrorProps {
   onChangeElement?: (id: string, patch: Partial<Pick<LabelElementDef, 'x' | 'y' | 'w' | 'h'>>) => void;
 }
 
-/** Renders one representative cell of a label type's template — a live HTML/CSS mirror of what buildLabelPdfs.ts will actually print, used both as a read-only preview and, in edit mode, as the surface for dragging/resizing elements. */
+/** Renders one representative cell of a label type's template - a live HTML/CSS mirror of what buildLabelPdfs.ts will actually print, used both as a read-only preview and, in edit mode, as the surface for dragging/resizing elements. */
 export default function SheetMirror({
   template,
   item,

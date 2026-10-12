@@ -40,7 +40,7 @@ function buildGridDays(year: number, month: number): Date[] {
   return Array.from({ length: 42 }, (_, i) => new Date(gridStart.getFullYear(), gridStart.getMonth(), gridStart.getDate() + i));
 }
 
-/** Buckets events by the calendar day(s) they touch — a multi-day event appears on every day in its range. */
+/** Buckets events by the calendar day(s) they touch - a multi-day event appears on every day in its range. */
 function bucketEvents(events: CalendarEvent[]): Map<string, CalendarEvent[]> {
   const map = new Map<string, CalendarEvent[]>();
   for (const ev of events) {

@@ -17,7 +17,7 @@ function formatDateRange(startsAt: string | null, endsAt: string | null): string
 }
 
 /**
- * The crew member's schedule — a month calendar plus every job they're assigned to listed
+ * The crew member's schedule - a month calendar plus every job they're assigned to listed
  * below it (soonest first; jobs without a synced date sort to the bottom rather than being
  * hidden, since not every job is linked to a Current RMS opportunity yet), mirroring the
  * admin dashboard's calendar-plus-list layout rather than making List a separate tab.

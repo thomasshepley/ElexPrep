@@ -3,7 +3,7 @@ import { api } from '../api/client';
 import Modal from './Modal';
 
 /**
- * Sidebar footer version number — click it to see the changelog. Shared between the admin/prep
+ * Sidebar footer version number - click it to see the changelog. Shared between the admin/prep
  * shell (App.tsx) and the crew portal shell (CrewLayout.tsx).
  */
 export default function VersionBadge() {
@@ -27,7 +27,7 @@ export default function VersionBadge() {
             {data.changelog.map((entry) => (
               <div key={entry.version} style={{ marginBottom: '1rem' }}>
                 <strong>
-                  v{entry.version} <span className="muted" style={{ fontWeight: 400 }}>— {entry.date}</span>
+                  v{entry.version} <span className="muted" style={{ fontWeight: 400 }}>- {entry.date}</span>
                 </strong>
                 <ul style={{ margin: '0.35rem 0 0' }}>
                   {entry.notes.map((note, i) => (

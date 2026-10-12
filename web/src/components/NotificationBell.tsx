@@ -16,7 +16,7 @@ function formatRelative(iso: string): string {
   return `${days}d ago`;
 }
 
-/** Polling notification bell — shared by the admin and crew sidebars. Self-contained: it owns its own open/unread state and only needs to be dropped into a sidebar. */
+/** Polling notification bell - shared by the admin and crew sidebars. Self-contained: it owns its own open/unread state and only needs to be dropped into a sidebar. */
 export default function NotificationBell() {
   const [open, setOpen] = useState(false);
   const [unread, setUnread] = useState(0);

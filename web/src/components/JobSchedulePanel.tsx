@@ -3,7 +3,7 @@ import { api, type JobScheduleItem } from '../api/client';
 import DayTimeline from './DayTimeline';
 
 // The native datetime-local spinner/scroll-wheel snaps to this step, so picking a time quickly
-// moves in 15-minute jumps — typing a value directly (e.g. 09:07) is still unrestricted, so an
+// moves in 15-minute jumps - typing a value directly (e.g. 09:07) is still unrestricted, so an
 // exact, non-aligned time is still just as easy to enter.
 const TIME_STEP_SECONDS = 15 * 60;
 
@@ -12,7 +12,7 @@ function toDatetimeLocal(d: Date): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-/** Today at 09:00 — the sensible default for a fresh "Starts" field. */
+/** Today at 09:00 - the sensible default for a fresh "Starts" field. */
 function defaultStartsAt(): string {
   const d = new Date();
   d.setHours(9, 0, 0, 0);
@@ -31,7 +31,7 @@ export default function JobSchedulePanel({ jobId }: { jobId: string }) {
   const [title, setTitle] = useState('');
   const [startsAt, setStartsAt] = useState(defaultStartsAt);
   const [endsAt, setEndsAt] = useState(() => plusOneHour(defaultStartsAt()));
-  // Once the user edits Ends directly, stop overwriting it when Starts changes — only the
+  // Once the user edits Ends directly, stop overwriting it when Starts changes - only the
   // still-untouched default should track Starts automatically.
   const [endsAtTouched, setEndsAtTouched] = useState(false);
   const [notes, setNotes] = useState('');
@@ -143,8 +143,8 @@ export default function JobSchedulePanel({ jobId }: { jobId: string }) {
               <tr key={i.id}>
                 <td>{i.title}</td>
                 <td>{new Date(i.startsAt).toLocaleString(undefined, { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</td>
-                <td>{i.endsAt ? new Date(i.endsAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) : '—'}</td>
-                <td className="muted">{i.notes ?? '—'}</td>
+                <td>{i.endsAt ? new Date(i.endsAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) : '-'}</td>
+                <td className="muted">{i.notes ?? '-'}</td>
                 <td>
                   <button className="secondary" onClick={() => remove(i.id)}>
                     Remove

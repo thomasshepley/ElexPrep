@@ -5,7 +5,7 @@ import FileInput from './FileInput';
 /**
  * Upload/manage uploaded CAD plot PDFs. Previewing lives in CadPlotsViewer, shown once above
  * this panel on the Plots tab (alongside the auto-detected OneDrive CAD PDF and any
- * CAD-flagged OneDrive shares) — this panel only needs to handle add/remove.
+ * CAD-flagged OneDrive shares) - this panel only needs to handle add/remove.
  */
 export default function PlotsPanel({ jobId, onChange }: { jobId: string; onChange?: () => void }) {
   const [plots, setPlots] = useState<Plot[]>([]);

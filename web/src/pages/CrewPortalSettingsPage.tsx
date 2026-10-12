@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { api, type CrewFeatures, CREW_FEATURE_KEYS, CREW_FEATURE_LABELS } from '../api/client';
 
 /**
- * Company-wide baseline for which crew-portal sections are visible to crew on any job — the
+ * Company-wide baseline for which crew-portal sections are visible to crew on any job - the
  * starting point every newly-onboarded job's crew-feature checkboxes default to (see
  * JobsListPage's onboarding form), overridable per job afterwards from that job's Settings tab.
  */

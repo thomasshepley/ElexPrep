@@ -5,9 +5,9 @@ import OneDriveFilesPanel from './OneDriveFilesPanel';
 import PlotsPanel from './PlotsPanel';
 
 /**
- * The job's "Plots" tab: a single CAD view up top combining every candidate — the
+ * The job's "Plots" tab: a single CAD view up top combining every candidate - the
  * auto-detected OneDrive CAD PDF, uploaded Plot PDFs, and any OneDrive share flagged as a CAD
- * plot — switching via tabs once a multi-stage job has more than one. The management panels
+ * plot - switching via tabs once a multi-stage job has more than one. The management panels
  * below (browse/share/mark, upload/delete) feed that view rather than each showing their own.
  */
 export default function JobPlotsTab({ jobId }: { jobId: string }) {

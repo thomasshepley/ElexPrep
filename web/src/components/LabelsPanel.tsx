@@ -25,7 +25,7 @@ export default function LabelsPanel({ jobId }: { jobId: string }) {
       <LabelSection
         jobId={jobId}
         title="PAL"
-        description="Generic PAL case labels — personal Peli cases, one-off equipment cases."
+        description="Generic PAL case labels - personal Peli cases, one-off equipment cases."
         types={['PAL']}
         items={items}
         onChanged={refresh}
@@ -41,7 +41,7 @@ export default function LabelsPanel({ jobId }: { jobId: string }) {
       <LabelSection
         jobId={jobId}
         title="Truss Spikes and Fixture Labels"
-        description="Truss/spike position, tip warning and sACN node labels, plus rack labels — all print on the same die-cut sheet stock as fixture labels."
+        description="Truss/spike position, tip warning and sACN node labels, plus rack labels - all print on the same die-cut sheet stock as fixture labels."
         types={['TRUSS_SPIKE_POSITION', 'TRUSS_SPIKE_TIP', 'TRUSS_SPIKE_SACN', 'RACK']}
         items={items}
         onChanged={refresh}
@@ -53,7 +53,7 @@ export default function LabelsPanel({ jobId }: { jobId: string }) {
 function summarizeContent(labelType: string, content: Record<string, unknown>): string {
   switch (labelType) {
     case 'TRUSS_SPIKE_POSITION':
-      return `#${content.address ?? ''} — ${content.location ?? ''}`;
+      return `#${content.address ?? ''} - ${content.location ?? ''}`;
     case 'TRUSS_SPIKE_TIP':
       return String(content.text ?? 'DO NOT TIP');
     case 'TRUSS_SPIKE_SACN':
@@ -61,7 +61,7 @@ function summarizeContent(labelType: string, content: Record<string, unknown>): 
     case 'CABLE':
       return `${content.text ?? ''}${content.isDmx ? ' (DMX)' : ''}`;
     case 'PAL':
-      return `${content.location ?? ''} — ${content.title ?? ''} ${content.subtitle ?? ''}`;
+      return `${content.location ?? ''} - ${content.title ?? ''} ${content.subtitle ?? ''}`;
     case 'RACK':
       return `${content.title ?? ''} ${content.subtitle ?? ''}`;
     default:
@@ -125,7 +125,7 @@ function RequestedLabelsPanel({ jobId, onChanged }: { jobId: string; onChanged: 
   return (
     <div className="panel">
       <h3>Requested labels</h3>
-      <p className="muted">Labels crew members have asked for from the job's Why section — review before they print.</p>
+      <p className="muted">Labels crew members have asked for from the job's Why section - review before they print.</p>
       {error && <p className="error">{error}</p>}
       {selected.size > 0 && (
         <div className="row" style={{ marginBottom: '0.5rem', gap: '0.5rem' }}>

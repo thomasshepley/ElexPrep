@@ -28,13 +28,13 @@ const COOKIE_OPTS = {
 };
 
 // Slows down password-guessing without needing external state (per-process, resets on
-// restart) — generous enough not to lock out someone who just mistypes a few times.
+// restart) - generous enough not to lock out someone who just mistypes a few times.
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: 20,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: 'Too many attempts — wait a while and try again' },
+  message: { error: 'Too many attempts - wait a while and try again' },
 });
 
 authRouter.get('/status', async (_req, res) => {
@@ -70,7 +70,7 @@ authRouter.post('/login', loginLimiter, async (req, res) => {
   if (!username || !password) return res.status(400).json({ error: 'username and password are required' });
   const user = await prisma.user.findUnique({ where: { username } });
   if (!user || !verifyPassword(password, user.passwordHash)) {
-    // Logged either way (user not found vs. wrong password look identical here) — an admin
+    // Logged either way (user not found vs. wrong password look identical here) - an admin
     // reviewing the activity log for a compromise attempt cares that someone tried this
     // username from this IP, not which specific reason it failed for.
     await logActivity('auth.login_failed', username, undefined, user?.id);
@@ -94,10 +94,10 @@ const totpVerifyLimiter = rateLimit({
   limit: 20,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: 'Too many attempts — wait a while and try again' },
+  message: { error: 'Too many attempts - wait a while and try again' },
 });
 
-/** The second step of logging in to a 2FA-enabled account — pendingToken proves the password
+/** The second step of logging in to a 2FA-enabled account - pendingToken proves the password
  * step already succeeded (see /login above); this only ever creates a session once a correct
  * TOTP code or an unused backup code is also supplied. */
 authRouter.post('/login/verify-2fa', totpVerifyLimiter, async (req, res) => {
@@ -106,10 +106,10 @@ authRouter.post('/login/verify-2fa', totpVerifyLimiter, async (req, res) => {
     return res.status(400).json({ error: 'pendingToken and code (or backupCode) are required' });
   }
   const pending = checkPendingLogin(pendingToken);
-  if (!pending) return res.status(401).json({ error: 'That login attempt has expired — sign in again' });
+  if (!pending) return res.status(401).json({ error: 'That login attempt has expired - sign in again' });
 
   const user = await prisma.user.findUnique({ where: { id: pending.userId } });
-  if (!user || !user.totpEnabled) return res.status(401).json({ error: 'That login attempt has expired — sign in again' });
+  if (!user || !user.totpEnabled) return res.status(401).json({ error: 'That login attempt has expired - sign in again' });
 
   const secret = decryptTotpSecret(user);
   const ok = code ? !!secret && verifyTotpToken(secret, code) : await consumeBackupCode(user.id, backupCode);

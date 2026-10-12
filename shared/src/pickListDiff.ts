@@ -19,8 +19,8 @@ export interface PickListDiff {
 
 /**
  * Compares two pick-list snapshots (matched by the Current RMS item's stable id) to find what
- * changed between syncs — added lines, removed lines, and quantity changes on lines that
- * survived — for the signage full-screen change alert (GitHub-diff style: green/red/orange).
+ * changed between syncs - added lines, removed lines, and quantity changes on lines that
+ * survived - for the signage full-screen change alert (GitHub-diff style: green/red/orange).
  */
 export function diffPickListItems(before: PickListItemSnapshot[], after: PickListItemSnapshot[]): PickListDiff {
   const beforeById = new Map(before.map((i) => [i.id, i]));

@@ -1,5 +1,5 @@
 /**
- * A small vector chevron that rotates via CSS transform instead of swapping glyphs — used for
+ * A small vector chevron that rotates via CSS transform instead of swapping glyphs - used for
  * expand/collapse affordances. Replaces raw Unicode ▲/▼ characters, which were the only
  * icon-like elements in an otherwise fully text-based interface and render inconsistently
  * across platform fonts.

@@ -20,7 +20,7 @@ async function fonts(doc: PDFDocument) {
 
 /**
  * Picks a legible text fill color for a resolved location color, plus an outline color when
- * the background is diagonal stripes — a flat fill alone can vanish against whichever stripe
+ * the background is diagonal stripes - a flat fill alone can vanish against whichever stripe
  * happens to match it, so striped backgrounds get an outlined (fill + halo) text treatment.
  */
 function textColorsFor(resolved: ResolvedLocationColor): { fill: ReturnType<typeof rgb>; outline?: ReturnType<typeof rgb> } {
@@ -34,7 +34,7 @@ function textColorsFor(resolved: ResolvedLocationColor): { fill: ReturnType<type
  * Renders one label type's sheets from its declarative template: fill/image/text/stackedText
  * elements are walked in template order, scaled from the template's reference cell width to
  * each actual sheet cell (handles PAL's slightly-wider right column the same way the original
- * hand-written renderer did), and drawn with pdfBuilder's existing primitives — so this
+ * hand-written renderer did), and drawn with pdfBuilder's existing primitives - so this
  * produces pixel-identical output to the old per-type functions it replaces.
  */
 export async function renderLabelTypeGeneric(

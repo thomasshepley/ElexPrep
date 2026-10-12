@@ -35,9 +35,9 @@ interface LaidOutItem extends TimedItem {
 
 /**
  * Assigns each item a column (and the column count of its overlap cluster) so entries whose
- * times overlap render side by side instead of stacked on top of each other — the same
+ * times overlap render side by side instead of stacked on top of each other - the same
  * layout Google Calendar's day view uses. `items` must already be sorted by start time, and
- * must all belong to the same calendar day — see DayTimeline below, which groups by date
+ * must all belong to the same calendar day - see DayTimeline below, which groups by date
  * before calling this, since two items on different days are never really "overlapping" even
  * if they happen to share the same time-of-day.
  */
@@ -81,7 +81,7 @@ function layoutColumns(items: TimedItem[]): LaidOutItem[] {
 }
 
 /** A single day's Google-Calendar-day-view-style vertical timeline. `items` must all fall on
- * the same calendar day — DayTimeline (below) handles splitting a multi-day job's items into
+ * the same calendar day - DayTimeline (below) handles splitting a multi-day job's items into
  * one of these per day. */
 function SingleDayTimeline({ items }: { items: TimelineItem[] }) {
   const sorted = [...items].sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
@@ -142,7 +142,7 @@ function SingleDayTimeline({ items }: { items: TimelineItem[] }) {
 /**
  * A job's day-by-day schedule, split into one calendar day per tab. Items are laid out by
  * minutes-since-midnight within a day (see SingleDayTimeline/layoutColumns), which only makes
- * sense when every item being compared actually falls on the same date — grouping by date
+ * sense when every item being compared actually falls on the same date - grouping by date
  * first (rather than rendering every item from every day on one shared time axis, as this
  * component used to) is what stops a multi-day job's entries from appearing to overlap just
  * because e.g. "Load in" on day 1 and "Show" on day 2 both start at 09:00.

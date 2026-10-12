@@ -1,4 +1,4 @@
-/** Fixed taxonomy for crew skills/roles — used by both the public application form and the
+/** Fixed taxonomy for crew skills/roles - used by both the public application form and the
  * admin crew roster, so the two never drift apart (same pattern as AD_HOC_TYPES for labels). */
 export const CREW_SKILLS = [
   'Lighting Designer',

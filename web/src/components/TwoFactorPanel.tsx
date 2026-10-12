@@ -4,7 +4,7 @@ import { api } from '../api/client';
 import PasswordInput from './PasswordInput';
 
 /**
- * Self-service TOTP enrollment — any signed-in account (admin, user, signage, crew) can set
+ * Self-service TOTP enrollment - any signed-in account (admin, user, signage, crew) can set
  * this up for themselves; nothing here is enforced/required yet (see routes/auth.ts's login
  * flow for where it actually gates sign-in once a user opts in). A setup is only persisted
  * once the user proves they can generate a valid code from it (see /confirm), so an abandoned
@@ -116,7 +116,7 @@ export default function TwoFactorPanel() {
         <div className="panel" style={{ borderColor: 'var(--accent)' }}>
           <h4>Save your backup codes</h4>
           <p className="muted">
-            Each works once, if you lose access to your authenticator app. They won't be shown again — save them somewhere safe.
+            Each works once, if you lose access to your authenticator app. They won't be shown again - save them somewhere safe.
           </p>
           <div
             style={{

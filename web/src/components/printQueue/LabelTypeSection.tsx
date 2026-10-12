@@ -9,9 +9,9 @@ import SheetMirror from './SheetMirror';
 export function summarize(labelType: string, content: Record<string, unknown>): string {
   switch (labelType) {
     case 'FIXTURE':
-      return `#${content.address} — Uni ${content.mainUniverse}/${content.mainAddress}`;
+      return `#${content.address} - Uni ${content.mainUniverse}/${content.mainAddress}`;
     case 'PAL':
-      return `${content.location ?? ''} — ${content.title ?? ''} ${content.subtitle ?? ''}`;
+      return `${content.location ?? ''} - ${content.title ?? ''} ${content.subtitle ?? ''}`;
     case 'TRUSS_SPIKE_POSITION':
       return String(content.address ?? '');
     case 'TRUSS_SPIKE_TIP':
@@ -117,7 +117,7 @@ export default function LabelTypeSection({
 
   const startCustomizing = () => {
     // Seed the draft with whatever's already been customized (inferred by diffing the merged
-    // template against the shared defaults) — PUT replaces the whole override map for this
+    // template against the shared defaults) - PUT replaces the whole override map for this
     // label type, so a save that only carries this session's edits would silently drop any
     // other element's previously saved position/size.
     const base = DEFAULT_LABEL_TEMPLATES[labelType as LabelType];
@@ -385,7 +385,7 @@ function ElementInspector({ element, onChange }: { element: LabelElementDef; onC
   return (
     <div className="panel" style={{ marginTop: '0.5rem', padding: '0.75rem', background: 'var(--surface-sunken)' }}>
       <p className="muted" style={{ marginTop: 0 }}>
-        {element.id} — position &amp; size (inches)
+        {element.id} - position &amp; size (inches)
       </p>
       <div className="row" style={{ flexWrap: 'wrap', gap: '0.5rem' }}>
         {(['x', 'y', 'w', 'h'] as const).map((k) => (

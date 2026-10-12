@@ -75,7 +75,7 @@ patchRouter.post('/:jobId/patch/import', async (req, res) => {
   if (!m || !m.address || !m.fixtureType) {
     return res.status(400).json({
       error:
-        'No column mapping available — set the CSV column mapping in Settings → Import Mapping (address and fixture type are required)',
+        'No column mapping available - set the CSV column mapping in Settings → Import Mapping (address and fixture type are required)',
     });
   }
 
@@ -87,10 +87,10 @@ patchRouter.post('/:jobId/patch/import', async (req, res) => {
 });
 
 /**
- * Looks for a patch source in the job's OneDrive folder — an exported CSV in the "Patch"
+ * Looks for a patch source in the job's OneDrive folder - an exported CSV in the "Patch"
  * subfolder first, falling back to extracting a table out of the job's CAD PDF when there's no
- * CSV (see oneDrive/patchDetect.ts's findPatchSource) — and, if found, stores it as a PENDING
- * candidate for review — never applied directly. A re-scan that finds the same file (by its
+ * CSV (see oneDrive/patchDetect.ts's findPatchSource) - and, if found, stores it as a PENDING
+ * candidate for review - never applied directly. A re-scan that finds the same file (by its
  * Graph lastModifiedDateTime) leaves the existing candidate's status alone; a re-scan that finds
  * a changed or new file overwrites it back to PENDING even if the old one was already reviewed.
  */
@@ -192,7 +192,7 @@ patchRouter.post('/:jobId/patch/onedrive-candidate/approve', requirePermission('
   if (!m || !m.address || !m.fixtureType) {
     return res.status(400).json({
       error:
-        'No column mapping available — set the CSV column mapping in Settings → Import Mapping (address and fixture type are required)',
+        'No column mapping available - set the CSV column mapping in Settings → Import Mapping (address and fixture type are required)',
     });
   }
 
@@ -250,7 +250,7 @@ const FIXTURE_EDITABLE_FIELDS = [
 ] as const;
 
 /**
- * Bulk endpoints must be registered before the /:id routes below — Express matches routes in
+ * Bulk endpoints must be registered before the /:id routes below - Express matches routes in
  * registration order, and a literal "bulk" segment would otherwise be swallowed by :id.
  */
 patchRouter.put('/:jobId/fixtures/bulk', async (req, res) => {

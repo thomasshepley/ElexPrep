@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 
-// This file lives at server/src/version.ts (or server/dist/version.js once built) — either
+// This file lives at server/src/version.ts (or server/dist/version.js once built) - either
 // way one directory inside server/, so "../.." from __dirname reaches the repo root where
 // VERSION and CHANGELOG.md live (see scripts/bump-version.mjs, which writes them).
 const REPO_ROOT = path.resolve(__dirname, '../..');
@@ -22,7 +22,7 @@ function readSafe(filePath: string): string | null {
 
 function parseChangelog(markdown: string): ChangelogEntry[] {
   const entries: ChangelogEntry[] = [];
-  const headingRe = /^## v(\S+) — (\d{4}-\d{2}-\d{2})\s*$/gm;
+  const headingRe = /^## v(\S+) - (\d{4}-\d{2}-\d{2})\s*$/gm;
   const matches = [...markdown.matchAll(headingRe)];
   for (let i = 0; i < matches.length; i++) {
     const m = matches[i];

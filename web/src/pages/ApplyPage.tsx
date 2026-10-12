@@ -66,7 +66,7 @@ export default function ApplyPage() {
           <div className="auth-brand">
             <span className="auth-brand-mark" />
             <h1>Application received</h1>
-            <p>Thanks, {fullName.split(' ')[0] || 'there'} — we'll be in touch once it's been reviewed.</p>
+            <p>Thanks, {fullName.split(' ')[0] || 'there'} - we'll be in touch once it's been reviewed.</p>
           </div>
         </div>
       </div>
@@ -79,7 +79,7 @@ export default function ApplyPage() {
         <div className="auth-brand">
           <span className="auth-brand-mark" />
           <h1>Join the ELEX crew</h1>
-          <p>Apply for freelance work — we'll review your application and be in touch.</p>
+          <p>Apply for freelance work - we'll review your application and be in touch.</p>
         </div>
         <form onSubmit={submit}>
           <div className="row" style={{ flexWrap: 'wrap', gap: '1rem' }}>
@@ -134,7 +134,7 @@ export default function ApplyPage() {
           </div>
 
           <div className="field">
-            <label>Documents (optional now — can be sent later)</label>
+            <label>Documents (optional now - can be sent later)</label>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
               {DOCUMENT_SLOTS.map(({ field, label }) => (
                 <div key={field} className="row" style={{ justifyContent: 'space-between' }}>

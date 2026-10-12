@@ -9,11 +9,11 @@ import { notifyCrewApplicationSubmitted } from '../notifications';
 
 /**
  * Public application intake + admin review queue for the freelance crew roster. The public
- * submission (POST /) needs no login — see auth.ts's explicit exemption for this exact path —
+ * submission (POST /) needs no login - see auth.ts's explicit exemption for this exact path -
  * everything else here requires the (delegatable) manageCrewApplications permission, applied
  * per-route rather than via router.use so it never shadows that public route. Viewing/downloading
  * an actual document's bytes is a narrower, hard requireRole('ADMIN') check per route (not
- * delegated), matching the plan's "compliance document visibility stays admin-only" decision —
+ * delegated), matching the plan's "compliance document visibility stays admin-only" decision -
  * reviewing an application's form fields and approving/rejecting it is delegatable, seeing the
  * underlying compliance files is not.
  */
@@ -60,7 +60,7 @@ function toApplicationDto(a: ApplicationRow) {
     notes: a.notes,
     gender: a.gender,
     address: a.address,
-    // Never the ciphertext itself — just whether bank details were provided at all, so the
+    // Never the ciphertext itself - just whether bank details were provided at all, so the
     // review UI can show "on file" without a dedicated decrypt call every list render.
     hasBankDetails: a.bankDetailsCiphertext !== null,
     status: a.status,
@@ -127,7 +127,7 @@ crewApplicationsRouter.get('/:id', requirePermission('manageCrewApplications'), 
   res.json({ ...toApplicationDto(application), documents: application.documents });
 });
 
-// Document bytes are the one part of this flow that stays hard admin-only, never delegated —
+// Document bytes are the one part of this flow that stays hard admin-only, never delegated -
 // see this file's top comment.
 crewApplicationsRouter.get('/:id/documents/:docId', requireRole('ADMIN'), async (req, res) => {
   const doc = await prisma.crewDocument.findUnique({ where: { id: req.params.docId } });

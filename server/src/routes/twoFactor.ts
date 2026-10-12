@@ -6,10 +6,10 @@ import { generateTotpSecret, verifyTotpToken, buildOtpauthUrl } from '../totp';
 import { encryptTotpSecret, regenerateBackupCodes, countRemainingBackupCodes } from '../twoFactor';
 
 /**
- * Self-service two-factor management — any signed-in role (ADMIN/USER/SIGNAGE/CREW) can
+ * Self-service two-factor management - any signed-in role (ADMIN/USER/SIGNAGE/CREW) can
  * enroll their own account, matching the "crew login" half of the security ask as much as the
  * admin half. Nothing here is mandatory/enforced yet (see routes/auth.ts's login flow for the
- * part that actually gates login once a user has opted in) — this is the self-enrollment
+ * part that actually gates login once a user has opted in) - this is the self-enrollment
  * surface.
  */
 export const twoFactorRouter = Router();
@@ -19,7 +19,7 @@ const sensitiveActionLimiter = rateLimit({
   limit: 20,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: 'Too many attempts — wait a while and try again' },
+  message: { error: 'Too many attempts - wait a while and try again' },
 });
 
 twoFactorRouter.get('/status', async (req, res) => {
@@ -33,7 +33,7 @@ twoFactorRouter.get('/status', async (req, res) => {
   });
 });
 
-/** Generates a new secret but does NOT persist it — an abandoned setup (closed the tab before
+/** Generates a new secret but does NOT persist it - an abandoned setup (closed the tab before
  * entering a code) leaves the account exactly as it was. The client must prove it can produce
  * a valid code for this exact secret via /confirm before anything is saved. */
 twoFactorRouter.post('/setup', async (req, res) => {
@@ -46,7 +46,7 @@ twoFactorRouter.post('/confirm', sensitiveActionLimiter, async (req, res) => {
   if (!req.user) return res.status(401).json({ error: 'Not signed in' });
   const { secret, code } = req.body ?? {};
   if (!secret || !code) return res.status(400).json({ error: 'secret and code are required' });
-  if (!verifyTotpToken(secret, code)) return res.status(400).json({ error: 'Incorrect code — check the time on your device and try again' });
+  if (!verifyTotpToken(secret, code)) return res.status(400).json({ error: 'Incorrect code - check the time on your device and try again' });
 
   const encrypted = encryptTotpSecret(secret);
   await prisma.user.update({

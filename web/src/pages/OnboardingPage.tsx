@@ -56,7 +56,7 @@ export default function OnboardingPage() {
     <div>
       <h1>Onboarding</h1>
       <p className="muted">
-        For people we already want on the roster — skip the full application. Approving a
+        For people we already want on the roster - skip the full application. Approving a
         request generates a one-time link for them to set up their own account; copy it and send
         it however you'd like (no email is sent automatically).
       </p>

@@ -75,7 +75,7 @@ export default function ImportMappingPage() {
     <div>
       <h1>Import mapping</h1>
       <p className="muted" style={{ maxWidth: 640 }}>
-        Set once which CSV columns from your Wysiwyg patch export map onto each field — every
+        Set once which CSV columns from your Wysiwyg patch export map onto each field - every
         patch import then uses this automatically. Upload a sample export to pick columns from a
         list instead of typing them.
       </p>
@@ -108,7 +108,7 @@ export default function ImportMappingPage() {
                   <input
                     list={sampleHeaders.length ? 'sample-headers' : undefined}
                     value={mapping[key] ?? ''}
-                    placeholder="— not mapped —"
+                    placeholder="- not mapped -"
                     onChange={(e) => setMapping((m) => ({ ...m, [key]: e.target.value }))}
                     style={{ width: 260 }}
                   />

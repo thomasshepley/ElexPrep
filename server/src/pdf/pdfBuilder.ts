@@ -36,12 +36,12 @@ export function cellToPt(cell: CellGeometry, pageHeightIn: number): CellRectPt {
 
 /**
  * A striped background alternates two colors (e.g. Rigging's yellow/near-black hazard tape),
- * so a single flat text fill can only ever contrast reliably against ONE of the two — for
+ * so a single flat text fill can only ever contrast reliably against ONE of the two - for
  * exactly that reason, the color actually chosen for the fill often coincides with one of the
  * stripe colors (see textColorsFor in genericRenderer.ts), which would otherwise make the
  * text vanish into that stripe. The outline (drawn as offset copies of the opposite color,
  * behind the real text) is what keeps it legible there instead, so it has to read as a real,
- * fairly bold stroke — not just a hairline nudge — or it degrades to a thin, hard-to-read
+ * fairly bold stroke - not just a hairline nudge - or it degrades to a thin, hard-to-read
  * hollow outline exactly where the fill disappears. The radius scales with font size (pdf-lib
  * has no native text-stroke, so this is pure sampled copies) and samples a full ring of
  * points rather than just the 8 compass directions, so the stroke stays smooth at any size.
@@ -76,7 +76,7 @@ export function centerText(
 /**
  * Shrinks font size to fit `text` within `maxWidthPt` at `startSize`, down to `minSize`. If it
  * still doesn't fit at the minimum size (e.g. "Maverick Storm 1 Flex Hybrid"), trailing words
- * are dropped one at a time until what's left fits — so long fixture type names shorten to
+ * are dropped one at a time until what's left fits - so long fixture type names shorten to
  * something like "Maverick Storm 1" rather than overlapping or running off the label.
  */
 export function fitTextToWidth(
@@ -102,7 +102,7 @@ export function fitTextToWidth(
 /**
  * Draws an image to completely cover a rect edge-to-edge (like CSS `object-fit: cover`):
  * scales up to fill both dimensions, preserving aspect ratio, and clips the overflow rather
- * than letterboxing — so a banner-style image slot never shows gaps on the sides regardless
+ * than letterboxing - so a banner-style image slot never shows gaps on the sides regardless
  * of the source image's own aspect ratio.
  */
 export function drawImageCover(page: PDFPage, image: PDFImage, rect: CellRectPt) {
@@ -123,7 +123,7 @@ export function drawImageCover(page: PDFPage, image: PDFImage, rect: CellRectPt)
 }
 
 /**
- * Fills a rect with a resolved location color — a plain solid fill, or classic 45-degree
+ * Fills a rect with a resolved location color - a plain solid fill, or classic 45-degree
  * hazard-tape stripes (e.g. red/white for Spare, yellow/black for Rigging) when the rule
  * says so.
  */

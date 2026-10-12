@@ -5,7 +5,7 @@ import { AuthedUser, Role } from './auth';
 /**
  * Granular capabilities an admin can delegate to the USER role, beyond its fixed baseline.
  * ADMIN implicitly has every permission; SIGNAGE has none (it's hardcoded read-only elsewhere).
- * All default to false: introducing this system must not silently change existing behavior —
+ * All default to false: introducing this system must not silently change existing behavior -
  * every one of these previously required ADMIN outright, so an admin has to opt in to delegate.
  */
 export const PERMISSION_KEYS = [
@@ -66,7 +66,7 @@ export async function saveRolePermissions(patch: Partial<RolePermissions>): Prom
   return merged;
 }
 
-/** A specific USER account's override on top of the role baseline — null means none set (every
+/** A specific USER account's override on top of the role baseline - null means none set (every
  * key falls back to loadRolePermissions()). Lets one USER have different capabilities from
  * another, rather than every USER account sharing one identical policy. */
 export async function loadUserPermissionOverride(userId: string): Promise<Partial<RolePermissions> | null> {

@@ -50,7 +50,7 @@ function App() {
           <div className="sidebar-user">
             <div className="sidebar-user-row">
               <span className="avatar">{initial}</span>
-              <NavLink to="/settings/preferences" className="sidebar-username" aria-label={`${user.displayName} — preferences`}>
+              <NavLink to="/settings/preferences" className="sidebar-username" aria-label={`${user.displayName} - preferences`}>
                 {user.displayName}
               </NavLink>
             </div>

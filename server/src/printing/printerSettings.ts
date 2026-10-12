@@ -7,7 +7,7 @@ export type TrayKey = 'TRAY1' | 'TRAY2' | 'BYPASS';
 export interface TrayConfig {
   /** Human-readable name shown in the UI, e.g. "Tray 1". */
   label: string;
-  /** PJL MEDIASOURCE value used by the direct port-9100 path. Verify against the device —
+  /** PJL MEDIASOURCE value used by the direct port-9100 path. Verify against the device -
    * Konica/Develop bizhub-family values are typically TRAY1/TRAY2/MANUALFEED. */
   pjl: string;
   /** SumatraPDF `bin=` value used by the Windows agent. Get exact names from

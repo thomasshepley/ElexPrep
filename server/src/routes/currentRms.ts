@@ -17,7 +17,7 @@ import { normalizeCrewFeaturesPatch } from '../crewFeatures';
 
 export const currentRmsRouter = Router();
 
-// Connection config and manual sync stay ADMIN-only — they hold the API key and can hammer
+// Connection config and manual sync stay ADMIN-only - they hold the API key and can hammer
 // Current RMS's rate limit. Browsing/onboarding opportunities (below) is delegatable instead,
 // since onboarding a job is now the only way to create one at all.
 currentRmsRouter.get('/config', requireRole('ADMIN'), async (_req, res) => {
@@ -32,7 +32,7 @@ currentRmsRouter.put('/config', requireRole('ADMIN'), async (req, res) => {
     enabled: body.enabled ?? current.enabled,
     subdomain: body.subdomain !== undefined ? body.subdomain : current.subdomain,
     pollMinutes: body.pollMinutes ?? current.pollMinutes,
-    // Only overwrite the stored key if a non-empty one was actually submitted — this lets
+    // Only overwrite the stored key if a non-empty one was actually submitted - this lets
     // the settings form round-trip without the client ever needing to see the real key.
     // removeApiKey is the one explicit way to clear it instead of replacing it.
     apiKey: body.removeApiKey ? '' : body.apiKey ? body.apiKey : current.apiKey,
@@ -84,7 +84,7 @@ currentRmsRouter.get('/opportunities', requirePermission('onboardJobs'), async (
 });
 
 /** Attempts an automatic OneDrive folder match for a newly-onboarded job, or resolves a
- * manually-supplied path to a real folder if one was given instead. Never throws — a OneDrive
+ * manually-supplied path to a real folder if one was given instead. Never throws - a OneDrive
  * failure (not configured, no match, a transient Graph error) shouldn't block onboarding the
  * job itself, so this just falls back to "no folder linked yet" on any error. */
 async function resolveOneDriveFolderForOnboarding(
@@ -110,7 +110,7 @@ async function resolveOneDriveFolderForOnboarding(
 currentRmsRouter.post('/opportunities/:rmsId/import', requirePermission('onboardJobs'), async (req, res) => {
   const rmsId = Number(req.params.rmsId);
   const opp = await prisma.currentRmsOpportunity.findUnique({ where: { rmsId } });
-  if (!opp) return res.status(404).json({ error: 'Opportunity not cached — try syncing first' });
+  if (!opp) return res.status(404).json({ error: 'Opportunity not cached - try syncing first' });
 
   const existingJob = await prisma.job.findFirst({ where: { currentRmsOpportunityId: String(rmsId) } });
   if (existingJob) return res.status(409).json({ error: 'A job is already linked to this opportunity', job: existingJob });
@@ -121,7 +121,7 @@ currentRmsRouter.post('/opportunities/:rmsId/import', requirePermission('onboard
   const crewFeaturesJson = crewFeatures ? JSON.stringify(normalizeCrewFeaturesPatch(crewFeatures)) : null;
 
   // The review step on the dashboard pre-fills these from the opportunity and lets the admin
-  // override before the job is actually created — see JobsListPage's OnboardingOptionsForm.
+  // override before the job is actually created - see JobsListPage's OnboardingOptionsForm.
   const job = await prisma.job.create({
     data: {
       name: name || opp.subject,
@@ -139,7 +139,7 @@ currentRmsRouter.post('/opportunities/:rmsId/import', requirePermission('onboard
   res.status(201).json(job);
 });
 
-/** Bulk-onboards several cached opportunities at once — the dashboard's "Onboard N selected"
+/** Bulk-onboards several cached opportunities at once - the dashboard's "Onboard N selected"
  * action. Each one gets its own best-effort OneDrive auto-match (no manual override makes
  * sense across a batch of different jobs); the same crewFeatures patch, if given, applies to
  * all of them uniformly. Skips (rather than fails the whole batch) any opportunity that's
@@ -157,7 +157,7 @@ currentRmsRouter.post('/opportunities/bulk-import', requirePermission('onboardJo
     const rmsId = Number(raw);
     const opp = await prisma.currentRmsOpportunity.findUnique({ where: { rmsId } });
     if (!opp) {
-      skipped.push({ rmsId, reason: 'Not cached — try syncing first' });
+      skipped.push({ rmsId, reason: 'Not cached - try syncing first' });
       continue;
     }
     const existingJob = await prisma.job.findFirst({ where: { currentRmsOpportunityId: String(rmsId) } });
@@ -219,7 +219,7 @@ jobCurrentRmsRouter.get('/:jobId/current-rms/pick-list', async (req, res) => {
         ...i,
         prepped: preppedById.get(i.id) ?? false,
         // Current RMS's own opportunity-item status: 20 = "Booked Out" (physically out on
-        // hire) — this is CRMS's system of record, separate from ElexPrep's own `prepped`
+        // hire) - this is CRMS's system of record, separate from ElexPrep's own `prepped`
         // crew checklist above, which tracks warehouse prep independent of when someone
         // updates CRMS itself.
         bookedOut: typeof i.status === 'number' && i.status >= 20,
@@ -233,7 +233,7 @@ jobCurrentRmsRouter.get('/:jobId/current-rms/pick-list', async (req, res) => {
   }
 });
 
-/** Crew ticks an item off (or back on) as they physically pull it — ElexPrep's own tracking,
+/** Crew ticks an item off (or back on) as they physically pull it - ElexPrep's own tracking,
  * independent of whatever Current RMS's own line-item status says. */
 jobCurrentRmsRouter.put('/:jobId/current-rms/pick-list/:itemId/prepped', async (req, res) => {
   const { prepped } = req.body ?? {};
@@ -275,7 +275,7 @@ jobCurrentRmsRouter.post('/:jobId/current-rms/link', requirePermission('linkCurr
     const config = await getCurrentRmsConfig();
     if (config.enabled) snapshotJson = JSON.stringify(await fetchPickListSnapshot(config, Number(rmsId)));
   } catch {
-    // Not fatal — the link itself still succeeds; the next sync will establish it instead.
+    // Not fatal - the link itself still succeeds; the next sync will establish it instead.
   }
   const job = await prisma.job.update({
     where: { id: req.params.jobId },
@@ -313,7 +313,7 @@ jobCurrentRmsRouter.post('/:jobId/current-rms/acknowledge', async (req, res) => 
 
 /**
  * Explicit, admin-set links from this job to other Current RMS opportunities whose crew
- * charges should count toward its margin — for a separate "<Job> - Crewing" opportunity that
+ * charges should count toward its margin - for a separate "<Job> - Crewing" opportunity that
  * Current RMS didn't group under the same Project as the main opportunity (see
  * JobLinkedRmsOpportunity's schema comment). Same sensitivity tier as the margin view itself.
  */
@@ -359,7 +359,7 @@ function toMoney(value: string | undefined): number {
   return Number.isFinite(n) ? n : 0;
 }
 
-/** What one opportunity charges the client for crew/labour — the sum of every Service-type
+/** What one opportunity charges the client for crew/labour - the sum of every Service-type
  * line's pre-tax charge (not a Group row's own total, and not Current RMS's own per-asset
  * opportunity_cost, which this app doesn't read; see RawOpportunityItem). Service is this
  * account's existing convention for labour/setup lines (already relied on by the pick list's
@@ -373,7 +373,7 @@ function sumServiceCharge(items: RawOpportunityItem[]): number {
 }
 
 /** Per-line detail behind sumServiceCharge's total, for the side-by-side CRM-vs-ElexPrep
- * cross-reference on the crew margin view — lets an admin see e.g. "3x Lighting Technician"
+ * cross-reference on the crew margin view - lets an admin see e.g. "3x Lighting Technician"
  * on the Current RMS side next to their own crew assignments, to sanity-check man days. */
 function serviceLineItems(items: RawOpportunityItem[]): { name: string; quantity: number; rate: number; total: number }[] {
   return serviceItems(items).map((i) => {
@@ -390,13 +390,13 @@ function serviceLineItems(items: RawOpportunityItem[]): { name: string; quantity
 
 /**
  * Admin-only crew profit/cost view: what the client is charged for crew (from Current RMS,
- * summed across every opportunity sharing this job's Current RMS "project" — see
- * CurrentRmsOpportunity.projectId — plus any opportunity manually linked via
+ * summed across every opportunity sharing this job's Current RMS "project" - see
+ * CurrentRmsOpportunity.projectId - plus any opportunity manually linked via
  * JobLinkedRmsOpportunity, so a separate "<Job> - Crewing" opportunity counts too whether
  * Current RMS grouped it under the same Project or an admin had to say so explicitly) against
  * what ElexPrep's own records say crew actually cost on this job (JobCrewAssignment's day
  * rate override, or the crew member's own default, times the assignment's days). This is
- * financial margin data, same sensitivity tier as bank details/compliance documents — ADMIN
+ * financial margin data, same sensitivity tier as bank details/compliance documents - ADMIN
  * only, never delegated via the permissions system, and never surfaced in the freelancer-
  * facing crew portal.
  */
@@ -414,7 +414,7 @@ jobCurrentRmsRouter.get('/:jobId/current-rms/crew-margin', requireRole('ADMIN'),
     : [];
   const manualLinks = await prisma.jobLinkedRmsOpportunity.findMany({ where: { jobId: job.id } });
   // Always include the job's own linked opportunity even if it isn't cached locally yet (a
-  // sync hasn't run since it was linked) — siblings/manual links alone would silently drop it.
+  // sync hasn't run since it was linked) - siblings/manual links alone would silently drop it.
   const opportunityIds = [
     ...new Set([primaryRmsId, ...siblings.map((s) => s.rmsId), ...manualLinks.map((l) => l.rmsId)]),
   ];
@@ -449,7 +449,7 @@ jobCurrentRmsRouter.get('/:jobId/current-rms/crew-margin', requireRole('ADMIN'),
     : 0;
   const costBreakdown = assignments.map((a) => {
     // "Suggested" = what rate would apply if this assignment had no explicit override and
-    // wasn't zero-rated — the job's own day-rate field, falling back through the crew
+    // wasn't zero-rated - the job's own day-rate field, falling back through the crew
     // member's profile default to the portal-wide default. Shown to admins hovering the
     // day-rate cell so they can see what's actually driving the number vs. what they typed.
     const suggestedRate = toMoney(a.crewProfile.dayRate ?? undefined) || globalDefaultRate;

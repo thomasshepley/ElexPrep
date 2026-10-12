@@ -3,7 +3,7 @@ import { api, type CurrentRmsOpportunity, type CurrentRmsPickItem } from '../api
 import { useAuth } from '../auth/AuthContext';
 
 /** Current RMS sends quantity as a decimal string (e.g. "12.0"), same quirk as its money
- * fields — Number() strips the trailing .0 for a whole number while still showing real
+ * fields - Number() strips the trailing .0 for a whole number while still showing real
  * fractional quantities (e.g. "1.5") as-is. */
 function formatQuantity(q: unknown): string {
   const n = Number(q);
@@ -22,7 +22,7 @@ export default function CurrentRmsPanel({ jobId }: { jobId: string }) {
   const [linkInput, setLinkInput] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  // Current RMS's "Service" line items are typically labour/setup, not physical kit to prep —
+  // Current RMS's "Service" line items are typically labour/setup, not physical kit to prep -
   // defaulting to Rentals-only keeps the pick list focused on what crew actually need to pull.
   const [showAllTypes, setShowAllTypes] = useState(false);
   const [hiddenIds, setHiddenIds] = useState<Set<number>>(new Set());
@@ -75,11 +75,11 @@ export default function CurrentRmsPanel({ jobId }: { jobId: string }) {
   const unhideAll = () => setHiddenIds(new Set());
 
   // An Accessory row (opportunity_item_type 2) frequently carries no transaction_type_name of
-  // its own in Current RMS's response — it inherits its Principal's. Treating a blank as
+  // its own in Current RMS's response - it inherits its Principal's. Treating a blank as
   // "Rental" by default let Service accessory lines (e.g. a crew member's sub-line items)
   // leak through the Rentals-only filter, so look back to the nearest preceding Principal row
   // (type 1) for the type instead of trusting a missing field. A Group row (type 0) ends the
-  // lookback — it starts a new section.
+  // lookback - it starts a new section.
   const effectiveTransactionType = (all: CurrentRmsPickItem[], i: CurrentRmsPickItem, idx: number): string | undefined => {
     if (i.transaction_type_name) return i.transaction_type_name;
     if (i.opportunity_item_type !== 2) return i.transaction_type_name;
@@ -187,7 +187,7 @@ export default function CurrentRmsPanel({ jobId }: { jobId: string }) {
                 <tr>
                   <td>RMS last updated</td>
                   <td className="muted">
-                    {opportunity.rmsUpdatedAt ? new Date(opportunity.rmsUpdatedAt).toLocaleString() : '—'}
+                    {opportunity.rmsUpdatedAt ? new Date(opportunity.rmsUpdatedAt).toLocaleString() : '-'}
                   </td>
                 </tr>
               </tbody>
@@ -208,7 +208,7 @@ export default function CurrentRmsPanel({ jobId }: { jobId: string }) {
                 <p className="muted" style={{ fontSize: '0.85rem' }}>
                   {!showAllTypes && hiddenByTypeCount > 0 && (
                     <>
-                      Showing Rentals only — {hiddenByTypeCount} Service/Sale item{hiddenByTypeCount === 1 ? '' : 's'} hidden.{' '}
+                      Showing Rentals only - {hiddenByTypeCount} Service/Sale item{hiddenByTypeCount === 1 ? '' : 's'} hidden.{' '}
                       <button type="button" className="link-button" onClick={() => setShowAllTypes(true)}>
                         Show all types
                       </button>

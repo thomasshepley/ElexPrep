@@ -6,7 +6,7 @@ import PasswordInput from '../components/PasswordInput';
  * Azure app-registration credentials for the Microsoft Graph / OneDrive scaffold (see
  * server/src/oneDrive/). Until these are filled in with a real app registration (client-
  * credentials flow, Files.Read.All + Sites.Read.All application permissions granted by an
- * admin in Azure AD), `enabled` has no effect — every job's Files tab shows "not connected".
+ * admin in Azure AD), `enabled` has no effect - every job's Files tab shows "not connected".
  */
 export default function OneDriveSettingsPage() {
   const [config, setConfig] = useState<OneDriveConfig | null>(null);
@@ -78,7 +78,7 @@ export default function OneDriveSettingsPage() {
     <div>
       <h1>OneDrive</h1>
       <p className="muted">
-        Scaffolded against the Microsoft Graph API — matches each onboarded job to a folder under{' '}
+        Scaffolded against the Microsoft Graph API - matches each onboarded job to a folder under{' '}
         <code>{rootFolderPath || 'Projects'}/&lt;year&gt;/&lt;project name&gt;</code>, lets admins
         browse it and share individual files or folders with crew, and auto-surfaces the first PDF
         in a "CAD" subfolder on the job's Plots tab. Everything stays inert until a real Azure app
@@ -105,7 +105,7 @@ export default function OneDriveSettingsPage() {
             <br />
             <PasswordInput
               value={clientSecret}
-              placeholder={config.hasClientSecret ? '•••••••• (set — leave blank to keep)' : 'paste client secret'}
+              placeholder={config.hasClientSecret ? '•••••••• (set - leave blank to keep)' : 'paste client secret'}
               onChange={(e) => setClientSecret(e.target.value)}
               style={{ width: 260 }}
             />

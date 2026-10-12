@@ -2,7 +2,7 @@
  * Real-world patch exports (e.g. Wysiwyg patch reports) often have a few title/metadata rows
  * before the actual column header row, plus "Type: X" sub-group marker rows interspersed with
  * data further down. This scores each row's likelihood of being the real header row so callers
- * don't have to assume it's always row 1 — a header row is mostly-full of short text labels,
+ * don't have to assume it's always row 1 - a header row is mostly-full of short text labels,
  * whereas metadata rows are sparse and data rows are mostly numeric.
  */
 export function findHeaderRowIndex(rows: string[][], scanLimit = 40): number {

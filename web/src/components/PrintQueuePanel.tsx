@@ -123,7 +123,7 @@ export default function PrintQueuePanel({ jobId }: { jobId: string }) {
         </p>
         <p className="muted">
           Delivery method: <strong>{method === 'DRY_RUN' ? 'Dry run (no printing)' : method === 'DIRECT_9100' ? 'Direct network (port 9100)' : 'Windows agent'}</strong>
-          {' — '}configure in <Link to="/settings/printer">Printer Settings</Link>.
+          {' - '}configure in <Link to="/settings/printer">Printer Settings</Link>.
         </p>
       </div>
 
@@ -136,7 +136,7 @@ export default function PrintQueuePanel({ jobId }: { jobId: string }) {
         </div>
 
         {pendingItems.length === 0 && adHoc.length === 0 && (
-          <p className="muted">Nothing queued yet — build from patch/cases or add ad hoc labels.</p>
+          <p className="muted">Nothing queued yet - build from patch/cases or add ad hoc labels.</p>
         )}
 
         {error && <p className="error">{error}</p>}

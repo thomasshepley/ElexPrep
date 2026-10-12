@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { prisma } from '../db';
 
 /**
- * Self-service notifications for the signed-in account — every query is scoped to req.user.id,
+ * Self-service notifications for the signed-in account - every query is scoped to req.user.id,
  * never a client-supplied id, so this is safe to open to every role (ADMIN/USER/CREW), not just
  * staff. Polled by the sidebar bell in both shells rather than pushed.
  */

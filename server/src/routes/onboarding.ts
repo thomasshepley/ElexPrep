@@ -7,8 +7,8 @@ import { encryptBankDetails, parseBankDetails } from '../bankDetails';
 import { notifyOnboardingRequestSubmitted } from '../notifications';
 
 /**
- * The lighter-weight crew intake path — see OnboardingInvite's schema comment. Three audiences:
- * the public (submit a name, look up/complete an approved invite by its token — both exempted
+ * The lighter-weight crew intake path - see OnboardingInvite's schema comment. Three audiences:
+ * the public (submit a name, look up/complete an approved invite by its token - both exempted
  * from the session gate in auth.ts, same as the crew-applications public POST), and admin/staff
  * with manageCrewApplications (review the queue, approve/reject). Nothing here is reachable by
  * a CREW account; by the time one exists, onboarding for that person is already done.
@@ -22,7 +22,7 @@ function toInviteDto(i: { id: string; fullName: string; status: string; reviewed
     status: i.status,
     reviewedAt: i.reviewedAt,
     createdAt: i.createdAt,
-    // The token is the signup link itself — fine to show the admin who approved it, never to
+    // The token is the signup link itself - fine to show the admin who approved it, never to
     // anyone else, and never on the PENDING list before a decision has been made.
     token: i.status === 'APPROVED' ? i.token : null,
   };
@@ -75,7 +75,7 @@ onboardingRouter.post('/:id/reject', requirePermission('manageCrewApplications')
 });
 
 // Public: the invitee following their one-time link. Says just enough to greet them and decide
-// whether to show the completion form — never the full admin invite list shape.
+// whether to show the completion form - never the full admin invite list shape.
 onboardingRouter.get('/invite/:token', async (req, res) => {
   const invite = await prisma.onboardingInvite.findUnique({ where: { token: req.params.token } });
   if (!invite || invite.status === 'PENDING' || invite.status === 'REJECTED') {

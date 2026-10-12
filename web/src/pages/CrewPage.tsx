@@ -132,7 +132,7 @@ export default function CrewPage() {
           </div>
           <SkillPicker value={skills} onChange={setSkills} />
           <p className="muted" style={{ marginTop: '0.4rem' }}>
-            Set a rate card after adding them — expand their row with "Details".
+            Set a rate card after adding them - expand their row with "Details".
           </p>
           <button type="submit">Add crew member</button>
         </form>
@@ -171,11 +171,11 @@ export default function CrewPage() {
                 </td>
                 <td>
                   <div className="row" style={{ gap: '0.4rem' }}>
-                    {c.phone ?? '—'}
+                    {c.phone ?? '-'}
                     <WhatsAppButton phone={c.phone} label="WhatsApp" />
                   </div>
                 </td>
-                <td>{c.skills ?? '—'}</td>
+                <td>{c.skills ?? '-'}</td>
                 <td>
                   <label className="switch">
                     <input type="checkbox" checked={c.active} onChange={() => toggleActive(c)} />
@@ -442,7 +442,7 @@ function CrewDocumentsPanel({ crewId }: { crewId: string }) {
 }
 
 /**
- * Portal-wide fallback day rate — applied on the crew margin calculator when a job
+ * Portal-wide fallback day rate - applied on the crew margin calculator when a job
  * assignment has no rate override and the crew member has no profile default of their own.
  */
 function DefaultRatePanel() {
@@ -487,7 +487,7 @@ function DefaultRatePanel() {
 }
 
 /**
- * Lets an ADMIN who also works shifts show up as assignable crew without a second login —
+ * Lets an ADMIN who also works shifts show up as assignable crew without a second login -
  * picks from admin accounts that don't already have a crew profile (see
  * api.crew.adminCandidates), then calls api.crew.fromAdmin to attach a bare CrewProfile to
  * their existing User row.
@@ -527,7 +527,7 @@ function AddAdminAsCrewPanel({ onAdded }: { onAdded: () => void }) {
     <div className="panel">
       <h3>Add an admin as crew</h3>
       <p className="muted">
-        For staff who also work shifts — this makes their existing login assignable to jobs
+        For staff who also work shifts - this makes their existing login assignable to jobs
         without creating a second account.
       </p>
       <form onSubmit={add} className="row" style={{ alignItems: 'flex-end', gap: '0.6rem' }}>

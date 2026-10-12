@@ -4,7 +4,7 @@ import type { BankDetails } from '../api/client';
 const EMPTY: BankDetails = { accountName: '', sortCode: '', accountNumber: '', bankName: '' };
 
 /**
- * Structured bank details fields — replaces the old "upload a document" slot (see the schema
+ * Structured bank details fields - replaces the old "upload a document" slot (see the schema
  * comment on CrewProfile.bankDetailsCiphertext). Returns null to the caller when every field is
  * blank, so an untouched form never sends an empty-but-present bankDetails object.
  */
@@ -46,7 +46,7 @@ export default function BankDetailsForm({
         </div>
       </div>
       <p className="muted" style={{ marginTop: '0.3rem' }}>
-        Stored encrypted — only visible to admins reviewing compliance details, and to you.
+        Stored encrypted - only visible to admins reviewing compliance details, and to you.
       </p>
     </div>
   );

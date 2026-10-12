@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { BankDetails } from '../api/client';
 
 /**
- * "On file" until clicked — decrypting and displaying bank details is a deliberate, logged
+ * "On file" until clicked - decrypting and displaying bank details is a deliberate, logged
  * action (see the server routes' logActivity calls), not something that renders automatically
  * every time a page loads. fetchDetails is injected so this one component serves the admin
  * (api.crew.bankDetails / api.crewApplications.bankDetails) and crew self-service

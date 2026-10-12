@@ -8,7 +8,7 @@ const DIFF_POLL_MS = 20_000;
 /**
  * Chromeless fullscreen view for prep-bay TV screens: pick a job once, then it shows either
  * that job's Current RMS pick list (if linked) or the locally-generated case list (if not),
- * refreshing itself. Works with the read-only SIGNAGE role — the one exception is ticking an
+ * refreshing itself. Works with the read-only SIGNAGE role - the one exception is ticking an
  * item's prepped checkbox, which is explicitly allowlisted since prep is the whole point here.
  */
 export default function SignagePage() {
@@ -48,7 +48,7 @@ export default function SignagePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [job?.id, linked]);
 
-  // Polled separately (and more often) so the full-screen change alert shows up promptly —
+  // Polled separately (and more often) so the full-screen change alert shows up promptly -
   // this is cheap: it's just reading a column already on the job row, not a live CRMS call.
   useEffect(() => {
     if (!job || !linked) return;
@@ -90,7 +90,7 @@ export default function SignagePage() {
               onClick={() => setJob(j)}
             >
               {j.name}
-              {j.venue ? ` — ${j.venue}` : ''}
+              {j.venue ? ` - ${j.venue}` : ''}
             </button>
           ))}
           {jobs.length === 0 && <p className="muted">No jobs found.</p>}
@@ -139,7 +139,7 @@ export default function SignagePage() {
                 {groups.map((g) => (
                   <div key={g.id} style={{ fontSize: '1.5rem', padding: '0.25rem 0' }}>
                     <strong>{g.label}</strong>
-                    {g.location && <span className="muted" style={{ fontSize: '1.1rem' }}> — {g.location}</span>}
+                    {g.location && <span className="muted" style={{ fontSize: '1.1rem' }}> - {g.location}</span>}
                   </div>
                 ))}
               </div>
@@ -165,14 +165,14 @@ function PickListView({
   if (items.length === 0) return <p className="muted" style={{ fontSize: '1.4rem' }}>No items on this opportunity yet.</p>;
 
   // Group rows are Current RMS's own section headings (e.g. "Lighting - Moving Lights"),
-  // not real items to pick — shown as titles, excluded from the prepped count.
+  // not real items to pick - shown as titles, excluded from the prepped count.
   const pickable = items.filter((i) => !i.isGroup);
   const preppedCount = pickable.filter((i) => i.prepped).length;
 
   return (
     <div>
       <p className="muted" style={{ fontSize: '1.2rem', marginBottom: '1rem' }}>
-        {preppedCount} / {pickable.length} prepped — tap a row as you pull it
+        {preppedCount} / {pickable.length} prepped - tap a row as you pull it
       </p>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
         {items.map((item) => {
@@ -250,7 +250,7 @@ function PickListView({
 
 /**
  * Full-screen GitHub-diff-style alert: red for what was removed from the pick list, green for
- * what was added, orange for quantity changes — flashed the moment the sync poller detects the
+ * what was added, orange for quantity changes - flashed the moment the sync poller detects the
  * linked opportunity's items changed, until someone on this screen dismisses it.
  */
 function ItemsDiffOverlay({ diff, onDismiss }: { diff: PickListDiff; onDismiss: () => void }) {

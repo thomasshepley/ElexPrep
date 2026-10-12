@@ -2,7 +2,7 @@ import { prisma } from '../db';
 
 /**
  * The next free `order` value for a (jobId, labelType) group, continuing the shared
- * sequence across both PrintQueueItem and AdHocLabel — so newly-created rows append after
+ * sequence across both PrintQueueItem and AdHocLabel - so newly-created rows append after
  * whatever's already there instead of colliding at the default of 0.
  */
 export async function nextOrderStart(jobId: string, labelType: string): Promise<number> {

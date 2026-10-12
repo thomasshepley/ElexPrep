@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 
 /**
- * AES-256-GCM via Node's built-in crypto — right-sized for a small company's internal tool,
+ * AES-256-GCM via Node's built-in crypto - right-sized for a small company's internal tool,
  * not an enterprise KMS (see the plan). The key lives in CREW_DOC_ENCRYPTION_KEY (64 hex chars
  * = 32 bytes), checked lazily at first use rather than a hard startup crash, since most routes
  * never touch it and a misconfigured key shouldn't take down the whole server.
@@ -11,7 +11,7 @@ const ALGORITHM = 'aes-256-gcm';
 function loadKey(): Buffer {
   const raw = process.env.CREW_DOC_ENCRYPTION_KEY;
   if (!raw) {
-    throw new Error('CREW_DOC_ENCRYPTION_KEY is not set — crew document upload/download is unavailable');
+    throw new Error('CREW_DOC_ENCRYPTION_KEY is not set - crew document upload/download is unavailable');
   }
   const key = Buffer.from(raw, 'hex');
   if (key.length !== 32) {

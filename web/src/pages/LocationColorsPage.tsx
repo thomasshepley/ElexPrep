@@ -80,7 +80,7 @@ export default function LocationColorsPage() {
       <p className="muted">
         Colors the PAL label's location bar so crew can spot a case's stage position at a
         glance. Match the location string exactly as it appears on the patch/ad hoc label
-        (case-insensitive) — a location with no rule here prints with a neutral dark bar.
+        (case-insensitive) - a location with no rule here prints with a neutral dark bar.
       </p>
       <div className="panel">
         <h3>Add rule</h3>

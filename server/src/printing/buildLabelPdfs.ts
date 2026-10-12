@@ -30,7 +30,7 @@ function expandContent(
 
 /**
  * Combines queue items + ad hoc labels into one ordered list per label type, sorted by the
- * shared `order` field rather than simply concatenating queue-then-adhoc — so a manual
+ * shared `order` field rather than simply concatenating queue-then-adhoc - so a manual
  * reorder (which writes `order` across both sources in the same per-type sequence) is
  * respected when building the actual print PDF, not just whatever order the two tables
  * happen to return rows in.
@@ -52,7 +52,7 @@ export async function collectConfirmedContent(jobId: string): Promise<LabelConte
 }
 
 /**
- * The not-yet-confirmed view of the queue (PENDING items + ad hoc labels) — this is what the
+ * The not-yet-confirmed view of the queue (PENDING items + ad hoc labels) - this is what the
  * "what will actually print" preview renders, since it's what a user is looking at before
  * they've hit either confirm action.
  */
@@ -88,7 +88,7 @@ export async function renderLabelType(
   return renderLabelTypeGeneric(doc, template, items, locationColors, logoImage);
 }
 
-/** One PDF per label type — the unit a print job (and its tray selection) operates on. */
+/** One PDF per label type - the unit a print job (and its tray selection) operates on. */
 export async function buildPdfPerType(
   jobId: string,
   byType: LabelContentByType
@@ -106,7 +106,7 @@ export async function buildPdfPerType(
   return out;
 }
 
-/** All types combined into a single PDF — used for both the manual download and the live preview. */
+/** All types combined into a single PDF - used for both the manual download and the live preview. */
 export async function buildCombinedPdf(jobId: string, byType: LabelContentByType): Promise<Buffer> {
   const locationColors = await loadLocationColorMap(jobId);
   const doc = await PDFDocument.create();
@@ -119,10 +119,10 @@ export async function buildCombinedPdf(jobId: string, byType: LabelContentByType
 
 /**
  * PAL content collated 4-up onto an Avery 105x148-R sheet (A4 landscape, plain paper + Avery
- * self-adhesive stock) instead of PAL's usual one-per-page direct-to-label-printer output —
+ * self-adhesive stock) instead of PAL's usual one-per-page direct-to-label-printer output -
  * a separate export for print shops/offices without the dedicated die-cut label printer.
  * Reuses the job's own (possibly customized) PAL template content/logo, swapping only the
- * sheet geometry — see PAL_AVERY_SHEET's own comment for why the same element layout carries
+ * sheet geometry - see PAL_AVERY_SHEET's own comment for why the same element layout carries
  * over to the physically larger Avery label without needing its own template.
  */
 export async function buildPalAverySheetPdf(jobId: string, items: unknown[]): Promise<Buffer> {

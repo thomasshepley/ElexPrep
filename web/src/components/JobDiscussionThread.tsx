@@ -9,7 +9,7 @@ function formatTime(iso: string): string {
 }
 
 /**
- * A flat, chronological message thread for one job — shared by the admin job detail page's
+ * A flat, chronological message thread for one job - shared by the admin job detail page's
  * Discussion tab and the crew portal job page's Discussion card, parameterized only by which
  * API surface to call (same message model underneath; see routes/jobDiscussion.ts and
  * crewPortal.ts's /me/jobs/:jobId/discussion). Polls like NotificationBell rather than pushing,
@@ -27,7 +27,7 @@ export default function JobDiscussionThread({ jobId, scope }: { jobId: string; s
   const send = scope === 'staff' ? api.jobDiscussion.send : api.crewPortal.discussion.send;
   const remove = scope === 'staff' ? api.jobDiscussion.remove : api.crewPortal.discussion.remove;
   // Staff with the moderateDiscussion permission (ADMIN always has it) can remove anyone's
-  // message; crew can only ever remove their own — see routes/jobDiscussion.ts's and
+  // message; crew can only ever remove their own - see routes/jobDiscussion.ts's and
   // crewPortal.ts's matching server-side checks, which this only mirrors for the UI affordance.
   const canModerate = scope === 'staff' && Boolean(user?.permissions?.moderateDiscussion);
 
@@ -74,7 +74,7 @@ export default function JobDiscussionThread({ jobId, scope }: { jobId: string; s
     <div className="discussion-thread">
       <div className="discussion-messages" ref={listRef}>
         {messages === null && <p className="muted">Loading…</p>}
-        {messages !== null && messages.length === 0 && <p className="muted">No messages yet — say hello.</p>}
+        {messages !== null && messages.length === 0 && <p className="muted">No messages yet - say hello.</p>}
         {messages?.map((m) => {
           const isOwn = m.authorUserId === user?.id;
           const canDelete = isOwn || canModerate;

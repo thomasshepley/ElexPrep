@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 
 /**
  * A custom, canvas-rendered PDF viewer (pdf.js), used instead of the browser's own PDF plugin
- * (an <iframe src="...pdf">) so CAD plans render identically everywhere — the native plugin
+ * (an <iframe src="...pdf">) so CAD plans render identically everywhere - the native plugin
  * varies by browser/OS and is often unavailable at all on mobile, which matters for CAD/plots
  * viewed on-site from a phone. Page navigation and zoom are deliberately minimal: this is a
  * "look at the plan" viewer, not a general-purpose PDF reader.

@@ -16,6 +16,6 @@ export function applyTheme(theme: Theme) {
   try {
     localStorage.setItem(STORAGE_KEY, theme);
   } catch {
-    // Private browsing or storage disabled — theme still applies for this page load.
+    // Private browsing or storage disabled - theme still applies for this page load.
   }
 }

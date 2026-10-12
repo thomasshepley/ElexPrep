@@ -18,7 +18,7 @@ import { getOneDriveConfig } from '../oneDrive/config';
 /**
  * Self-service data for a logged-in CREW account: their own profile, the jobs they're
  * assigned to, and (for the job detail page) the Who/What/When/Where a crew member needs.
- * Everything here is scoped to the caller's own CrewProfile — there is no way to pass
+ * Everything here is scoped to the caller's own CrewProfile - there is no way to pass
  * someone else's id and see their data, since every query starts from req.user.id, not from
  * a client-supplied id. Mounted at /api/crew, BEFORE the admin-only roster router (routes/
  * crew.ts) at the same prefix, so these specific paths are tried first and everything else
@@ -32,7 +32,7 @@ async function ownProfile(userId: string) {
 
 /**
  * Resolves the caller's own profile + their assignment to jobId, or null if either doesn't
- * exist — the shared "are you actually on this job" check every /me/jobs/:jobId/* sub-route
+ * exist - the shared "are you actually on this job" check every /me/jobs/:jobId/* sub-route
  * below needs before touching that job's data at all.
  */
 async function requireAssignedJob(userId: string, jobId: string) {
@@ -45,7 +45,7 @@ async function requireAssignedJob(userId: string, jobId: string) {
   return assignment ? { profile, assignment } : null;
 }
 
-// requireRole('CREW') is applied per-route below, not as a router-wide `.use()` — a router-wide
+// requireRole('CREW') is applied per-route below, not as a router-wide `.use()` - a router-wide
 // guard would run (and reject with 403) for EVERY request under /api/crew/*, including ones
 // that don't match any route here, which would stop them from ever falling through to the
 // admin-only roster router mounted after this one at the same prefix.
@@ -70,8 +70,8 @@ crewPortalRouter.get('/me', requireRole('CREW'), async (req, res) => {
   });
 });
 
-// Self-service profile edit — deliberately excludes dayRate (admin-set compensation data,
-// superseded by the crew member's own rate card — see the rate-lines routes below) and
+// Self-service profile edit - deliberately excludes dayRate (admin-set compensation data,
+// superseded by the crew member's own rate card - see the rate-lines routes below) and
 // displayName/password (already handled by the role-agnostic /api/auth/me). A crew member can
 // only ever touch their own row here: there's no id in the request, it's always ownProfile(req.user.id).
 crewPortalRouter.put('/me', requireRole('CREW'), async (req, res) => {
@@ -127,7 +127,7 @@ crewPortalRouter.put('/me', requireRole('CREW'), async (req, res) => {
   });
 });
 
-// A crew member viewing their own bank details — no admin gate needed since it's their own
+// A crew member viewing their own bank details - no admin gate needed since it's their own
 // data, but still logged the same as every other bank-details read.
 crewPortalRouter.get('/me/bank-details', requireRole('CREW'), async (req, res) => {
   const profile = await ownProfile(req.user!.id);
@@ -140,7 +140,7 @@ crewPortalRouter.get('/me/bank-details', requireRole('CREW'), async (req, res) =
   res.json(details);
 });
 
-// Self-service rate card — mirrors routes/crew.ts's admin rate-line CRUD, scoped to the
+// Self-service rate card - mirrors routes/crew.ts's admin rate-line CRUD, scoped to the
 // caller's own profile. See CrewRateLine's schema comment for the model itself.
 crewPortalRouter.get('/me/rate-lines', requireRole('CREW'), async (req, res) => {
   const profile = await ownProfile(req.user!.id);
@@ -335,7 +335,7 @@ crewPortalRouter.get('/me/jobs/:jobId/plots/:plotId/file', requireRole('CREW'), 
 
 /**
  * OneDrive-sourced CAD/files for the crew CAD section: the auto-detected first PDF in the
- * job's matched "CAD" folder (always surfaced once a folder's linked — see oneDrive/cad.ts),
+ * job's matched "CAD" folder (always surfaced once a folder's linked - see oneDrive/cad.ts),
  * plus anything else an admin has explicitly shared with crew via the Files tab. Both are
  * scaffolded against the Graph API and return empty/null until OneDrive is actually
  * configured with real Azure credentials (see oneDrive/config.ts).
@@ -353,7 +353,7 @@ crewPortalRouter.get('/me/jobs/:jobId/onedrive', requireRole('CREW'), async (req
 });
 
 /** Streams a OneDrive item's bytes through our own auth, rather than handing the crew member a
- * raw Graph URL — scaffolded; throws a clear "not configured" error until real credentials are
+ * raw Graph URL - scaffolded; throws a clear "not configured" error until real credentials are
  * wired in (see oneDrive/client.ts). */
 crewPortalRouter.get('/me/jobs/:jobId/onedrive/:itemId/file', requireRole('CREW'), async (req, res) => {
   const found = await requireAssignedJob(req.user!.id, req.params.jobId);
@@ -375,7 +375,7 @@ crewPortalRouter.get('/me/jobs/:jobId/onedrive/:itemId/file', requireRole('CREW'
 });
 
 /**
- * Kit list, no pricing — reuses fetchPickListSnapshot (the same pricing-free {id, name,
+ * Kit list, no pricing - reuses fetchPickListSnapshot (the same pricing-free {id, name,
  * quantity} shape the pick-list-diff alert already uses), not the admin/signage pick-list
  * endpoint, which spreads the full raw Current RMS item (including whatever price fields the
  * account's response carries) into its response.
@@ -399,7 +399,7 @@ crewPortalRouter.get('/me/jobs/:jobId/kit-list', requireRole('CREW'), async (req
 /**
  * The "request to prep system" form: a crew member builds a label with the same type + content
  * fields the admin's ad hoc label creator uses (see web's LabelTypeForm, shared by both), but
- * it lands as a PENDING CrewLabelRequest, not directly in the print queue or Labels tab — an
+ * it lands as a PENDING CrewLabelRequest, not directly in the print queue or Labels tab - an
  * admin/staff member has to approve it first (routes/crewLabelRequests.ts), at which point it
  * becomes a real AdHocLabel attributed back to this crew member.
  */
@@ -479,7 +479,7 @@ crewPortalRouter.post('/me/jobs/:jobId/discussion', requireRole('CREW'), async (
   res.status(201).json(toDiscussionMessageDto(message));
 });
 
-// A crew member can only ever delete their own message — no moderation permission applies on
+// A crew member can only ever delete their own message - no moderation permission applies on
 // this side, matching routes/jobDiscussion.ts's staff-side moderateDiscussion check.
 crewPortalRouter.delete('/me/jobs/:jobId/discussion/:messageId', requireRole('CREW'), async (req, res) => {
   const found = await requireAssignedJob(req.user!.id, req.params.jobId);

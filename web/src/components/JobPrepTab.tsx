@@ -9,7 +9,7 @@ type PrepTab = (typeof PREP_TABS)[number];
 
 /**
  * Patch Import / Cases / Labels / Print Queue combined under one "Prep" tab, switching via
- * sub-tabs — these four used to be separate top-level tabs, which got messy since they're all
+ * sub-tabs - these four used to be separate top-level tabs, which got messy since they're all
  * steps of the same prep workflow (import fixtures, pack cases, generate labels, print them).
  */
 export default function JobPrepTab({ jobId }: { jobId: string }) {

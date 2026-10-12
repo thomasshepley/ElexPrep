@@ -3,7 +3,7 @@ import { prisma, logActivity } from '../db';
 import { requireRole } from '../auth';
 
 /**
- * A job's day schedule — timed entries (load-in, soundcheck, doors, show, get-out, ...)
+ * A job's day schedule - timed entries (load-in, soundcheck, doors, show, get-out, ...)
  * rendered as a timeline on both the admin job detail page and the crew portal's "Why"
  * section. Reads are open to any signed-in staff account (mirrors jobCurrentRmsRouter's
  * reasoning: anyone who can see the job should see its schedule); writes are admin-only, same

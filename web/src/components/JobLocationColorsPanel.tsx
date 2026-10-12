@@ -20,7 +20,7 @@ function swatchBackground(rule: Pick<LocationColorRule, 'color' | 'pattern' | 's
 }
 
 /**
- * Per-job location color overrides — for jobs whose patch uses stage location names that
+ * Per-job location color overrides - for jobs whose patch uses stage location names that
  * don't match the house defaults in Settings -> Location Colors (e.g. "Cube North", "Entrance
  * Arch Top" instead of "Floor"/"Downstage"/etc). A rule added here only affects this job's PAL
  * labels, and takes precedence over a global rule of the same name if one exists.
@@ -89,7 +89,7 @@ export default function JobLocationColorsPanel({ jobId }: { jobId: string }) {
         <a href="/settings/location-colors" target="_blank" rel="noreferrer">
           Settings → Location Colors
         </a>{' '}
-        for jobs whose patch uses different location names — match the location exactly as it
+        for jobs whose patch uses different location names - match the location exactly as it
         appears in this job's patch (case-insensitive).
       </p>
       <form className="row" onSubmit={create}>

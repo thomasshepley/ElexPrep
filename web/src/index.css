@@ -1,8 +1,8 @@
 /*
- * Design tokens — established via an Apple-HIG-grounded design pass (see the apple-design
+ * Design tokens - established via an Apple-HIG-grounded design pass (see the apple-design
  * skill's accessibility/color lenses). Two concrete contrast bugs fixed here: white button
  * text on --accent and --danger both fell under the 4.5:1 minimum for normal-weight text
- * (3.22:1 and 3.01:1 respectively) — each signal color now has a lighter "foreground" shade
+ * (3.22:1 and 3.01:1 respectively) - each signal color now has a lighter "foreground" shade
  * (for text/links/icons on a dark surface) and, where it's ever used as a solid button fill,
  * a separate darker "-fill" shade verified at >=4.5:1 against white text. Light-mode values
  * are provided (prefers-color-scheme) so the app follows the OS setting; dark remains the
@@ -20,14 +20,14 @@
   --content: #e4e4e7;
   --content-muted: #9a9aa2;
 
-  /* Accent (brand blue) — --accent for text/links/icons on a dark surface (5.6:1), --accent-fill
+  /* Accent (brand blue) - --accent for text/links/icons on a dark surface (5.6:1), --accent-fill
      for solid button backgrounds with white text (4.7:1 with #fff). */
   --accent: #4f8cff;
   --accent-fill: #2f6fe0;
   --accent-wash: rgba(79, 140, 255, 0.14);
 
   /* Signal colors. --success/--warning reuse the exact hex already used for "Floor"/an amber
-     gel tone in the location-color system (see shared/src/locationColors.ts) — the same
+     gel tone in the location-color system (see shared/src/locationColors.ts) - the same
      contrast-adaptive text-color logic used for printed labels (light text on a dark fill,
      dark text on a light fill) applies here via --on-success/--on-warning. */
   --danger: #ff5d5d;
@@ -37,7 +37,7 @@
   --warning: #d98c22;
   --on-warning: #211604;
 
-  /* Elevation — soft, theme-aware shadows so raised surfaces (panels, cards, the header) read
+  /* Elevation - soft, theme-aware shadows so raised surfaces (panels, cards, the header) read
      as physically above the page instead of just outlined. Kept subtle on purpose: Apple's own
      guidance is to differentiate controls from content without resorting to heavy drop shadows. */
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.03);
@@ -65,7 +65,7 @@
 
   font: 15px/1.5 system-ui, 'Segoe UI', Roboto, sans-serif;
 
-  /* Legacy aliases kept during the rebrand — existing components still reference these;
+  /* Legacy aliases kept during the rebrand - existing components still reference these;
      new/updated components should use the roles above directly. */
   --bg: var(--surface);
   --panel: var(--surface-raised);
@@ -73,7 +73,7 @@
   --text-dim: var(--content-muted);
 }
 
-/* Dark is the default regardless of OS preference — light is opt-in only, toggled via
+/* Dark is the default regardless of OS preference - light is opt-in only, toggled via
    ThemeToggle and persisted in localStorage (see theme.ts and index.html's pre-paint script,
    which sets this same attribute before React loads to avoid a flash of the wrong theme). */
 :root[data-theme='light'] {
@@ -221,7 +221,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
   box-shadow: 0 0 0 3px var(--accent-wash);
 }
 
-/* A labeled form field — the label is persistent (not a placeholder standing in for it), with
+/* A labeled form field - the label is persistent (not a placeholder standing in for it), with
    the placeholder reserved for a short example/hint, per writing.md's "label all fields
    clearly, and use hint or placeholder text" (two different things, not one). */
 .field {
@@ -435,7 +435,7 @@ tbody tr:hover {
 }
 
 /* A clickable/hoverable card that isn't a navigation link (e.g. the crew job page's
-   expand/collapse cards) — same lift treatment as .job-card without the anchor semantics. */
+   expand/collapse cards) - same lift treatment as .job-card without the anchor semantics. */
 .card-interactive {
   cursor: pointer;
   transition: transform 150ms ease, box-shadow 150ms ease, border-color 150ms ease;
@@ -504,7 +504,7 @@ tbody tr:hover {
   outline-offset: 2px;
 }
 
-/* Chip-style multi-select for the crew skill taxonomy (see SkillPicker) — each chip wraps a
+/* Chip-style multi-select for the crew skill taxonomy (see SkillPicker) - each chip wraps a
    visually-hidden real checkbox so it keeps native checkbox semantics/keyboard behavior, same
    approach as .switch and .file-input. */
 .skill-picker {
@@ -589,7 +589,7 @@ tbody tr:hover {
   font-weight: 600;
 }
 
-/* A secondary, nested tab row (e.g. switching between a job's CAD plots) — same behavior as
+/* A secondary, nested tab row (e.g. switching between a job's CAD plots) - same behavior as
    .tabs, smaller so it doesn't visually compete with the page's primary tab row. */
 .tabs-sub {
   margin-bottom: var(--space-3);
@@ -601,7 +601,7 @@ tbody tr:hover {
 }
 
 /* A page's internal tabs rendered as a vertical secondary nav to the right of the main sidebar
-   (replaces a horizontal .tabs row for pages with enough sections that wrapping gets messy —
+   (replaces a horizontal .tabs row for pages with enough sections that wrapping gets messy -
    e.g. Settings, a job's detail page). Collapses back to a horizontal scrollable row on narrow
    viewports, same as .tabs already does. */
 .secondary-shell {
@@ -698,9 +698,9 @@ tbody tr:hover {
 }
 
 /*
- * Chip — the app's one signature element. Rather than a generic badge, it reuses the exact
+ * Chip - the app's one signature element. Rather than a generic badge, it reuses the exact
  * color language already used on physical printed labels (the location-color system: Floor,
- * Downstage, Spare, Rigging...) as a consistent status motif across the whole UI — job status,
+ * Downstage, Spare, Rigging...) as a consistent status motif across the whole UI - job status,
  * print job state, and (later) crew roles all read through the same visual language the crew
  * already sees on the labels themselves.
  */
@@ -742,7 +742,7 @@ tbody tr:hover {
   border-color: transparent;
 }
 
-/* A softer tint for frequently-repeated chips (e.g. a crew member's role, once per row) —
+/* A softer tint for frequently-repeated chips (e.g. a crew member's role, once per row) -
    full solid-fill chips are reserved for a single state signal per screen; a wash keeps a list
    of many chips calm instead of a wall of solid blue. */
 .chip-role {
@@ -759,7 +759,7 @@ tbody tr:hover {
 }
 
 /*
- * Expandable info card (crew job page's Who/What/When/Where) — the trigger is a real <button>
+ * Expandable info card (crew job page's Who/What/When/Where) - the trigger is a real <button>
  * wrapped in a heading, per the WAI-ARIA disclosure pattern, instead of resetting a button with
  * `all: unset` (which previously stripped the global focus-visible outline for keyboard users).
  * Only the specific properties that need overriding are touched here, so button:focus-visible
@@ -828,7 +828,7 @@ tbody tr:hover {
 }
 
 /*
- * Login page — the one screen that gets its own fixed dark treatment regardless of the
+ * Login page - the one screen that gets its own fixed dark treatment regardless of the
  * visitor's OS light/dark preference (same call plenty of products make: the entrance is a
  * deliberate brand moment, the product itself stays theme-adaptive utility). Implemented by
  * redeclaring the token values on this one scope rather than one-off colors, so every existing
@@ -871,7 +871,7 @@ tbody tr:hover {
 }
 
 /* A wider variant for longer forms on the same branded entrance treatment (e.g. the public
-   crew application) — everything else about .auth-card stays the same. */
+   crew application) - everything else about .auth-card stays the same. */
 .auth-card-wide {
   max-width: 640px;
 }
@@ -917,7 +917,7 @@ tbody tr:hover {
   padding: 0.65rem var(--space-4);
 }
 
-/* Dashboard toolbar — a search field (with a leading icon) plus a primary action, in one row. */
+/* Dashboard toolbar - a search field (with a leading icon) plus a primary action, in one row. */
 .toolbar {
   display: flex;
   align-items: center;
@@ -1037,7 +1037,7 @@ tbody tr:hover {
   flex-shrink: 0;
 }
 
-/* MonthCalendar — a Google-Calendar-style month grid shared by the admin dashboard and the
+/* MonthCalendar - a Google-Calendar-style month grid shared by the admin dashboard and the
    crew portal's own schedule view. */
 .month-calendar-weekdays {
   display: grid;
@@ -1126,7 +1126,7 @@ tbody tr:hover {
   padding: 0 0.2rem;
 }
 
-/* DayTimeline — a single-day Google-Calendar-style vertical agenda for a job's schedule,
+/* DayTimeline - a single-day Google-Calendar-style vertical agenda for a job's schedule,
    positioned proportionally to time-of-day rather than just a flat list. */
 .day-timeline {
   position: relative;
@@ -1169,7 +1169,7 @@ tbody tr:hover {
   border-left: 3px solid var(--accent);
   border-radius: var(--radius-sm);
   padding: 0.3rem 0.6rem;
-  /* Deliberately no overflow:hidden — a short time slot still shows its full title/notes by
+  /* Deliberately no overflow:hidden - a short time slot still shows its full title/notes by
      growing past its nominal duration height (min-height, not height, on the element) rather
      than clipping text. A slightly-taller-than-proportional block reads better than cut-off
      text. */
@@ -1192,7 +1192,7 @@ tbody tr:hover {
   color: var(--content-muted);
 }
 
-/* NotificationBell — a sidebar button that opens a small panel upward (the sidebar sits at
+/* NotificationBell - a sidebar button that opens a small panel upward (the sidebar sits at
    the bottom of the viewport in both shells, so the panel has more room above than below). */
 .notification-bell {
   position: relative;
@@ -1218,7 +1218,7 @@ tbody tr:hover {
 }
 
 /* position:fixed with left/bottom set inline from the trigger button's measured position (see
-   NotificationBell.tsx) — the sidebar's own overflow-y:auto implicitly clips overflow-x too
+   NotificationBell.tsx) - the sidebar's own overflow-y:auto implicitly clips overflow-x too
    (the CSS "swap visible for auto" rule), which would otherwise cut this panel off at the
    sidebar's edge if it were positioned relative to an ancestor inside that scroll container. */
 .notification-panel {
@@ -1286,7 +1286,7 @@ tbody tr:hover {
   margin-top: 0.3rem;
 }
 
-/* Job discussion thread (see JobDiscussionThread) — a flat message list with a compose bar,
+/* Job discussion thread (see JobDiscussionThread) - a flat message list with a compose bar,
    shared by the staff Discussion tab and the crew portal's Discussion card. */
 .discussion-thread {
   display: flex;
@@ -1345,7 +1345,7 @@ tbody tr:hover {
   flex: 1;
 }
 
-/* A collapsible form section (see CertificationPicker) — keeps optional, rarely-filled fields
+/* A collapsible form section (see CertificationPicker) - keeps optional, rarely-filled fields
    out of the way without a separate "show more" button to wire up. */
 .field-disclosure {
   border: 1px solid var(--border);
@@ -1389,7 +1389,7 @@ tbody tr:hover {
   gap: 0.4rem;
 }
 
-/* Structured bank details fields (see BankDetailsForm) — a tight 2-column grid that collapses
+/* Structured bank details fields (see BankDetailsForm) - a tight 2-column grid that collapses
    to 1 column on narrow viewports, consistent with the app's mobile breakpoint elsewhere. */
 .bank-details-grid {
   display: grid;
@@ -1405,7 +1405,7 @@ tbody tr:hover {
 
 /* Crew-defined rate card (see RateCardEditor): the general rate is always visible; the
    role-specific suggestions reveal with a brief slide/fade once it has a value, rather than
-   appearing instantly — a short, purposeful animation on a rarely-repeated action, not a
+   appearing instantly - a short, purposeful animation on a rarely-repeated action, not a
    frequent interaction (see motion.md's guidance this codebase already follows elsewhere). */
 .rate-card-extra {
   overflow: hidden;
@@ -1450,7 +1450,7 @@ tbody tr:hover {
   cursor: default;
 }
 
-/* A WhatsApp deep link (wa.me) — green is a deliberate exception to the chip color language
+/* A WhatsApp deep link (wa.me) - green is a deliberate exception to the chip color language
    (see .chip's comment): it borrows WhatsApp's own brand color so the button reads at a glance
    as "this opens WhatsApp", same reasoning a payment button borrows its provider's mark. */
 .whatsapp-button {

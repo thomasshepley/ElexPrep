@@ -5,7 +5,7 @@ import { CREW_SKILLS, formatSkills, parseSkills } from '@elexprep/shared';
  * Multi-select for the fixed crew skill taxonomy, plus a free-text "other" catch-all so an
  * existing record's non-taxonomy skills (or a genuinely unusual one) are never dropped. Reads
  * and writes the same comma-separated string CrewProfile.skills/CrewApplication.skills already
- * store — used by both the admin crew form and the public application form (see LabelTypeForm
+ * store - used by both the admin crew form and the public application form (see LabelTypeForm
  * for the equivalent shared-component pattern with ad hoc labels).
  */
 export default function SkillPicker({ value, onChange }: { value: string; onChange: (next: string) => void }) {

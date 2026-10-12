@@ -34,7 +34,7 @@ jobsRouter.get('/', async (req, res) => {
   res.json(jobs);
 });
 
-// Jobs can no longer be created directly — every job enters the portal by onboarding a
+// Jobs can no longer be created directly - every job enters the portal by onboarding a
 // Current RMS Quote/Order (see routes/currentRms.ts's import/bulk-import endpoints), so the
 // job list and its data (crew features, OneDrive folder, etc.) always starts from a real
 // opportunity rather than a blank admin-typed name.

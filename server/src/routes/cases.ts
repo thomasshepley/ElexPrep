@@ -48,7 +48,7 @@ casesRouter.get('/:jobId/cases', async (req, res) => {
   res.json(records.map(serializeCase));
 });
 
-/** Adds a single manual case row — for cases the algorithm didn't create (or got wrong)
+/** Adds a single manual case row - for cases the algorithm didn't create (or got wrong)
  * without needing a full regenerate, which would wipe every other manual edit. */
 casesRouter.post('/:jobId/cases', async (req, res) => {
   const { fixtureType, label, location, addresses } = req.body ?? {};
@@ -69,7 +69,7 @@ casesRouter.post('/:jobId/cases', async (req, res) => {
 });
 
 /**
- * Bulk endpoints must be registered before the /:id routes below — Express matches routes in
+ * Bulk endpoints must be registered before the /:id routes below - Express matches routes in
  * registration order, and a literal "bulk" segment would otherwise be swallowed by :id.
  */
 casesRouter.put('/:jobId/cases/bulk', async (req, res) => {

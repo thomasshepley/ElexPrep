@@ -1,6 +1,6 @@
 /**
  * Given a free-text address, shows a small embedded map pin plus "Open in" deep links for
- * Google Maps, Apple Maps, Waze, and What3Words — all plain https:// links, no API keys. The
+ * Google Maps, Apple Maps, Waze, and What3Words - all plain https:// links, no API keys. The
  * embedded preview uses Google's no-key map embed (maps.google.com/maps?...&output=embed);
  * the "Open in" links work regardless if that ever changes.
  */

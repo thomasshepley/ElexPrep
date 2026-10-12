@@ -24,7 +24,7 @@ export function requestContextMiddleware(req: Request, _res: Response, next: Nex
   storage.run(context, next);
 }
 
-/** Null outside an HTTP request (a background timer, a script) — logActivity treats that as
+/** Null outside an HTTP request (a background timer, a script) - logActivity treats that as
  * "no IP/user-agent to record" rather than an error. */
 export function getRequestContext(): RequestContext | null {
   return storage.getStore() ?? null;

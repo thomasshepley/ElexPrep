@@ -6,7 +6,7 @@ import { printJobFilePath } from '../printing/printJobService';
 
 /**
  * Endpoints for the Windows print agent (agent/ in this repo). The agent is not a browser
- * session — it authenticates with the static token from Printer Settings via the
+ * session - it authenticates with the static token from Printer Settings via the
  * X-Agent-Token header.
  */
 export const agentRouter = Router();

@@ -19,7 +19,7 @@ export default function UsersPage() {
   const [showBaseline, setShowBaseline] = useState(false);
 
   // CREW accounts are real rows from GET /api/users (it's unfiltered), but this page's own
-  // role <select> only ever offers ADMIN/USER/SIGNAGE — a CREW row would render a dropdown
+  // role <select> only ever offers ADMIN/USER/SIGNAGE - a CREW row would render a dropdown
   // whose value matches none of its options, which browsers silently resolve to the first
   // option (ADMIN), visually misrepresenting a crew login as an admin one. They're managed on
   // the Crew page instead, so they're filtered out here rather than ever rendering that select.
@@ -278,7 +278,7 @@ function UserPermissionsPanel({ userId }: { userId: string }) {
   );
 }
 
-/** The shared USER-role baseline (what every USER account can do by default) — formerly its
+/** The shared USER-role baseline (what every USER account can do by default) - formerly its
  * own top-level Settings page; folded in here so permissions live in one "Users" tab, with the
  * per-account override (UserPermissionsPanel, above) right below it as the next layer down. */
 function RoleBaselinePanel() {

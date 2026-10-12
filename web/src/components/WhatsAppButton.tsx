@@ -10,7 +10,7 @@ function toWhatsAppDigits(phone: string): string {
 }
 
 /**
- * A "Chat on WhatsApp" deep link (wa.me) for a crew member's phone number — no WhatsApp
+ * A "Chat on WhatsApp" deep link (wa.me) for a crew member's phone number - no WhatsApp
  * Business API integration, just opens a chat in the viewer's own WhatsApp. Renders nothing if
  * there's no phone number to link.
  */

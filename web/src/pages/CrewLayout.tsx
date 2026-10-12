@@ -6,13 +6,13 @@ import NotificationBell from '../components/NotificationBell';
 import VersionBadge from '../components/VersionBadge';
 
 /**
- * Shell for the whole crew portal (/crew/*) — a sibling to the admin/prep App shell and the
+ * Shell for the whole crew portal (/crew/*) - a sibling to the admin/prep App shell and the
  * signage view, not nested inside either, matching the forced-redirect precedent those two
  * already use (see App.tsx). Reuses the same sidebar shell classes (App.css) for visual
  * consistency, just with its own (currently single-item) nav. The schedule (index route) and a
  * job's Who/What/When/Where page render below it via Outlet.
  *
- * Needs its own loading/logged-out/wrong-role guard, same as App.tsx — this route isn't nested
+ * Needs its own loading/logged-out/wrong-role guard, same as App.tsx - this route isn't nested
  * inside App, so App's guard never runs for it. Without this, signing out (which just clears
  * the in-memory user) left the shell rendering as if nothing happened, with individual panels
  * underneath failing their own API calls and showing a small "not authenticated" error instead
@@ -48,7 +48,7 @@ export default function CrewLayout() {
           <div className="sidebar-user">
             <div className="sidebar-user-row">
               <span className="avatar">{initial}</span>
-              <NavLink to="/crew/account" className="sidebar-username" aria-label={`${user.displayName} — account`}>
+              <NavLink to="/crew/account" className="sidebar-username" aria-label={`${user.displayName} - account`}>
                 {user.displayName}
               </NavLink>
             </div>

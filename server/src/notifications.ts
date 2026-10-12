@@ -2,7 +2,7 @@ import { prisma } from './db';
 import { NOTIFICATION_CATEGORIES, type NotificationCategory } from '@elexprep/shared';
 
 /**
- * In-app notifications v1 — deliberately a handful of trigger points, not a general event
+ * In-app notifications v1 - deliberately a handful of trigger points, not a general event
  * bus (see the plan's "notifications v1" milestone). Each helper below is called from exactly
  * the route that causes the thing it describes; nothing here polls or infers.
  */
@@ -13,7 +13,7 @@ function categoryOf(type: string): NotificationCategory | null {
 }
 
 /** A category with no entry in prefs.notifications, or no parseable prefs at all, defaults to
- * enabled — opting out is an explicit choice, not the starting state (same "default false, admin
+ * enabled - opting out is an explicit choice, not the starting state (same "default false, admin
  * must opt in" posture permissions.ts uses, just inverted since these default to on). */
 function isCategoryEnabled(prefsJson: string, type: string): boolean {
   const category = categoryOf(type);
@@ -32,7 +32,7 @@ export async function notifyUser(userId: string, type: string, title: string, bo
   await prisma.notification.create({ data: { userId, type, title, body, link } });
 }
 
-/** Every ADMIN account — used for events only staff with full access should see (a new crew
+/** Every ADMIN account - used for events only staff with full access should see (a new crew
  * application, a new label request) rather than every USER, which would be noisier than useful
  * for a small team. */
 async function notifyAdmins(type: string, title: string, body?: string, link?: string) {
@@ -83,7 +83,7 @@ export async function notifyLabelRequestReviewed(userId: string, jobId: string, 
 const EXCERPT_LENGTH = 80;
 
 /**
- * A new message in a job's discussion thread — notifies every ADMIN/USER staff account and
+ * A new message in a job's discussion thread - notifies every ADMIN/USER staff account and
  * every crew member assigned to the job, excluding whoever just posted it. Two batches because
  * the two audiences land on different shells (staff -> the job's Discussion tab, crew -> their
  * portal's job page), so they need different links.

@@ -24,7 +24,7 @@ function formatDateTime(iso: string | null): string {
 }
 
 /**
- * One expandable card — collapsed shows just the summary line, expanded reveals the detail
+ * One expandable card - collapsed shows just the summary line, expanded reveals the detail
  * slot. The trigger is a real <button> wrapped in an <h2> (the WAI-ARIA disclosure pattern),
  * not a div with a nested heading, so this reads correctly to screen-reader heading navigation
  * and keeps a visible keyboard focus ring.
@@ -75,7 +75,7 @@ function WhySubsection({ title, children }: { title: string; children: ReactNode
 /**
  * The "request to prep system" form: a real label creator (same type + content fields as the
  * admin's ad hoc label creator, via the shared LabelTypeForm) rather than a free-text box
- * standing in for one. Submits as a PENDING CrewLabelRequest — it doesn't print until an admin
+ * standing in for one. Submits as a PENDING CrewLabelRequest - it doesn't print until an admin
  * approves it from the job's Labels tab.
  */
 function RequestLabelForm({ jobId }: { jobId: string }) {
@@ -90,7 +90,7 @@ function RequestLabelForm({ jobId }: { jobId: string }) {
   return (
     <div>
       <LabelTypeForm types={[...AD_HOC_TYPES]} onSubmit={submit} submitLabel="Send request" />
-      {sent && <p className="muted">Request sent — it'll show up for prep to review before it prints.</p>}
+      {sent && <p className="muted">Request sent - it'll show up for prep to review before it prints.</p>}
     </div>
   );
 }

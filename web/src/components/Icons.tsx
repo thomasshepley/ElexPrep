@@ -1,5 +1,5 @@
 /**
- * A small, consistent-weight icon set (1.6pt stroke, 16x16, currentColor) — matches Chevron.tsx's
+ * A small, consistent-weight icon set (1.6pt stroke, 16x16, currentColor) - matches Chevron.tsx's
  * style so every icon in the app (sidebar nav, dashboard toolbar, the crew job page's cards)
  * shares one visual language rather than mixing glyph styles.
  */

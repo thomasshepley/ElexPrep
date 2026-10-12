@@ -5,7 +5,7 @@ import { notifyDiscussionMessage } from '../notifications';
 import { resolvePermissionsForUser } from '../permissions';
 
 /**
- * A job's discussion thread — staff side (ADMIN/USER). The crew side lives in crewPortal.ts at
+ * A job's discussion thread - staff side (ADMIN/USER). The crew side lives in crewPortal.ts at
  * /me/jobs/:jobId/discussion, scoped to the caller's own assignment; this router has no such
  * per-caller scoping since any staff account can already see any job. Reads are open to any
  * signed-in staff account (mirrors jobSchedule.ts's reasoning); posting is explicitly
@@ -57,7 +57,7 @@ jobDiscussionRouter.post('/:jobId/discussion', requireRole('ADMIN', 'USER'), asy
 });
 
 // Anyone can delete their own message; deleting someone else's needs the (delegatable)
-// moderateDiscussion permission — ADMIN always has it, a USER account only if granted.
+// moderateDiscussion permission - ADMIN always has it, a USER account only if granted.
 jobDiscussionRouter.delete('/:jobId/discussion/:messageId', requireRole('ADMIN', 'USER'), async (req, res) => {
   const message = await prisma.jobDiscussionMessage.findUnique({ where: { id: req.params.messageId } });
   if (!message || message.jobId !== req.params.jobId) return res.status(404).json({ error: 'Message not found' });

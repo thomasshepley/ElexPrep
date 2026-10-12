@@ -6,7 +6,7 @@ import WhatsAppButton from './WhatsAppButton';
 /**
  * Who's working this job, in what role, at what rate. Viewing is open to anyone who can see
  * the job; adding/editing/removing needs the delegatable manageCrewAssignments permission
- * (ADMIN always has it) — mirrors the publishJobs pattern already used in Job Settings.
+ * (ADMIN always has it) - mirrors the publishJobs pattern already used in Job Settings.
  */
 export default function JobCrewPanel({ jobId }: { jobId: string }) {
   const { user } = useAuth();
@@ -127,7 +127,7 @@ export default function JobCrewPanel({ jobId }: { jobId: string }) {
             <p className="muted">Every active crew member is already assigned to this job.</p>
           )}
           {roster.length === 0 && (
-            <p className="muted">No crew in the roster yet — add some on the Crew settings page.</p>
+            <p className="muted">No crew in the roster yet - add some on the Crew settings page.</p>
           )}
           {error && <p className="error">{error}</p>}
         </>
@@ -160,7 +160,7 @@ export default function JobCrewPanel({ jobId }: { jobId: string }) {
                     <span className="chip chip-role">{a.role}</span>
                   )}
                 </td>
-                <td>{a.zeroRated ? <span className="muted">Zero-rated</span> : a.dayRate ?? a.profileDayRate ?? '—'}</td>
+                <td>{a.zeroRated ? <span className="muted">Zero-rated</span> : a.dayRate ?? a.profileDayRate ?? '-'}</td>
                 <td>
                   {canManage ? (
                     <input

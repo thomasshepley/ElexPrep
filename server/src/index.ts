@@ -47,7 +47,7 @@ import { seedDefaultLocationColorsIfEmpty, seedNewDefaultLocationColorsIfMissing
 import { prisma } from './db';
 
 const app = express();
-// One reverse proxy in front of this app in the documented deployment (see DEPLOY.md) — trust
+// One reverse proxy in front of this app in the documented deployment (see DEPLOY.md) - trust
 // its X-Forwarded-For so req.ip (used for activity-log IP logging, see requestContext.ts) is
 // the real client address, not the proxy's. Harmless when there's no proxy (nothing sets the
 // header, so req.ip falls back to the direct connection's address same as before).

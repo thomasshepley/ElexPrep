@@ -67,7 +67,7 @@ export default function JobDetailPage() {
 }
 
 /** Formats an ISO datetime string for a <input type="datetime-local"> value (local time, no
- * seconds/timezone) — undefined/null becomes '' so the field renders empty rather than crashing. */
+ * seconds/timezone) - undefined/null becomes '' so the field renders empty rather than crashing. */
 function toDatetimeLocal(iso: string | null): string {
   if (!iso) return '';
   const d = new Date(iso);
@@ -165,7 +165,7 @@ function JobSettingsPanel({ job, onUpdate }: { job: Job; onUpdate: (j: Job) => v
           <>
             <label className="row" style={{ gap: '0.4rem' }}>
               <input type="checkbox" checked={job.isPublic} onChange={togglePublic} />
-              Public — normal users can see this job
+              Public - normal users can see this job
             </label>
             <p className="muted">Admins always see every job regardless of this setting.</p>
           </>
@@ -192,7 +192,7 @@ function JobSettingsPanel({ job, onUpdate }: { job: Job; onUpdate: (j: Job) => v
   );
 }
 
-/** Per-job override of which crew-portal sections are visible for this job's crew — starts
+/** Per-job override of which crew-portal sections are visible for this job's crew - starts
  * from whatever was set at onboarding (or the portal default, if never overridden). */
 function JobCrewFeaturesPanel({ job, onUpdate }: { job: Job; onUpdate: (j: Job) => void }) {
   const { user } = useAuth();

@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 
 /**
- * A plain floating overlay — the first modal pattern in this codebase (everywhere else reveals
+ * A plain floating overlay - the first modal pattern in this codebase (everywhere else reveals
  * detail inline via expand/collapse, see CrewJobPage's info-card-trigger). Closes on backdrop
  * click or Escape, matching ordinary dialog expectations.
  */

@@ -7,7 +7,7 @@ import { notifyCrewAssigned } from '../notifications';
  * Job-scoped crew attribution: who's working this job, in what role, at what rate. Viewing is
  * open to anyone who can see the job (same as other job sub-resources, e.g. Plots); adding,
  * editing, or removing an assignment needs the delegatable manageCrewAssignments permission
- * (ADMIN always has it). The crew roster itself — creating/deleting a CREW account — is a
+ * (ADMIN always has it). The crew roster itself - creating/deleting a CREW account - is a
  * separate, ADMIN-only concern handled by routes/crew.ts.
  */
 export const jobCrewAssignmentsRouter = Router();

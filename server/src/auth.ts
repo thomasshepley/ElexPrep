@@ -68,7 +68,7 @@ const SIGNAGE_WRITE_ALLOWLIST = [/^\/api\/jobs\/[^/]+\/current-rms\/pick-list\/[
 
 // The crew portal (routes/crewPortal.ts) is entirely self-service: every path here only ever
 // returns the logged-in crew member's own data (profile, their jobs, a job's Who/What/When/
-// Where/Why — schedule, documents, plots, kit list, prep requests) — nothing takes another
+// Where/Why - schedule, documents, plots, kit list, prep requests) - nothing takes another
 // crew member's id from the client, and every /me/jobs/:jobId/* handler re-checks the caller
 // is actually assigned to that job before touching its data. Notifications are likewise
 // self-scoped to req.user.id in every handler (routes/notifications.ts), so they're safe to
@@ -91,7 +91,7 @@ const CREW_ALLOWLIST = [
  * allowlisted exception above): any other non-GET request from one is rejected, so a
  * compromised prep-bay TV login can't mutate anything else. CREW accounts are locked out of
  * everything except auth/me until the crew portal (a later milestone) gives them somewhere
- * to go — see CREW_ALLOWLIST.
+ * to go - see CREW_ALLOWLIST.
  */
 export async function authMiddleware(req: Request, res: Response, next: NextFunction) {
   const token = req.cookies?.[SESSION_COOKIE];
@@ -102,7 +102,7 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
     }
   }
 
-  // Only API routes are session-gated — static assets and the SPA shell must load so the
+  // Only API routes are session-gated - static assets and the SPA shell must load so the
   // login page itself can render. /api/agent/* authenticates with its own static token
   // (see routes/agent.ts), not a session.
   if (!req.path.startsWith('/api/')) return next();
@@ -115,7 +115,7 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
     return next();
   }
   // The one public write in the whole app: submitting a crew application needs no login (the
-  // applicant doesn't have an account yet — that's the point). Every other path under this
+  // applicant doesn't have an account yet - that's the point). Every other path under this
   // prefix (list/approve/reject/documents) stays behind the normal auth + permission check
   // below, matched by not being this exact path/method.
   if (req.path === '/api/crew-applications' && req.method === 'POST') return next();

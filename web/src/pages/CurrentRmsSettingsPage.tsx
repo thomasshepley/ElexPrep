@@ -113,7 +113,7 @@ export default function CurrentRmsSettingsPage() {
   const importOpportunity = async (rmsId: number) => {
     try {
       const job = await api.currentRms.importOpportunity(rmsId);
-      alert(`Created job "${job.name}" — it's private until you mark it Public in Job Settings.`);
+      alert(`Created job "${job.name}" - it's private until you mark it Public in Job Settings.`);
     } catch (e) {
       alert((e as Error).message);
     }
@@ -126,7 +126,7 @@ export default function CurrentRmsSettingsPage() {
       <h1>Current RMS</h1>
       <p className="muted">
         Pulls opportunities from Current RMS so you can turn one into a job here. Only admins
-        see this raw opportunity list — once you import one as a job, it stays private until
+        see this raw opportunity list - once you import one as a job, it stays private until
         you mark it Public in that job's settings, which is when normal users can see it.
       </p>
       {saveMessage && <p className="muted">{saveMessage}</p>}
@@ -189,7 +189,7 @@ export default function CurrentRmsSettingsPage() {
             <div className="muted" style={{ fontSize: '0.8rem', marginTop: '0.25rem' }}>
               {editingApiKey
                 ? 'Not saved until you click Save below.'
-                : "Saved — Test connection below uses this saved key unless you click Replace and type a new one."}
+                : "Saved - Test connection below uses this saved key unless you click Replace and type a new one."}
             </div>
           </label>
           <label>
@@ -256,7 +256,7 @@ export default function CurrentRmsSettingsPage() {
         </div>
         {opportunities.length === 0 && (
           <p className="muted">
-            No opportunities cached yet — save a valid connection above and click Sync now.
+            No opportunities cached yet - save a valid connection above and click Sync now.
           </p>
         )}
         {opportunities.length > 0 && (

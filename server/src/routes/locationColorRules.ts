@@ -9,7 +9,7 @@ const PATTERNS = ['SOLID', 'DIAGONAL_STRIPES'];
 
 /**
  * Prisma/SQLite can't do a case-insensitive equality filter directly, so this checks the
- * small per-scope rule set (global or one job's) in JS instead — always just a handful of rows.
+ * small per-scope rule set (global or one job's) in JS instead - always just a handful of rows.
  */
 async function assertNoDuplicate(jobId: string | null, location: string, excludeId?: string) {
   const all = await prisma.locationColorRule.findMany({ where: { jobId } });
@@ -33,7 +33,7 @@ function validatePattern(body: Record<string, unknown>): { error: string } | { p
   return { pattern, secondaryColor: null };
 }
 
-// Global default rules (jobId = null) — these are the house-wide fallbacks every job starts with.
+// Global default rules (jobId = null) - these are the house-wide fallbacks every job starts with.
 locationColorRulesRouter.get('/', async (_req, res) => {
   const rules = await prisma.locationColorRule.findMany({ where: { jobId: null }, orderBy: { location: 'asc' } });
   res.json(rules);
@@ -83,7 +83,7 @@ locationColorRulesRouter.delete('/:id', async (req, res) => {
   res.status(204).end();
 });
 
-// Per-job overrides/additions (jobId set) — for jobs whose patch uses location names that
+// Per-job overrides/additions (jobId set) - for jobs whose patch uses location names that
 // don't match the house defaults (e.g. "Cube North", "Entrance Arch Top"), configured without
 // touching the shared defaults. A job-specific rule wins over a global one of the same name.
 jobLocationColorRulesRouter.get('/:jobId/location-colors', async (req, res) => {

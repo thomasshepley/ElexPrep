@@ -2,7 +2,7 @@ import crypto from 'crypto';
 
 /**
  * A minimal RFC 4226 (HOTP) / RFC 6238 (TOTP) implementation using only Node's built-in
- * crypto module — deliberately no otplib/speakeasy dependency, the same "right-sized, not an
+ * crypto module - deliberately no otplib/speakeasy dependency, the same "right-sized, not an
  * enterprise dependency" posture as crewDocCrypto.ts. SHA-1/6-digit/30-second-step is the
  * universal default every authenticator app (Google Authenticator, Authy, 1Password, etc.)
  * assumes, so those aren't made configurable.
@@ -41,7 +41,7 @@ export function base32Decode(encoded: string): Buffer {
   return Buffer.from(bytes);
 }
 
-/** A fresh random secret, 160 bits (20 bytes) — RFC 4226's recommended minimum. */
+/** A fresh random secret, 160 bits (20 bytes) - RFC 4226's recommended minimum. */
 export function generateTotpSecret(): string {
   return base32Encode(crypto.randomBytes(20));
 }

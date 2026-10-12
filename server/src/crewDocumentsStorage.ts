@@ -5,12 +5,12 @@ import { prisma, logActivity } from './db';
 import { uploadDir } from './routes/jobs';
 import { encryptBuffer, decryptBuffer } from './crewDocCrypto';
 
-/** Ciphertext only — see crewDocCrypto.ts. A dedicated subdirectory under the existing uploads
+/** Ciphertext only - see crewDocCrypto.ts. A dedicated subdirectory under the existing uploads
  * tree, served only through the decrypt-and-stream routes below, never res.sendFile. */
 export const crewDocumentsDir = path.join(uploadDir, 'crew-documents');
 fs.mkdirSync(crewDocumentsDir, { recursive: true });
 
-// Right-to-work evidence and bank details are no longer collected as file uploads — the former
+// Right-to-work evidence and bank details are no longer collected as file uploads - the former
 // was dropped from intake entirely, the latter is now structured fields, encrypted at rest the
 // same way (see bankDetails.ts) but stored as columns, not a CrewDocument row.
 export const DOCUMENT_FIELDS: { field: string; kind: string }[] = [

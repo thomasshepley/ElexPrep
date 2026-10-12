@@ -35,7 +35,7 @@ export default function JobDocumentsPanel({ jobId }: { jobId: string }) {
   return (
     <div className="panel">
       <h3>Job documents</h3>
-      <p className="muted">Call sheets, info packs, and other general files — visible to crew assigned to this job.</p>
+      <p className="muted">Call sheets, info packs, and other general files - visible to crew assigned to this job.</p>
       <FileInput accept="application/pdf,image/*" disabled={busy} onFile={upload} label="Upload document" />
       {error && <p className="error">{error}</p>}
 

@@ -32,7 +32,7 @@ function OpportunityKindChip({ kind }: { kind: CurrentRmsOpportunity['kind'] }) 
 
 /**
  * The shared onboarding-options form used by both the single-row "Onboard" action and the
- * bulk "Onboard N selected" action — crew feature overrides apply either way; the OneDrive
+ * bulk "Onboard N selected" action - crew feature overrides apply either way; the OneDrive
  * manual-folder override only makes sense for a single job (a batch can't all share one path),
  * so it's hidden when onboarding more than one at once.
  */
@@ -79,7 +79,7 @@ function OnboardingOptionsForm({
       {opportunity && (
         <div style={{ marginBottom: '1.25rem' }}>
           <p className="muted">
-            Review and override the details below before this job is created — everything here
+            Review and override the details below before this job is created - everything here
             stays editable afterward too, from the job's Job Settings tab.
           </p>
 
@@ -109,7 +109,7 @@ function OnboardingOptionsForm({
           </div>
           {!opportunity.startsAt && (
             <p className="muted" style={{ fontSize: '0.8rem' }}>
-              Current RMS has no dates cached for this opportunity yet — set them here or later from the Schedule tab.
+              Current RMS has no dates cached for this opportunity yet - set them here or later from the Schedule tab.
             </p>
           )}
 
@@ -135,7 +135,7 @@ function OnboardingOptionsForm({
 
       <p className="muted">
         Sets which crew-portal sections are visible to this job's crew. Starts from the portal
-        defaults (Settings → Crew Portal) — override any of them just for this job below.
+        defaults (Settings → Crew Portal) - override any of them just for this job below.
       </p>
       {features && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginBottom: '1rem' }}>
@@ -161,7 +161,7 @@ function OnboardingOptionsForm({
             placeholder="Leave blank to auto-match by name, e.g. Projects/2026/Big Gig Ltd"
           />
           <p className="muted" style={{ fontSize: '0.8rem', margin: '0.3rem 0 0' }}>
-            Only takes effect once OneDrive is connected in Settings → OneDrive — safe to leave
+            Only takes effect once OneDrive is connected in Settings → OneDrive - safe to leave
             blank either way.
           </p>
         </div>
@@ -232,7 +232,7 @@ function OnboardOpportunitiesPanel({ existingOppIds, onOnboarded }: { existingOp
     setError(null);
     try {
       const job = await api.currentRms.importOpportunity(pendingSingle.rmsId, opts);
-      setMessage(`Onboarded "${job.name}" — it's private until you mark it Public in Job Settings.`);
+      setMessage(`Onboarded "${job.name}" - it's private until you mark it Public in Job Settings.`);
       setPendingSingle(null);
       onOnboarded();
     } catch (e) {
@@ -301,7 +301,7 @@ function OnboardOpportunitiesPanel({ existingOppIds, onOnboarded }: { existingOp
       {unOnboarded.length === 0 && (
         <div className="empty-state">
           <p style={{ margin: 0 }}>
-            No un-onboarded Quotes or Orders cached yet — sync Current RMS from{' '}
+            No un-onboarded Quotes or Orders cached yet - sync Current RMS from{' '}
             <Link to="/settings/current-rms">Settings → Current RMS</Link>.
           </p>
         </div>
@@ -427,7 +427,7 @@ export default function JobsListPage() {
                 {canOnboard ? (
                   <>
                     {' '}
-                    — <button type="button" className="link-button" onClick={() => setTab('onboard')}>
+                    - <button type="button" className="link-button" onClick={() => setTab('onboard')}>
                       onboard one from Current RMS
                     </button>{' '}
                     to get started.

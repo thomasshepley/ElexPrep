@@ -21,7 +21,7 @@ export default function CasesPanel({ jobId }: { jobId: string }) {
     if (
       cases.length > 0 &&
       !confirm(
-        `This replaces all ${cases.length} case row(s) below with a fresh set built from the current patch and case rules — any manual edits or additions will be lost. Continue?`
+        `This replaces all ${cases.length} case row(s) below with a fresh set built from the current patch and case rules - any manual edits or additions will be lost. Continue?`
       )
     ) {
       return;
@@ -109,10 +109,10 @@ export default function CasesPanel({ jobId }: { jobId: string }) {
       <p className="muted">
         Groups fixtures into cases using the units-per-case rule for each fixture type. Every
         field below is editable in place (click and type, saves on blur); use Regenerate after
-        importing a new patch or editing case rules — it replaces every row here, so add any
+        importing a new patch or editing case rules - it replaces every row here, so add any
         one-off cases below afterwards rather than before.
       </p>
-      {cases.length === 0 && <p className="muted">No cases yet — generate from the patch, or add one below.</p>}
+      {cases.length === 0 && <p className="muted">No cases yet - generate from the patch, or add one below.</p>}
       {cases.length > 0 && (
         <>
           {selected.size > 0 && (

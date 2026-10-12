@@ -3,7 +3,7 @@ import { CREW_CERTIFICATIONS, formatSkills, parseSkills } from '@elexprep/shared
 
 /**
  * Optional certifications/tickets, tucked behind a <details> disclosure rather than shown
- * inline like SkillPicker — most people hold a handful of these at most, and the application/
+ * inline like SkillPicker - most people hold a handful of these at most, and the application/
  * account forms already have enough always-visible fields (see the user request this answers:
  * "one big dropdown so it doesn't fill up too much"). Reuses the exact same comma-separated-
  * string read/write helpers as SkillPicker (parseSkills/formatSkills are generic despite the

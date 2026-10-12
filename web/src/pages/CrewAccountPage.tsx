@@ -12,7 +12,7 @@ import PasswordInput from '../components/PasswordInput';
 
 /**
  * Crew self-service: the first place a crew member can edit anything about their own account
- * (previously everything was admin-only — see routes/crewPortal.ts's PUT /me). Profile basics
+ * (previously everything was admin-only - see routes/crewPortal.ts's PUT /me). Profile basics
  * (phone/skills/notes/etc.) are its own crew-scoped endpoint; password change reuses the same
  * role-agnostic /api/auth/me staff accounts already use (see PreferencesPage); notification
  * preferences is the exact same shared component both shells use.

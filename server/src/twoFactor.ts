@@ -17,7 +17,7 @@ export function decryptTotpSecret(user: { totpSecretCiphertext: string | null; t
 }
 
 /** Human-friendly format (XXXX-XXXX, excluding visually ambiguous characters) rather than a
- * raw hex string — these get written down or typed by hand when an authenticator is lost. */
+ * raw hex string - these get written down or typed by hand when an authenticator is lost. */
 function generateBackupCode(): string {
   const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no 0/O/1/I
   const bytes = crypto.randomBytes(8);
@@ -26,7 +26,7 @@ function generateBackupCode(): string {
   return `${code.slice(0, 4)}-${code.slice(4)}`;
 }
 
-/** Replaces this user's entire backup-code set and returns the new plaintext codes — the
+/** Replaces this user's entire backup-code set and returns the new plaintext codes - the
  * only time they're ever available in plaintext; only bcrypt hashes are persisted. */
 export async function regenerateBackupCodes(userId: string): Promise<string[]> {
   const codes = Array.from({ length: BACKUP_CODE_COUNT }, generateBackupCode);
@@ -44,7 +44,7 @@ export async function countRemainingBackupCodes(userId: string): Promise<number>
 }
 
 /** Checks `code` against this user's unused backup codes and marks the match consumed.
- * Each code works exactly once — a second attempt with the same code fails like a wrong one. */
+ * Each code works exactly once - a second attempt with the same code fails like a wrong one. */
 export async function consumeBackupCode(userId: string, code: string): Promise<boolean> {
   const normalized = code.trim().toUpperCase();
   const candidates = await prisma.backupCode.findMany({ where: { userId, usedAt: null } });

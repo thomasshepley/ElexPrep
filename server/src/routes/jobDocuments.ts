@@ -7,7 +7,7 @@ import { requireRole } from '../auth';
 import { uploadDir } from './jobs';
 
 /**
- * General job files (call sheets, info packs, contracts) — unencrypted, same pattern as
+ * General job files (call sheets, info packs, contracts) - unencrypted, same pattern as
  * routes/plots.ts, just a different document category. Part of the crew portal's "Why"
  * section; reads are open to any signed-in staff account, writes are admin-only.
  */

@@ -1,5 +1,5 @@
 /**
- * Coarse notification categories a person can opt out of individually — one per logical kind
+ * Coarse notification categories a person can opt out of individually - one per logical kind
  * of event, derived from the dotted notification `type` strings' prefix (e.g.
  * "crew_assignment.added" -> "crew_assignment"). Stored per-user under prefs.notifications as
  * { [category]: boolean }, missing/true = enabled, false = opted out. Shared so the server

@@ -7,7 +7,7 @@ import BankDetailsForm from '../components/BankDetailsForm';
 import PasswordInput from '../components/PasswordInput';
 
 /**
- * Where an approved OnboardingInvite's one-time link lands — the invitee fills in their own
+ * Where an approved OnboardingInvite's one-time link lands - the invitee fills in their own
  * profile and picks their own username/password, rather than an admin doing it on their
  * behalf (contrast routes/crewApplications.ts's approve flow). No document uploads here;
  * those can be added from the crew portal once the account exists.
@@ -83,7 +83,7 @@ export default function OnboardCompletePage() {
           <div className="auth-brand">
             <span className="auth-brand-mark" />
             <h1>Link not found</h1>
-            <p className="muted">This onboarding link isn't valid — it may have expired, already been used, or never been approved.</p>
+            <p className="muted">This onboarding link isn't valid - it may have expired, already been used, or never been approved.</p>
           </div>
         </div>
       </div>
@@ -98,7 +98,7 @@ export default function OnboardCompletePage() {
             <span className="auth-brand-mark" />
             <h1>Already set up</h1>
             <p className="muted">
-              This account's already been created — <a href="/login">sign in</a> instead.
+              This account's already been created - <a href="/login">sign in</a> instead.
             </p>
           </div>
         </div>

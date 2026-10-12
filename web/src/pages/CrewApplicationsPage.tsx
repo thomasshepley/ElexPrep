@@ -202,7 +202,7 @@ export default function CrewApplicationsPage() {
                       </span>
                     ))
                   ) : (
-                    <span className="muted">{detail.documents.length} file(s) — admin-only to view</span>
+                    <span className="muted">{detail.documents.length} file(s) - admin-only to view</span>
                   )}
                 </div>
               )}

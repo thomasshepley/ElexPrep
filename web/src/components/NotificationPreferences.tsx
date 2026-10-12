@@ -5,7 +5,7 @@ import { useAuth } from '../auth/AuthContext';
 
 /**
  * Per-category notification opt-out, shared by the staff My Preferences page and the crew
- * portal's My Account page — both read/write the same User.prefs.notifications JSON (see
+ * portal's My Account page - both read/write the same User.prefs.notifications JSON (see
  * server/src/notifications.ts's isCategoryEnabled), so one component serves both without
  * needing to know which shell it's in. Showing all four categories to everyone is deliberately
  * simple: a category that can never fire for a given role (e.g. "New crew applications" for a

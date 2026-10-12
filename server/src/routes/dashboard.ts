@@ -5,7 +5,7 @@ import { prisma } from '../db';
 /**
  * Admin home: the jobs that are actual Current RMS orders (linked opportunities), with their
  * schedule dates and order value, for the dashboard's active-orders list and calendar. Same
- * ADMIN-sees-everything / USER-sees-public-only visibility rule as jobsRouter's GET / — this
+ * ADMIN-sees-everything / USER-sees-public-only visibility rule as jobsRouter's GET / - this
  * is a different view of the same job list, not a separate permission boundary.
  */
 export const dashboardRouter = Router();

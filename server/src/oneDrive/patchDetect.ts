@@ -14,12 +14,12 @@ export interface DetectedPatchCsv {
 /**
  * The detection half of OneDrive patch auto-import: if the job's matched OneDrive folder has a
  * child folder named "Patch" (any case), the most recently modified CSV inside it is surfaced as
- * a candidate for review — same "look for a conventionally-named subfolder" approach as
+ * a candidate for review - same "look for a conventionally-named subfolder" approach as
  * cad.ts's "CAD" folder. Unlike the CAD PDF, a patch CSV isn't safe to apply automatically
- * (importing it destructively replaces every Fixture row for the job — see routes/patch.ts), so
+ * (importing it destructively replaces every Fixture row for the job - see routes/patch.ts), so
  * this only detects a file; turning it into fixtures is a separate, explicit approval step.
  * Returns null whenever OneDrive isn't configured, the job has no matched folder, there's no
- * "Patch" subfolder, or it has no CSV in it — all ordinary, expected states, not errors.
+ * "Patch" subfolder, or it has no CSV in it - all ordinary, expected states, not errors.
  */
 export async function findPatchCsv(job: {
   oneDriveFolderId: string | null;
@@ -67,12 +67,12 @@ async function collectStreamText(stream: NodeJS.ReadableStream): Promise<Buffer>
 /**
  * The full OneDrive patch-sourcing flow: look for an exported CSV in the job's "Patch"
  * subfolder first (findPatchCsv); if there isn't one, fall back to extracting a patch table out
- * of the job's CAD PDF (findSharedCadPdf + patchPdfExtract) — the plan's "if absent, fall back
+ * of the job's CAD PDF (findSharedCadPdf + patchPdfExtract) - the plan's "if absent, fall back
  * to parsing the patch table out of the CAD PDF". Both branches end up parsed into the same
  * header+rows shape, but the CSV path is the reliable one; the PDF path is inherently fuzzy
- * (see patchPdfExtract.ts), which is why the result carries `source` — routes/patch.ts surfaces
+ * (see patchPdfExtract.ts), which is why the result carries `source` - routes/patch.ts surfaces
  * it so a reviewer knows a PDF-sourced candidate deserves extra scrutiny. Returns null when
- * neither a patch CSV nor a CAD PDF with an extractable table could be found — an ordinary,
+ * neither a patch CSV nor a CAD PDF with an extractable table could be found - an ordinary,
  * expected outcome, not an error.
  */
 export async function findPatchSource(job: {

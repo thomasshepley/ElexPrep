@@ -16,10 +16,10 @@ const CELL_SEPARATOR = '\u0001';
  *    on the same line have a wide horizontal gap between them) for CAD exports that lay out a
  *    table without literal grid lines.
  *
- * Both are inherently approximate — irregular spacing, wrapped cells, or a table rendered as an
+ * Both are inherently approximate - irregular spacing, wrapped cells, or a table rendered as an
  * image rather than real text will defeat this. That's expected and acceptable: unlike the CSV
  * path, a PDF-sourced result is never applied automatically (see the `source` field on
- * PatchImportCandidate) — it always lands in the same PENDING review state for a human to check
+ * PatchImportCandidate) - it always lands in the same PENDING review state for a human to check
  * before anything touches the job's fixtures. Returns empty headers/rows (not an error) when
  * nothing table-shaped could be found at all.
  */

@@ -4,15 +4,15 @@ export const AD_HOC_TYPES = ['TRUSS_SPIKE_POSITION', 'TRUSS_SPIKE_TIP', 'TRUSS_S
 export type AdHocType = (typeof AD_HOC_TYPES)[number];
 
 export const TYPE_LABELS: Record<AdHocType, string> = {
-  TRUSS_SPIKE_POSITION: 'Truss/Spike — position number',
-  TRUSS_SPIKE_TIP: 'Truss/Spike — DO NOT TIP',
-  TRUSS_SPIKE_SACN: 'Truss/Spike — sACN node (IP)',
+  TRUSS_SPIKE_POSITION: 'Truss/Spike - position number',
+  TRUSS_SPIKE_TIP: 'Truss/Spike - DO NOT TIP',
+  TRUSS_SPIKE_SACN: 'Truss/Spike - sACN node (IP)',
   CABLE: 'Cable label',
   PAL: 'PAL case label (generic, e.g. personal Peli case)',
   RACK: 'Rack label',
 };
 
-/** The one place that knows how each ad hoc label type's free-text fields map onto its content shape — shared by LabelsPanel (admin) and the crew request form, so the two never drift apart. */
+/** The one place that knows how each ad hoc label type's free-text fields map onto its content shape - shared by LabelsPanel (admin) and the crew request form, so the two never drift apart. */
 export function buildLabelContent(labelType: AdHocType, fields: Record<string, string>, isDmx: boolean): Record<string, unknown> {
   switch (labelType) {
     case 'TRUSS_SPIKE_POSITION':
@@ -32,7 +32,7 @@ export function buildLabelContent(labelType: AdHocType, fields: Record<string, s
 
 /**
  * The actual label-creator form: a type selector (when more than one type is offered) plus
- * that type's content fields and a quantity — the same fields LabelsPanel always used, just
+ * that type's content fields and a quantity - the same fields LabelsPanel always used, just
  * extracted so the crew request form can present a real label creator instead of a free-text
  * box standing in for one.
  */
@@ -53,7 +53,7 @@ export default function LabelTypeForm({
   const idPrefix = useId();
 
   // Every field gets a persistent, visible label (not just placeholder text, which disappears
-  // once typing starts) — see writing.md's "label all fields clearly, and use hint or
+  // once typing starts) - see writing.md's "label all fields clearly, and use hint or
   // placeholder text", and the same .field pattern used by LoginPage/ApplyPage.
   const field = (key: string, labelText: string, placeholder: string) => {
     const id = `${idPrefix}-${key}`;

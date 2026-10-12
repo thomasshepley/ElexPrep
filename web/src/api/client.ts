@@ -88,7 +88,7 @@ export interface Fixture {
 export interface PatchImportCandidate {
   id: string;
   fileName: string;
-  /// csv | pdf — pdf means the rows were lifted from the CAD PDF via fuzzy table/text
+  /// csv | pdf - pdf means the rows were lifted from the CAD PDF via fuzzy table/text
   /// extraction (no patch CSV was found) and deserve extra scrutiny before approval.
   extractedFrom: string;
   oneDriveItemPath: string;
@@ -183,7 +183,7 @@ export interface CrewMember {
   username: string;
   displayName: string;
   /// ADMIN means this row is a staff admin's own account also assigned as crew (see
-  /// api.crew.fromAdmin), not a freelancer — their login/password lives on the Users page.
+  /// api.crew.fromAdmin), not a freelancer - their login/password lives on the Users page.
   userRole: Role;
   phone: string | null;
   color: string | null;
@@ -254,7 +254,7 @@ export interface OnboardingInvite {
   status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'COMPLETED';
   reviewedAt: string | null;
   createdAt: string;
-  /** The signup link token — only present once approved, and only in the admin list response. */
+  /** The signup link token - only present once approved, and only in the admin list response. */
   token: string | null;
 }
 
@@ -267,10 +267,10 @@ export interface JobCrewAssignment {
   role: string;
   dayRate: string | null;
   profileDayRate: string | null;
-  /// How many days this assignment is booked for — null means 1 (see server's JobCrewAssignment
+  /// How many days this assignment is booked for - null means 1 (see server's JobCrewAssignment
   /// comment). Used to compute this assignment's cost on the admin-only crew margin view.
   days: string | null;
-  /// Explicitly costs this assignment at zero regardless of dayRate/profile/global defaults —
+  /// Explicitly costs this assignment at zero regardless of dayRate/profile/global defaults -
   /// distinct from leaving dayRate blank (which means "use the default").
   zeroRated: boolean;
   active: boolean;
@@ -486,10 +486,10 @@ export interface CurrentRmsPickItem {
   bookedOut?: boolean;
   /** A Current RMS section-heading row (e.g. "Lighting - Moving Lights"), not a real item. */
   isGroup?: boolean;
-  /** Current RMS's own classification — "Rental", "Sale", or "Service". */
+  /** Current RMS's own classification - "Rental", "Sale", or "Service". */
   transaction_type_name?: string;
   /** 0 = Group, 1 = Principal, 2 = Accessory. An Accessory row often carries no
-   * transaction_type_name of its own — see isNonRental in CurrentRmsPanel, which inherits it
+   * transaction_type_name of its own - see isNonRental in CurrentRmsPanel, which inherits it
    * from the nearest preceding Principal row instead of treating a blank as "Rental". */
   opportunity_item_type?: number;
   [key: string]: unknown;

@@ -2,10 +2,10 @@
  * Pure location-color resolution logic, shared by the server's PDF renderer today and
  * usable by a future web-side print-queue preview without pulling in Prisma. The
  * Prisma-backed loading/seeding functions (loadLocationColorMap, seedDefaultLocationColorsIfEmpty,
- * seedNewDefaultLocationColorsIfMissing) stay server-only — see server/src/pdf/locationColors.ts.
+ * seedNewDefaultLocationColorsIfMissing) stay server-only - see server/src/pdf/locationColors.ts.
  */
 
-/** Used for any location with no matching rule — same look as the original fixed black bar. */
+/** Used for any location with no matching rule - same look as the original fixed black bar. */
 export const DEFAULT_LOCATION_COLOR = '#1a1a1a';
 
 export type LocationColorPattern = 'SOLID' | 'DIAGONAL_STRIPES';

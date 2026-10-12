@@ -1,7 +1,7 @@
 import type { Readable } from 'stream';
 import { OneDriveConfig } from './config';
 
-// Overridable so a local mock server can stand in for the real endpoints during verification —
+// Overridable so a local mock server can stand in for the real endpoints during verification -
 // same pattern as CURRENT_RMS_BASE_URL in currentRms/client.ts.
 export const GRAPH_AUTH_BASE_URL = process.env.GRAPH_AUTH_BASE_URL ?? 'https://login.microsoftonline.com';
 export const GRAPH_API_BASE_URL = process.env.GRAPH_API_BASE_URL ?? 'https://graph.microsoft.com/v1.0';
@@ -16,7 +16,7 @@ export class OneDriveError extends Error {
 
 export class OneDriveNotConfiguredError extends OneDriveError {
   constructor() {
-    super('OneDrive is not configured — add Azure app credentials in Settings -> OneDrive first', 400);
+    super('OneDrive is not configured - add Azure app credentials in Settings -> OneDrive first', 400);
   }
 }
 
@@ -41,7 +41,7 @@ function assertConfigured(config: Pick<OneDriveConfig, 'enabled' | 'tenantId' | 
 let cachedToken: { token: string; expiresAt: number } | null = null;
 
 /** Client-credentials (app-only) OAuth2 flow against the tenant's token endpoint. Cached in
- * memory until shortly before it expires — this integration never acts as a specific user, so
+ * memory until shortly before it expires - this integration never acts as a specific user, so
  * there's no refresh token or per-user session to manage. */
 async function getAccessToken(config: Pick<OneDriveConfig, 'tenantId' | 'clientId' | 'clientSecret'>): Promise<string> {
   if (cachedToken && cachedToken.expiresAt > Date.now() + 30_000) return cachedToken.token;
@@ -113,7 +113,7 @@ export async function getItemByPath(
   }
 }
 
-/** Case-insensitive, trimmed name match among a folder's children — real-world folder names
+/** Case-insensitive, trimmed name match among a folder's children - real-world folder names
  * rarely match a candidate exactly byte-for-byte (trailing spaces, different casing). */
 export function findChildByName(children: DriveItem[], name: string): DriveItem | null {
   const target = name.trim().toLowerCase();

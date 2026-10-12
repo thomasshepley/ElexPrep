@@ -34,7 +34,7 @@ export async function saveCurrentRmsConfig(config: CurrentRmsConfig): Promise<vo
   });
 }
 
-/** Public-facing config shape — never echoes the API key back to the browser. */
+/** Public-facing config shape - never echoes the API key back to the browser. */
 export function toPublicConfig(config: CurrentRmsConfig) {
   const { apiKey, ...rest } = config;
   return { ...rest, hasApiKey: apiKey.length > 0 };

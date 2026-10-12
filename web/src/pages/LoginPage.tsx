@@ -15,7 +15,7 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  // Set once the password step succeeds for a 2FA-enabled account — switches the form to the
+  // Set once the password step succeeds for a 2FA-enabled account - switches the form to the
   // code-entry step. Nothing is signed in yet at this point (see routes/auth.ts's /login).
   const [pendingToken, setPendingToken] = useState<string | null>(null);
   const [totpCode, setTotpCode] = useState('');
@@ -121,7 +121,7 @@ export default function LoginPage() {
         <div className="auth-brand">
           <span className="auth-brand-mark" />
           <h1>ELEX Portal</h1>
-          <p>{needsSetup ? 'First run — create the admin account.' : 'Sign in to continue.'}</p>
+          <p>{needsSetup ? 'First run - create the admin account.' : 'Sign in to continue.'}</p>
         </div>
         <form onSubmit={submit}>
           <div className="field">

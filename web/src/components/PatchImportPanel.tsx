@@ -167,7 +167,7 @@ export default function PatchImportPanel({ jobId }: { jobId: string }) {
         </div>
         <p className="muted">
           Looks for a CSV in this job's OneDrive "Patch" subfolder, falling back to extracting a
-          table from the CAD PDF if there's no CSV. Nothing is applied automatically — a detected
+          table from the CAD PDF if there's no CSV. Nothing is applied automatically - a detected
           file sits here for review until approved.
         </p>
         {scanError && <p className="error">{scanError}</p>}
@@ -183,7 +183,7 @@ export default function PatchImportPanel({ jobId }: { jobId: string }) {
               </p>
               {candidate.extractedFrom === 'pdf' && (
                 <p className="error" style={{ margin: '0.3rem 0 0' }}>
-                  No patch CSV was found — these rows were lifted from the CAD PDF by fuzzy table
+                  No patch CSV was found - these rows were lifted from the CAD PDF by fuzzy table
                   extraction, not a real export. Check them carefully before approving.
                 </p>
               )}
@@ -213,7 +213,7 @@ export default function PatchImportPanel({ jobId }: { jobId: string }) {
         <h3>Upload Wysiwyg patch CSV</h3>
         <p className="muted">
           Columns are mapped using the saved layout from{' '}
-          <Link to="/settings/import-mapping">Settings → Import Mapping</Link> — no need to remap
+          <Link to="/settings/import-mapping">Settings → Import Mapping</Link> - no need to remap
           each time.
         </p>
         <FileInput accept=".csv" onFile={onFile} label="Choose CSV" />
@@ -222,12 +222,12 @@ export default function PatchImportPanel({ jobId }: { jobId: string }) {
 
       {fileName && (
         <div className="panel">
-          <h3>Ready to import — {fileName}</h3>
+          <h3>Ready to import - {fileName}</h3>
           <p className="muted">{rows.length} rows found.</p>
 
           {!mappingOk && (
             <p className="error">
-              No saved column mapping yet — set it up in{' '}
+              No saved column mapping yet - set it up in{' '}
               <Link to="/settings/import-mapping">Settings → Import Mapping</Link> first.
             </p>
           )}
@@ -248,7 +248,7 @@ export default function PatchImportPanel({ jobId }: { jobId: string }) {
                       <td>
                         {column}
                         {missingColumns.some((m) => m.field === field) && (
-                          <span className="error"> — not in this file</span>
+                          <span className="error"> - not in this file</span>
                         )}
                       </td>
                     </tr>
@@ -257,7 +257,7 @@ export default function PatchImportPanel({ jobId }: { jobId: string }) {
               </table>
               {requiredMissing && (
                 <p className="error">
-                  This file is missing the mapped Address/Fixture Type columns — check the file or
+                  This file is missing the mapped Address/Fixture Type columns - check the file or
                   update the mapping in Settings.
                 </p>
               )}

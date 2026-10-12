@@ -3,7 +3,7 @@ import { api, type CrewRateLine } from '../api/client';
 
 const GENERAL_LABEL = 'General day rate';
 
-// Suggestions, not a fixed taxonomy — clicking one just pre-fills the add-line form below with
+// Suggestions, not a fixed taxonomy - clicking one just pre-fills the add-line form below with
 // that label so it's one click plus an amount, not a strict enum. Anyone can still add a
 // completely custom line.
 const SUGGESTED_ROLES = [
@@ -21,7 +21,7 @@ const SUGGESTED_ROLES = [
 /**
  * Crew-defined rate card: the general day rate is always visible and effectively required to
  * get anywhere (nothing else appears until it's set); once it has a value, the optional
- * role-specific lines reveal below with a brief animation (see .rate-card-extra in index.css) —
+ * role-specific lines reveal below with a brief animation (see .rate-card-extra in index.css) -
  * both to keep the form from being intimidating up front and to establish "set your baseline
  * rate first, everything else is optional detail on top of it."
  */
@@ -113,7 +113,7 @@ export default function RateCardEditor() {
 
       <div className={`rate-card-extra${expanded ? ' is-open' : ''}`}>
         <p className="muted" style={{ marginTop: '0.75rem' }}>
-          Optional — add a different rate for specific roles, overtime, or anything else clients should know about.
+          Optional - add a different rate for specific roles, overtime, or anything else clients should know about.
         </p>
 
         {others.length > 0 && (

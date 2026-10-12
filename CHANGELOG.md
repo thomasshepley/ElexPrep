@@ -1,12 +1,16 @@
 # Changelog
 
-Newest entries first. Each push/merge gets exactly one entry — see
+Newest entries first. Each push/merge gets exactly one entry - see
 `scripts/bump-version.mjs` for how the version number itself advances.
 
-## v1.0.2 — 2026-10-12
+## v1.0.3 - 2026-10-12
 
-- Add version tracking and changelog viewer to the sidebar
+- Fixed the version bump rule to match what was asked, and cleaned up em dashes across the app
 
-## v1.0.1 — 2026-10-12
+## v1.0.2 - 2026-10-12
+
+- Added a version number and changelog viewer to the sidebar.
+
+## v1.0.1 - 2026-10-12
 
 - Start of version tracking.
