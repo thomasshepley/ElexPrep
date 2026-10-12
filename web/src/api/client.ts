@@ -445,6 +445,8 @@ export interface CurrentRmsPickItem {
   bookedOut?: boolean;
   /** A Current RMS section-heading row (e.g. "Lighting - Moving Lights"), not a real item. */
   isGroup?: boolean;
+  /** Current RMS's own classification — "Rental", "Sale", or "Service". */
+  transaction_type_name?: string;
   [key: string]: unknown;
 }
 

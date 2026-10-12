@@ -195,6 +195,11 @@ export interface RawOpportunityItem {
   // 1 = Principal, 2 = Accessory. Per Current RMS's own API reference.
   opportunity_item_type?: number;
   opportunity_item_type_name?: string;
+  // 1 = Rental, 2 = Sale, 3 = Service. Per Current RMS's own API reference — used by the pick
+  // list UI to default to showing only Rental items (Service entries are typically labour/setup
+  // line items, not physical kit to prep).
+  transaction_type?: number;
+  transaction_type_name?: string;
   [key: string]: unknown;
 }
 

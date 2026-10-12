@@ -166,6 +166,19 @@ export default function OneDriveFilesPanel({ jobId }: { jobId: string }) {
         <>
           <h4>Browse &amp; share</h4>
           <p className="muted" style={{ marginTop: 0 }}>
+            {crumbs.length > 1 && (
+              <span>
+                <button
+                  type="button"
+                  className="link-button"
+                  onClick={() => browse(undefined, 'Project folder', 0)}
+                  aria-label="Back to project folder"
+                >
+                  …
+                </button>
+                {' / '}
+              </span>
+            )}
             {crumbs.map((c, i) => (
               <span key={i}>
                 {i > 0 && ' / '}
