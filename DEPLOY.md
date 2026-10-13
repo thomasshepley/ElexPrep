@@ -91,71 +91,64 @@ admin account here. You can close the tunnel afterwards; this step only needs do
 ## Go live at portal.elex.lighting
 
 Your main site (`elex.lighting`) stays exactly where it is, on OVH — nothing here touches
-its hosting, its DNS, or its email. The trick is **delegating just the `portal` subdomain**
-to Cloudflare, so Cloudflare only ever sees `portal.elex.lighting` and OVH keeps managing
-everything else completely independently.
+its hosting, its DNS, or its email. Cloudflare is not needed at all: add one DNS record
+directly in OVH's own DNS zone, pointing just the `portal` subdomain at the EC2 box.
+(Cloudflare's "Add a site" flow only accepts root/apex domains like `elex.lighting` — it
+rejects a subdomain-only entry like `portal.elex.lighting` outright, so there's no working
+Cloudflare-only-for-the-subdomain option here; see the note at the end if you want
+Cloudflare's proxy/WAF anyway.)
 
-1. **Create the Cloudflare zone for the subdomain itself.** In the Cloudflare dashboard,
-   **Add a site**, and enter `portal.elex.lighting` as the domain — not `elex.lighting`.
-   Cloudflare treats this as its own independent zone. Pick the **Free** plan.
-2. **Skip/ignore the DNS record import step** Cloudflare offers — there's nothing on `portal`
-   yet, you'll add the one record you need in the next step.
-3. **Cloudflare gives you two nameservers** for this new zone (something like
-   `ada.ns.cloudflare.com` / `jack.ns.cloudflare.com` — yours will differ). Copy them.
-4. **In OVH, delegate the subdomain to those nameservers.** Log into the
-   [OVH Control Panel](https://www.ovh.com/manager/) → **Web Cloud → Domains** → `elex.lighting`
-   → **DNS zone**, and add two **NS** records:
+1. **In OVH, add one A record.** Log into the [OVH Control Panel](https://www.ovh.com/manager/)
+   → **Web Cloud → Domains** → `elex.lighting` → **DNS zone**, and add:
    ```
-   Subdomain: portal        Type: NS        Target: ada.ns.cloudflare.com.
-   Subdomain: portal        Type: NS        Target: jack.ns.cloudflare.com.
+   Subdomain: portal        Type: A        Target: <your Elastic IP>
    ```
-   (Use the two nameservers Cloudflare actually gave you, with the trailing dot, and OVH's own
-   field names may say "sub-domain"/"target" rather than exactly this.) This is the only
+   (OVH's own field names may differ slightly, e.g. "sub-domain"/"target".) This is the only
    change made in OVH's DNS — the root domain, `www`, and any mail (MX) records already there
-   are untouched, since this NS pair only delegates authority for names *under* `portal`.
-5. **Back in Cloudflare, add the one record this app needs**, in the `portal.elex.lighting`
-   zone you created: an **A** record, name `@` (meaning the bare `portal.elex.lighting`
-   itself, since that's the zone's root), value the Elastic IP from "Launch the instance"
-   above. Set its proxy status to **DNS only** (grey cloud, not orange) — Caddy's automatic
-   HTTPS needs Let's Encrypt to reach the EC2 box directly to verify it, which a proxied
-   (orange-cloud) record would get in the way of.
-6. **Confirm the Caddyfile** at the repo root points at the right domain — it already does by
+   are untouched.
+2. **Confirm the Caddyfile** at the repo root points at the right domain — it already does by
    default:
    ```
    portal.elex.lighting {
    	reverse_proxy elexprep:4000
    }
    ```
-7. **Wait for the delegation to propagate** — this is a nameserver change, so it can take
-   anywhere from a few minutes up to 24 hours (usually much faster). Check with:
+3. **Wait for the record to propagate** — usually minutes, occasionally up to a few hours.
+   Check with:
    ```bash
-   dig NS portal.elex.lighting      # should list Cloudflare's two nameservers
    dig portal.elex.lighting         # should resolve to the Elastic IP
    ```
-   Once both look right, restart Caddy so it notices and requests the certificate:
+   Once that resolves correctly, restart Caddy so it notices and requests the certificate:
    ```bash
    docker compose restart caddy
    ```
    Follow `docker compose logs -f caddy` the first time — it should report obtaining a
-   certificate within a few seconds of DNS resolving correctly.
-8. **Confirm it's live**: open `https://portal.elex.lighting` from your phone on mobile data
+   certificate (via Let's Encrypt, automatically — no Cloudflare involved) within a few
+   seconds of DNS resolving correctly.
+4. **Confirm it's live**: open `https://portal.elex.lighting` from your phone on mobile data
    (not from the EC2 box itself) to prove it's really reachable over the public internet.
-9. **Turn on `COOKIE_SECURE`** now that every login goes through HTTPS:
+5. **Turn on `COOKIE_SECURE`** now that every login goes through HTTPS:
    ```bash
    echo "COOKIE_SECURE=true" >> .env
    docker compose up -d
    ```
 
-**Simpler alternative, no Cloudflare account at all**: if you'd rather not add a second DNS
-provider into the mix, you can add the **A record straight in OVH's own DNS zone** for
-`elex.lighting` instead (subdomain `portal`, same Elastic IP) and skip steps 1-4 and the
-delegation entirely — step 5 onward still applies, just without a proxy-status toggle to
-worry about. The Cloudflare route above is worth it mainly if you want Cloudflare's own
-dashboard/analytics/WAF for this subdomain specifically; either way reaches the same place.
-
 From here, `git pull && docker compose up -d --build` (see **Updating to a new version**
 below) keeps `portal.elex.lighting` current — DNS, the Elastic IP, and the certificate don't
 need touching again (Caddy renews automatically).
+
+**If you actually want Cloudflare in front of this subdomain** (its proxy/CDN, WAF, or
+analytics — not required for anything above to work), the only way is to move the *entire*
+`elex.lighting` domain's nameservers to Cloudflare, not just `portal`. That means: before
+touching anything, write down every record currently in OVH's DNS zone for `elex.lighting`
+(the main site's A/CNAME records, and critically every mail record — MX, SPF, DKIM, DMARC —
+since getting one of those wrong breaks email delivery, not just the website); recreate all
+of them exactly in Cloudflare's DNS zone for `elex.lighting`; add the new `portal` A record
+pointing at the Elastic IP there too; then change elex.lighting's nameservers at OVH to the
+two Cloudflare gives you. Hosting doesn't move — the main site and mail keep running on
+whatever servers they run on today — only DNS management moves to Cloudflare. This is real
+extra work and risk for a benefit (Cloudflare's proxy features) this app doesn't need, so
+it's not the recommended path; it's here only in case you want it for the main site too.
 
 ## Test checklist (everything except physical printing)
 

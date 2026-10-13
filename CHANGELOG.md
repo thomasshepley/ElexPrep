@@ -3,6 +3,10 @@
 Newest entries first. Each push/merge gets exactly one entry - see
 `scripts/bump-version.mjs` for how the version number itself advances.
 
+## v2.8.4 - 2026-10-13
+
+- Fix DEPLOY.md DNS instructions - Cloudflare rejects subdomain-only zones
+
 ## v2.8.3 - 2026-10-13
 
 - Add admin CLI for VPS operations and forced password reset
