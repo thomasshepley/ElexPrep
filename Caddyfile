@@ -1,0 +1,6 @@
+# Caddy gets a Let's Encrypt certificate for this domain automatically the first time it
+# starts after DNS actually points at this box - no manual certbot/renewal setup. See
+# DEPLOY.md's "Go live at portal.elex.lighting".
+portal.elex.lighting {
+	reverse_proxy elexprep:4000
+}

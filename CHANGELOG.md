@@ -3,6 +3,10 @@
 Newest entries first. Each push/merge gets exactly one entry - see
 `scripts/bump-version.mjs` for how the version number itself advances.
 
+## v2.8.2 - 2026-10-13
+
+- Rewrote deployment docs for an AWS EC2 VPS with Caddy for HTTPS, replacing the home-server Cloudflare Tunnel approach
+
 ## v2.7.2 - 2026-10-13
 
 - Added a Windows Server print-agent troubleshooting note for the scheduled-task SYSTEM account
