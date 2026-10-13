@@ -4,6 +4,10 @@ Newest entries first. Each push/merge gets exactly one entry - see
 `scripts/bump-version.mjs` for how the version number itself advances. A `+` marks a
 feature addition, a `-` marks a bug fix.
 
+## v1.3.7 - 2026-10-13
+
++ Dashboard this-week strip, crew next call and calendar export, clearer print queue and schedule, tidier crew settings and a browser smoke test
+
 ## v1.3.6 - 2026-10-13
 
 + New ELEX brand colours and logo, a bottom tab bar on phones, jobs list with dates and prep progress, grouped settings, click-to-edit tables, contact cards and a reorganised job settings page
