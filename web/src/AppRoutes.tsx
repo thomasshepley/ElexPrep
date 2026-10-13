@@ -31,7 +31,6 @@ const PrinterSettingsPage = lazy(() => import('./pages/PrinterSettingsPage'))
 const CurrentRmsSettingsPage = lazy(() => import('./pages/CurrentRmsSettingsPage'))
 const OneDriveSettingsPage = lazy(() => import('./pages/OneDriveSettingsPage'))
 const CrewPortalSettingsPage = lazy(() => import('./pages/CrewPortalSettingsPage'))
-const ActivityLogPage = lazy(() => import('./pages/ActivityLogPage'))
 const OnboardingPage = lazy(() => import('./pages/OnboardingPage'))
 const WebmasterPage = lazy(() => import('./pages/WebmasterPage'))
 
@@ -72,7 +71,7 @@ export default function AppRoutes() {
               <Route path="current-rms" element={<CurrentRmsSettingsPage />} />
               <Route path="onedrive" element={<OneDriveSettingsPage />} />
               <Route path="crew-portal" element={<CrewPortalSettingsPage />} />
-              <Route path="activity" element={<ActivityLogPage />} />
+              <Route path="activity" element={<Navigate to="/webmaster" replace />} />
               <Route path="preferences" element={<Navigate to="/preferences" replace />} />
               <Route path="*" element={<NotFoundPage home="/settings" />} />
             </Route>

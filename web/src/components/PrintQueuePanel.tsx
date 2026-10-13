@@ -251,26 +251,28 @@ export default function PrintQueuePanel({ jobId, groupId = null }: { jobId: stri
                       {pj.status}
                       {pj.error && <div className="error">{pj.error}</div>}
                     </td>
-                    <td className="row">
-                      <a href={api.printJobs.pdfUrl(pj.id)} target="_blank" rel="noreferrer">
-                        PDF
-                      </a>
-                      {(pj.status === 'FAILED' || pj.status === 'CANCELLED') && (
-                        <button
-                          className="secondary"
-                          onClick={() => api.printJobs.retry(pj.id).then(refreshPrintJobs)}
-                        >
-                          Retry
-                        </button>
-                      )}
-                      {pj.status === 'QUEUED' && (
-                        <button
-                          className="secondary"
-                          onClick={() => api.printJobs.cancel(pj.id).then(refreshPrintJobs)}
-                        >
-                          Cancel
-                        </button>
-                      )}
+                    <td>
+                      <div className="row">
+                        <a href={api.printJobs.pdfUrl(pj.id)} target="_blank" rel="noreferrer">
+                          PDF
+                        </a>
+                        {(pj.status === 'FAILED' || pj.status === 'CANCELLED') && (
+                          <button
+                            className="secondary"
+                            onClick={() => api.printJobs.retry(pj.id).then(refreshPrintJobs)}
+                          >
+                            Retry
+                          </button>
+                        )}
+                        {pj.status === 'QUEUED' && (
+                          <button
+                            className="secondary"
+                            onClick={() => api.printJobs.cancel(pj.id).then(refreshPrintJobs)}
+                          >
+                            Cancel
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}

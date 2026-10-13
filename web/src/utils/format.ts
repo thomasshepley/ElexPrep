@@ -106,8 +106,8 @@ export function toDatetimeLocal(iso: string | null | undefined): string {
   return date ? `${date}T${time}` : '';
 }
 
-/** The server's "integration is turned off" errors are an expected state, not a failure: pages
+/** The server's "integration is turned off" / "job not linked" errors are an expected state, not a failure: pages
  * show them as a muted note and hide actions that can't work. */
 export function isIntegrationOff(message: string | null | undefined): boolean {
-  return Boolean(message && /integration is disabled/i.test(message));
+  return Boolean(message && /integration is disabled|not linked to a Current RMS opportunity/i.test(message));
 }

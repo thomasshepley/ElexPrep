@@ -1,11 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
-import { api, type DiscussionMessage } from '../api/client';
+import { api, type DiscussionGroup, type DiscussionGroupInput, type DiscussionMessage, type JobCrewAssignment } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
+import { isAdminRole } from '../auth/roles';
+import Modal from './Modal';
 import { useDialog } from './Dialog';
 import { formatDateTime } from '../utils/format';
 import UserName from './UserName';
 
 const POLL_MS = 15000;
+
+// Same small palette as schedule entries, so group colours sit with the rest of the job's colours.
+const GROUP_COLORS = ['#E53935', '#8E24AA', '#3949AB', '#1E88E5', '#00897B', '#43A047', '#F9A825', '#EF6C00'];
 
 
 /**
@@ -26,7 +31,13 @@ export default function JobDiscussionThread({ jobId, scope }: { jobId: string; s
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [groups, setGroups] = useState<DiscussionGroup[]>([]);
+  const [groupId, setGroupId] = useState<string | null>(null);
+  // null = closed, 'new' = creating, otherwise the group being edited.
+  const [editingGroup, setEditingGroup] = useState<DiscussionGroup | 'new' | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const groupIdRef = useRef<string | null>(null);
+  groupIdRef.current = groupId;
 
   const list = scope === 'staff' ? api.jobDiscussion.list : api.crewPortal.discussion.list;
   const send = scope === 'staff' ? api.jobDiscussion.send : api.crewPortal.discussion.send;
@@ -37,6 +48,7 @@ export default function JobDiscussionThread({ jobId, scope }: { jobId: string; s
   // see a lock control - see routes/jobDiscussion.ts's and crewPortal.ts's matching
   // server-side checks, which this only mirrors for the UI affordance.
   const canModerate = scope === 'staff' && Boolean(user?.permissions?.moderateDiscussion);
+  const canManageGroups = scope === 'staff' && isAdminRole(user?.role);
 
   // Whether the reader is at (or near) the bottom - new messages only pull the view down when
   // they are, so someone scrolled up reading history isn't yanked away every poll.
@@ -46,21 +58,76 @@ export default function JobDiscussionThread({ jobId, scope }: { jobId: string; s
     if (el) stickToBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 48;
   };
 
-  const refresh = () =>
-    list(jobId)
+  const refresh = (wanted: string | null = groupIdRef.current) =>
+    list(jobId, wanted)
       .then((data) => {
+        // A switch of group while this request was in flight wins; drop the stale answer.
+        if (wanted !== groupIdRef.current && groupIdRef.current !== null) return;
         // Keep the same array when nothing changed, so a quiet poll doesn't re-render the thread.
         setMessages((prev) => (prev && JSON.stringify(prev) === JSON.stringify(data.messages) ? prev : data.messages));
         setLocked(data.locked);
+        setGroups((prev) => (JSON.stringify(prev) === JSON.stringify(data.groups) ? prev : data.groups));
+        if (data.groupId !== groupIdRef.current) {
+          groupIdRef.current = data.groupId;
+          setGroupId(data.groupId);
+        }
       })
       .catch((e) => setError(e.message));
 
   useEffect(() => {
-    refresh();
-    const timer = setInterval(refresh, POLL_MS);
+    groupIdRef.current = null;
+    setGroupId(null);
+    refresh(null);
+    const timer = setInterval(() => refresh(), POLL_MS);
     return () => clearInterval(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [jobId]);
+
+  const switchGroup = (id: string) => {
+    if (id === groupId) return;
+    groupIdRef.current = id;
+    setGroupId(id);
+    setMessages(null);
+    setEditingId(null);
+    stickToBottom.current = true;
+    refresh(id);
+  };
+
+  const saveGroup = async (data: DiscussionGroupInput) => {
+    if (editingGroup === 'new') {
+      const created = await api.jobDiscussion.createGroup(jobId, data);
+      setEditingGroup(null);
+      switchGroup(created.id);
+    } else if (editingGroup) {
+      await api.jobDiscussion.updateGroup(jobId, editingGroup.id, data);
+      setEditingGroup(null);
+      refresh();
+    }
+  };
+
+  const deleteGroup = async (g: DiscussionGroup) => {
+    if (
+      !(await dialog.confirm({
+        title: `Delete "${g.name}"?`,
+        message: `Its ${g.messageCount ?? 0} message${g.messageCount === 1 ? '' : 's'} are deleted with it. This can't be undone.`,
+        confirmLabel: 'Delete group',
+        danger: true,
+        typeToConfirm: g.messageCount ? g.name : undefined,
+      }))
+    )
+      return;
+    try {
+      await api.jobDiscussion.removeGroup(jobId, g.id);
+      setEditingGroup(null);
+      const general = groups.find((x) => x.isDefault);
+      if (general) switchGroup(general.id);
+      else refresh(null);
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  };
+
+  const currentGroup = groups.find((g) => g.id === groupId) ?? null;
 
   useEffect(() => {
     if (listRef.current && stickToBottom.current) listRef.current.scrollTop = listRef.current.scrollHeight;
@@ -72,7 +139,7 @@ export default function JobDiscussionThread({ jobId, scope }: { jobId: string; s
     setBusy(true);
     setError(null);
     try {
-      const message = await send(jobId, draft.trim());
+      const message = await send(jobId, draft.trim(), groupId);
       stickToBottom.current = true;
       setMessages((prev) => [...(prev ?? []), message]);
       setDraft('');
@@ -134,12 +201,57 @@ export default function JobDiscussionThread({ jobId, scope }: { jobId: string; s
     <div className="discussion-thread">
       <div className="row-between discussion-header">
         <h3 className="mt-0 mb-0">Discussion</h3>
-        {canModerate && (
-          <button type="button" className="secondary" disabled={lockBusy} onClick={toggleLock}>
-            {locked ? 'Unlock discussion' : 'Lock discussion'}
-          </button>
-        )}
+        <div className="row" style={{ gap: '0.5rem' }}>
+          {canManageGroups && currentGroup && (
+            <button type="button" className="secondary" onClick={() => setEditingGroup(currentGroup)}>
+              Edit group
+            </button>
+          )}
+          {canModerate && (
+            <button type="button" className="secondary" disabled={lockBusy} onClick={toggleLock}>
+              {locked ? 'Unlock discussion' : 'Lock discussion'}
+            </button>
+          )}
+        </div>
       </div>
+      {(groups.length > 1 || canManageGroups) && (
+        <div className="discussion-groups" role="tablist" aria-label="Chat groups">
+          {groups.map((g) => (
+            <button
+              key={g.id}
+              type="button"
+              role="tab"
+              aria-selected={g.id === groupId}
+              className={`discussion-group-tab${g.id === groupId ? ' active' : ''}`}
+              style={{ '--group-color': g.color ?? 'var(--accent)' } as React.CSSProperties}
+              onClick={() => switchGroup(g.id)}
+            >
+              <span className="discussion-group-dot" aria-hidden="true" />
+              {g.name}
+              {g.visibility === 'MEMBERS' && (
+                <span className="muted" title="Only the crew added to this group (and staff) can see it">
+                  {' '}
+                  · members
+                </span>
+              )}
+            </button>
+          ))}
+          {canManageGroups && (
+            <button type="button" className="discussion-group-tab discussion-group-add" onClick={() => setEditingGroup('new')}>
+              + Group
+            </button>
+          )}
+        </div>
+      )}
+      {editingGroup && (
+        <GroupEditor
+          jobId={jobId}
+          group={editingGroup === 'new' ? null : editingGroup}
+          onCancel={() => setEditingGroup(null)}
+          onSave={saveGroup}
+          onDelete={editingGroup !== 'new' && !editingGroup.isDefault ? () => deleteGroup(editingGroup) : undefined}
+        />
+      )}
       {locked && (
         <p className="muted discussion-locked-note">
           {canModerate ? 'This discussion is locked - only moderators can post.' : 'This discussion is locked.'}
@@ -147,7 +259,9 @@ export default function JobDiscussionThread({ jobId, scope }: { jobId: string; s
       )}
       <div className="discussion-messages" ref={listRef} onScroll={onScroll} role="log" aria-live="polite">
         {messages === null && <p className="muted">Loading…</p>}
-        {messages !== null && messages.length === 0 && <p className="muted">No messages yet - say hello.</p>}
+        {messages !== null && messages.length === 0 && (
+          <p className="muted">No messages in {currentGroup?.name ?? 'this group'} yet - say hello.</p>
+        )}
         {messages?.map((m) => {
           const isOwn = m.authorUserId === user?.id;
           const isDeleted = Boolean(m.deletedAt);
@@ -210,7 +324,7 @@ export default function JobDiscussionThread({ jobId, scope }: { jobId: string; s
         <form className="discussion-compose" onSubmit={submit}>
           <textarea
             aria-label="Message"
-            placeholder="Write a message… (Enter to send, Shift+Enter for a new line)"
+            placeholder={`Message ${currentGroup?.name ?? 'the crew'}… (Enter to send, Shift+Enter for a new line)`}
             rows={Math.min(6, Math.max(1, draft.split('\n').length))}
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
@@ -231,5 +345,135 @@ export default function JobDiscussionThread({ jobId, scope }: { jobId: string; s
       )}
       {error && <p className="error">{error}</p>}
     </div>
+  );
+}
+
+/** Create or edit a chat group: name, colour, and who on the crew can see it. */
+function GroupEditor({
+  jobId,
+  group,
+  onCancel,
+  onSave,
+  onDelete,
+}: {
+  jobId: string;
+  group: DiscussionGroup | null;
+  onCancel: () => void;
+  onSave: (data: DiscussionGroupInput) => Promise<void>;
+  onDelete?: () => void;
+}) {
+  const [name, setName] = useState(group?.name ?? '');
+  const [color, setColor] = useState<string | null>(group?.color ?? null);
+  const [visibility, setVisibility] = useState(group?.visibility ?? 'EVERYONE');
+  const [members, setMembers] = useState<Set<string>>(new Set(group?.memberAssignmentIds ?? []));
+  const [crew, setCrew] = useState<JobCrewAssignment[] | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    api.jobCrewAssignments.list(jobId).then(setCrew).catch(() => setCrew([]));
+  }, [jobId]);
+
+  const toggleMember = (id: string) =>
+    setMembers((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      await onSave({ name: name.trim(), color, visibility, memberAssignmentIds: [...members] });
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Modal title={group ? `Edit "${group.name}"` : 'New chat group'} onClose={onCancel}>
+      <form onSubmit={submit} className="stack">
+        <div className="field">
+          <label htmlFor="group-name">Name</label>
+          <input id="group-name" value={name} onChange={(e) => setName(e.target.value)} maxLength={40} required autoFocus placeholder="e.g. Riggers" />
+        </div>
+        <div className="field">
+          <label>Colour</label>
+          <div className="row" style={{ gap: '0.3rem' }}>
+            <button
+              type="button"
+              className="schedule-color-swatch"
+              style={{ background: 'var(--accent)', outline: color === null ? '2px solid var(--content)' : 'none', outlineOffset: 2 }}
+              onClick={() => setColor(null)}
+              aria-label="Default colour"
+              aria-pressed={color === null}
+            />
+            {GROUP_COLORS.map((c) => (
+              <button
+                key={c}
+                type="button"
+                className="schedule-color-swatch"
+                style={{ background: c, outline: color === c ? '2px solid var(--content)' : 'none', outlineOffset: 2 }}
+                onClick={() => setColor(c)}
+                aria-label={`Colour ${c}`}
+                aria-pressed={color === c}
+              />
+            ))}
+          </div>
+        </div>
+        <fieldset className="stack" style={{ border: 'none', padding: 0, margin: 0 }}>
+          <legend className="field-label" style={{ marginBottom: '0.4rem' }}>
+            Who can see it
+          </legend>
+          <label className="row" style={{ gap: '0.5rem' }}>
+            <input type="radio" name="group-visibility" checked={visibility === 'EVERYONE'} onChange={() => setVisibility('EVERYONE')} />
+            Everyone on this job&apos;s crew
+          </label>
+          <label className="row" style={{ gap: '0.5rem' }}>
+            <input type="radio" name="group-visibility" checked={visibility === 'MEMBERS'} onChange={() => setVisibility('MEMBERS')} />
+            Only crew I add
+          </label>
+          <span className="muted" style={{ fontSize: 'var(--text-sm)' }}>
+            Staff can always see every group.
+          </span>
+        </fieldset>
+        {visibility === 'MEMBERS' && (
+          <div className="field">
+            <label>Members</label>
+            {crew === null && <span className="muted">Loading crew…</span>}
+            {crew?.length === 0 && <span className="muted">No crew on this job yet - add them on the Crew tab first.</span>}
+            {crew?.map((a) => (
+              <label key={a.id} className="row" style={{ gap: '0.5rem' }}>
+                <input type="checkbox" checked={members.has(a.id)} onChange={() => toggleMember(a.id)} />
+                {a.displayName} <span className="muted">{a.role}</span>
+              </label>
+            ))}
+          </div>
+        )}
+        {error && <p className="error">{error}</p>}
+        <div className="row" style={{ justifyContent: 'space-between' }}>
+          {onDelete ? (
+            <button type="button" className="danger" onClick={onDelete}>
+              Delete group
+            </button>
+          ) : (
+            <span />
+          )}
+          <div className="row" style={{ gap: '0.5rem' }}>
+            <button type="button" className="secondary" onClick={onCancel}>
+              Cancel
+            </button>
+            <button type="submit" disabled={busy || !name.trim()}>
+              {group ? 'Save' : 'Create group'}
+            </button>
+          </div>
+        </div>
+      </form>
+    </Modal>
   );
 }

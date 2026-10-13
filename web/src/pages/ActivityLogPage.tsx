@@ -32,6 +32,7 @@ function readableDetail(detail: string | null): string | null {
   return detail ? detail.replace(ISO_PATTERN, (iso) => formatDateTime(iso)) : detail;
 }
 
+/** The system activity log - shown as a tab of the Webmaster page. */
 export default function ActivityLogPage() {
   const [entries, setEntries] = useState<ActivityLogEntry[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
@@ -77,7 +78,6 @@ export default function ActivityLogPage() {
 
   return (
     <div>
-      <h1>Activity log</h1>
       <div className="panel">
         <div className="row">
           <input

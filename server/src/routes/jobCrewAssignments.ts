@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { prisma, logActivity } from '../db';
 import { requirePermission } from '../permissions';
 import { notifyCrewAssigned } from '../notifications';
-import { effectiveDayRate, effectiveDays, loadGlobalDefaultDayRate } from '../crewRates';
+import { assignmentCost, crewSuggestedRate, effectiveDayRate, loadRateTables, type RateTables } from '../crewRates';
 
 /**
  * Job-scoped crew attribution: who's working this job, in what role, at what rate. Viewing is
@@ -31,12 +31,14 @@ interface AssignmentRow {
     user: { username: string; displayName: string };
     rateLines: { label: string; amount: string }[];
   };
-  _count: { dayAssignments: number };
+  dayAssignments: { id: string; dayRate: string | null; jobDay: { id: string; date: Date } }[];
 }
 
-function toAssignmentDto(a: AssignmentRow, globalDefaultRate: number) {
-  const rate = effectiveDayRate(a, a.crewProfile.dayRate, a.crewProfile.rateLines, globalDefaultRate);
-  const days = effectiveDays(a._count.dayAssignments, a.days);
+function toAssignmentDto(a: AssignmentRow, tables: RateTables) {
+  const rate = effectiveDayRate(a, a.crewProfile.dayRate, tables);
+  const days = [...a.dayAssignments].sort((x, y) => x.jobDay.date.getTime() - y.jobDay.date.getTime());
+  const cost = assignmentCost(rate, days.map((d) => d.dayRate), a.days);
+  const suggested = crewSuggestedRate(a.role, a.crewProfile.rateLines);
   return {
     id: a.id,
     crewProfileId: a.crewProfileId,
@@ -53,10 +55,16 @@ function toAssignmentDto(a: AssignmentRow, globalDefaultRate: number) {
     /** What the margin calc actually uses - see crewRates.ts for the fallback order. */
     effectiveDayRate: rate.rate,
     dayRateSource: rate.source,
-    suggestedDayRate: rate.suggested.rate,
-    suggestedDayRateSource: rate.suggested.source,
-    scheduledDays: a._count.dayAssignments,
-    effectiveDays: days.days,
+    /** What they'd get without their own override on this job. */
+    inheritedDayRate: rate.inherited.rate,
+    inheritedDayRateSource: rate.inherited.source,
+    /** What the crew member asks for on their own rate card - shown, never used for cost. */
+    suggestedDayRate: suggested.rate,
+    suggestedDayRateSource: suggested.source,
+    scheduledDays: days.length,
+    scheduledDayList: days.map((d) => ({ id: d.id, dayId: d.jobDay.id, date: d.jobDay.date.toISOString(), dayRate: d.dayRate })),
+    effectiveDays: cost.days,
+    cost: cost.cost,
   };
 }
 
@@ -67,7 +75,7 @@ const assignmentInclude = {
       rateLines: { select: { label: true, amount: true } },
     },
   },
-  _count: { select: { dayAssignments: true } },
+  dayAssignments: { select: { id: true, dayRate: true, jobDay: { select: { id: true, date: true } } } },
 } as const;
 
 jobCrewAssignmentsRouter.get('/:jobId/crew', async (req, res) => {
@@ -76,8 +84,8 @@ jobCrewAssignmentsRouter.get('/:jobId/crew', async (req, res) => {
     include: assignmentInclude,
     orderBy: { createdAt: 'asc' },
   });
-  const globalDefaultRate = await loadGlobalDefaultDayRate();
-  res.json(assignments.map((a) => toAssignmentDto(a, globalDefaultRate)));
+  const tables = await loadRateTables(req.params.jobId);
+  res.json(assignments.map((a) => toAssignmentDto(a, tables)));
 });
 
 jobCrewAssignmentsRouter.post('/:jobId/crew', requirePermission('manageCrewAssignments'), async (req, res) => {
@@ -103,7 +111,7 @@ jobCrewAssignmentsRouter.post('/:jobId/crew', requirePermission('manageCrewAssig
   await logActivity('crew_assignment.create', `${assignment.crewProfile.user.username} as ${role}`, jobId, req.user?.id);
   const job = await prisma.job.findUnique({ where: { id: jobId }, select: { name: true } });
   if (job) await notifyCrewAssigned(assignment.crewProfile.userId, jobId, job.name, role);
-  res.status(201).json(toAssignmentDto(assignment, await loadGlobalDefaultDayRate()));
+  res.status(201).json(toAssignmentDto(assignment, await loadRateTables(jobId)));
 });
 
 jobCrewAssignmentsRouter.put('/:jobId/crew/:id', requirePermission('manageCrewAssignments'), async (req, res) => {
@@ -121,7 +129,15 @@ jobCrewAssignmentsRouter.put('/:jobId/crew/:id', requirePermission('manageCrewAs
     },
     include: assignmentInclude,
   });
-  res.json(toAssignmentDto(assignment, await loadGlobalDefaultDayRate()));
+  res.json(toAssignmentDto(assignment, await loadRateTables(req.params.jobId)));
+});
+
+// "Use role rates": drops every per-person rate override and typed day count on this job, so
+// costs come from the job's role rates and the days assigned on the Schedule tab.
+jobCrewAssignmentsRouter.post('/:jobId/crew/clear-overrides', requirePermission('manageCrewAssignments'), async (req, res) => {
+  const { count } = await prisma.jobCrewAssignment.updateMany({ where: { jobId: req.params.jobId }, data: { dayRate: null, days: null } });
+  await logActivity('crew_assignment.clear_overrides', `${count} assignment(s)`, req.params.jobId, req.user?.id);
+  res.json({ cleared: count });
 });
 
 jobCrewAssignmentsRouter.delete('/:jobId/crew/:id', requirePermission('manageCrewAssignments'), async (req, res) => {

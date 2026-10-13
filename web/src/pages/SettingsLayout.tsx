@@ -40,10 +40,6 @@ const GROUPS: { title: string; sections: SettingsSection[] }[] = [
       { to: '/settings/crew-portal', label: 'Crew Portal', adminOnly: true },
     ],
   },
-  {
-    title: 'System',
-    sections: [{ to: '/settings/activity', label: 'Activity Log', webmasterOnly: true }],
-  },
 ];
 
 export default function SettingsLayout() {

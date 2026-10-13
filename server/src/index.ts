@@ -52,6 +52,7 @@ import { requireJobVisible } from './jobVisibility';
 import { RejectedUploadError } from './uploadSafety';
 import { seedDefaultLocationColorsIfEmpty, seedNewDefaultLocationColorsIfMissing } from './pdf/locationColors';
 import { prisma } from './db';
+import { globalRoleRatesRouter, jobRoleRatesRouter } from './routes/roleRates';
 
 const app = express();
 // One reverse proxy in front of this app in the documented deployment (see DEPLOY.md) - trust
@@ -115,6 +116,8 @@ app.use('/api/users', usersRouter);
 app.use('/api/settings', settingsRouter);
 app.use('/api/jobs/:jobId', requireJobVisible);
 app.use('/api/jobs', jobsRouter);
+app.use('/api/jobs', jobRoleRatesRouter);
+app.use('/api/role-rates', globalRoleRatesRouter);
 app.use('/api/fixture-type-rules', fixtureTypeRulesRouter);
 app.use('/api/location-color-rules', locationColorRulesRouter);
 app.use('/api/jobs', patchRouter);

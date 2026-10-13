@@ -152,9 +152,10 @@ export const crewApi = {
     submitLabelRequest: (jobId: string, data: { labelType: string; content: Record<string, unknown>; quantity?: number }) =>
       request<CrewLabelRequest>(`/crew/me/jobs/${jobId}/label-requests`, { method: 'POST', body: JSON.stringify(data) }),
     discussion: {
-      list: (jobId: string) => request<DiscussionThreadData>(`/crew/me/jobs/${jobId}/discussion`),
-      send: (jobId: string, body: string) =>
-        request<DiscussionMessage>(`/crew/me/jobs/${jobId}/discussion`, { method: 'POST', body: JSON.stringify({ body }) }),
+      list: (jobId: string, groupId?: string | null) =>
+        request<DiscussionThreadData>(`/crew/me/jobs/${jobId}/discussion${groupId ? `?groupId=${encodeURIComponent(groupId)}` : ''}`),
+      send: (jobId: string, body: string, groupId?: string | null) =>
+        request<DiscussionMessage>(`/crew/me/jobs/${jobId}/discussion`, { method: 'POST', body: JSON.stringify({ body, groupId }) }),
       edit: (jobId: string, messageId: string, body: string) =>
         request<DiscussionMessage>(`/crew/me/jobs/${jobId}/discussion/${messageId}`, { method: 'PUT', body: JSON.stringify({ body }) }),
       remove: (jobId: string, messageId: string) =>

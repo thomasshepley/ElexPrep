@@ -7,6 +7,7 @@ import { useToast } from './Toast';
 import { useDialog } from './Dialog';
 import { formatDateTime } from '../utils/format';
 import InlineEdit from './InlineEdit';
+import LocationSelect, { useJobLocations } from './LocationSelect';
 
 /** Fixture types that actually take a separate pixel-map patch - only these get the Pix
  * Uni/Pix Addr columns in the fixtures table. Matched on letters and digits only, so
@@ -16,50 +17,6 @@ const PIXEL_MAPPED_TYPE_KEYS = ['astrabladeip', 'pixellineip'];
 function supportsPixelMap(fixtureType: string | null | undefined): boolean {
   const key = (fixtureType ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
   return PIXEL_MAPPED_TYPE_KEYS.some((k) => key.includes(k));
-}
-
-const NEW_LOCATION = '__new_location__';
-
-/** Location picker for the fixtures table: every location this job already knows about
- * (global + job location colours, plus whatever fixtures already use) with "New location…"
- * for anything else. Controlled by the saved value, so cancelling the prompt snaps back. */
-function LocationSelect({
-  value,
-  options,
-  onChange,
-  ariaLabel,
-  placeholder = '-',
-  width = '9rem',
-}: {
-  value: string;
-  options: string[];
-  onChange: (value: string) => void;
-  ariaLabel: string;
-  placeholder?: string;
-  width?: string;
-}) {
-  const dialog = useDialog();
-  const all = value && !options.includes(value) ? [value, ...options] : options;
-  return (
-    <select
-      value={value}
-      aria-label={ariaLabel}
-      style={{ width }}
-      onChange={async (e) => {
-        if (e.target.value !== NEW_LOCATION) return onChange(e.target.value);
-        const typed = await dialog.prompt({ title: 'New location', label: 'Location', placeholder: 'e.g. Stage Left', confirmLabel: 'Use', required: true });
-        if (typed?.trim()) onChange(typed.trim());
-      }}
-    >
-      <option value="">{placeholder}</option>
-      {all.map((loc) => (
-        <option key={loc} value={loc}>
-          {loc}
-        </option>
-      ))}
-      <option value={NEW_LOCATION}>New location…</option>
-    </select>
-  );
 }
 
 function announceNewFixtureTypes(showToast: ReturnType<typeof useToast>['showToast'], types: string[]) {
@@ -94,7 +51,6 @@ export default function PatchImportPanel({ jobId, groupId = null }: { jobId: str
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkLocation, setBulkLocation] = useState('');
   const [fixtureSearch, setFixtureSearch] = useState('');
-  const [knownLocations, setKnownLocations] = useState<string[]>([]);
 
   const [candidate, setCandidate] = useState<PatchImportCandidate | null>(null);
   const [scanError, setScanError] = useState<string | null>(null);
@@ -103,14 +59,6 @@ export default function PatchImportPanel({ jobId, groupId = null }: { jobId: str
   const loadFixtures = () => api.patch.fixtures(jobId).then(setFixtures);
   const loadCandidate = () => api.patch.getOneDriveCandidate(jobId).then(setCandidate);
 
-  useEffect(() => {
-    // Location names already set up as colours (global and this job's own) seed the picker;
-    // a failed load just means a shorter list, not a broken table.
-    Promise.all([
-      api.locationColorRules.list().catch(() => []),
-      api.jobLocationColorRules.list(jobId).catch(() => []),
-    ]).then(([globalRules, jobRules]) => setKnownLocations([...globalRules, ...jobRules].map((r) => r.location)));
-  }, [jobId]);
 
   useEffect(() => {
     loadFixtures();
@@ -174,9 +122,7 @@ export default function PatchImportPanel({ jobId, groupId = null }: { jobId: str
 
   const stageFixtures = (fixtures ?? []).filter((f) => (f.groupId ?? null) === groupId);
 
-  const locationOptions = [...new Set([...knownLocations, ...(fixtures ?? []).map((f) => f.location ?? '')])]
-    .filter(Boolean)
-    .sort((a, b) => a.localeCompare(b));
+  const locationOptions = useJobLocations(jobId, (fixtures ?? []).map((f) => f.location));
   const showPixColumns = stageFixtures.some((f) => supportsPixelMap(f.fixtureType));
   const columnCount = showPixColumns ? 10 : 8;
 

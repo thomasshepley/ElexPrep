@@ -4,6 +4,7 @@ import LabelTypeForm, { TYPE_LABELS, type AdHocType } from './LabelTypeForm';
 import { WhoIcon } from './Icons';
 import { useDialog } from './Dialog';
 import InlineEdit from './InlineEdit';
+import LocationSelect, { useJobLocations } from './LocationSelect';
 
 /**
  * One-off/ad hoc labels for a job, grouped into the same 3 sections crew think in when they
@@ -185,11 +186,13 @@ function RequestedLabelsPanel({ jobId, onChanged }: { jobId: string; onChanged: 
                 <td>{TYPE_LABELS[r.labelType as AdHocType] ?? r.labelType}</td>
                 <td>{summarizeContent(r.labelType, r.content)}</td>
                 <td>{r.quantity}</td>
-                <td className="row">
-                  <button onClick={() => approve(r.id)}>Approve</button>
-                  <button className="secondary" onClick={() => reject(r.id)}>
-                    Deny
-                  </button>
+                <td>
+                  <div className="row">
+                    <button onClick={() => approve(r.id)}>Approve</button>
+                    <button className="secondary" onClick={() => reject(r.id)}>
+                      Deny
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -218,6 +221,7 @@ function LabelSection({
   onChanged: () => void;
 }) {
   const sectionItems = items.filter((i) => types.includes(i.labelType as AdHocType));
+  const locationOptions = useJobLocations(jobId, items.map((i) => (typeof i.content.location === 'string' ? i.content.location : null)));
 
   const create = async (labelType: AdHocType, content: Record<string, unknown>, quantity: number) => {
     await api.adHocLabels.create(jobId, { labelType, content, quantity, groupId });
@@ -242,7 +246,16 @@ function LabelSection({
     onChanged();
   };
 
-  const editableField = (item: AdHocLabel, key: string, placeholder: string, width: number, type: 'text' | 'number' = 'text') => (
+  const editableField = (item: AdHocLabel, key: string, placeholder: string, width: number, type: 'text' | 'number' = 'text') =>
+    key === 'location' ? (
+      <LocationSelect
+        ariaLabel={placeholder}
+        placeholder="Location…"
+        value={item.content.location == null ? '' : String(item.content.location)}
+        options={locationOptions}
+        onChange={(v) => updateContentField(item, 'location', v)}
+      />
+    ) : (
     <InlineEdit
       type={type}
       label={placeholder}
@@ -316,7 +329,7 @@ function LabelSection({
     <div className="panel">
       <h3>{title}</h3>
       <p className="muted">{description}</p>
-      <LabelTypeForm types={types} onSubmit={create} />
+      <LabelTypeForm types={types} onSubmit={create} locations={locationOptions} />
 
       {sectionItems.length > 0 && (
         <>

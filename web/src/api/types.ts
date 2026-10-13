@@ -284,7 +284,17 @@ export interface OnboardingInvite {
   token: string | null;
 }
 
-export type DayRateSource = 'override' | 'role' | 'profile' | 'rateCard' | 'default' | 'none';
+/** Where a crew day rate came from - see server/src/crewRates.ts for the order. */
+export type DayRateSource = 'zero' | 'override' | 'jobRole' | 'profile' | 'globalRole' | 'default' | 'none';
+/** Where the crew member's own suggested rate came from (their rate card). */
+export type SuggestedRateSource = 'role' | 'rateCard' | 'none';
+
+export interface RoleRate {
+  id: string;
+  jobId: string | null;
+  role: string;
+  dayRate: string;
+}
 
 export interface JobCrewAssignment {
   id: string;
@@ -309,12 +319,17 @@ export interface JobCrewAssignment {
   /// server/src/crewRates.ts for the fallback order.
   effectiveDayRate: number;
   dayRateSource: DayRateSource;
-  /// The rate with no job-level override (what clearing the override would fall back to).
+  /// The rate with no per-person override on this job (what clearing the override falls back to).
+  inheritedDayRate: number;
+  inheritedDayRateSource: DayRateSource;
+  /// What the crew member asks for on their own rate card - shown, never used for cost.
   suggestedDayRate: number;
-  suggestedDayRateSource: DayRateSource;
-  /// Job days this person is assigned to on the Schedule tab; when > 0 it drives the cost.
+  suggestedDayRateSource: SuggestedRateSource;
+  /// Job days this person is assigned to on the Schedule tab; when > 0 they drive the cost.
   scheduledDays: number;
+  scheduledDayList: { id: string; dayId: string; date: string; dayRate: string | null }[];
   effectiveDays: number;
+  cost: number;
 }
 
 export interface JobDayCrew {
@@ -594,9 +609,33 @@ export interface DiscussionMessage {
   deletedByName: string | null;
 }
 
+export type DiscussionGroupVisibility = 'EVERYONE' | 'MEMBERS';
+
+export interface DiscussionGroup {
+  id: string;
+  name: string;
+  color: string | null;
+  visibility: DiscussionGroupVisibility;
+  isDefault: boolean;
+  /** Staff only: crew (by job assignment id) added to a members-only group. */
+  memberAssignmentIds?: string[];
+  /** Staff only. */
+  messageCount?: number;
+}
+
 export interface DiscussionThreadData {
   locked: boolean;
+  /** The group these messages are from (General unless another was asked for). */
+  groupId: string | null;
+  groups: DiscussionGroup[];
   messages: DiscussionMessage[];
+}
+
+export interface DiscussionGroupInput {
+  name?: string;
+  color?: string | null;
+  visibility?: DiscussionGroupVisibility;
+  memberAssignmentIds?: string[];
 }
 
 export interface AppNotification {

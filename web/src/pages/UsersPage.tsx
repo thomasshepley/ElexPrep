@@ -197,20 +197,22 @@ export default function UsersPage() {
                       onChange={(e) => togglePm(u, e.target.checked)}
                     />
                   </td>
-                  <td className="row">
-                    {u.role === 'USER' && (
-                      <button className="secondary" onClick={() => setExpandedId(expandedId === u.id ? null : u.id)}>
-                        Permissions
+                  <td>
+                    <div className="row">
+                      {u.role === 'USER' && (
+                        <button className="secondary" onClick={() => setExpandedId(expandedId === u.id ? null : u.id)}>
+                          Permissions
+                        </button>
+                      )}
+                      <button className="secondary" onClick={() => resetPassword(u)}>
+                        Reset password
                       </button>
-                    )}
-                    <button className="secondary" onClick={() => resetPassword(u)}>
-                      Reset password
-                    </button>
-                    {u.id !== me?.id && (
-                      <button className="secondary" onClick={() => remove(u)}>
-                        Delete
-                      </button>
-                    )}
+                      {u.id !== me?.id && (
+                        <button className="secondary" onClick={() => remove(u)}>
+                          Delete
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
                 {expandedId === u.id && u.role === 'USER' && (

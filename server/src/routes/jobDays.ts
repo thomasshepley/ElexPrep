@@ -164,6 +164,19 @@ jobDaysRouter.post('/:jobId/days/:dayId/crew', requirePermission('manageCrewAssi
   res.status(201).json({ id: created.id });
 });
 
+// One person's rate for one day (a travel or half day). Blank clears it back to their job rate.
+// Read back through the Crew tab (routes/jobCrewAssignments.ts), never the day DTO, which crew see.
+jobDaysRouter.put('/:jobId/days/:dayId/crew/:id', requirePermission('manageCrewAssignments'), async (req, res) => {
+  const row = await prisma.jobDayCrewAssignment.findUnique({ where: { id: req.params.id }, include: { jobDay: { select: { jobId: true } } } });
+  if (!row || row.jobDayId !== req.params.dayId || row.jobDay.jobId !== req.params.jobId) return res.status(404).json({ error: 'Not found' });
+  const raw = req.body?.dayRate;
+  const cleaned = raw == null ? '' : String(raw).replace(/[£,\s]/g, '');
+  if (cleaned && (!Number.isFinite(Number(cleaned)) || Number(cleaned) < 0)) return res.status(400).json({ error: 'dayRate must be a number' });
+  await prisma.jobDayCrewAssignment.update({ where: { id: row.id }, data: { dayRate: cleaned || null } });
+  await logActivity('job_day.crew_rate', cleaned || '(cleared)', req.params.jobId, req.user?.id);
+  res.json({ id: row.id, dayRate: cleaned || null });
+});
+
 jobDaysRouter.delete('/:jobId/days/:dayId/crew/:id', requirePermission('manageCrewAssignments'), async (req, res) => {
   const row = await prisma.jobDayCrewAssignment.findUnique({ where: { id: req.params.id }, include: { jobDay: { select: { jobId: true } } } });
   if (!row || row.jobDayId !== req.params.dayId || row.jobDay.jobId !== req.params.jobId) return res.status(404).json({ error: 'Not found' });

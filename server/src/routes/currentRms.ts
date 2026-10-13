@@ -14,7 +14,7 @@ import { getOneDriveConfig } from '../oneDrive/config';
 import { matchJobFolder } from '../oneDrive/matcher';
 import { getItemByPath } from '../oneDrive/client';
 import { normalizeCrewFeaturesPatch } from '../crewFeatures';
-import { effectiveDayRate, effectiveDays, loadGlobalDefaultDayRate } from '../crewRates';
+import { assignmentCost, crewSuggestedRate, effectiveDayRate, loadRateTables } from '../crewRates';
 
 export const currentRmsRouter = Router();
 
@@ -449,26 +449,28 @@ jobCurrentRmsRouter.get('/:jobId/current-rms/crew-margin', requireRole('ADMIN'),
           rateLines: { select: { label: true, amount: true } },
         },
       },
-      _count: { select: { dayAssignments: true } },
+      dayAssignments: { select: { dayRate: true } },
     },
   });
-  const globalDefaultRate = await loadGlobalDefaultDayRate();
+  const tables = await loadRateTables(job.id);
   const costBreakdown = assignments.map((a) => {
     // Rate and days come from crewRates.ts so the Crew tab and this view always agree: the
     // days are the job days this person is assigned to on the Schedule tab (falling back to
     // the typed "Days" figure only when they aren't on any day yet).
-    const rate = effectiveDayRate(a, a.crewProfile.dayRate, a.crewProfile.rateLines, globalDefaultRate);
-    const { days, fromSchedule } = effectiveDays(a._count.dayAssignments, a.days);
+    const rate = effectiveDayRate(a, a.crewProfile.dayRate, tables);
+    const { days, fromSchedule, cost, dayOverrides } = assignmentCost(rate, a.dayAssignments.map((d) => d.dayRate), a.days);
     return {
       crewProfileId: a.crewProfileId,
       name: a.crewProfile.user.displayName,
       role: a.role,
       dayRate: rate.rate,
-      suggestedRate: rate.suggested.rate,
+      dayRateSource: rate.source,
+      suggestedRate: crewSuggestedRate(a.role, a.crewProfile.rateLines).rate,
       zeroRated: a.zeroRated,
       days,
       daysFromSchedule: fromSchedule,
-      cost: rate.rate * days,
+      dayOverrides,
+      cost,
     };
   });
   const costTotal = costBreakdown.reduce((sum, b) => sum + b.cost, 0);

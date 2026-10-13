@@ -128,6 +128,15 @@ function LinkedOpportunitiesPanel({ jobId, onChanged }: { jobId: string; onChang
   );
 }
 
+const MARGIN_RATE_SOURCES: Record<string, string> = {
+  override: 'their rate on this job',
+  jobRole: "this job's role rate",
+  profile: 'their agreed rate',
+  globalRole: 'the portal role rate',
+  default: 'the portal default rate',
+  none: 'nowhere - no rate set',
+};
+
 function MarginDisplay({
   data,
   error,
@@ -155,11 +164,17 @@ function MarginDisplay({
         linked opportunity and any other opportunity sharing its Current RMS project (e.g. a
         separate crewing quote). Cost is each crew member's day rate × the job days they're
         assigned to on the Schedule tab (* = not on any day yet, so the Crew tab's Days figure is
-        used). Admin-only - never shown to crew.
+        used; † = some days have their own rate). Rates come from the job's role rates unless a
+        person has their own - hover a rate to see where it came from. Admin-only - never shown
+        to crew.
       </p>
       {error &&
         (isIntegrationOff(error) ? (
-          <p className="muted">Current RMS is turned off, so there's no charge to compare against. Turn it on in Settings → Current RMS.</p>
+          <p className="muted">
+            {/not linked/i.test(error)
+              ? "This job isn't linked to a Current RMS opportunity yet, so there's no charge to compare against. Link one on the Current RMS tab."
+              : "Current RMS is turned off, so there's no charge to compare against. Turn it on in Settings → Current RMS."}
+          </p>
         ) : (
           <p className="error">{error}</p>
         ))}
@@ -270,8 +285,17 @@ function MarginDisplay({
                           {b.days}
                           {!b.daysFromSchedule && <span className="muted"> *</span>}
                         </td>
-                        <td title={`Suggested rate (profile/global default): ${formatMoney(b.suggestedRate)}`}>
+                        <td
+                          title={[
+                            `From ${MARGIN_RATE_SOURCES[b.dayRateSource] ?? 'their rates'}`,
+                            b.suggestedRate ? `their rate card asks ${formatMoney(b.suggestedRate)}` : '',
+                            b.dayOverrides ? `${b.dayOverrides} day(s) at their own rate` : '',
+                          ]
+                            .filter(Boolean)
+                            .join(' · ')}
+                        >
                           {b.zeroRated ? <span className="muted">Zero-rated</span> : formatMoney(b.dayRate)}
+                          {b.dayOverrides > 0 && <span className="muted"> †</span>}
                         </td>
                         <td>{formatMoney(b.cost)}</td>
                       </tr>

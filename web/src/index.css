@@ -226,6 +226,29 @@ input, select, textarea {
   transition: border-color 120ms ease, box-shadow 120ms ease;
 }
 
+/* The text-input padding above squashed colour swatches down to a thin line. */
+input[type='color'] {
+  width: 2.6rem;
+  height: 2.2rem;
+  padding: 3px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+input[type='color']::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+input[type='color']::-webkit-color-swatch {
+  border: none;
+  border-radius: calc(var(--radius-sm) - 2px);
+}
+
+input[type='color']::-moz-color-swatch {
+  border: none;
+  border-radius: calc(var(--radius-sm) - 2px);
+}
+
 input:hover, select:hover, textarea:hover {
   border-color: var(--border-strong);
 }
@@ -2713,4 +2736,56 @@ button.row-menu-item:hover:not(:disabled) {
 
 button.row-menu-item.is-danger {
   color: var(--danger);
+}
+
+.crew-day-rates {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: var(--space-2) 0;
+}
+
+/* Discussion: chat group tabs, each with its colour as a dot and underline. */
+.discussion-groups {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: var(--space-3);
+}
+
+button.discussion-group-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: var(--surface-raised);
+  color: var(--content-muted);
+  border: 1px solid var(--border);
+  box-shadow: none;
+  font-weight: 600;
+  padding: 0.3rem 0.75rem;
+  border-radius: 999px;
+}
+
+button.discussion-group-tab:hover:not(:disabled) {
+  transform: none;
+  filter: none;
+  box-shadow: none;
+  border-color: var(--border-strong);
+}
+
+button.discussion-group-tab.active {
+  color: var(--content);
+  border-color: var(--group-color);
+  background: color-mix(in srgb, var(--group-color) 16%, var(--surface-raised));
+}
+
+.discussion-group-dot {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  background: var(--group-color);
+}
+
+button.discussion-group-add {
+  border-style: dashed;
 }

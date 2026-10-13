@@ -24,7 +24,6 @@ const ROUTE_TITLES: [pattern: string, title: string][] = [
   ['/settings/current-rms', 'Current RMS'],
   ['/settings/onedrive', 'OneDrive'],
   ['/settings/crew-portal', 'Crew Portal'],
-  ['/settings/activity', 'Activity Log'],
   ['/preferences', 'My Preferences'],
   ['/crew', 'My schedule'],
   ['/crew/jobs/:jobId', 'Job'],

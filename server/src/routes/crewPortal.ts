@@ -18,7 +18,7 @@ import { applyStreamHeaders, sendStoredUpload } from '../uploadSafety';
 import { autoPopulateDaysFromOpportunity, dayInclude, toDayDto } from './jobDays';
 import { scheduleItemInclude, toScheduleItemDto } from './jobSchedule';
 import { buildIcs, type IcsEvent } from '../calendar/ics';
-import { listRateLines, syncProfileDayRate } from '../rateCard';
+import { crewCanSee, ensureJobGroups, pickGroup, toGroupDto } from '../discussionGroups';
 
 /**
  * Self-service data for a logged-in CREW account: their own profile, the jobs they're
@@ -150,7 +150,8 @@ crewPortalRouter.get('/me/bank-details', requireRole('CREW'), async (req, res) =
 crewPortalRouter.get('/me/rate-lines', requireRole('CREW'), async (req, res) => {
   const profile = await ownProfile(req.user!.id);
   if (!profile) return res.status(404).json({ error: 'No crew profile found for this account' });
-  res.json(await listRateLines(profile.id));
+  const lines = await prisma.crewRateLine.findMany({ where: { crewProfileId: profile.id }, orderBy: { order: 'asc' } });
+  res.json(lines);
 });
 
 crewPortalRouter.post('/me/rate-lines', requireRole('CREW'), async (req, res) => {
@@ -160,7 +161,6 @@ crewPortalRouter.post('/me/rate-lines', requireRole('CREW'), async (req, res) =>
   if (!label || !amount) return res.status(400).json({ error: 'label and amount are required' });
   const count = await prisma.crewRateLine.count({ where: { crewProfileId: profile.id } });
   const line = await prisma.crewRateLine.create({ data: { crewProfileId: profile.id, label, amount, order: count } });
-  await syncProfileDayRate(profile.id);
   await logActivity('crew.rateLine.selfCreate', `${label}: ${amount}`, undefined, req.user!.id);
   res.status(201).json(line);
 });
@@ -175,7 +175,6 @@ crewPortalRouter.put('/me/rate-lines/:lineId', requireRole('CREW'), async (req, 
     where: { id: existing.id },
     data: { ...(label !== undefined ? { label } : {}), ...(amount !== undefined ? { amount } : {}) },
   });
-  await syncProfileDayRate(profile.id);
   await logActivity('crew.rateLine.selfUpdate', `${line.label}: ${line.amount}`, undefined, req.user!.id);
   res.json(line);
 });
@@ -186,7 +185,6 @@ crewPortalRouter.delete('/me/rate-lines/:lineId', requireRole('CREW'), async (re
   const existing = await prisma.crewRateLine.findUnique({ where: { id: req.params.lineId } });
   if (!existing || existing.crewProfileId !== profile.id) return res.status(404).json({ error: 'Rate line not found' });
   await prisma.crewRateLine.delete({ where: { id: existing.id } });
-  await syncProfileDayRate(profile.id);
   await logActivity('crew.rateLine.selfDelete', existing.label, undefined, req.user!.id);
   res.status(204).end();
 });
@@ -579,13 +577,21 @@ crewPortalRouter.get('/me/jobs/:jobId/discussion', requireRole('CREW'), async (r
   const found = await requireAssignedJob(req.user!.id, req.params.jobId);
   if (!found) return res.status(404).json({ error: 'Job not found' });
   const features = await resolveCrewFeatures(found.assignment.job);
-  if (!features.discussion) return res.json({ locked: false, messages: [] });
+  if (!features.discussion) return res.json({ locked: false, groups: [], groupId: null, messages: [] });
+  // Only the groups this person may see; a members-only group they aren't in is never named.
+  const groups = (await ensureJobGroups(req.params.jobId)).filter((g) => crewCanSee(g, found.assignment.id));
+  const group = pickGroup(groups, req.query.groupId);
   const messages = await prisma.jobDiscussionMessage.findMany({
-    where: { jobId: req.params.jobId },
+    where: { jobId: req.params.jobId, groupId: group.id },
     include: DISCUSSION_MESSAGE_INCLUDE,
     orderBy: { createdAt: 'asc' },
   });
-  res.json({ locked: found.assignment.job.discussionLocked, messages: messages.map(toDiscussionMessageDto) });
+  res.json({
+    locked: found.assignment.job.discussionLocked,
+    groupId: group.id,
+    groups: groups.map((g) => toGroupDto(g, { includeMembers: false })),
+    messages: messages.map(toDiscussionMessageDto),
+  });
 });
 
 crewPortalRouter.post('/me/jobs/:jobId/discussion', requireRole('CREW'), async (req, res) => {
@@ -594,15 +600,19 @@ crewPortalRouter.post('/me/jobs/:jobId/discussion', requireRole('CREW'), async (
   const features = await resolveCrewFeatures(found.assignment.job);
   if (!features.discussion) return res.status(403).json({ error: 'Discussion is not enabled for this job' });
   if (found.assignment.job.discussionLocked) return res.status(403).json({ error: 'This discussion is locked' });
-  const { body } = req.body ?? {};
+  const { body, groupId } = req.body ?? {};
   if (!body || typeof body !== 'string' || !body.trim()) return res.status(400).json({ error: 'body is required' });
+  if (body.length > 5000) return res.status(400).json({ error: 'Message is too long' });
+  const groups = (await ensureJobGroups(req.params.jobId)).filter((g) => crewCanSee(g, found.assignment.id));
+  if (groupId && !groups.some((g) => g.id === groupId)) return res.status(404).json({ error: 'Group not found' });
+  const group = pickGroup(groups, groupId);
 
   const message = await prisma.jobDiscussionMessage.create({
-    data: { jobId: req.params.jobId, authorUserId: req.user!.id, body: body.trim() },
+    data: { jobId: req.params.jobId, authorUserId: req.user!.id, body: body.trim(), groupId: group.id },
     include: DISCUSSION_MESSAGE_INCLUDE,
   });
   await logActivity('job_discussion.create', req.params.jobId, req.params.jobId, req.user!.id);
-  await notifyDiscussionMessage(req.params.jobId, found.assignment.job.name, req.user!.id, req.user!.displayName, message.body);
+  await notifyDiscussionMessage(req.params.jobId, found.assignment.job.name, req.user!.id, req.user!.displayName, message.body, group.id);
   res.status(201).json(toDiscussionMessageDto(message));
 });
 

@@ -88,9 +88,10 @@ const EXCERPT_LENGTH = 80;
  * the two audiences land on different shells (staff -> the job's Discussion tab, crew -> their
  * portal's job page), so they need different links.
  */
-export async function notifyDiscussionMessage(jobId: string, jobName: string, authorUserId: string, authorName: string, body: string) {
+export async function notifyDiscussionMessage(jobId: string, jobName: string, authorUserId: string, authorName: string, body: string, groupId?: string) {
   const excerpt = body.length > EXCERPT_LENGTH ? `${body.slice(0, EXCERPT_LENGTH)}…` : body;
-  const title = `${authorName} in ${jobName}`;
+  const group = groupId ? await prisma.discussionGroup.findUnique({ where: { id: groupId }, include: { members: { select: { jobCrewAssignmentId: true } } } }) : null;
+  const title = group && !group.isDefault ? `${authorName} in ${jobName} · ${group.name}` : `${authorName} in ${jobName}`;
 
   // USER accounts can't open a private job, so they aren't told about its messages either.
   const job = await prisma.job.findUnique({ where: { id: jobId }, select: { isPublic: true } });
@@ -106,8 +107,13 @@ export async function notifyDiscussionMessage(jobId: string, jobName: string, au
     });
   }
 
+  // Crew only hear about groups they can see (members-only groups: just the members).
   const assignments = await prisma.jobCrewAssignment.findMany({
-    where: { jobId, crewProfile: { userId: { not: authorUserId } } },
+    where: {
+      jobId,
+      crewProfile: { userId: { not: authorUserId } },
+      ...(group?.visibility === 'MEMBERS' ? { id: { in: group.members.map((m) => m.jobCrewAssignmentId) } } : {}),
+    },
     select: { crewProfile: { select: { userId: true, user: { select: { prefsJson: true } } } } },
   });
   const seen = new Set<string>();

@@ -1,4 +1,5 @@
 import { useId, useState } from 'react';
+import LocationSelect from './LocationSelect';
 
 export const AD_HOC_TYPES = ['TRUSS_SPIKE_POSITION', 'TRUSS_SPIKE_TIP', 'TRUSS_SPIKE_SACN', 'CABLE', 'PAL', 'RACK'] as const;
 export type AdHocType = (typeof AD_HOC_TYPES)[number];
@@ -41,10 +42,13 @@ export default function LabelTypeForm({
   types,
   onSubmit,
   submitLabel = 'Add label',
+  locations,
 }: {
   types: AdHocType[];
   onSubmit: (labelType: AdHocType, content: Record<string, unknown>, quantity: number) => Promise<void>;
   submitLabel?: string;
+  /** Known locations for this job; when given, Location is a dropdown instead of free text. */
+  locations?: string[];
 }) {
   const [labelType, setLabelType] = useState<AdHocType>(types[0]);
   // Kept as typed so the field can be cleared and retyped; parsed when submitting.
@@ -60,6 +64,14 @@ export default function LabelTypeForm({
   // placeholder text", and the same .field pattern used by LoginPage/ApplyPage.
   const field = (key: string, labelText: string, placeholder: string) => {
     const id = `${idPrefix}-${key}`;
+    if (key === 'location' && locations) {
+      return (
+        <div className="field">
+          <label htmlFor={id}>{labelText}</label>
+          <LocationSelect id={id} ariaLabel={labelText} placeholder="-" value={fields.location ?? ''} options={locations} onChange={(v) => setFields((f) => ({ ...f, location: v }))} />
+        </div>
+      );
+    }
     return (
       <div className="field">
         <label htmlFor={id}>{labelText}</label>

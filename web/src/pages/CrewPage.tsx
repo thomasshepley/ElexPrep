@@ -1,12 +1,13 @@
 import { Fragment, useEffect, useState } from 'react';
 import { resolveCrewColor } from '@elexprep/shared';
-import { api, type BankDetails, type CrewMember, type CrewDocumentSummary, type CrewRateLine } from '../api/client';
+import { api, type RoleRate, type BankDetails, type CrewMember, type CrewDocumentSummary, type CrewRateLine } from '../api/client';
 import FileInput from '../components/FileInput';
 import SkillPicker from '../components/SkillPicker';
 import CertificationPicker from '../components/CertificationPicker';
 import BankDetailsForm from '../components/BankDetailsForm';
 import BankDetailsReveal from '../components/BankDetailsReveal';
 import RowMenu from '../components/RowMenu';
+import { useToast } from '../components/Toast';
 import { PlusIcon } from '../components/Icons';
 import WhatsAppButton from '../components/WhatsAppButton';
 import PasswordInput from '../components/PasswordInput';
@@ -209,17 +210,19 @@ export default function CrewPage() {
                       {c.active ? 'Active' : 'Inactive'}
                     </label>
                   </td>
-                  <td className="row" style={{ flexWrap: 'nowrap' }}>
-                    <button className="secondary" aria-expanded={expandedId === c.id} onClick={() => setExpandedId(expandedId === c.id ? null : c.id)}>
-                      {expandedId === c.id ? 'Close' : 'Details'}
-                    </button>
-                    <RowMenu
-                      label={`More actions for ${c.displayName}`}
-                      items={[
-                        ...(c.userRole !== 'ADMIN' ? [{ label: 'Reset password…', onSelect: () => resetPassword(c) }] : []),
-                        { label: c.userRole === 'ADMIN' ? 'Remove from crew…' : 'Delete…', onSelect: () => remove(c), danger: true },
-                      ]}
-                    />
+                  <td>
+                    <div className="row" style={{ flexWrap: 'nowrap' }}>
+                      <button className="secondary" aria-expanded={expandedId === c.id} onClick={() => setExpandedId(expandedId === c.id ? null : c.id)}>
+                        {expandedId === c.id ? 'Close' : 'Details'}
+                      </button>
+                      <RowMenu
+                        label={`More actions for ${c.displayName}`}
+                        items={[
+                          ...(c.userRole !== 'ADMIN' ? [{ label: 'Reset password…', onSelect: () => resetPassword(c) }] : []),
+                          { label: c.userRole === 'ADMIN' ? 'Remove from crew…' : 'Delete…', onSelect: () => remove(c), danger: true },
+                        ]}
+                      />
+                    </div>
                   </td>
                 </tr>
                 {expandedId === c.id && (
@@ -251,6 +254,7 @@ function ProfileEditPanel({ crew, onChanged }: { crew: CrewMember; onChanged: ()
   const [instagramUrl, setInstagramUrl] = useState(crew.instagramUrl ?? '');
   const [facebookUrl, setFacebookUrl] = useState(crew.facebookUrl ?? '');
   const [otherLinkUrl, setOtherLinkUrl] = useState(crew.otherLinkUrl ?? '');
+  const [dayRate, setDayRate] = useState(crew.dayRate ?? '');
   const [bankDetails, setBankDetails] = useState<BankDetails | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -269,6 +273,7 @@ function ProfileEditPanel({ crew, onChanged }: { crew: CrewMember; onChanged: ()
         instagramUrl,
         facebookUrl,
         otherLinkUrl,
+        dayRate: dayRate.replace(/[£,\s]/g, ''),
         bankDetails: bankDetails ?? undefined,
       });
       setBankDetails(null);
@@ -285,6 +290,17 @@ function ProfileEditPanel({ crew, onChanged }: { crew: CrewMember; onChanged: ()
       {error && <p className="error">{error}</p>}
       <form onSubmit={save}>
         <div className="row" style={{ flexWrap: 'wrap', gap: '0.9rem' }}>
+          <div className="field" style={{ width: '9rem' }}>
+            <label htmlFor={`profile-day-rate-${crew.id}`}>Agreed day rate (£)</label>
+            <input
+              id={`profile-day-rate-${crew.id}`}
+              inputMode="decimal"
+              value={dayRate}
+              onChange={(e) => setDayRate(e.target.value)}
+              placeholder="Role rate"
+              title="What ELEX pays this person per day, unless a job sets a rate for their role. Blank uses the role rates."
+            />
+          </div>
           <div className="field" style={{ width: '6rem' }}>
             <label htmlFor={`profile-color-${crew.id}`}>Schedule swatch</label>
             <input
@@ -475,39 +491,114 @@ function CrewDocumentsPanel({ crewId }: { crewId: string }) {
  */
 function DefaultRatePanel() {
   const [dayRate, setDayRate] = useState('');
-  const [saved, setSaved] = useState(false);
+  const [roleRates, setRoleRates] = useState<RoleRate[]>([]);
+  const [newRole, setNewRole] = useState('');
+  const [newRate, setNewRate] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const { showToast } = useToast();
+
+  const refreshRoles = () => api.globalRoleRates.list().then(setRoleRates).catch((e) => setError(e.message));
 
   useEffect(() => {
     api.crew.getDefaultRate().then((r) => setDayRate(r.dayRate ?? '')).catch((e) => setError(e.message));
+    refreshRoles();
   }, []);
 
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    setSaved(false);
     try {
       await api.crew.setDefaultRate(dayRate || null);
-      setSaved(true);
+      showToast('Default day rate saved');
     } catch (err) {
       setError((err as Error).message);
     }
   };
 
+  const setRoleRate = async (role: string, value: string) => {
+    setError(null);
+    try {
+      await api.globalRoleRates.set(role, value.replace(/[£,\s]/g, ''));
+      refreshRoles();
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  };
+
+  const addRole = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newRole.trim() || !newRate.trim()) return;
+    await setRoleRate(newRole.trim(), newRate);
+    setNewRole('');
+    setNewRate('');
+  };
+
   return (
     <div className="panel">
-      <h3>Default day rate</h3>
+      <h3>Day rates by role</h3>
       <p className="muted">
-        Used on the crew margin calculator when a job assignment has no rate override and the
-        crew member's own profile has no default day rate set either.
+        What ELEX pays per day for each role, on every job. A job can set its own rate for a role on
+        its Crew tab, and a person's agreed rate (their Details) beats the portal role rate. Roles
+        match whatever's typed on the job, ignoring capitals and spaces.
       </p>
+      {roleRates.length > 0 && (
+        <div className="table-scroll">
+          <table style={{ maxWidth: '32rem' }}>
+            <thead>
+              <tr>
+                <th>Role</th>
+                <th>Day rate (£)</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {roleRates.map((r) => (
+                <tr key={r.id}>
+                  <td>{r.role}</td>
+                  <td>
+                    <input
+                      key={`${r.id}-${r.dayRate}`}
+                      defaultValue={r.dayRate}
+                      inputMode="decimal"
+                      aria-label={`Day rate for ${r.role}`}
+                      style={{ width: '6rem' }}
+                      onBlur={(e) => e.target.value.trim() && e.target.value.trim() !== r.dayRate && setRoleRate(r.role, e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+                    />
+                  </td>
+                  <td>
+                    <button type="button" className="secondary" onClick={() => setRoleRate(r.role, '')}>
+                      Remove
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <form onSubmit={addRole} className="row" style={{ alignItems: 'flex-end', gap: '0.6rem', marginTop: '0.5rem' }}>
+        <div className="field" style={{ width: '11rem' }}>
+          <label htmlFor="role-rate-role">Role</label>
+          <input id="role-rate-role" value={newRole} onChange={(e) => setNewRole(e.target.value)} placeholder="e.g. LX Tech" />
+        </div>
+        <div className="field" style={{ width: '7rem' }}>
+          <label htmlFor="role-rate-rate">Day rate (£)</label>
+          <input id="role-rate-rate" inputMode="decimal" value={newRate} onChange={(e) => setNewRate(e.target.value)} />
+        </div>
+        <button type="submit" className="secondary" disabled={!newRole.trim() || !newRate.trim()}>
+          Add role
+        </button>
+      </form>
+
+      <h4 style={{ marginTop: '1.25rem' }}>Any other role</h4>
+      <p className="muted" style={{ marginTop: 0 }}>Used when nothing above (or on the job, or for the person) sets a rate.</p>
       <form onSubmit={save} className="row" style={{ alignItems: 'flex-end', gap: '0.6rem' }}>
         <div className="field" style={{ width: '9rem' }}>
-          <label htmlFor="default-day-rate">Day rate</label>
-          <input id="default-day-rate" value={dayRate} onChange={(e) => setDayRate(e.target.value)} placeholder="e.g. 200" />
+          <label htmlFor="default-day-rate">Default day rate (£)</label>
+          <input id="default-day-rate" inputMode="decimal" value={dayRate} onChange={(e) => setDayRate(e.target.value)} placeholder="e.g. 200" />
         </div>
         <button type="submit">Save</button>
-        {saved && <span className="muted">Saved ✓</span>}
       </form>
       {error && <p className="error">{error}</p>}
     </div>

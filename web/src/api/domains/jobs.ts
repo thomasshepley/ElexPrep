@@ -1,5 +1,5 @@
 import { BASE, request } from '../http';
-import type { DashboardData, DiscussionMessage, DiscussionThreadData, Job, JobContact, JobCrewAssignment, JobDay, JobDocument, JobScheduleItem, Plot } from '../types';
+import type { DiscussionGroupInput, DayRateSource, RoleRate, DashboardData, DiscussionMessage, DiscussionThreadData, Job, JobContact, JobCrewAssignment, JobDay, JobDocument, JobScheduleItem, Plot } from '../types';
 import type { CrewFeatures } from '@elexprep/shared';
 
 export const jobsApi = {
@@ -33,11 +33,19 @@ export const jobsApi = {
       }),
     unassignCrew: (jobId: string, dayId: string, id: string) =>
       request<void>(`/jobs/${jobId}/days/${dayId}/crew/${id}`, { method: 'DELETE' }),
+    setCrewDayRate: (jobId: string, dayId: string, id: string, dayRate: string) =>
+      request<{ id: string; dayRate: string | null }>(`/jobs/${jobId}/days/${dayId}/crew/${id}`, { method: 'PUT', body: JSON.stringify({ dayRate }) }),
   },
   jobDiscussion: {
-    list: (jobId: string) => request<DiscussionThreadData>(`/jobs/${jobId}/discussion`),
-    send: (jobId: string, body: string) =>
-      request<DiscussionMessage>(`/jobs/${jobId}/discussion`, { method: 'POST', body: JSON.stringify({ body }) }),
+    list: (jobId: string, groupId?: string | null) =>
+      request<DiscussionThreadData>(`/jobs/${jobId}/discussion${groupId ? `?groupId=${encodeURIComponent(groupId)}` : ''}`),
+    send: (jobId: string, body: string, groupId?: string | null) =>
+      request<DiscussionMessage>(`/jobs/${jobId}/discussion`, { method: 'POST', body: JSON.stringify({ body, groupId }) }),
+    createGroup: (jobId: string, data: DiscussionGroupInput) =>
+      request<{ id: string }>(`/jobs/${jobId}/discussion/groups`, { method: 'POST', body: JSON.stringify(data) }),
+    updateGroup: (jobId: string, groupId: string, data: DiscussionGroupInput) =>
+      request<{ id: string }>(`/jobs/${jobId}/discussion/groups/${groupId}`, { method: 'PUT', body: JSON.stringify(data) }),
+    removeGroup: (jobId: string, groupId: string) => request<void>(`/jobs/${jobId}/discussion/groups/${groupId}`, { method: 'DELETE' }),
     edit: (jobId: string, messageId: string, body: string) =>
       request<DiscussionMessage>(`/jobs/${jobId}/discussion/${messageId}`, { method: 'PUT', body: JSON.stringify({ body }) }),
     remove: (jobId: string, messageId: string) => request<void>(`/jobs/${jobId}/discussion/${messageId}`, { method: 'DELETE' }),
@@ -75,6 +83,17 @@ export const jobsApi = {
     update: (jobId: string, id: string, data: Partial<{ role: string; dayRate: string; days: string; zeroRated: boolean }>) =>
       request<JobCrewAssignment>(`/jobs/${jobId}/crew/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     remove: (jobId: string, id: string) => request<void>(`/jobs/${jobId}/crew/${id}`, { method: 'DELETE' }),
+    clearOverrides: (jobId: string) => request<{ cleared: number }>(`/jobs/${jobId}/crew/clear-overrides`, { method: 'POST' }),
+  },
+  jobRoleRates: {
+    list: (jobId: string) => request<RoleRate[]>(`/jobs/${jobId}/role-rates`),
+    /** A blank dayRate removes that role's rate for the job. */
+    set: (jobId: string, role: string, dayRate: string) =>
+      request<RoleRate | null>(`/jobs/${jobId}/role-rates`, { method: 'PUT', body: JSON.stringify({ role, dayRate }) }),
+  },
+  globalRoleRates: {
+    list: () => request<RoleRate[]>('/role-rates'),
+    set: (role: string, dayRate: string) => request<RoleRate | null>('/role-rates', { method: 'PUT', body: JSON.stringify({ role, dayRate }) }),
   },
   jobCrewMargin: {
     get: (jobId: string) =>
@@ -92,11 +111,14 @@ export const jobsApi = {
           name: string;
           role: string;
           dayRate: number;
+          dayRateSource: DayRateSource;
           suggestedRate: number;
           zeroRated: boolean;
           days: number;
           /** True when `days` is the count of job days assigned on the Schedule tab. */
           daysFromSchedule: boolean;
+          /** How many of those days carry their own rate. */
+          dayOverrides: number;
           cost: number;
         }[];
         margin: number;

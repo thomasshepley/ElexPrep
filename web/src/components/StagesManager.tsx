@@ -158,15 +158,17 @@ export default function StagesManager({
                     />
                     {g.rmsGroupName && <span className="muted" style={{ marginLeft: '0.5rem' }}>from Current RMS</span>}
                   </td>
-                  <td className="row">
-                    {g.rmsGroupName && (
-                      <button className="secondary" disabled={busy} onClick={() => rematch(g)}>
-                        Re-match from RMS
+                  <td>
+                    <div className="row">
+                      {g.rmsGroupName && (
+                        <button className="secondary" disabled={busy} onClick={() => rematch(g)}>
+                          Re-match from RMS
+                        </button>
+                      )}
+                      <button className="secondary" disabled={busy} onClick={() => remove(g)}>
+                        Delete
                       </button>
-                    )}
-                    <button className="secondary" disabled={busy} onClick={() => remove(g)}>
-                      Delete
-                    </button>
+                    </div>
                   </td>
                 </tr>
               ))}

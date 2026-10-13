@@ -135,11 +135,13 @@ export default function JobLocationColorsPanel({ jobId }: { jobId: string }) {
               {rules.map((r) => (
                 <tr key={r.id}>
                   <td>{r.location}</td>
-                  <td className="row" style={{ gap: '0.3rem' }}>
-                    <CommitColorInput value={r.color} ariaLabel={`${r.location} colour`} onCommit={(v) => updateColor(r, v)} />
-                    {r.pattern === 'DIAGONAL_STRIPES' && (
-                      <CommitColorInput value={r.secondaryColor ?? '#FFFFFF'} title={`${r.location} second stripe colour`} onCommit={(v) => updateSecondaryColor(r, v)} />
-                    )}
+                  <td>
+                    <div className="row" style={{ gap: '0.3rem' }}>
+                      <CommitColorInput value={r.color} ariaLabel={`${r.location} colour`} onCommit={(v) => updateColor(r, v)} />
+                      {r.pattern === 'DIAGONAL_STRIPES' && (
+                        <CommitColorInput value={r.secondaryColor ?? '#FFFFFF'} title={`${r.location} second stripe colour`} onCommit={(v) => updateSecondaryColor(r, v)} />
+                      )}
+                    </div>
                   </td>
                   <td>
                     <select value={r.pattern} onChange={(e) => updatePattern(r, e.target.value as LocationColorPattern)}>

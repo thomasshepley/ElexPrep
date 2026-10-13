@@ -332,8 +332,10 @@ function OnboardOpportunitiesPanel({ existingOppIds, onOnboarded }: { existingOp
                   </td>
                   <td>{o.subject}</td>
                   <td>{o.memberName}</td>
-                  <td className="row" style={{ gap: '0.4rem' }}>
-                    <OpportunityKindChip kind={o.kind} /> <span className="muted">{o.status}</span>
+                  <td>
+                    <div className="row" style={{ gap: '0.4rem' }}>
+                      <OpportunityKindChip kind={o.kind} /> <span className="muted">{o.status}</span>
+                    </div>
                   </td>
                   <td className="muted">
                     {o.startsAt ? formatDate(o.startsAt) : ''}

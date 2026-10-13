@@ -5,6 +5,7 @@ import { useAuth } from '../auth/AuthContext';
 import { useToast } from '../components/Toast';
 import { formatDateTime, formatTime } from '../utils/format';
 import { bugReportsToMarkdown, downloadMarkdown } from '../bugReport/exportMarkdown';
+import ActivityLogPage from './ActivityLogPage';
 
 function SiteControlsPanel() {
   const { user, setUser } = useAuth();
@@ -119,6 +120,7 @@ export default function WebmasterPage() {
   const { showToast } = useToast();
   const [reports, setReports] = useState<BugReport[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [tab, setTab] = useState<'controls' | 'bugs' | 'activity'>('bugs');
 
   const refresh = () => api.bugReports.list().then(setReports).catch((e) => setError(e.message));
 
@@ -155,7 +157,23 @@ export default function WebmasterPage() {
   return (
     <div>
       <h1>Webmaster</h1>
-      <SiteControlsPanel />
+      <div className="tabs" role="tablist" aria-label="Webmaster sections">
+        {(
+          [
+            ['bugs', `Bug reports${reports.length ? ` (${reports.length})` : ''}`],
+            ['activity', 'Activity log'],
+            ['controls', 'Site controls'],
+          ] as const
+        ).map(([key, label]) => (
+          <button key={key} role="tab" aria-selected={tab === key} className={tab === key ? 'active' : ''} onClick={() => setTab(key)}>
+            {label}
+          </button>
+        ))}
+      </div>
+      {tab === 'controls' && <SiteControlsPanel />}
+      {tab === 'activity' && <ActivityLogPage />}
+      {tab === 'bugs' && (
+      <>
       <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
         <p className="muted" style={{ margin: 0 }}>
           Bug reports submitted from anywhere in the app.
@@ -178,6 +196,8 @@ export default function WebmasterPage() {
             <ReportRow key={r.id} report={r} onRemove={remove} />
           ))}
         </div>
+      )}
+      </>
       )}
     </div>
   );

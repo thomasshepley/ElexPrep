@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api, type CaseGroup } from '../api/client';
 import { useDialog } from './Dialog';
 import InlineEdit from './InlineEdit';
+import LocationSelect, { useJobLocations } from './LocationSelect';
 
 export default function CasesPanel({ jobId, groupId = null }: { jobId: string; groupId?: string | null }) {
   const dialog = useDialog();
@@ -21,6 +22,7 @@ export default function CasesPanel({ jobId, groupId = null }: { jobId: string; g
   }, [jobId]);
 
   const stageCases = cases.filter((c) => (c.groupId ?? null) === groupId);
+  const locationOptions = useJobLocations(jobId, cases.map((c) => c.location));
 
   const generate = async () => {
     if (
@@ -126,12 +128,7 @@ export default function CasesPanel({ jobId, groupId = null }: { jobId: string; g
           {selected.size > 0 && (
             <div className="row panel" style={{ background: 'rgba(255,255,255,0.04)', alignItems: 'center', gap: '0.6rem' }}>
               <strong>{selected.size} selected</strong>
-              <input aria-label="Set location to"
-                placeholder="Set location to…"
-                value={bulkLocation}
-                onChange={(e) => setBulkLocation(e.target.value)}
-                style={{ width: 160 }}
-              />
+              <LocationSelect ariaLabel="Set location to" placeholder="Set location to…" value={bulkLocation} options={locationOptions} onChange={setBulkLocation} width="12rem" />
               <button onClick={bulkSetLocation}>Set location</button>
               <button className="secondary" onClick={bulkDelete}>
                 Delete selected
@@ -171,7 +168,7 @@ export default function CasesPanel({ jobId, groupId = null }: { jobId: string; g
                       <InlineEdit label="Case label" value={c.label} onSave={(v) => updateField(c, 'label', v)} />
                     </td>
                     <td>
-                      <InlineEdit label="Location" value={c.location} onSave={(v) => updateField(c, 'location', v)} />
+                      <LocationSelect ariaLabel={`Location for ${c.label}`} value={c.location ?? ''} options={locationOptions} onChange={(v) => updateField(c, 'location', v)} />
                     </td>
                     <td>
                       <button className="secondary" onClick={() => remove(c.id)}>
@@ -190,7 +187,7 @@ export default function CasesPanel({ jobId, groupId = null }: { jobId: string; g
       <form className="row" onSubmit={addCase}>
         <input aria-label="Fixture type" placeholder="Fixture type" value={newType} onChange={(e) => setNewType(e.target.value)} />
         <input aria-label="Case label" placeholder="Case label (e.g. 501 + 502)" value={newLabel} onChange={(e) => setNewLabel(e.target.value)} />
-        <input aria-label="Location" placeholder="Location (optional)" value={newLocation} onChange={(e) => setNewLocation(e.target.value)} />
+        <LocationSelect ariaLabel="Location" placeholder="Location (optional)" value={newLocation} options={locationOptions} onChange={setNewLocation} width="12rem" />
         <button type="submit">Add case</button>
       </form>
       {error && <p className="error">{error}</p>}
