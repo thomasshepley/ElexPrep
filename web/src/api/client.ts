@@ -209,6 +209,10 @@ export interface AuthedUser {
   prefs: Record<string, unknown>;
   avatarPath: string | null;
   permissions?: Record<PermissionKey, boolean>;
+  /// Set by an admin (the server-side admin CLI's force-password-reset command) - the web
+  /// shell blocks everything except a "set a new password" form until this clears, which
+  /// happens automatically the moment the password is actually changed.
+  mustChangePassword: boolean;
 }
 
 export interface CrewMember {

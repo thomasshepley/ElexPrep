@@ -213,6 +213,46 @@ sudo ln -s "$(pwd)/scripts/updatesite.sh" /usr/local/bin/updatesite
 
 From then on, `updatesite` from any directory pulls and rebuilds.
 
+## Admin CLI
+
+A small command-line tool runs operator actions directly against the live database and
+uploads folder, for things no web UI should ever be able to do over HTTP (wiping the whole
+site back to nothing, setting a password without knowing the old one). It ships inside the
+same container as the app (`server/src/cli.ts`, built to `dist/cli.js`) - no separate
+install.
+
+Run it with:
+
+```bash
+docker compose exec elexprep node dist/cli.js <command> [args]
+```
+
+**Optional: a one-word `admin` command**, the same pattern as `updatesite` above:
+
+```bash
+chmod +x scripts/admin.sh
+sudo ln -s "$(pwd)/scripts/admin.sh" /usr/local/bin/admin
+```
+
+From then on, e.g. `admin status` from any directory.
+
+| Command | Does |
+|---|---|
+| `status` | Shows lockdown state, user counts by role, job count, active session count |
+| `list-users` | Lists every account (username, role, display name, and must-change-password/2FA flags) |
+| `add-user <user> <pass> [role] [name]` | Creates an account directly. `role` is one of `ADMIN`/`USER`/`SIGNAGE`/`CREW` (default `USER`) |
+| `remove-user <user> --confirm` | Permanently deletes an account and everything attached to it (crew profile, documents, rate lines) |
+| `set-password <user> <newPass>` | Sets an account's password directly - for when someone's genuinely locked out and can't use self-service reset |
+| `force-password-reset <user>` | The account can still sign in with its current password, but the web app blocks everything else until it sets a new one |
+| `set-role <user> <role>` | Changes an account's role |
+| `revoke-sessions <user>` or `revoke-sessions --all` | Signs an account - or everyone - out everywhere immediately |
+| `lockdown` | Emergency stop: only `ADMIN` accounts can sign in or use the API; every other account's sessions are revoked immediately. Use this if you suspect a compromise and want to freeze everything else while you investigate |
+| `unlock` | Undoes `lockdown` |
+| `reset-all-data --confirm-reset-everything` | **Deletes every row in every table and every uploaded file.** Leaves the site exactly as if freshly installed - visiting it afterwards shows the first-run "create the admin account" screen. There is no undo short of restoring a backup (see Notes below) |
+
+`remove-user` and `reset-all-data` both refuse to run without their `--confirm`/
+`--confirm-reset-everything` flag, so a bare mistyped command never destroys anything.
+
 ## Wiring up the real printer (later phase)
 
 When ready, go to **Printer Settings** (admin) and switch from Dry run to one of:

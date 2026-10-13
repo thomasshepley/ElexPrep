@@ -5,6 +5,7 @@ import ThemeToggle from './components/ThemeToggle'
 import NotificationBell from './components/NotificationBell'
 import VersionBadge from './components/VersionBadge'
 import Avatar from './components/Avatar'
+import ForcedPasswordChange from './components/ForcedPasswordChange'
 import './App.css'
 
 function App() {
@@ -13,6 +14,7 @@ function App() {
 
   if (loading) return null
   if (!user) return <Navigate to="/login" replace />
+  if (user.mustChangePassword) return <ForcedPasswordChange />
   if (user.role === 'SIGNAGE' && location.pathname !== '/signage') {
     return <Navigate to="/signage" replace />
   }

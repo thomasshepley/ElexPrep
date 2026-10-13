@@ -684,6 +684,12 @@ model User {
   totpEnabled            Boolean   @default(false)
   totpVerifiedAt         DateTime?
 
+  /// Set by an admin (via the server-side admin CLI's force-password-reset command, or a
+  /// future in-app equivalent) - the account can still log in normally with its current
+  /// password, but the web app blocks everything else until a new password is set, which
+  /// clears this flag automatically (see routes/auth.ts's PUT /me).
+  mustChangePassword Boolean @default(false)
+
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
   sessions     Session[]

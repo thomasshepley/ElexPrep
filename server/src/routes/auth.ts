@@ -15,6 +15,7 @@ import {
   verifyPassword,
 } from '../auth';
 import { authedUserWithPermissions } from '../permissions';
+import { isMaintenanceModeEnabled } from '../maintenanceMode';
 import { verifyTotpToken } from '../totp';
 import { decryptTotpSecret, consumeBackupCode } from '../twoFactor';
 import { createPendingLogin, checkPendingLogin, consumePendingLogin } from '../pendingTotpLogins';
@@ -95,6 +96,10 @@ authRouter.post('/login', loginLimiter, async (req, res) => {
     return res.status(401).json({ error: 'Incorrect username or password' });
   }
 
+  if (user.role !== 'ADMIN' && (await isMaintenanceModeEnabled())) {
+    return res.status(503).json({ error: 'The site is locked down for maintenance - try again shortly' });
+  }
+
   if (user.totpEnabled) {
     const pendingToken = createPendingLogin(user.id);
     await logActivity('auth.login_password_ok_awaiting_2fa', username, undefined, user.id);
@@ -136,6 +141,10 @@ authRouter.post('/login/verify-2fa', totpVerifyLimiter, async (req, res) => {
     return res.status(401).json({ error: 'Incorrect code' });
   }
 
+  if (user.role !== 'ADMIN' && (await isMaintenanceModeEnabled())) {
+    return res.status(503).json({ error: 'The site is locked down for maintenance - try again shortly' });
+  }
+
   consumePendingLogin(pendingToken);
   const session = await createSession(user.id);
   res.cookie(SESSION_COOKIE, session.id, { ...COOKIE_OPTS, expires: session.expiresAt });
@@ -159,7 +168,7 @@ authRouter.put('/me', async (req, res) => {
   if (!req.user) return res.status(401).json({ error: 'Not signed in' });
   const { displayName, password, currentPassword, prefs } = req.body ?? {};
 
-  const data: Record<string, string> = {};
+  const data: Record<string, unknown> = {};
   if (displayName !== undefined) data.displayName = displayName;
   if (prefs !== undefined) data.prefsJson = JSON.stringify(prefs);
   if (password !== undefined) {
@@ -171,6 +180,10 @@ authRouter.put('/me', async (req, res) => {
       return res.status(403).json({ error: 'Current password is incorrect' });
     }
     data.passwordHash = hashPassword(password);
+    // Satisfies an admin-forced reset (see maintenanceMode.ts-adjacent cli.ts's
+    // force-password-reset) the moment they actually change it - no separate "I'm done"
+    // step needed.
+    data.mustChangePassword = false;
   }
 
   const updated = await prisma.user.update({ where: { id: req.user.id }, data });

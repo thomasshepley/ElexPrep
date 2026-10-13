@@ -5,6 +5,7 @@ import ThemeToggle from '../components/ThemeToggle';
 import NotificationBell from '../components/NotificationBell';
 import VersionBadge from '../components/VersionBadge';
 import Avatar from '../components/Avatar';
+import ForcedPasswordChange from '../components/ForcedPasswordChange';
 
 /**
  * Shell for the whole crew portal (/crew/*) - a sibling to the admin/prep App shell and the
@@ -25,6 +26,7 @@ export default function CrewLayout() {
   if (loading) return null;
   if (!user) return <Navigate to="/login" replace />;
   if (user.role !== 'CREW') return <Navigate to="/" replace />;
+  if (user.mustChangePassword) return <ForcedPasswordChange />;
 
   return (
     <div className="shell">

@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import { NextFunction, Request, Response } from 'express';
 import { prisma } from './db';
+import { isMaintenanceModeEnabled } from './maintenanceMode';
 
 export type Role = 'ADMIN' | 'USER' | 'SIGNAGE' | 'CREW';
 
@@ -12,6 +13,7 @@ export interface AuthedUser {
   role: Role;
   prefs: Record<string, unknown>;
   avatarPath: string | null;
+  mustChangePassword: boolean;
 }
 
 declare global {
@@ -53,6 +55,7 @@ export function toAuthedUser(u: {
   role: string;
   prefsJson: string;
   avatarPath?: string | null;
+  mustChangePassword?: boolean;
 }): AuthedUser {
   let prefs: Record<string, unknown> = {};
   try {
@@ -60,7 +63,15 @@ export function toAuthedUser(u: {
   } catch {
     // corrupted prefs shouldn't lock the account out
   }
-  return { id: u.id, username: u.username, displayName: u.displayName, role: u.role as Role, prefs, avatarPath: u.avatarPath ?? null };
+  return {
+    id: u.id,
+    username: u.username,
+    displayName: u.displayName,
+    role: u.role as Role,
+    prefs,
+    avatarPath: u.avatarPath ?? null,
+    mustChangePassword: u.mustChangePassword ?? false,
+  };
 }
 
 // The one deliberate, narrow write exception for the otherwise read-only SIGNAGE role: prep
@@ -129,6 +140,12 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
   if (req.path === '/api/onboarding' && req.method === 'POST') return next();
   if (/^\/api\/onboarding\/invite\/[^/]+(\/complete)?$/.test(req.path)) return next();
   if (!req.user) return res.status(401).json({ error: 'Not signed in' });
+  // Emergency full-stop (see maintenanceMode.ts) - everyone except ADMIN is locked out of
+  // every API call, including one from a session that was already live when lockdown was
+  // switched on, not just new logins (those are stopped separately in routes/auth.ts).
+  if (req.user.role !== 'ADMIN' && (await isMaintenanceModeEnabled())) {
+    return res.status(503).json({ error: 'The site is locked down for maintenance - try again shortly' });
+  }
   if (req.user.role === 'SIGNAGE' && req.method !== 'GET') {
     const allowed = SIGNAGE_WRITE_ALLOWLIST.some((re) => re.test(req.path));
     if (!allowed) return res.status(403).json({ error: 'Signage accounts are view-only' });
