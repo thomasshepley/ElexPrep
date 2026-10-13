@@ -30,8 +30,10 @@ docker compose up -d --build
 Then open **http://localhost:4000** (or `http://<server-ip>:4000` from another machine —
 allow TCP 4000 through the firewall).
 
-The first visit shows the **create admin account** screen. Do this immediately — whoever
-gets there first owns the instance.
+The first visit shows the **create admin account** screen. Do this immediately over
+`localhost`/the LAN, **before** turning on the Cloudflare Tunnel below or otherwise exposing
+the container to the internet — whoever submits that form first owns the instance, with no
+invite or confirmation step in between.
 
 ## Previewing externally (before portal.elex.lighting is wired up)
 
@@ -189,6 +191,13 @@ with a full batch.
   yourself). Either way, only set `COOKIE_SECURE=true` once *every* login goes through
   HTTPS — a secure cookie is silently dropped by the browser on a plain-HTTP request,
   which breaks login for whichever access path doesn't use TLS.
+- **CORS**: the API only ever needs to be called same-origin (one Express server serves both
+  the SPA and the API in production; the Vite dev server proxies `/api` to it rather than
+  calling it cross-origin), so cross-origin requests are rejected by default. If you ever
+  genuinely need a different origin to call the API with credentials, set
+  `CORS_ALLOWED_ORIGINS` to a comma-separated list of exact origins (e.g.
+  `https://portal.elex.lighting`) - never set it to `*` or reflect arbitrary origins, since
+  this API is cookie-session-authenticated.
 - **Backups**: stop the container (`docker compose stop`), copy `data/`, start it again —
   or just copy `data/` live; SQLite single-writer usage here makes that low-risk. The server
   handles `docker compose stop`/`restart` (`SIGTERM`) by closing its DB connection cleanly

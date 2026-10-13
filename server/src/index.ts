@@ -61,7 +61,19 @@ app.set('trust proxy', 1);
 // DEPLOY.md), and HSTS over plain HTTP just teaches the browser to refuse to reconnect.
 // A TLS-terminating reverse proxy (Caddy/nginx/Traefik) is the right place to add it.
 app.use(helmet({ contentSecurityPolicy: false, hsts: false }));
-app.use(cors({ origin: true, credentials: true }));
+// The SPA and API are always same-origin in practice - one Express server serves both in
+// production, and the Vite dev server proxies /api to this server rather than calling it
+// cross-origin (see web/vite.config.ts) - so no cross-origin access is actually needed.
+// `origin: true` here used to reflect every requesting origin back with credentials
+// enabled, which told the browser "yes" to any site's cookie-carrying request against this
+// session-cookie-authenticated API - a real CSRF/data-exposure misconfiguration, not just
+// unnecessary surface. CORS_ALLOWED_ORIGINS lets a genuine cross-origin case opt in
+// explicitly (comma-separated) without going back to reflecting everything.
+const corsAllowedOrigins = (process.env.CORS_ALLOWED_ORIGINS ?? '')
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean);
+app.use(cors({ origin: corsAllowedOrigins.length > 0 ? corsAllowedOrigins : false, credentials: true }));
 app.use(express.json({ limit: '10mb' }));
 app.use(cookieParser());
 app.use(requestContextMiddleware);

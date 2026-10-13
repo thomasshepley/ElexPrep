@@ -1,4 +1,5 @@
 import { prisma } from '../db';
+import { encryptSecret, decryptSecret } from '../secretCrypto';
 
 export interface CurrentRmsConfig {
   enabled: boolean;
@@ -23,14 +24,16 @@ const SETTING_KEY = 'currentRmsConfig';
 export async function getCurrentRmsConfig(): Promise<CurrentRmsConfig> {
   const row = await prisma.appSetting.findUnique({ where: { key: SETTING_KEY } });
   if (!row) return { ...DEFAULT_CURRENT_RMS_CONFIG };
-  return { ...DEFAULT_CURRENT_RMS_CONFIG, ...JSON.parse(row.valueJson) };
+  const stored = JSON.parse(row.valueJson);
+  return { ...DEFAULT_CURRENT_RMS_CONFIG, ...stored, apiKey: decryptSecret(stored.apiKey ?? '') };
 }
 
 export async function saveCurrentRmsConfig(config: CurrentRmsConfig): Promise<void> {
+  const stored = { ...config, apiKey: encryptSecret(config.apiKey) };
   await prisma.appSetting.upsert({
     where: { key: SETTING_KEY },
-    create: { key: SETTING_KEY, valueJson: JSON.stringify(config) },
-    update: { valueJson: JSON.stringify(config) },
+    create: { key: SETTING_KEY, valueJson: JSON.stringify(stored) },
+    update: { valueJson: JSON.stringify(stored) },
   });
 }
 

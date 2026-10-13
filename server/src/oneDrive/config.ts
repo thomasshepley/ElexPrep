@@ -1,4 +1,5 @@
 import { prisma } from '../db';
+import { encryptSecret, decryptSecret } from '../secretCrypto';
 
 /**
  * Scaffold for the Microsoft Graph / OneDrive integration - mirrors currentRms/config.ts's
@@ -38,14 +39,16 @@ const SETTING_KEY = 'oneDriveConfig';
 export async function getOneDriveConfig(): Promise<OneDriveConfig> {
   const row = await prisma.appSetting.findUnique({ where: { key: SETTING_KEY } });
   if (!row) return { ...DEFAULT_ONE_DRIVE_CONFIG };
-  return { ...DEFAULT_ONE_DRIVE_CONFIG, ...JSON.parse(row.valueJson) };
+  const stored = JSON.parse(row.valueJson);
+  return { ...DEFAULT_ONE_DRIVE_CONFIG, ...stored, clientSecret: decryptSecret(stored.clientSecret ?? '') };
 }
 
 export async function saveOneDriveConfig(config: OneDriveConfig): Promise<void> {
+  const stored = { ...config, clientSecret: encryptSecret(config.clientSecret) };
   await prisma.appSetting.upsert({
     where: { key: SETTING_KEY },
-    create: { key: SETTING_KEY, valueJson: JSON.stringify(config) },
-    update: { valueJson: JSON.stringify(config) },
+    create: { key: SETTING_KEY, valueJson: JSON.stringify(stored) },
+    update: { valueJson: JSON.stringify(stored) },
   });
 }
 

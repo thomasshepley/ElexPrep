@@ -8,7 +8,10 @@ import { parseWysiwygCsv, buildFixturesFromRows } from '../patchCsv';
 import { getOneDriveConfig } from '../oneDrive/config';
 import { findPatchSource } from '../oneDrive/patchDetect';
 
-const upload = multer({ storage: multer.memoryStorage() });
+// Every other multer instance in this app bounds upload size explicitly (jobs.ts, plots.ts,
+// jobDocuments.ts, crew.ts) - this one didn't, so an arbitrarily large request body could be
+// buffered fully into memory (memoryStorage) before any row-count/shape validation runs.
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
 
 export const patchRouter = Router();
 

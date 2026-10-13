@@ -3,6 +3,10 @@
 Newest entries first. Each push/merge gets exactly one entry - see
 `scripts/bump-version.mjs` for how the version number itself advances.
 
+## v2.7.1 - 2026-10-13
+
+- Security hardening pass before going live: locked down CORS, encrypted API keys at rest, timing-safe agent auth
+
 ## v2.6.1 - 2026-10-13
 
 - Patch import now keeps unaddressed fixtures and merges re-imports instead of wiping them
