@@ -79,6 +79,7 @@ model Job {
   labelTemplates LabelTemplate[]
   crewAssignments JobCrewAssignment[]
   scheduleItems  JobScheduleItem[]
+  jobDays        JobDay[]
   documents      JobDocument[]
   contacts       JobContact[]
   labelRequests  CrewLabelRequest[]
@@ -181,6 +182,46 @@ model JobScheduleItem {
   updatedAt DateTime  @updatedAt
 
   @@index([jobId])
+}
+
+/// An explicit calendar-day "block" for a job - the admin-managed day-by-day overview (see
+/// routes/jobDays.ts) that crew get dragged onto, shown alongside the hour-by-hour
+/// JobScheduleItem timeline rather than derived from it. A day can exist with no hourly items
+/// yet (crew staged ahead of time, before anyone's written up a running order), and an hourly
+/// item's date can exist with no JobDay row yet - the web client shows that as an
+/// unmaterialized placeholder block until something (explicitly adding the day, or dragging
+/// crew onto it) actually creates this row. `date` is whatever instant the client that created
+/// it sent (local midnight in the browser's own timezone), and is always re-bucketed back into
+/// a calendar day on the client (see DayTimeline.tsx's dateKey) rather than compared in UTC
+/// server-side, so it round-trips to the same calendar day for the browser that set it
+/// regardless of what timezone the server itself runs in.
+model JobDay {
+  id        String   @id @default(cuid())
+  jobId     String
+  job       Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  date      DateTime
+  createdAt DateTime @default(now())
+
+  crewAssignments JobDayCrewAssignment[]
+
+  @@unique([jobId, date])
+  @@index([jobId])
+}
+
+/// Which of a job's already-attributed crew (JobCrewAssignment) are actually working a given
+/// JobDay - the drag-and-drop target record itself. A crew member must already be assigned to
+/// the job before they can be dropped onto one of its days; removing either side cascades here.
+model JobDayCrewAssignment {
+  id                  String            @id @default(cuid())
+  jobDayId            String
+  jobDay              JobDay            @relation(fields: [jobDayId], references: [id], onDelete: Cascade)
+  jobCrewAssignmentId String
+  jobCrewAssignment   JobCrewAssignment @relation(fields: [jobCrewAssignmentId], references: [id], onDelete: Cascade)
+  createdAt           DateTime          @default(now())
+
+  @@unique([jobDayId, jobCrewAssignmentId])
+  @@index([jobDayId])
+  @@index([jobCrewAssignmentId])
 }
 
 /// General job files (call sheets, info packs, contracts) — unencrypted like Plot, since
@@ -389,6 +430,8 @@ model JobCrewAssignment {
   xeroContactId String?
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
+
+  dayAssignments JobDayCrewAssignment[]
 
   @@unique([jobId, crewProfileId])
   @@index([jobId])

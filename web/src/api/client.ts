@@ -313,6 +313,25 @@ export interface JobCrewAssignment {
   /// distinct from leaving dayRate blank (which means "use the default").
   zeroRated: boolean;
   active: boolean;
+  /// The crew member's swatch color (admin override, or a stable id-derived default when
+  /// null) - see shared's resolveCrewColor. Used for the day-blocks drag-and-drop chips.
+  color: string | null;
+}
+
+export interface JobDayCrew {
+  /// The JobDayCrewAssignment id - the drag-and-drop link record itself, not the crew member.
+  id: string;
+  jobCrewAssignmentId: string;
+  crewProfileId: string;
+  displayName: string;
+  role: string;
+  color: string | null;
+}
+
+export interface JobDay {
+  id: string;
+  date: string;
+  crew: JobDayCrew[];
 }
 
 export interface CrewMe {
@@ -775,6 +794,19 @@ export const api = {
     update: (jobId: string, id: string, data: Partial<{ title: string; startsAt: string; endsAt: string | null; notes: string }>) =>
       request<JobScheduleItem>(`/jobs/${jobId}/schedule/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     remove: (jobId: string, id: string) => request<void>(`/jobs/${jobId}/schedule/${id}`, { method: 'DELETE' }),
+  },
+  jobDays: {
+    list: (jobId: string) => request<JobDay[]>(`/jobs/${jobId}/days`),
+    create: (jobId: string, date: string) =>
+      request<JobDay>(`/jobs/${jobId}/days`, { method: 'POST', body: JSON.stringify({ date }) }),
+    remove: (jobId: string, id: string) => request<void>(`/jobs/${jobId}/days/${id}`, { method: 'DELETE' }),
+    assignCrew: (jobId: string, dayId: string, jobCrewAssignmentId: string) =>
+      request<{ id: string }>(`/jobs/${jobId}/days/${dayId}/crew`, {
+        method: 'POST',
+        body: JSON.stringify({ jobCrewAssignmentId }),
+      }),
+    unassignCrew: (jobId: string, dayId: string, id: string) =>
+      request<void>(`/jobs/${jobId}/days/${dayId}/crew/${id}`, { method: 'DELETE' }),
   },
   jobDiscussion: {
     list: (jobId: string) => request<DiscussionThreadData>(`/jobs/${jobId}/discussion`),

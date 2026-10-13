@@ -1276,6 +1276,146 @@ tbody tr:hover {
   color: var(--content-muted);
 }
 
+/* JobSchedulePanel's split layout - the day-blocks overview on the left, the selected day's
+   hour-by-hour timeline on the right - collapses to a single column on narrow viewports,
+   consistent with the app's mobile breakpoint elsewhere. */
+.schedule-split {
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  gap: 1rem;
+  align-items: start;
+}
+
+@media (max-width: 860px) {
+  .schedule-split {
+    grid-template-columns: 1fr;
+  }
+}
+
+.day-blocks-column {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.day-blocks-roster-hint {
+  margin: 0 0 0.5rem;
+  font-size: var(--text-xs);
+}
+
+.day-blocks-roster-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.day-block-crew-chip-draggable {
+  cursor: grab;
+  touch-action: none;
+}
+
+.day-block-crew-chip-draggable:active {
+  cursor: grabbing;
+}
+
+.day-blocks-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.day-block {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 0.6rem 0.75rem;
+  background: var(--surface);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.day-block:hover {
+  border-color: var(--accent);
+}
+
+.day-block-active {
+  border-color: var(--accent);
+  background: var(--accent-wash);
+}
+
+.day-block-drag-over {
+  border-color: var(--accent);
+  border-style: dashed;
+  background: var(--accent-wash);
+}
+
+.day-block-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.4rem;
+}
+
+.day-block-date {
+  font-weight: 700;
+  flex: 1;
+}
+
+.day-block-remove {
+  background: none;
+  border: none;
+  color: var(--content-muted);
+  cursor: pointer;
+  font-size: var(--text-lg);
+  line-height: 1;
+  padding: 0 0.2rem;
+}
+
+.day-block-remove:hover {
+  color: var(--danger-fill);
+}
+
+.day-block-crew {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  min-height: 1.6rem;
+  align-items: center;
+}
+
+.day-block-crew-empty {
+  font-size: var(--text-xs);
+}
+
+.day-block-crew-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: var(--text-xs);
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.15rem 0.5rem 0.15rem 0.4rem;
+}
+
+.day-block-crew-chip-remove {
+  background: none;
+  border: none;
+  color: var(--content-muted);
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+
+.day-block-crew-chip-remove:hover {
+  color: var(--danger-fill);
+}
+
+.day-block-add-form {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
 /* NotificationBell - a sidebar button that opens a small panel upward (the sidebar sits at
    the bottom of the viewport in both shells, so the panel has more room above than below). */
 .notification-bell {

@@ -19,7 +19,10 @@ function formatTime(d: Date): string {
   return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
 }
 
-function dateKey(d: Date): string {
+/** Also used by JobSchedulePanel/DayBlocksColumn to match schedule items to day blocks - always
+ * bucket by local calendar day (not UTC), consistent with how the hour-by-hour view below
+ * already splits a multi-day job's items. */
+export function dateKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
@@ -83,7 +86,7 @@ function layoutColumns(items: TimedItem[]): LaidOutItem[] {
 /** A single day's Google-Calendar-day-view-style vertical timeline. `items` must all fall on
  * the same calendar day - DayTimeline (below) handles splitting a multi-day job's items into
  * one of these per day. */
-function SingleDayTimeline({ items }: { items: TimelineItem[] }) {
+export function SingleDayTimeline({ items }: { items: TimelineItem[] }) {
   const sorted = [...items].sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
   const timed: TimedItem[] = sorted.map((item) => {
     const startMin = minutesSinceMidnight(new Date(item.startsAt));

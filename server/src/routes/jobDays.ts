@@ -1,0 +1,126 @@
+import { Router } from 'express';
+import { prisma, logActivity } from '../db';
+import { requireRole } from '../auth';
+import { requirePermission } from '../permissions';
+
+/**
+ * A job's day-by-day overview "blocks" - distinct from JobScheduleItem (the hourly entries
+ * within a day): a JobDay can exist before any hourly item does, letting an admin drag crew
+ * onto a day before there's anything else scheduled on it. Structural add/remove of a day is
+ * admin-only (mirrors jobSchedule.ts); assigning/unassigning crew to a day uses the same
+ * delegatable manageCrewAssignments permission as job-level crew attribution, since it's the
+ * same underlying capability at finer grain. Reads are open to anyone who can see the job.
+ */
+export const jobDaysRouter = Router();
+
+const dayInclude = {
+  crewAssignments: {
+    include: {
+      jobCrewAssignment: {
+        include: { crewProfile: { include: { user: { select: { displayName: true } } } } },
+      },
+    },
+  },
+} as const;
+
+type DayRow = {
+  id: string;
+  date: Date;
+  crewAssignments: {
+    id: string;
+    jobCrewAssignment: {
+      id: string;
+      role: string;
+      crewProfileId: string;
+      crewProfile: { color: string | null; user: { displayName: string } };
+    };
+  }[];
+};
+
+function toDayDto(day: DayRow) {
+  return {
+    id: day.id,
+    date: day.date.toISOString(),
+    crew: day.crewAssignments.map((ca) => ({
+      id: ca.id,
+      jobCrewAssignmentId: ca.jobCrewAssignment.id,
+      crewProfileId: ca.jobCrewAssignment.crewProfileId,
+      displayName: ca.jobCrewAssignment.crewProfile.user.displayName,
+      role: ca.jobCrewAssignment.role,
+      color: ca.jobCrewAssignment.crewProfile.color,
+    })),
+  };
+}
+
+jobDaysRouter.get('/:jobId/days', async (req, res) => {
+  const days = await prisma.jobDay.findMany({
+    where: { jobId: req.params.jobId },
+    include: dayInclude,
+    orderBy: { date: 'asc' },
+  });
+  res.json(days.map(toDayDto));
+});
+
+jobDaysRouter.post('/:jobId/days', requireRole('ADMIN'), async (req, res) => {
+  const { jobId } = req.params;
+  const { date } = req.body ?? {};
+  const parsed = typeof date === 'string' ? new Date(date) : null;
+  if (!parsed || Number.isNaN(parsed.getTime())) return res.status(400).json({ error: 'date is required' });
+  const existing = await prisma.jobDay.findUnique({
+    where: { jobId_date: { jobId, date: parsed } },
+    include: dayInclude,
+  });
+  if (existing) return res.status(200).json(toDayDto(existing));
+  const day = await prisma.jobDay.create({ data: { jobId, date: parsed }, include: dayInclude });
+  await logActivity('job_day.create', parsed.toISOString(), jobId, req.user?.id);
+  res.status(201).json(toDayDto(day));
+});
+
+jobDaysRouter.delete('/:jobId/days/:id', requireRole('ADMIN'), async (req, res) => {
+  const day = await prisma.jobDay.findUnique({
+    where: { id: req.params.id },
+    include: { crewAssignments: true },
+  });
+  if (!day || day.jobId !== req.params.jobId) return res.status(404).json({ error: 'Day not found' });
+  if (day.crewAssignments.length > 0) {
+    return res.status(409).json({ error: "Unassign this day's crew first" });
+  }
+  const dayStart = day.date;
+  const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
+  const itemCount = await prisma.jobScheduleItem.count({
+    where: { jobId: req.params.jobId, startsAt: { gte: dayStart, lt: dayEnd } },
+  });
+  if (itemCount > 0) {
+    return res.status(409).json({ error: `Remove this day's ${itemCount} schedule ${itemCount === 1 ? 'entry' : 'entries'} first` });
+  }
+  await prisma.jobDay.delete({ where: { id: day.id } });
+  await logActivity('job_day.delete', dayStart.toISOString(), req.params.jobId, req.user?.id);
+  res.status(204).end();
+});
+
+jobDaysRouter.post('/:jobId/days/:dayId/crew', requirePermission('manageCrewAssignments'), async (req, res) => {
+  const { jobId, dayId } = req.params;
+  const { jobCrewAssignmentId } = req.body ?? {};
+  if (!jobCrewAssignmentId || typeof jobCrewAssignmentId !== 'string') {
+    return res.status(400).json({ error: 'jobCrewAssignmentId is required' });
+  }
+  const day = await prisma.jobDay.findUnique({ where: { id: dayId } });
+  if (!day || day.jobId !== jobId) return res.status(404).json({ error: 'Day not found' });
+  const assignment = await prisma.jobCrewAssignment.findUnique({ where: { id: jobCrewAssignmentId } });
+  if (!assignment || assignment.jobId !== jobId) return res.status(404).json({ error: 'Crew assignment not found on this job' });
+  const existing = await prisma.jobDayCrewAssignment.findUnique({
+    where: { jobDayId_jobCrewAssignmentId: { jobDayId: dayId, jobCrewAssignmentId } },
+  });
+  if (existing) return res.status(200).json({ id: existing.id });
+  const created = await prisma.jobDayCrewAssignment.create({ data: { jobDayId: dayId, jobCrewAssignmentId } });
+  await logActivity('job_day.assign_crew', assignment.id, jobId, req.user?.id);
+  res.status(201).json({ id: created.id });
+});
+
+jobDaysRouter.delete('/:jobId/days/:dayId/crew/:id', requirePermission('manageCrewAssignments'), async (req, res) => {
+  const row = await prisma.jobDayCrewAssignment.findUnique({ where: { id: req.params.id } });
+  if (!row || row.jobDayId !== req.params.dayId) return res.status(404).json({ error: 'Not found' });
+  await prisma.jobDayCrewAssignment.delete({ where: { id: row.id } });
+  await logActivity('job_day.unassign_crew', row.id, req.params.jobId, req.user?.id);
+  res.status(204).end();
+});

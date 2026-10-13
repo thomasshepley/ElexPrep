@@ -25,6 +25,7 @@ interface AssignmentRow {
     id: string;
     dayRate: string | null;
     phone: string | null;
+    color: string | null;
     active: boolean;
     user: { username: string; displayName: string };
   };
@@ -43,6 +44,7 @@ function toAssignmentDto(a: AssignmentRow) {
     days: a.days,
     zeroRated: a.zeroRated,
     active: a.crewProfile.active,
+    color: a.crewProfile.color,
   };
 }
 
