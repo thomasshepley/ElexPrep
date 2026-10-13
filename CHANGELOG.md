@@ -4,6 +4,10 @@ Newest entries first. Each push/merge gets exactly one entry - see
 `scripts/bump-version.mjs` for how the version number itself advances. A `+` marks a
 feature addition, a `-` marks a bug fix.
 
+## v1.4.7 - 2026-10-13
+
+- Chat messages with long words no longer spill off small phones, phones held sideways and tablets get the app-style tab bar, and the Schedule tab and filter tabs fit narrower screens
+
 ## v1.4.6 - 2026-10-13
 
 - On phones the site now feels like an app: a floating tab bar with Home, Jobs, Alerts and More that stays clear of curved screen corners, and no more sideways scrolling

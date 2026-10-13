@@ -204,6 +204,9 @@
   left: max(12px, env(safe-area-inset-left));
   right: max(12px, env(safe-area-inset-right));
   bottom: max(10px, env(safe-area-inset-bottom));
+  /* On a phone held sideways or a tablet, a compact centred bar rather than one stretched edge to edge. */
+  max-width: 520px;
+  margin-inline: auto;
   display: grid;
   grid-auto-columns: 1fr;
   grid-auto-flow: column;
@@ -292,6 +295,8 @@ button.mobile-tab.active:hover:not(:disabled) {
 
 .sheet {
   width: 100%;
+  max-width: 640px;
+  margin-inline: auto;
   max-height: 85vh;
   overflow-y: auto;
   padding: 0.5rem max(1rem, env(safe-area-inset-right)) calc(1rem + env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
@@ -425,9 +430,10 @@ button.mobile-tab.active:hover:not(:disabled) {
   }
 }
 
-/* Phones: no sidebar (MobileTabBar replaces it), content kept clear of the floating bar and the
-   notch, and nothing wider than the screen. */
-@media (max-width: 760px) {
+/* Phones (and touch screens up to 1100px - see hooks/useIsPhone.ts, which must match): no
+   sidebar (MobileTabBar replaces it), content kept clear of the floating bar and the notch, and
+   nothing wider than the screen. */
+@media (max-width: 760px), (pointer: coarse) and (max-width: 1100px) {
   html,
   body {
     overflow-x: clip;
@@ -473,6 +479,8 @@ button.mobile-tab.active:hover:not(:disabled) {
     position: fixed;
     left: max(12px, env(safe-area-inset-left));
     right: max(12px, env(safe-area-inset-right));
+    max-width: 520px;
+    margin-inline: auto;
     bottom: calc(max(10px, env(safe-area-inset-bottom)) + 76px);
     width: auto;
     max-height: 65vh;

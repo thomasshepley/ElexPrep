@@ -671,6 +671,14 @@ tbody tr:hover {
   gap: 0.4rem;
   margin-bottom: var(--space-4);
   border-bottom: 1px solid var(--border);
+  /* A row that doesn't fit scrolls sideways on its own instead of widening the page. */
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.tabs > * {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .tabs button,
@@ -1376,12 +1384,13 @@ tbody tr:hover {
    consistent with the app's mobile breakpoint elsewhere. */
 .schedule-split {
   display: grid;
-  grid-template-columns: 300px 1fr;
+  grid-template-columns: 300px minmax(0, 1fr);
   gap: 1rem;
   align-items: start;
 }
 
-@media (max-width: 860px) {
+/* Side by side needs ~1100px of window beside the sidebar; narrower, the days stack above the hours. */
+@media (max-width: 1100px) {
   .schedule-split {
     grid-template-columns: 1fr;
   }
@@ -1627,7 +1636,15 @@ tbody tr:hover {
   border-radius: var(--radius-md);
   background: var(--surface-sunken);
   border: 1px solid var(--border);
-  max-width: 34rem;
+  /* A bubble never wider than the thread, and a long unbroken word (a link, a serial number)
+     wraps instead of pushing it off the screen. */
+  max-width: min(34rem, 88%);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.discussion-message-meta {
+  flex-wrap: wrap;
 }
 
 .discussion-message.is-own {
