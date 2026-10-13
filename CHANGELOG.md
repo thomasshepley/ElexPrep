@@ -3,6 +3,10 @@
 Newest entries first. Each push/merge gets exactly one entry - see
 `scripts/bump-version.mjs` for how the version number itself advances.
 
+## v2.8.5 - 2026-10-13
+
+- Fix web build errors from nullable address and label-size typing
+
 ## v2.8.4 - 2026-10-13
 
 - Fix DEPLOY.md DNS instructions - Cloudflare rejects subdomain-only zones

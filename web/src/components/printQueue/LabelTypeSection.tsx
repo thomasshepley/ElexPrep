@@ -127,7 +127,10 @@ export default function LabelTypeSection({
       for (const el of template.elements) {
         const baseEl = base.elements.find((b) => b.id === el.id);
         if (!baseEl) continue;
-        const patch: Partial<LabelElementDef> = {};
+        // Intersected with `{ size?: number }` because `size` only exists on the
+        // text/stackedText branches of the LabelElementDef union - without it, TS rejects
+        // writing patch.size since it's not present on every branch (e.g. FillElementDef).
+        const patch: Partial<LabelElementDef> & { size?: number } = {};
         if (el.x !== baseEl.x) patch.x = el.x;
         if (el.y !== baseEl.y) patch.y = el.y;
         if (el.w !== baseEl.w) patch.w = el.w;

@@ -396,7 +396,7 @@ export default function PatchImportPanel({ jobId, groupId = null }: { jobId: str
                     <td>
                       <input
                         type="number"
-                        defaultValue={f.address}
+                        defaultValue={f.address ?? ''}
                         style={{ width: 60 }}
                         onBlur={(e) => updateFixture(f, 'address', e.target.value)}
                       />
