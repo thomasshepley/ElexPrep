@@ -47,7 +47,10 @@ usersRouter.post('/', async (req, res) => {
 });
 
 usersRouter.put('/:id', async (req, res) => {
-  const { displayName, role, password } = req.body ?? {};
+  const { displayName, role, password, isProjectManager } = req.body ?? {};
+  if (isProjectManager !== undefined && typeof isProjectManager !== 'boolean') {
+    return res.status(400).json({ error: 'isProjectManager must be a boolean' });
+  }
   if (role && !['ADMIN', 'USER', 'SIGNAGE'].includes(role)) {
     return res.status(400).json({ error: 'role must be ADMIN, USER, or SIGNAGE (crew accounts are managed on the Crew settings page)' });
   }
@@ -66,11 +69,17 @@ usersRouter.put('/:id', async (req, res) => {
     data: {
       ...(displayName !== undefined ? { displayName } : {}),
       ...(role !== undefined ? { role } : {}),
+      ...(isProjectManager !== undefined ? { isProjectManager } : {}),
       ...(password !== undefined ? { passwordHash: await hashPassword(password) } : {}),
     },
   });
   if (password !== undefined) await revokeOtherSessions(user.id, user.id === req.user!.id ? req.cookies?.[SESSION_COOKIE] : undefined);
-  await logActivity('user.update', user.username, undefined, req.user!.id);
+  await logActivity(
+    'user.update',
+    isProjectManager !== undefined ? `${user.username} (PM tag ${isProjectManager ? 'on' : 'off'})` : user.username,
+    undefined,
+    req.user!.id
+  );
   res.json(toAuthedUser(user));
 });
 

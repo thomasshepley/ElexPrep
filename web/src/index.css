@@ -31,6 +31,10 @@
   --on-accent: var(--brand-secondary);
   --accent-wash: rgba(2, 176, 191, 0.14);
 
+  /* "PM" tag (project manager) - purple names and chip, see components/UserName.tsx. */
+  --pm: #b98cff;
+  --pm-wash: rgba(185, 140, 255, 0.16);
+
   /* Signal colors. --success/--warning reuse the exact hex already used for "Floor"/an amber
      gel tone in the location-color system (see shared/src/locationColors.ts) - the same
      contrast-adaptive text-color logic used for printed labels (light text on a dark fill,
@@ -96,6 +100,8 @@
   --accent-fill: #02b0bf;
   --on-accent: var(--brand-secondary);
   --accent-wash: rgba(2, 176, 191, 0.1);
+  --pm: #7a3fd1;
+  --pm-wash: rgba(122, 63, 209, 0.1);
   --danger: #cc3b3b;
   --danger-fill: #cc3b3b;
   --success: #1fa34c;
@@ -837,6 +843,24 @@ tbody tr:hover {
 .chip-role {
   background: var(--accent-wash);
   color: var(--accent);
+  border-color: transparent;
+  font-weight: 700;
+}
+
+/* Names across the site: admins in the brand blue, a PM-tagged account in purple (the PM
+   colour wins), everyone else in the normal text colour - see components/UserName.tsx. */
+.user-name {
+  font-weight: 600;
+}
+.user-name.is-admin {
+  color: var(--accent);
+}
+.user-name.is-pm {
+  color: var(--pm);
+}
+.chip-pm {
+  background: var(--pm-wash);
+  color: var(--pm);
   border-color: transparent;
   font-weight: 700;
 }
@@ -2056,6 +2080,24 @@ td input[type='number']::-webkit-inner-spin-button {
 
 .datetime-input-readout {
   font-size: var(--text-xs);
+}
+
+/* Job Settings logo slot preview - one column of the PAL label's logo bar (white like the
+   printed label), so the size slider shows roughly what will print. */
+.logo-size-preview {
+  max-width: 100%;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.logo-size-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
 .form-grid {

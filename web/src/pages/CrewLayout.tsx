@@ -8,6 +8,7 @@ import BugReportButton from '../components/BugReportButton';
 import Avatar from '../components/Avatar';
 import ForcedPasswordChange from '../components/ForcedPasswordChange';
 import LockdownBanner from '../components/LockdownBanner';
+import UserName from '../components/UserName';
 
 /**
  * Shell for the whole crew portal (/crew/*) - a sibling to the admin/prep App shell and the
@@ -54,7 +55,7 @@ export default function CrewLayout() {
               <div className="sidebar-user-row">
                 <Avatar userId={user.id} displayName={user.displayName} hasAvatar={Boolean(user.avatarPath)} />
                 <NavLink to="/crew/account" className="sidebar-username" aria-label={`${user.displayName} - account`}>
-                  {user.displayName}
+                  <UserName name={user.displayName} role={user.role} isProjectManager={user.isProjectManager} showPmChip={false} />
                 </NavLink>
               </div>
               <div className="sidebar-actions">

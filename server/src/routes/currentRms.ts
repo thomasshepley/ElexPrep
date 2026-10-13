@@ -14,6 +14,7 @@ import { getOneDriveConfig } from '../oneDrive/config';
 import { matchJobFolder } from '../oneDrive/matcher';
 import { getItemByPath } from '../oneDrive/client';
 import { normalizeCrewFeaturesPatch } from '../crewFeatures';
+import { effectiveDayRate, effectiveDays, loadGlobalDefaultDayRate } from '../crewRates';
 
 export const currentRmsRouter = Router();
 
@@ -394,8 +395,8 @@ function serviceLineItems(items: RawOpportunityItem[]): { name: string; quantity
  * CurrentRmsOpportunity.projectId - plus any opportunity manually linked via
  * JobLinkedRmsOpportunity, so a separate "<Job> - Crewing" opportunity counts too whether
  * Current RMS grouped it under the same Project or an admin had to say so explicitly) against
- * what ElexPrep's own records say crew actually cost on this job (JobCrewAssignment's day
- * rate override, or the crew member's own default, times the assignment's days). This is
+ * what ElexPrep's own records say crew actually cost on this job (each assignment's day rate
+ * times the job days they're scheduled on - see crewRates.ts). This is
  * financial margin data, same sensitivity tier as bank details/compliance documents - ADMIN
  * only, never delegated via the permissions system, and never surfaced in the freelancer-
  * facing crew portal.
@@ -441,29 +442,33 @@ jobCurrentRmsRouter.get('/:jobId/current-rms/crew-margin', requireRole('ADMIN'),
 
   const assignments = await prisma.jobCrewAssignment.findMany({
     where: { jobId: job.id },
-    include: { crewProfile: { include: { user: { select: { displayName: true } } } } },
+    include: {
+      crewProfile: {
+        include: {
+          user: { select: { displayName: true } },
+          rateLines: { select: { label: true, amount: true } },
+        },
+      },
+      _count: { select: { dayAssignments: true } },
+    },
   });
-  const defaultRateSetting = await prisma.appSetting.findUnique({ where: { key: 'defaultCrewDayRate' } });
-  const globalDefaultRate = defaultRateSetting
-    ? toMoney((JSON.parse(defaultRateSetting.valueJson) as { dayRate: string | null }).dayRate ?? undefined)
-    : 0;
+  const globalDefaultRate = await loadGlobalDefaultDayRate();
   const costBreakdown = assignments.map((a) => {
-    // "Suggested" = what rate would apply if this assignment had no explicit override and
-    // wasn't zero-rated - the job's own day-rate field, falling back through the crew
-    // member's profile default to the portal-wide default. Shown to admins hovering the
-    // day-rate cell so they can see what's actually driving the number vs. what they typed.
-    const suggestedRate = toMoney(a.crewProfile.dayRate ?? undefined) || globalDefaultRate;
-    const rate = a.zeroRated ? 0 : toMoney(a.dayRate ?? undefined) || suggestedRate;
-    const days = a.days ? toMoney(a.days) || 1 : 1;
+    // Rate and days come from crewRates.ts so the Crew tab and this view always agree: the
+    // days are the job days this person is assigned to on the Schedule tab (falling back to
+    // the typed "Days" figure only when they aren't on any day yet).
+    const rate = effectiveDayRate(a, a.crewProfile.dayRate, a.crewProfile.rateLines, globalDefaultRate);
+    const { days, fromSchedule } = effectiveDays(a._count.dayAssignments, a.days);
     return {
       crewProfileId: a.crewProfileId,
       name: a.crewProfile.user.displayName,
       role: a.role,
-      dayRate: rate,
-      suggestedRate,
+      dayRate: rate.rate,
+      suggestedRate: rate.suggested.rate,
       zeroRated: a.zeroRated,
       days,
-      cost: rate * days,
+      daysFromSchedule: fromSchedule,
+      cost: rate.rate * days,
     };
   });
   const costTotal = costBreakdown.reduce((sum, b) => sum + b.cost, 0);

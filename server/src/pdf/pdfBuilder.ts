@@ -129,13 +129,19 @@ export function drawImageCover(page: PDFPage, image: PDFImage, rect: CellRectPt)
  * slot that should never show gaps), a logo whose aspect ratio differs from its slot needs to
  * stay fully visible rather than being zoomed in and cropped to fill the box edge-to-edge.
  */
-export function drawImageContain(page: PDFPage, image: PDFImage, rect: CellRectPt) {
-  const scale = Math.min(rect.wPt / image.width, rect.hPt / image.height);
+export function drawImageContain(page: PDFPage, image: PDFImage, rect: CellRectPt, zoom = 1) {
+  // zoom scales the fitted size around the slot's centre (a job's per-logo size setting);
+  // past 1 the logo would spill over neighbouring content, so it's clipped to the slot.
+  const scale = Math.min(rect.wPt / image.width, rect.hPt / image.height) * zoom;
   const drawWidth = image.width * scale;
   const drawHeight = image.height * scale;
   const x = rect.xPt + (rect.wPt - drawWidth) / 2;
   const y = rect.yPt + (rect.hPt - drawHeight) / 2;
+  if (zoom > 1) {
+    page.pushOperators(pushGraphicsState(), rectangle(rect.xPt, rect.yPt, rect.wPt, rect.hPt), clip(), endPath());
+  }
   page.drawImage(image, { x, y, width: drawWidth, height: drawHeight });
+  if (zoom > 1) page.pushOperators(popGraphicsState());
 }
 
 /**

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, type ActivityLogEntry } from '../api/client';
 import { formatDateTime } from '../utils/format';
+import UserName from '../components/UserName';
 
 const ACRONYMS: Record<string, string> = {
   rms: 'RMS',
@@ -118,7 +119,7 @@ export default function ActivityLogPage() {
             {filtered.map((e) => (
               <tr key={e.id}>
                 <td className="muted">{formatDateTime(e.createdAt)}</td>
-                <td>{e.userName ?? <span className="muted">system</span>}</td>
+                <td>{e.userName ? <UserName name={e.userName} role={e.userRole} isProjectManager={e.userIsProjectManager} /> : <span className="muted">system</span>}</td>
                 <td>
                   {e.jobId && e.jobName ? (
                     <Link to={`/jobs/${e.jobId}`}>{e.jobName}</Link>

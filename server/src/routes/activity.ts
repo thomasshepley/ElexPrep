@@ -56,13 +56,15 @@ activityRouter.get('/', requireRole('WEBMASTER'), async (req, res) => {
     prisma.job.findMany({ where: { id: { in: jobIds } }, select: { id: true, name: true } }),
     resolveIds(page.map((e) => e.detail)),
   ]);
-  const nameById = new Map(users.map((u) => [u.id, u.displayName]));
+  const userById = new Map(users.map((u) => [u.id, u]));
   const jobById = new Map(jobs.map((j) => [j.id, j.name]));
   res.json({
     entries: page.map((e) => ({
       ...e,
       detail: e.detail ? e.detail.replace(CUID_PATTERN, (id) => idNames.get(id) ?? id) : e.detail,
-      userName: e.userId ? nameById.get(e.userId) ?? '(deleted user)' : null,
+      userName: e.userId ? userById.get(e.userId)?.displayName ?? '(deleted user)' : null,
+      userRole: e.userId ? userById.get(e.userId)?.role ?? null : null,
+      userIsProjectManager: e.userId ? userById.get(e.userId)?.isProjectManager ?? false : false,
       jobName: e.jobId ? jobById.get(e.jobId) ?? '(deleted job)' : null,
     })),
     nextCursor: entries.length > PAGE_SIZE ? page[page.length - 1].id : null,

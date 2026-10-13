@@ -36,17 +36,21 @@ export interface LogoImages {
   left?: PDFImage;
   middle?: PDFImage;
   right?: PDFImage;
+  /** Per-slot size as a percentage of the slot (Job.logoScale*) - 100 = fit, the default. */
+  scales?: { left?: number; middle?: number; right?: number };
 }
 
 /** Draws whichever logo slots are set, splitting the rect into equal columns only across the
  * slots actually in use - a single logo (the common case) still gets the full rect, matching
  * the pre-multi-logo behavior exactly, while two or three share it evenly left to right. */
 function drawLogoBar(page: PDFPage, rect: CellRectPt, logos: LogoImages) {
-  const present = [logos.left, logos.middle, logos.right].filter((img): img is PDFImage => Boolean(img));
+  const present = (['left', 'middle', 'right'] as const)
+    .map((slot) => ({ img: logos[slot], zoom: (logos.scales?.[slot] ?? 100) / 100 }))
+    .filter((p): p is { img: PDFImage; zoom: number } => Boolean(p.img));
   if (present.length === 0) return;
   const colWidth = rect.wPt / present.length;
-  present.forEach((img, i) => {
-    drawImageContain(page, img, { ...rect, xPt: rect.xPt + colWidth * i, wPt: colWidth });
+  present.forEach(({ img, zoom }, i) => {
+    drawImageContain(page, img, { ...rect, xPt: rect.xPt + colWidth * i, wPt: colWidth }, zoom);
   });
 }
 

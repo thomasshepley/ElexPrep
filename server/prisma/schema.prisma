@@ -34,6 +34,11 @@ model Job {
   logoPath      String?
   logoPathLeft  String?
   logoPathRight String?
+  /// Per-slot logo size as a percentage of its slot on the label logo bar (100 = fit the slot,
+  /// lower shrinks, higher zooms and clips to the slot) - for logos with odd padding/aspect.
+  logoScaleLeft  Int @default(100)
+  logoScale      Int @default(100)
+  logoScaleRight Int @default(100)
   /// Visible to USER/SIGNAGE roles only when true; ADMIN always sees every job.
   isPublic    Boolean  @default(false)
 
@@ -760,6 +765,9 @@ model User {
   /// password, but the web app blocks everything else until a new password is set, which
   /// clears this flag automatically (see routes/auth.ts's PUT /me).
   mustChangePassword Boolean @default(false)
+  /// Admin-set "PM" tag - the account's name shows in purple (instead of the usual role
+  /// colour) across the site, e.g. in job discussions, so the project manager stands out.
+  isProjectManager Boolean @default(false)
 
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt

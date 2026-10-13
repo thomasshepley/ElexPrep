@@ -28,6 +28,8 @@ export interface AuthedUser {
   prefs: Record<string, unknown>;
   avatarPath: string | null;
   mustChangePassword: boolean;
+  /** Admin-set "PM" tag - purple name across the site (see UserName.tsx). */
+  isProjectManager: boolean;
 }
 
 declare global {
@@ -86,6 +88,7 @@ export function toAuthedUser(u: {
   prefsJson: string;
   avatarPath?: string | null;
   mustChangePassword?: boolean;
+  isProjectManager?: boolean;
 }): AuthedUser {
   let prefs: Record<string, unknown> = {};
   try {
@@ -101,6 +104,7 @@ export function toAuthedUser(u: {
     prefs,
     avatarPath: u.avatarPath ?? null,
     mustChangePassword: u.mustChangePassword ?? false,
+    isProjectManager: u.isProjectManager ?? false,
   };
 }
 

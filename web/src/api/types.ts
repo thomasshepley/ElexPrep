@@ -19,6 +19,10 @@ export interface Job {
   logoPath: string | null;
   logoPathLeft: string | null;
   logoPathRight: string | null;
+  /// Per-slot logo size on the label logo bar, as a percentage of the slot (100 = fit).
+  logoScaleLeft: number;
+  logoScale: number;
+  logoScaleRight: number;
   isPublic: boolean;
   currentRmsOpportunityId: string | null;
   rmsAlertAt: string | null;
@@ -158,6 +162,8 @@ export interface ActivityLogEntry {
   userAgent: string | null;
   createdAt: string;
   userName?: string | null;
+  userRole?: string | null;
+  userIsProjectManager?: boolean;
   jobName?: string | null;
 }
 
@@ -187,6 +193,8 @@ export interface AuthedUser {
   /// shell blocks everything except a "set a new password" form until this clears, which
   /// happens automatically the moment the password is actually changed.
   mustChangePassword: boolean;
+  /// Admin-set "PM" tag - shows this person's name in purple across the site.
+  isProjectManager?: boolean;
   /// Both lockdown tiers (see server/src/lockdownMode.ts), surfaced on every authedUserWithPermissions
   /// response so even an about-to-be-blocked account can render the lockdown banner via /auth/me,
   /// the one route the lockdown gate itself exempts.
@@ -276,6 +284,8 @@ export interface OnboardingInvite {
   token: string | null;
 }
 
+export type DayRateSource = 'override' | 'role' | 'profile' | 'rateCard' | 'default' | 'none';
+
 export interface JobCrewAssignment {
   id: string;
   crewProfileId: string;
@@ -295,6 +305,16 @@ export interface JobCrewAssignment {
   /// The crew member's swatch color (admin override, or a stable id-derived default when
   /// null) - see shared's resolveCrewColor. Used for the day-blocks drag-and-drop chips.
   color: string | null;
+  /// What the crew margin actually costs this assignment at, and where that came from - see
+  /// server/src/crewRates.ts for the fallback order.
+  effectiveDayRate: number;
+  dayRateSource: DayRateSource;
+  /// The rate with no job-level override (what clearing the override would fall back to).
+  suggestedDayRate: number;
+  suggestedDayRateSource: DayRateSource;
+  /// Job days this person is assigned to on the Schedule tab; when > 0 it drives the cost.
+  scheduledDays: number;
+  effectiveDays: number;
 }
 
 export interface JobDayCrew {
@@ -566,6 +586,7 @@ export interface DiscussionMessage {
   authorUserId: string;
   authorName: string;
   authorRole: string;
+  authorIsProjectManager?: boolean;
   body: string;
   createdAt: string;
   editedAt: string | null;

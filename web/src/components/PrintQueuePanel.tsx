@@ -190,6 +190,7 @@ export default function PrintQueuePanel({ jobId, groupId = null }: { jobId: stri
                   left: job.logoPathLeft ? api.jobs.logoUrl(jobId, 'left') : undefined,
                   middle: job.logoPath ? api.jobs.logoUrl(jobId, 'middle') : undefined,
                   right: job.logoPathRight ? api.jobs.logoUrl(jobId, 'right') : undefined,
+                  scales: { left: job.logoScaleLeft, middle: job.logoScale, right: job.logoScaleRight },
                 }
               : undefined
           }

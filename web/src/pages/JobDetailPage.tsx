@@ -15,6 +15,7 @@ import JobCrewPanel from '../components/JobCrewPanel';
 import CrewMarginPanel from '../components/CrewMarginPanel';
 import JobDiscussionThread from '../components/JobDiscussionThread';
 import FileInput from '../components/FileInput';
+import { useToast } from '../components/Toast';
 import { usePageTitle } from '../pageTitle';
 import DateTimeInput from '../components/DateTimeInput';
 import { useDialog } from '../components/Dialog';
@@ -264,7 +265,7 @@ function JobSettingsPanel({ job, onUpdate }: { job: Job; onUpdate: (j: Job) => v
               <div key={slot} className="logo-slot">
                 <p className="muted logo-slot-name">{slot}</p>
                 {path ? (
-                  <img src={api.jobs.logoUrl(job.id, slot)} alt={`Job logo (${slot})`} className="logo-slot-preview" />
+                  <LogoSizeControl job={job} slot={slot} canEdit={canEditJob} onUpdate={onUpdate} />
                 ) : (
                   <p className="muted">None</p>
                 )}
@@ -313,6 +314,85 @@ function JobSettingsPanel({ job, onUpdate }: { job: Job; onUpdate: (j: Job) => v
 }
 
 type LogoSlot = 'left' | 'middle' | 'right';
+
+const LOGO_SCALE_FIELD = { left: 'logoScaleLeft', middle: 'logoScale', right: 'logoScaleRight' } as const;
+
+/**
+ * A logo slot's preview at the proportions of one column of the label's logo bar, with a size
+ * slider (20-200% of the slot) for logos that come out too big/small because of their own
+ * padding or shape. Saved when the slider is let go, not on every step of the drag.
+ */
+function LogoSizeControl({
+  job,
+  slot,
+  canEdit,
+  onUpdate,
+}: {
+  job: Job;
+  slot: 'left' | 'middle' | 'right';
+  canEdit: boolean;
+  onUpdate: (j: Job) => void;
+}) {
+  const { showToast } = useToast();
+  const saved = job[LOGO_SCALE_FIELD[slot]] ?? 100;
+  const [scale, setScale] = useState(saved);
+  useEffect(() => setScale(saved), [saved]);
+  // PAL's logo bar is 5.30 x 0.70 in, split evenly across however many logos are set.
+  const logoCount = [job.logoPathLeft, job.logoPath, job.logoPathRight].filter(Boolean).length || 1;
+  const slotRatio = 5.3 / logoCount / 0.7;
+
+  const commit = async (value: number) => {
+    if (value === saved) return;
+    try {
+      onUpdate(await api.jobs.update(job.id, { logoScales: { [slot]: value } }));
+    } catch (err) {
+      setScale(saved);
+      showToast((err as Error).message, 'error');
+    }
+  };
+
+  return (
+    <div style={{ marginBottom: '0.3rem' }}>
+      <div className="logo-size-preview" style={{ aspectRatio: String(slotRatio), width: `${3 * slotRatio}rem` }}>
+        <img
+          src={api.jobs.logoUrl(job.id, slot)}
+          alt={`Job logo (${slot})`}
+          style={{ transform: scale !== 100 ? `scale(${scale / 100})` : undefined }}
+        />
+      </div>
+      {canEdit && (
+        <div className="row" style={{ gap: '0.4rem', alignItems: 'center', marginTop: '0.3rem' }}>
+          <input
+            type="range"
+            min={20}
+            max={200}
+            step={5}
+            value={scale}
+            aria-label={`Size of the ${slot} logo on labels`}
+            onChange={(e) => setScale(Number(e.target.value))}
+            onPointerUp={(e) => commit(Number(e.currentTarget.value))}
+            onKeyUp={(e) => commit(Number(e.currentTarget.value))}
+            onBlur={(e) => commit(Number(e.currentTarget.value))}
+            style={{ width: '8rem' }}
+          />
+          <span className="muted" style={{ minWidth: '3rem' }}>{scale}%</span>
+          {scale !== 100 && (
+            <button
+              type="button"
+              className="secondary"
+              onClick={() => {
+                setScale(100);
+                commit(100);
+              }}
+            >
+              Reset
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 /** Per-job override of which crew-portal sections are visible for this job's crew - starts
  * from whatever was set at onboarding (or the portal default, if never overridden). */

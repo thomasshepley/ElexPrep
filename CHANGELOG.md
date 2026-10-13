@@ -4,6 +4,14 @@ Newest entries first. Each push/merge gets exactly one entry - see
 `scripts/bump-version.mjs` for how the version number itself advances. A `+` marks a
 feature addition, a `-` marks a bug fix.
 
+## v1.3.9 - 2026-10-13
+
++ Added Copy all and Download .md buttons for bug reports on the Webmaster page
+
+## v1.3.8 - 2026-10-13
+
+- Editable crew day rates, crew margin counts scheduled days, location dropdown on fixtures, Pix columns only for pixel fixtures, PM tag and coloured names, adjustable logo size
+
 ## v1.3.7 - 2026-10-13
 
 + Dashboard this-week strip, crew next call and calendar export, clearer print queue and schedule, tidier crew settings and a browser smoke test

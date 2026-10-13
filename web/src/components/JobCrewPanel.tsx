@@ -1,9 +1,19 @@
 import { useEffect, useState } from 'react';
-import { api, type CrewMember, type JobCrewAssignment } from '../api/client';
+import { api, type CrewMember, type DayRateSource, type JobCrewAssignment } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { isAdminRole } from '../auth/roles';
 import WhatsAppButton from './WhatsAppButton';
 import { useDialog } from './Dialog';
+import { formatMoney } from '../utils/format';
+
+const RATE_SOURCE_LABELS: Record<DayRateSource, string> = {
+  override: 'set for this job',
+  role: "from their rate card's role rate",
+  profile: 'from their crew profile',
+  rateCard: 'from their general day rate',
+  default: 'portal default rate',
+  none: 'no rate set anywhere',
+};
 
 /**
  * Who's working this job, in what role, at what rate. Viewing is open to anyone who can see
@@ -42,7 +52,7 @@ export default function JobCrewPanel({ jobId }: { jobId: string }) {
       await api.jobCrewAssignments.create(jobId, {
         crewProfileId,
         role,
-        dayRate: dayRate || undefined,
+        dayRate: dayRate.replace(/[£,\s]/g, '') || undefined,
         days: days || undefined,
         zeroRated,
       });
@@ -64,15 +74,29 @@ export default function JobCrewPanel({ jobId }: { jobId: string }) {
     refresh();
   };
 
-  const updateDays = async (a: JobCrewAssignment, value: string) => {
-    await api.jobCrewAssignments.update(jobId, a.id, { days: value });
+  const updateField = async (a: JobCrewAssignment, data: { dayRate?: string; days?: string; zeroRated?: boolean }) => {
+    setError(null);
+    await api.jobCrewAssignments.update(jobId, a.id, data).catch((e) => setError((e as Error).message));
     refresh();
   };
 
-  const updateZeroRated = async (a: JobCrewAssignment, value: boolean) => {
-    await api.jobCrewAssignments.update(jobId, a.id, { zeroRated: value });
-    refresh();
+  // Blank clears the override so the rate falls back to the crew member's own rates again.
+  const updateDayRate = (a: JobCrewAssignment, value: string) => {
+    const cleaned = value.replace(/[£,\s]/g, '');
+    if (cleaned === (a.dayRate ?? '')) return;
+    if (cleaned && !Number.isFinite(Number(cleaned))) {
+      setError(`"${value}" isn't a number - enter a day rate like 250`);
+      return refresh();
+    }
+    return updateField(a, { dayRate: cleaned });
   };
+
+  const updateDays = (a: JobCrewAssignment, value: string) => {
+    if (value.trim() === (a.days ?? '')) return;
+    return updateField(a, { days: value.trim() });
+  };
+
+  const updateZeroRated = (a: JobCrewAssignment, value: boolean) => updateField(a, { zeroRated: value });
 
   const remove = async (a: JobCrewAssignment) => {
     if (!(await dialog.confirm({ title: `Remove ${a.displayName} from this job?`, message: 'Their day and task assignments on this job are removed too.', confirmLabel: 'Remove', danger: true }))) return;
@@ -105,8 +129,8 @@ export default function JobCrewPanel({ jobId }: { jobId: string }) {
                 <input id="assign-role" value={role} onChange={(e) => setRole(e.target.value)} placeholder="LD, Rigger…" required />
               </div>
               <div className="field" style={{ width: '9rem' }}>
-                <label htmlFor="assign-day-rate">Day rate override</label>
-                <input id="assign-day-rate" value={dayRate} onChange={(e) => setDayRate(e.target.value)} placeholder="Optional" />
+                <label htmlFor="assign-day-rate">Day rate (£)</label>
+                <input id="assign-day-rate" inputMode="decimal" value={dayRate} onChange={(e) => setDayRate(e.target.value)} placeholder="Their usual" />
               </div>
               <div className="field" style={{ width: '6rem' }}>
                 <label htmlFor="assign-days">Days</label>
@@ -167,17 +191,49 @@ export default function JobCrewPanel({ jobId }: { jobId: string }) {
                       <span className="chip chip-role">{a.role}</span>
                     )}
                   </td>
-                  <td>{a.zeroRated ? <span className="muted">Zero-rated</span> : a.dayRate ?? a.profileDayRate ?? '-'}</td>
                   <td>
-                    {canManage ? (
-                      <input aria-label={`Days for ${a.displayName}`}
+                    {a.zeroRated ? (
+                      <span className="muted">Zero-rated</span>
+                    ) : canManage ? (
+                      <>
+                        <input
+                          key={`${a.id}-${a.dayRate ?? ''}`}
+                          defaultValue={a.dayRate ?? ''}
+                          inputMode="decimal"
+                          placeholder={a.suggestedDayRate ? String(a.suggestedDayRate) : 'Rate'}
+                          aria-label={`Day rate for ${a.displayName}`}
+                          style={{ width: '6rem' }}
+                          onBlur={(e) => updateDayRate(a, e.target.value)}
+                          onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+                        />
+                        <div className="muted" style={{ fontSize: 'var(--text-xs)' }}>
+                          {a.dayRate
+                            ? `Override - default would be ${formatMoney(a.suggestedDayRate) || 'unset'}`
+                            : `${formatMoney(a.effectiveDayRate) || '£0'} ${RATE_SOURCE_LABELS[a.dayRateSource]}`}
+                        </div>
+                      </>
+                    ) : (
+                      formatMoney(a.effectiveDayRate) || '-'
+                    )}
+                  </td>
+                  <td>
+                    {a.scheduledDays > 0 ? (
+                      <span title="Counted from the days this person is assigned to on the Schedule tab">
+                        {a.scheduledDays} <span className="muted">(scheduled)</span>
+                      </span>
+                    ) : canManage ? (
+                      <input
+                        key={`${a.id}-${a.days ?? ''}`}
                         defaultValue={a.days ?? ''}
                         placeholder="1"
+                        aria-label={`Days for ${a.displayName}`}
+                        title="Used until they're assigned to days on the Schedule tab"
                         style={{ width: '3.5rem' }}
                         onBlur={(e) => updateDays(a, e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
                       />
                     ) : (
-                      a.days ?? '1'
+                      a.effectiveDays
                     )}
                   </td>
                   <td>
