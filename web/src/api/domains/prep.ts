@@ -132,6 +132,8 @@ export const prepApi = {
       request<PrintQueueItem>(`/jobs/${jobId}/print-queue/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     removeItem: (jobId: string, id: string) =>
       request<void>(`/jobs/${jobId}/print-queue/${id}`, { method: 'DELETE' }),
+    removeMany: (jobId: string, ids: { queueIds?: string[]; adHocIds?: string[] }) =>
+      request<{ removed: number }>(`/jobs/${jobId}/print-queue/remove`, { method: 'POST', body: JSON.stringify(ids) }),
     reorder: (jobId: string, labelType: string, items: { source: 'queue' | 'adhoc'; id: string }[]) =>
       request<{ reordered: number }>(`/jobs/${jobId}/print-queue/reorder`, {
         method: 'PUT',

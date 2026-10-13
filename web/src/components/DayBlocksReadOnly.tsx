@@ -22,8 +22,17 @@ export default function DayBlocksReadOnly({ days }: { days: JobDay[] }) {
       {days.map((day) => (
         <div key={day.id} className="day-block day-block-readonly">
           <div className="day-block-header">
-            <span className="day-block-date">{formatDayLabel(day.date)}</span>
+            <span className="day-block-date">
+              {formatDayLabel(day.date)}
+              {day.name && <span className="day-block-name">{day.name}</span>}
+            </span>
           </div>
+          {(day.callTime || day.wrapTime) && (
+            <div className="day-block-times">
+              {day.callTime && <span>Call {day.callTime}</span>}
+              {day.wrapTime && <span>Wrap ~{day.wrapTime}</span>}
+            </div>
+          )}
           <div className="day-block-crew">
             {day.crew.length === 0 ? (
               <span className="muted day-block-crew-empty">No crew assigned yet</span>

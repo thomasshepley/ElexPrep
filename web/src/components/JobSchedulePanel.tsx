@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { DndContext, DragOverlay, PointerSensor, useSensor, useSensors, type DragEndEvent, type DragStartEvent } from '@dnd-kit/core';
 import { resolveCrewColor } from '@elexprep/shared';
 import { api, type JobScheduleItem, type JobCrewAssignment, type JobDay } from '../api/client';
-import { dateKey, SingleDayTimeline } from './DayTimeline';
+import { dateKey, dayMarkers, isPointInTime, SingleDayTimeline } from './DayTimeline';
 import DayBlocksColumn, { localMidnightIso, useDayBlockActions, type DayBlockView } from './DayBlocksColumn';
 import { useAuth } from '../auth/AuthContext';
 import { isAdminRole } from '../auth/roles';
@@ -63,6 +63,8 @@ export default function JobSchedulePanel({ jobId }: { jobId: string }) {
   const [activeRosterAssignmentId, setActiveRosterAssignmentId] = useState<string | null>(null);
   const [addingEntry, setAddingEntry] = useState(false);
   const [assigningItemId, setAssigningItemId] = useState<string | null>(null);
+  const [pointInTime, setPointInTime] = useState(false);
+  const [editingDay, setEditingDay] = useState(false);
 
   const canManageCrew = isAdminRole(user?.role) || Boolean(user?.permissions?.manageCrewAssignments);
   const canManageDays = isAdminRole(user?.role);
@@ -136,7 +138,7 @@ export default function JobSchedulePanel({ jobId }: { jobId: string }) {
       await api.jobSchedule.create(jobId, {
         title,
         startsAt: new Date(startsAt).toISOString(),
-        endsAt: endsAt ? new Date(endsAt).toISOString() : undefined,
+        endsAt: pointInTime ? new Date(startsAt).toISOString() : endsAt ? new Date(endsAt).toISOString() : undefined,
         notes: notes || undefined,
         location: location || undefined,
         color: color || undefined,
@@ -149,6 +151,7 @@ export default function JobSchedulePanel({ jobId }: { jobId: string }) {
       setStartsAt(next);
       setEndsAt(sixPmSameDay(next));
       setEndsAtTouched(false);
+      setPointInTime(false);
       refresh();
       setAddingEntry(false);
       showToast(`Added "${title}" to the schedule`);
@@ -238,6 +241,19 @@ export default function JobSchedulePanel({ jobId }: { jobId: string }) {
     }
   };
 
+  const selectedDay = blocks.find((b) => b.dateKey === selectedDate)?.day ?? null;
+  const selectedMarkers = dayMarkers(selectedDay);
+
+  const saveDay = async (data: { name: string; callTime: string; wrapTime: string }) => {
+    if (!selectedDate) return;
+    let dayId = selectedDay?.id;
+    if (!dayId) dayId = (await api.jobDays.create(jobId, localMidnightIso(selectedDate))).id;
+    await api.jobDays.update(jobId, dayId, { name: data.name || null, callTime: data.callTime || null, wrapTime: data.wrapTime || null });
+    setEditingDay(false);
+    refreshDays();
+    showToast('Day saved');
+  };
+
   const activeAssignment = roster.find((a) => a.id === activeRosterAssignmentId);
   const assigningItem = items.find((i) => i.id === assigningItemId) ?? null;
 
@@ -272,10 +288,16 @@ export default function JobSchedulePanel({ jobId }: { jobId: string }) {
                 <label htmlFor="sched-starts">Starts</label>
                 <DateTimeInput id="sched-starts" stepMinutes={TIME_STEP_SECONDS / 60} value={startsAt} onChange={handleStartsChange} required />
               </div>
-              <div className="field">
-                <label htmlFor="sched-ends">Ends (optional)</label>
-                <DateTimeInput id="sched-ends" stepMinutes={TIME_STEP_SECONDS / 60} value={endsAt} onChange={handleEndsChange} defaultTime="18:00" />
-              </div>
+              {!pointInTime && (
+                <div className="field">
+                  <label htmlFor="sched-ends">Ends (optional)</label>
+                  <DateTimeInput id="sched-ends" stepMinutes={TIME_STEP_SECONDS / 60} value={endsAt} onChange={handleEndsChange} defaultTime="18:00" />
+                </div>
+              )}
+              <label className="row" style={{ gap: '0.4rem', width: '100%' }}>
+                <input type="checkbox" checked={pointInTime} onChange={(e) => setPointInTime(e.target.checked)} />
+                Just a moment in time - a deadline or info point like "Arrive on site"
+              </label>
               <div className="field" style={{ width: '12rem' }}>
                 <label htmlFor="sched-location">Where</label>
                 <input id="sched-location" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Loading bay" />
@@ -316,12 +338,29 @@ export default function JobSchedulePanel({ jobId }: { jobId: string }) {
 
           <div className="panel">
             <div className="row" style={{ justifyContent: 'space-between' }}>
-              <h3 style={{ margin: 0 }}>{selectedDate ? formatDayHeading(`${selectedDate}T00:00:00`) : 'Schedule'}</h3>
-              <button type="button" onClick={() => setAddingEntry(true)} aria-label="Add schedule entry">
-                <PlusIcon /> Entry
-              </button>
+              <div>
+                <h3 style={{ margin: 0 }}>
+                  {selectedDate ? formatDayHeading(`${selectedDate}T00:00:00`) : 'Schedule'}
+                  {selectedDay?.name && <span className="day-heading-name"> · {selectedDay.name}</span>}
+                </h3>
+                {(selectedDay?.callTime || selectedDay?.wrapTime) && (
+                  <p className="day-summary" style={{ margin: '0.2rem 0 0' }}>
+                    {[selectedDay.callTime && `Call ${selectedDay.callTime}`, selectedDay.wrapTime && `Estimated wrap ${selectedDay.wrapTime}`].filter(Boolean).join(' · ')}
+                  </p>
+                )}
+              </div>
+              <div className="row" style={{ gap: '0.5rem' }}>
+                {canManageDays && selectedDate && (
+                  <button type="button" className="secondary" onClick={() => setEditingDay(true)}>
+                    Name &amp; times
+                  </button>
+                )}
+                <button type="button" onClick={() => setAddingEntry(true)} aria-label="Add schedule entry">
+                  <PlusIcon /> Entry
+                </button>
+              </div>
             </div>
-            {selectedDate && itemsForSelectedDate.length > 0 ? (
+            {selectedDate && (itemsForSelectedDate.length > 0 || selectedMarkers.length > 0) ? (
               <>
                 <SingleDayTimeline
                   items={itemsForSelectedDate}
@@ -329,15 +368,17 @@ export default function JobSchedulePanel({ jobId }: { jobId: string }) {
                   canManageCrew={canManageCrew}
                   onUnassignCrew={unassignTaskCrew}
                   onOpen={setAssigningItemId}
+                  markers={selectedMarkers}
                 />
                 {/* Doubles as the colour legend, and gives every block keyboard/tap actions. */}
                 <ul className="plain-list schedule-entries">
                   {itemsForSelectedDate.map((i) => (
-                    <li key={i.id} className="schedule-entry">
+                    <li key={i.id} className={`schedule-entry${isPointInTime(i) ? ' is-point' : ''}`}>
                       <span className="crew-swatch-dot" style={{ background: i.color ?? 'var(--accent)' }} aria-hidden="true" />
                       <span className="schedule-entry-time">
                         {formatTime(i.startsAt)}
-                        {i.endsAt ? `–${formatTime(i.endsAt)}` : ''}
+                        {i.endsAt && !isPointInTime(i) ? `–${formatTime(i.endsAt)}` : ''}
+                        {isPointInTime(i) && <span className="chip chip-neutral schedule-point-chip">Point</span>}
                       </span>
                       <span className="schedule-entry-title">
                         <button type="button" className="link-button queue-row-preview" onClick={() => setAssigningItemId(i.id)}>
@@ -386,6 +427,9 @@ export default function JobSchedulePanel({ jobId }: { jobId: string }) {
           onDelete={canManageDays ? () => remove(assigningItem).then((done) => done && setAssigningItemId(null)) : undefined}
         />
       )}
+      {editingDay && selectedDate && (
+        <DayDetailsModal dateKey={selectedDate} day={selectedDay} onClose={() => setEditingDay(false)} onSave={saveDay} />
+      )}
       <DragOverlay>
         {activeAssignment && (
           <div className="day-block-crew-chip">
@@ -395,5 +439,71 @@ export default function JobSchedulePanel({ jobId }: { jobId: string }) {
         )}
       </DragOverlay>
     </DndContext>
+  );
+}
+
+/** A day's name ("Prep Day") and its call and estimated wrap times. */
+function DayDetailsModal({
+  dateKey: key,
+  day,
+  onClose,
+  onSave,
+}: {
+  dateKey: string;
+  day: JobDay | null;
+  onClose: () => void;
+  onSave: (data: { name: string; callTime: string; wrapTime: string }) => Promise<void>;
+}) {
+  const [name, setName] = useState(day?.name ?? '');
+  const [callTime, setCallTime] = useState(day?.callTime ?? '');
+  const [wrapTime, setWrapTime] = useState(day?.wrapTime ?? '');
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const runsPastMidnight = Boolean(callTime && wrapTime && wrapTime < callTime);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      await onSave({ name: name.trim(), callTime, wrapTime });
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Modal title={formatDayHeading(`${key}T00:00:00`)} onClose={onClose}>
+      <form onSubmit={submit}>
+        <div className="field">
+          <label htmlFor="day-name">Day name</label>
+          <input id="day-name" value={name} maxLength={60} onChange={(e) => setName(e.target.value)} placeholder="e.g. Prep Day, Show Day 1" />
+        </div>
+        <div className="row" style={{ gap: '0.9rem', flexWrap: 'wrap' }}>
+          <div className="field" style={{ width: '9rem' }}>
+            <label htmlFor="day-call">Call time</label>
+            <input id="day-call" type="time" step={TIME_STEP_SECONDS} value={callTime} onChange={(e) => setCallTime(e.target.value)} />
+          </div>
+          <div className="field" style={{ width: '9rem' }}>
+            <label htmlFor="day-wrap">Estimated wrap</label>
+            <input id="day-wrap" type="time" step={TIME_STEP_SECONDS} value={wrapTime} onChange={(e) => setWrapTime(e.target.value)} />
+          </div>
+        </div>
+        <p className="muted" style={{ marginTop: 0 }}>
+          {runsPastMidnight ? 'Wrap is earlier than call, so it runs past midnight into the next day.' : 'Crew see these on their schedule, and the call time on their home page.'}
+        </p>
+        {error && <p className="error">{error}</p>}
+        <div className="row" style={{ gap: '0.5rem' }}>
+          <button type="submit" disabled={busy}>
+            Save day
+          </button>
+          <button type="button" className="secondary" onClick={onClose}>
+            Cancel
+          </button>
+        </div>
+      </form>
+    </Modal>
   );
 }

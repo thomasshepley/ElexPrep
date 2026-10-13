@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import { formatDate, formatTime } from '../utils/format';
+import type { JobDay } from '../api/client';
 
 export interface TimelineItemCrew {
   id: string;
@@ -27,6 +28,50 @@ const MAX_TIMELINE_MIN = 30 * 60;
 
 function minutesSinceMidnight(d: Date): number {
   return d.getHours() * 60 + d.getMinutes();
+}
+
+/** An entry whose start and end are the same moment - a deadline or info point ("Call time",
+ * "Arrive on site") rather than a block of time. */
+export function isPointInTime(item: { startsAt: string; endsAt?: string | null }): boolean {
+  return Boolean(item.endsAt) && new Date(item.endsAt!).getTime() === new Date(item.startsAt).getTime();
+}
+
+/** A full-width line across the timeline at one moment: a point-in-time entry, or a day's
+ * call / estimated wrap time. */
+export interface DayMarker {
+  key: string;
+  label: string;
+  /** "HH:MM" as shown. */
+  time: string;
+  startMin: number;
+  tone: 'point' | 'call' | 'wrap';
+  color?: string | null;
+  itemId?: string;
+}
+
+function hhmmToMinutes(value: string): number {
+  const [h, m] = value.split(':').map(Number);
+  return h * 60 + m;
+}
+
+/** A day's call and estimated wrap as timeline markers. A wrap earlier than the call runs past midnight. */
+export function dayMarkers(day: Pick<JobDay, 'callTime' | 'wrapTime'> | null | undefined): DayMarker[] {
+  if (!day) return [];
+  const out: DayMarker[] = [];
+  const call = day.callTime ? hhmmToMinutes(day.callTime) : null;
+  if (day.callTime && call !== null) out.push({ key: 'call', label: 'Call time', time: day.callTime, startMin: call, tone: 'call' });
+  if (day.wrapTime) {
+    let wrap = hhmmToMinutes(day.wrapTime);
+    if (call !== null && wrap < call) wrap += 24 * 60;
+    out.push({ key: 'wrap', label: 'Estimated wrap', time: day.wrapTime, startMin: Math.min(wrap, MAX_TIMELINE_MIN), tone: 'wrap' });
+  }
+  return out;
+}
+
+/** "Prep Day · Call 08:00 · Wrap ~23:00" - whichever parts the day has. */
+export function daySummary(day: Pick<JobDay, 'name' | 'callTime' | 'wrapTime'> | null | undefined): string {
+  if (!day) return '';
+  return [day.name, day.callTime && `Call ${day.callTime}`, day.wrapTime && `Wrap ~${day.wrapTime}`].filter(Boolean).join(' · ');
 }
 
 
@@ -212,6 +257,7 @@ export function SingleDayTimeline({
   onUnassignCrew,
   onOpen,
   myCrewProfileId,
+  markers: dayLevelMarkers = [],
 }: {
   items: TimelineItem[];
   dropTargets?: boolean;
@@ -219,8 +265,19 @@ export function SingleDayTimeline({
   onUnassignCrew?: (itemId: string, crewRowId: string) => void;
   onOpen?: (itemId: string) => void;
   myCrewProfileId?: string | null;
+  /** The day's call / wrap lines (see dayMarkers). */
+  markers?: DayMarker[];
 }) {
-  const sorted = [...items].sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
+  const markers: DayMarker[] = [
+    ...dayLevelMarkers,
+    ...items.filter(isPointInTime).map((item) => {
+      const start = new Date(item.startsAt);
+      return { key: item.id, itemId: item.id, label: item.title, time: formatTime(start), startMin: minutesSinceMidnight(start), tone: 'point' as const, color: item.color };
+    }),
+  ].sort((a, b) => a.startMin - b.startMin);
+  const sorted = items
+    .filter((item) => !isPointInTime(item))
+    .sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
   const timed: TimedItem[] = sorted.map((item) => {
     const startMin = minutesSinceMidnight(new Date(item.startsAt));
     // Duration-based rather than end-of-day-based, so an entry running past midnight
@@ -231,8 +288,11 @@ export function SingleDayTimeline({
   });
   const laidOut = layoutColumns(timed);
 
-  const dayStartHour = Math.max(0, Math.floor(Math.min(...timed.map((i) => i.startMin)) / 60) - 1);
-  const dayEndHour = Math.min(MAX_TIMELINE_MIN / 60, Math.ceil(Math.max(...timed.map((i) => i.endMin)) / 60) + 1);
+  if (timed.length === 0 && markers.length === 0) return null;
+  const starts = [...timed.map((i) => i.startMin), ...markers.map((m) => m.startMin)];
+  const ends = [...timed.map((i) => i.endMin), ...markers.map((m) => m.startMin + 30)];
+  const dayStartHour = Math.max(0, Math.floor(Math.min(...starts) / 60) - 1);
+  const dayEndHour = Math.min(MAX_TIMELINE_MIN / 60, Math.ceil(Math.max(...ends) / 60) + 1);
   const hours = Array.from({ length: dayEndHour - dayStartHour + 1 }, (_, i) => dayStartHour + i);
   const totalHeight = (dayEndHour - dayStartHour) * 60 * PX_PER_MIN;
 
@@ -272,6 +332,25 @@ export function SingleDayTimeline({
             />
           );
         })}
+        {markers.map((m) => {
+          const item = m.itemId ? items.find((i) => i.id === m.itemId) : undefined;
+          const open = item && onOpen ? openProps({ ...item, startMin: m.startMin, endMin: m.startMin, col: 0, colCount: 1 }, onOpen) : {};
+          const mine = Boolean(myCrewProfileId && item?.crew?.some((c) => c.crewProfileId === myCrewProfileId));
+          return (
+            <div
+              key={m.key}
+              className={`day-timeline-marker tone-${m.tone}${mine ? ' is-mine' : ''}${item && onOpen ? ' is-openable' : ''}`}
+              style={{ top: (m.startMin - dayStartHour * 60) * PX_PER_MIN, ...(m.color ? ({ '--marker-color': m.color } as React.CSSProperties) : {}) }}
+              {...open}
+            >
+              <span className="day-timeline-marker-pill">
+                <span className="day-timeline-marker-time">{m.time}</span>
+                {m.label}
+                {item?.location && <span className="day-timeline-marker-extra"> · {item.location}</span>}
+              </span>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -289,13 +368,19 @@ export default function DayTimeline({
   items,
   onOpen,
   myCrewProfileId,
+  jobDays = [],
 }: {
   items: TimelineItem[];
   onOpen?: (itemId: string) => void;
   myCrewProfileId?: string | null;
+  /** The job's days, for each tab's name and the call / wrap lines. */
+  jobDays?: JobDay[];
 }) {
+  const dayByKey = useMemo(() => new Map(jobDays.map((d) => [dateKey(new Date(d.date)), d])), [jobDays]);
   const days = useMemo(() => {
     const map = new Map<string, TimelineItem[]>();
+    // A day with a call time shows even before anything else is scheduled on it.
+    for (const [key, day] of dayByKey) if (day.callTime || day.wrapTime) map.set(key, []);
     for (const item of items) {
       const key = dateKey(new Date(item.startsAt));
       const bucket = map.get(key) ?? [];
@@ -303,15 +388,16 @@ export default function DayTimeline({
       map.set(key, bucket);
     }
     return [...map.entries()].sort(([a], [b]) => a.localeCompare(b));
-  }, [items]);
+  }, [items, dayByKey]);
 
   const [selected, setSelected] = useState<string | null>(null);
   const activeKey = selected && days.some(([key]) => key === selected) ? selected : days[0]?.[0] ?? null;
   const activeItems = days.find(([key]) => key === activeKey)?.[1] ?? [];
 
-  if (items.length === 0) {
+  if (days.length === 0) {
     return <p className="muted">No schedule has been set for this job yet.</p>;
   }
+  const activeDay = activeKey ? dayByKey.get(activeKey) : undefined;
 
   return (
     <div>
@@ -324,11 +410,13 @@ export default function DayTimeline({
               onClick={() => setSelected(key)}
             >
               {formatDate(`${key}T00:00:00`)}
+              {dayByKey.get(key)?.name && <span className="day-tab-name"> · {dayByKey.get(key)!.name}</span>}
             </button>
           ))}
         </div>
       )}
-      {activeKey && <SingleDayTimeline items={activeItems} onOpen={onOpen} myCrewProfileId={myCrewProfileId} />}
+      {activeDay && daySummary(activeDay) && <p className="day-summary">{daySummary(activeDay)}</p>}
+      {activeKey && <SingleDayTimeline items={activeItems} onOpen={onOpen} myCrewProfileId={myCrewProfileId} markers={dayMarkers(activeDay)} />}
       {myCrewProfileId && <p className="muted day-timeline-legend"><span className="day-timeline-mine-swatch" /> Your slots</p>}
     </div>
   );

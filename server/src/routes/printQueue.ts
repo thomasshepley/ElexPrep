@@ -190,6 +190,25 @@ printQueueRouter.delete('/:jobId/print-queue/:id', async (req, res) => {
   res.status(204).end();
 });
 
+/**
+ * Bulk removal - "Remove selected" and "Clear queue" both land here with explicit ids, so the
+ * client decides the scope (one stage's rows, never another's) and the server only checks that
+ * every row belongs to this job. Removing an ad hoc label here deletes it, same as its row's
+ * own Remove button.
+ */
+printQueueRouter.post('/:jobId/print-queue/remove', async (req, res) => {
+  const { queueIds = [], adHocIds = [] } = req.body ?? {};
+  const isIdList = (v: unknown) => Array.isArray(v) && v.length <= 5000 && v.every((id) => typeof id === 'string');
+  if (!isIdList(queueIds) || !isIdList(adHocIds)) return res.status(400).json({ error: 'queueIds and adHocIds must be lists of ids' });
+  const { jobId } = req.params;
+  const [queue, adHoc] = await prisma.$transaction([
+    prisma.printQueueItem.deleteMany({ where: { jobId, id: { in: queueIds } } }),
+    prisma.adHocLabel.deleteMany({ where: { jobId, id: { in: adHocIds } } }),
+  ]);
+  await logActivity('print_queue.remove', `${queue.count} queued, ${adHoc.count} ad hoc`, jobId, req.user?.id);
+  res.json({ removed: queue.count + adHoc.count });
+});
+
 printQueueRouter.post('/:jobId/print-queue/confirm', async (req, res) => {
   const { ids, override } = req.body ?? {};
   if (!Array.isArray(ids) || ids.length === 0) {

@@ -26,6 +26,9 @@ export const dayInclude = {
 type DayRow = {
   id: string;
   date: Date;
+  name: string | null;
+  callTime: string | null;
+  wrapTime: string | null;
   crewAssignments: {
     id: string;
     jobCrewAssignment: {
@@ -41,6 +44,9 @@ export function toDayDto(day: DayRow) {
   return {
     id: day.id,
     date: day.date.toISOString(),
+    name: day.name,
+    callTime: day.callTime,
+    wrapTime: day.wrapTime,
     crew: day.crewAssignments.map((ca) => ({
       id: ca.id,
       jobCrewAssignmentId: ca.jobCrewAssignment.id,
@@ -121,6 +127,36 @@ jobDaysRouter.post('/:jobId/days', requireRole('ADMIN'), async (req, res) => {
   const day = await prisma.jobDay.create({ data: { jobId, date: parsed }, include: dayInclude });
   await logActivity('job_day.create', parsed.toISOString(), jobId, req.user?.id);
   res.status(201).json(toDayDto(day));
+});
+
+const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+// A day's name ("Prep Day") and its call and estimated wrap times, as "HH:MM" UK local time.
+// Blank clears a field; a field left out is unchanged.
+jobDaysRouter.put('/:jobId/days/:id', requireRole('ADMIN'), async (req, res) => {
+  const day = await prisma.jobDay.findUnique({ where: { id: req.params.id }, include: dayInclude });
+  if (!day || day.jobId !== req.params.jobId) return res.status(404).json({ error: 'Day not found' });
+  const { name, callTime, wrapTime } = req.body ?? {};
+  const data: { name?: string | null; callTime?: string | null; wrapTime?: string | null } = {};
+  if (name !== undefined) {
+    if (name !== null && typeof name !== 'string') return res.status(400).json({ error: 'name must be text' });
+    const trimmed = (name ?? '').trim();
+    if (trimmed.length > 60) return res.status(400).json({ error: 'Day names can be up to 60 characters' });
+    data.name = trimmed || null;
+  }
+  for (const [key, value] of Object.entries({ callTime, wrapTime })) {
+    if (value === undefined) continue;
+    if (value === null || value === '') {
+      data[key as 'callTime' | 'wrapTime'] = null;
+    } else if (typeof value !== 'string' || !TIME_RE.test(value)) {
+      return res.status(400).json({ error: `${key === 'callTime' ? 'Call' : 'Wrap'} time must be HH:MM` });
+    } else {
+      data[key as 'callTime' | 'wrapTime'] = value;
+    }
+  }
+  const updated = await prisma.jobDay.update({ where: { id: day.id }, data, include: dayInclude });
+  await logActivity('job_day.update', `${day.date.toISOString().slice(0, 10)} ${JSON.stringify(data)}`, req.params.jobId, req.user?.id);
+  res.json(toDayDto(updated));
 });
 
 jobDaysRouter.delete('/:jobId/days/:id', requireRole('ADMIN'), async (req, res) => {

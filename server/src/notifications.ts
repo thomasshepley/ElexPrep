@@ -116,7 +116,8 @@ export async function notifyDiscussionMessage(jobId: string, jobName: string, au
     },
     select: { crewProfile: { select: { userId: true, user: { select: { prefsJson: true } } } } },
   });
-  const seen = new Set<string>();
+  // Staff who are also on the crew already heard (or opted out) as staff above.
+  const seen = new Set<string>(staff.map((u) => u.id));
   const crewRecipients = assignments
     .map((a) => a.crewProfile)
     .filter((p) => {

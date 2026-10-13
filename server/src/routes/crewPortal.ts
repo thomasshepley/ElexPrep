@@ -19,6 +19,17 @@ import { autoPopulateDaysFromOpportunity, dayInclude, toDayDto } from './jobDays
 import { scheduleItemInclude, toScheduleItemDto } from './jobSchedule';
 import { buildIcs, type IcsEvent } from '../calendar/ics';
 import { crewCanSee, ensureJobGroups, pickGroup, toGroupDto } from '../discussionGroups';
+import {
+  MESSAGE_INCLUDE,
+  checkReplyTarget,
+  discussionImageUpload,
+  discussionUploadsDir,
+  notificationText,
+  parseMessageInput,
+  removeDiscussionImage,
+  storeDiscussionImage,
+  toMessageDto,
+} from '../discussionMessages';
 
 /**
  * Self-service data for a logged-in CREW account: their own profile, the jobs they're
@@ -50,11 +61,15 @@ async function requireAssignedJob(userId: string, jobId: string) {
   return assignment ? { profile, assignment } : null;
 }
 
+/** The crew view of a job - freelancers, plus staff who are also on that job's crew (every
+ * /me/jobs route still starts from the caller's own crew profile and assignment). */
+const crewView = requireRole('CREW', 'ADMIN', 'USER');
+
 // requireRole('CREW') is applied per-route below, not as a router-wide `.use()` - a router-wide
 // guard would run (and reject with 403) for EVERY request under /api/crew/*, including ones
 // that don't match any route here, which would stop them from ever falling through to the
 // admin-only roster router mounted after this one at the same prefix.
-crewPortalRouter.get('/me', requireRole('CREW'), async (req, res) => {
+crewPortalRouter.get('/me', crewView, async (req, res) => {
   const profile = await ownProfile(req.user!.id);
   if (!profile) return res.status(404).json({ error: 'No crew profile found for this account' });
   res.json({
@@ -189,7 +204,7 @@ crewPortalRouter.delete('/me/rate-lines/:lineId', requireRole('CREW'), async (re
   res.status(204).end();
 });
 
-crewPortalRouter.get('/me/jobs', requireRole('CREW'), async (req, res) => {
+crewPortalRouter.get('/me/jobs', crewView, async (req, res) => {
   const profile = await ownProfile(req.user!.id);
   if (!profile) return res.status(404).json({ error: 'No crew profile found for this account' });
 
@@ -222,6 +237,23 @@ crewPortalRouter.get('/me/jobs', requireRole('CREW'), async (req, res) => {
   });
   const nextDayByAssignment = new Map<string, (typeof upcomingDays)[number]['jobDay']>();
   for (const d of upcomingDays) if (!nextDayByAssignment.has(d.jobCrewAssignmentId)) nextDayByAssignment.set(d.jobCrewAssignmentId, d.jobDay);
+  // Someone on a job but not booked onto any particular day is on all of it: their next call is
+  // the job's next day with a call time.
+  const bookedAny = new Set(
+    (await prisma.jobDayCrewAssignment.findMany({ where: { jobCrewAssignmentId: { in: assignments.map((a) => a.id) } }, select: { jobCrewAssignmentId: true } })).map((r) => r.jobCrewAssignmentId)
+  );
+  const unbooked = assignments.filter((a) => !bookedAny.has(a.id));
+  if (unbooked.length) {
+    const jobCallDays = await prisma.jobDay.findMany({
+      where: { jobId: { in: unbooked.map((a) => a.jobId) }, date: { gte: today }, callTime: { not: null } },
+      include: { crewAssignments: { include: { jobCrewAssignment: { include: { crewProfile: { include: { user: { select: { displayName: true } } } } } } } } },
+      orderBy: { date: 'asc' },
+    });
+    for (const a of unbooked) {
+      const day = jobCallDays.find((d) => d.jobId === a.jobId);
+      if (day) nextDayByAssignment.set(a.id, day);
+    }
+  }
   const nextDays = [...nextDayByAssignment.entries()];
   const dayItems = nextDays.length
     ? await prisma.jobScheduleItem.findMany({
@@ -251,6 +283,9 @@ crewPortalRouter.get('/me/jobs', requireRole('CREW'), async (req, res) => {
         nextDay: day
           ? {
               date: day.date,
+              name: day.name,
+              callTime: day.callTime,
+              wrapTime: day.wrapTime,
               items: (mine.length ? mine : items).map((i) => ({ title: i.title, startsAt: i.startsAt, endsAt: i.endsAt })),
               others: day.crewAssignments
                 .filter((c) => c.jobCrewAssignmentId !== a.id)
@@ -282,13 +317,13 @@ crewPortalRouter.get('/me/jobs', requireRole('CREW'), async (req, res) => {
   res.json(jobs);
 });
 
-crewPortalRouter.get('/me/jobs/:jobId', requireRole('CREW'), async (req, res) => {
+crewPortalRouter.get('/me/jobs/:jobId', crewView, async (req, res) => {
   const profile = await ownProfile(req.user!.id);
   if (!profile) return res.status(404).json({ error: 'No crew profile found for this account' });
 
   const assignment = await prisma.jobCrewAssignment.findUnique({
     where: { jobId_crewProfileId: { jobId: req.params.jobId, crewProfileId: profile.id } },
-    include: { job: true },
+    include: { job: { include: { projectManager: { select: { id: true, displayName: true, avatarPath: true } } } } },
   });
   // Not assigned to this job -> treat it exactly like "doesn't exist" rather than leaking
   // whether the job itself exists to crew who have no business seeing it.
@@ -308,6 +343,9 @@ crewPortalRouter.get('/me/jobs/:jobId', requireRole('CREW'), async (req, res) =>
     jobId: assignment.jobId,
     who: {
       you: { role: assignment.role },
+      projectManager: assignment.job.projectManager
+        ? { userId: assignment.job.projectManager.id, displayName: assignment.job.projectManager.displayName, hasAvatar: Boolean(assignment.job.projectManager.avatarPath) }
+        : null,
       others: otherCrew
         .filter((c) => c.crewProfileId !== profile.id)
         .map((c) => ({ displayName: c.crewProfile.user.displayName, role: c.role })),
@@ -327,7 +365,7 @@ crewPortalRouter.get('/me/jobs/:jobId', requireRole('CREW'), async (req, res) =>
   });
 });
 
-crewPortalRouter.get('/me/jobs/:jobId/schedule', requireRole('CREW'), async (req, res) => {
+crewPortalRouter.get('/me/jobs/:jobId/schedule', crewView, async (req, res) => {
   const found = await requireAssignedJob(req.user!.id, req.params.jobId);
   if (!found) return res.status(404).json({ error: 'Job not found' });
   const features = await resolveCrewFeatures(found.assignment.job);
@@ -344,7 +382,7 @@ crewPortalRouter.get('/me/jobs/:jobId/schedule', requireRole('CREW'), async (req
 // per-job "schedule" visibility toggle as /schedule above, but no write endpoints: a crew
 // member can see which days exist and who else is working each one, never add/remove a day or
 // drag themselves (or anyone else) onto one.
-crewPortalRouter.get('/me/jobs/:jobId/days', requireRole('CREW'), async (req, res) => {
+crewPortalRouter.get('/me/jobs/:jobId/days', crewView, async (req, res) => {
   const found = await requireAssignedJob(req.user!.id, req.params.jobId);
   if (!found) return res.status(404).json({ error: 'Job not found' });
   const features = await resolveCrewFeatures(found.assignment.job);
@@ -360,7 +398,7 @@ crewPortalRouter.get('/me/jobs/:jobId/days', requireRole('CREW'), async (req, re
 
 // "Add to calendar": the days this person is booked on (all-day) plus the entries they're on,
 // falling back to the job's own dates when no days are set up yet.
-crewPortalRouter.get('/me/jobs/:jobId/calendar.ics', requireRole('CREW'), async (req, res) => {
+crewPortalRouter.get('/me/jobs/:jobId/calendar.ics', crewView, async (req, res) => {
   const found = await requireAssignedJob(req.user!.id, req.params.jobId);
   if (!found) return res.status(404).json({ error: 'Job not found' });
   const { assignment } = found;
@@ -395,7 +433,7 @@ crewPortalRouter.get('/me/jobs/:jobId/calendar.ics', requireRole('CREW'), async 
   res.send(buildIcs(job.name, events));
 });
 
-crewPortalRouter.get('/me/jobs/:jobId/documents', requireRole('CREW'), async (req, res) => {
+crewPortalRouter.get('/me/jobs/:jobId/documents', crewView, async (req, res) => {
   const found = await requireAssignedJob(req.user!.id, req.params.jobId);
   if (!found) return res.status(404).json({ error: 'Job not found' });
   const features = await resolveCrewFeatures(found.assignment.job);
@@ -407,7 +445,7 @@ crewPortalRouter.get('/me/jobs/:jobId/documents', requireRole('CREW'), async (re
   res.json(documents);
 });
 
-crewPortalRouter.get('/me/jobs/:jobId/documents/:docId/file', requireRole('CREW'), async (req, res) => {
+crewPortalRouter.get('/me/jobs/:jobId/documents/:docId/file', crewView, async (req, res) => {
   const found = await requireAssignedJob(req.user!.id, req.params.jobId);
   if (!found) return res.status(404).end();
   const features = await resolveCrewFeatures(found.assignment.job);
@@ -417,7 +455,7 @@ crewPortalRouter.get('/me/jobs/:jobId/documents/:docId/file', requireRole('CREW'
   await sendStoredUpload(res, path.join(uploadDir, 'job-documents', document.fileName), document.originalName);
 });
 
-crewPortalRouter.get('/me/jobs/:jobId/contacts', requireRole('CREW'), async (req, res) => {
+crewPortalRouter.get('/me/jobs/:jobId/contacts', crewView, async (req, res) => {
   const found = await requireAssignedJob(req.user!.id, req.params.jobId);
   if (!found) return res.status(404).json({ error: 'Job not found' });
   const features = await resolveCrewFeatures(found.assignment.job);
@@ -429,7 +467,7 @@ crewPortalRouter.get('/me/jobs/:jobId/contacts', requireRole('CREW'), async (req
   res.json(contacts);
 });
 
-crewPortalRouter.get('/me/jobs/:jobId/plots', requireRole('CREW'), async (req, res) => {
+crewPortalRouter.get('/me/jobs/:jobId/plots', crewView, async (req, res) => {
   const found = await requireAssignedJob(req.user!.id, req.params.jobId);
   if (!found) return res.status(404).json({ error: 'Job not found' });
   const features = await resolveCrewFeatures(found.assignment.job);
@@ -438,7 +476,7 @@ crewPortalRouter.get('/me/jobs/:jobId/plots', requireRole('CREW'), async (req, r
   res.json(plots);
 });
 
-crewPortalRouter.get('/me/jobs/:jobId/plots/:plotId/file', requireRole('CREW'), async (req, res) => {
+crewPortalRouter.get('/me/jobs/:jobId/plots/:plotId/file', crewView, async (req, res) => {
   const found = await requireAssignedJob(req.user!.id, req.params.jobId);
   if (!found) return res.status(404).end();
   const features = await resolveCrewFeatures(found.assignment.job);
@@ -455,7 +493,7 @@ crewPortalRouter.get('/me/jobs/:jobId/plots/:plotId/file', requireRole('CREW'), 
  * scaffolded against the Graph API and return empty/null until OneDrive is actually
  * configured with real Azure credentials (see oneDrive/config.ts).
  */
-crewPortalRouter.get('/me/jobs/:jobId/onedrive', requireRole('CREW'), async (req, res) => {
+crewPortalRouter.get('/me/jobs/:jobId/onedrive', crewView, async (req, res) => {
   const found = await requireAssignedJob(req.user!.id, req.params.jobId);
   if (!found) return res.status(404).json({ error: 'Job not found' });
   const features = await resolveCrewFeatures(found.assignment.job);
@@ -470,7 +508,7 @@ crewPortalRouter.get('/me/jobs/:jobId/onedrive', requireRole('CREW'), async (req
 /** Streams a OneDrive item's bytes through our own auth, rather than handing the crew member a
  * raw Graph URL - scaffolded; throws a clear "not configured" error until real credentials are
  * wired in (see oneDrive/client.ts). */
-crewPortalRouter.get('/me/jobs/:jobId/onedrive/:itemId/file', requireRole('CREW'), async (req, res) => {
+crewPortalRouter.get('/me/jobs/:jobId/onedrive/:itemId/file', crewView, async (req, res) => {
   const found = await requireAssignedJob(req.user!.id, req.params.jobId);
   if (!found) return res.status(404).end();
   const { itemId } = req.params;
@@ -494,7 +532,7 @@ crewPortalRouter.get('/me/jobs/:jobId/onedrive/:itemId/file', requireRole('CREW'
  * endpoint, which spreads the full raw Current RMS item (including whatever price fields the
  * account's response carries) into its response.
  */
-crewPortalRouter.get('/me/jobs/:jobId/kit-list', requireRole('CREW'), async (req, res) => {
+crewPortalRouter.get('/me/jobs/:jobId/kit-list', crewView, async (req, res) => {
   const found = await requireAssignedJob(req.user!.id, req.params.jobId);
   if (!found) return res.status(404).json({ error: 'Job not found' });
   const features = await resolveCrewFeatures(found.assignment.job);
@@ -519,7 +557,7 @@ crewPortalRouter.get('/me/jobs/:jobId/kit-list', requireRole('CREW'), async (req
  */
 const REQUESTABLE_LABEL_TYPES = ['TRUSS_SPIKE_POSITION', 'TRUSS_SPIKE_TIP', 'TRUSS_SPIKE_SACN', 'CABLE', 'PAL', 'RACK'];
 
-crewPortalRouter.post('/me/jobs/:jobId/label-requests', requireRole('CREW'), async (req, res) => {
+crewPortalRouter.post('/me/jobs/:jobId/label-requests', crewView, async (req, res) => {
   const found = await requireAssignedJob(req.user!.id, req.params.jobId);
   if (!found) return res.status(404).json({ error: 'Job not found' });
   const { labelType, content, quantity } = req.body ?? {};
@@ -542,38 +580,10 @@ crewPortalRouter.post('/me/jobs/:jobId/label-requests', requireRole('CREW'), asy
   res.status(201).json({ ...request, content: JSON.parse(request.contentJson) });
 });
 
-function toDiscussionMessageDto(m: {
-  id: string;
-  jobId: string;
-  authorUserId: string;
-  body: string;
-  createdAt: Date;
-  editedAt: Date | null;
-  deletedAt: Date | null;
-  deletedByName: string | null;
-  authorUser: { displayName: string; role: string; isProjectManager: boolean };
-}) {
-  return {
-    id: m.id,
-    jobId: m.jobId,
-    authorUserId: m.authorUserId,
-    authorName: m.authorUser.displayName,
-    authorRole: m.authorUser.role,
-    authorIsProjectManager: m.authorUser.isProjectManager,
-    body: m.deletedAt ? '' : m.body,
-    createdAt: m.createdAt,
-    editedAt: m.editedAt,
-    deletedAt: m.deletedAt,
-    deletedByName: m.deletedByName,
-  };
-}
-
-const DISCUSSION_MESSAGE_INCLUDE = { authorUser: { select: { displayName: true, role: true, isProjectManager: true } } } as const;
-
 // Same thread staff see on the job's Discussion tab (routes/jobDiscussion.ts), scoped here to
 // a job the caller is actually assigned to. Crew have no moderateDiscussion permission, so
 // `locked` here only ever disables the compose box - there's no unlock control on this side.
-crewPortalRouter.get('/me/jobs/:jobId/discussion', requireRole('CREW'), async (req, res) => {
+crewPortalRouter.get('/me/jobs/:jobId/discussion', crewView, async (req, res) => {
   const found = await requireAssignedJob(req.user!.id, req.params.jobId);
   if (!found) return res.status(404).json({ error: 'Job not found' });
   const features = await resolveCrewFeatures(found.assignment.job);
@@ -583,66 +593,83 @@ crewPortalRouter.get('/me/jobs/:jobId/discussion', requireRole('CREW'), async (r
   const group = pickGroup(groups, req.query.groupId);
   const messages = await prisma.jobDiscussionMessage.findMany({
     where: { jobId: req.params.jobId, groupId: group.id },
-    include: DISCUSSION_MESSAGE_INCLUDE,
+    include: MESSAGE_INCLUDE,
     orderBy: { createdAt: 'asc' },
   });
   res.json({
     locked: found.assignment.job.discussionLocked,
     groupId: group.id,
     groups: groups.map((g) => toGroupDto(g, { includeMembers: false })),
-    messages: messages.map(toDiscussionMessageDto),
+    messages: messages.map(toMessageDto),
   });
 });
 
-crewPortalRouter.post('/me/jobs/:jobId/discussion', requireRole('CREW'), async (req, res) => {
+crewPortalRouter.post('/me/jobs/:jobId/discussion', crewView, discussionImageUpload.single('image'), async (req, res) => {
   const found = await requireAssignedJob(req.user!.id, req.params.jobId);
   if (!found) return res.status(404).json({ error: 'Job not found' });
   const features = await resolveCrewFeatures(found.assignment.job);
   if (!features.discussion) return res.status(403).json({ error: 'Discussion is not enabled for this job' });
   if (found.assignment.job.discussionLocked) return res.status(403).json({ error: 'This discussion is locked' });
-  const { body, groupId } = req.body ?? {};
-  if (!body || typeof body !== 'string' || !body.trim()) return res.status(400).json({ error: 'body is required' });
-  if (body.length > 5000) return res.status(400).json({ error: 'Message is too long' });
+  const input = parseMessageInput(req.body, Boolean(req.file));
+  if ('error' in input) return res.status(400).json({ error: input.error });
+  const groupId = input.groupId;
   const groups = (await ensureJobGroups(req.params.jobId)).filter((g) => crewCanSee(g, found.assignment.id));
   if (groupId && !groups.some((g) => g.id === groupId)) return res.status(404).json({ error: 'Group not found' });
   const group = pickGroup(groups, groupId);
+  const replyError = await checkReplyTarget(req.params.jobId, group.id, input.replyToId);
+  if (replyError) return res.status(400).json({ error: replyError });
+  const image = req.file ? await storeDiscussionImage(req.file) : null;
 
   const message = await prisma.jobDiscussionMessage.create({
-    data: { jobId: req.params.jobId, authorUserId: req.user!.id, body: body.trim(), groupId: group.id },
-    include: DISCUSSION_MESSAGE_INCLUDE,
+    data: { jobId: req.params.jobId, authorUserId: req.user!.id, body: input.text, groupId: group.id, replyToId: input.replyToId, ...image },
+    include: MESSAGE_INCLUDE,
   });
   await logActivity('job_discussion.create', req.params.jobId, req.params.jobId, req.user!.id);
-  await notifyDiscussionMessage(req.params.jobId, found.assignment.job.name, req.user!.id, req.user!.displayName, message.body, group.id);
-  res.status(201).json(toDiscussionMessageDto(message));
+  await notifyDiscussionMessage(req.params.jobId, found.assignment.job.name, req.user!.id, req.user!.displayName, notificationText(message.body, Boolean(image)), group.id);
+  res.status(201).json(toMessageDto(message));
+});
+
+// An attached image, only from a chat group this person can see.
+crewPortalRouter.get('/me/jobs/:jobId/discussion/:messageId/attachment', crewView, async (req, res) => {
+  const found = await requireAssignedJob(req.user!.id, req.params.jobId);
+  if (!found) return res.status(404).end();
+  const features = await resolveCrewFeatures(found.assignment.job);
+  if (!features.discussion) return res.status(404).end();
+  const message = await prisma.jobDiscussionMessage.findUnique({ where: { id: req.params.messageId } });
+  if (!message || message.jobId !== req.params.jobId || message.deletedAt || !message.attachmentPath) return res.status(404).end();
+  const groups = (await ensureJobGroups(req.params.jobId)).filter((g) => crewCanSee(g, found.assignment.id));
+  if (!groups.some((g) => g.id === message.groupId)) return res.status(404).end();
+  await sendStoredUpload(res, path.join(discussionUploadsDir, message.attachmentPath), message.attachmentName ?? 'image');
 });
 
 // A crew member can edit or delete only their own message - no moderation permission applies
 // on this side, matching routes/jobDiscussion.ts's staff-side moderateDiscussion check.
-crewPortalRouter.put('/me/jobs/:jobId/discussion/:messageId', requireRole('CREW'), async (req, res) => {
+crewPortalRouter.put('/me/jobs/:jobId/discussion/:messageId', crewView, async (req, res) => {
   const found = await requireAssignedJob(req.user!.id, req.params.jobId);
   if (!found) return res.status(404).json({ error: 'Job not found' });
-  const { body } = req.body ?? {};
-  if (!body || typeof body !== 'string' || !body.trim()) return res.status(400).json({ error: 'body is required' });
   const message = await prisma.jobDiscussionMessage.findUnique({ where: { id: req.params.messageId } });
   if (!message || message.jobId !== req.params.jobId || message.deletedAt) return res.status(404).json({ error: 'Message not found' });
   if (message.authorUserId !== req.user!.id) return res.status(403).json({ error: 'You can only edit your own messages' });
+  const input = parseMessageInput(req.body, Boolean(message.attachmentPath));
+  if ('error' in input) return res.status(400).json({ error: input.error });
 
   const updated = await prisma.jobDiscussionMessage.update({
     where: { id: message.id },
-    data: { body: body.trim(), editedAt: new Date() },
-    include: DISCUSSION_MESSAGE_INCLUDE,
+    data: { body: input.text, editedAt: new Date() },
+    include: MESSAGE_INCLUDE,
   });
   await logActivity('job_discussion.edit', req.params.jobId, req.params.jobId, req.user!.id);
-  res.json(toDiscussionMessageDto(updated));
+  res.json(toMessageDto(updated));
 });
 
-crewPortalRouter.delete('/me/jobs/:jobId/discussion/:messageId', requireRole('CREW'), async (req, res) => {
+crewPortalRouter.delete('/me/jobs/:jobId/discussion/:messageId', crewView, async (req, res) => {
   const found = await requireAssignedJob(req.user!.id, req.params.jobId);
   if (!found) return res.status(404).json({ error: 'Job not found' });
   const message = await prisma.jobDiscussionMessage.findUnique({ where: { id: req.params.messageId } });
   if (!message || message.jobId !== req.params.jobId || message.deletedAt) return res.status(404).json({ error: 'Message not found' });
   if (message.authorUserId !== req.user!.id) return res.status(403).json({ error: 'You can only delete your own messages' });
   await prisma.jobDiscussionMessage.delete({ where: { id: message.id } });
+  await removeDiscussionImage(message.attachmentPath);
   await logActivity('job_discussion.delete', req.params.jobId, req.params.jobId, req.user!.id);
   res.status(204).end();
 });

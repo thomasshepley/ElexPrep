@@ -4,6 +4,7 @@ import { api, type DashboardData } from '../api/client';
 import MonthCalendar, { type CalendarEvent } from '../components/MonthCalendar';
 import CrewSwatch from '../components/CrewSwatch';
 import { dayKey, formatDateTime, formatDayHeading, formatDateRange, formatMoney, formatTime } from '../utils/format';
+import { isPointInTime } from '../components/DayTimeline';
 import { labelTypeName } from '../utils/labelTypes';
 
 const NO_DATE = 'No date set';
@@ -175,7 +176,7 @@ function ThisWeek({ days }: { days: DashboardData['thisWeek'] }) {
                         <li key={i.id}>
                           <span className="week-time">
                             {formatTime(i.startsAt)}
-                            {i.endsAt ? `–${formatTime(i.endsAt)}` : ''}
+                            {i.endsAt && !isPointInTime(i) ? `–${formatTime(i.endsAt)}` : ''}
                           </span>{' '}
                           {i.title}
                         </li>

@@ -10,6 +10,16 @@ import UserName from './UserName';
 
 const POLL_MS = 15000;
 
+function ImageIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <circle cx="8.5" cy="8.5" r="1.5" />
+      <path d="m21 15-5-5L5 21" />
+    </svg>
+  );
+}
+
 // Same small palette as schedule entries, so group colours sit with the rest of the job's colours.
 const GROUP_COLORS = ['#E53935', '#8E24AA', '#3949AB', '#1E88E5', '#00897B', '#43A047', '#F9A825', '#EF6C00'];
 
@@ -31,6 +41,11 @@ export default function JobDiscussionThread({ jobId, scope }: { jobId: string; s
   const [busy, setBusy] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState('');
+  const [replyTo, setReplyTo] = useState<DiscussionMessage | null>(null);
+  const [image, setImage] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const draftRef = useRef<HTMLTextAreaElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [groups, setGroups] = useState<DiscussionGroup[]>([]);
   const [groupId, setGroupId] = useState<string | null>(null);
@@ -44,6 +59,7 @@ export default function JobDiscussionThread({ jobId, scope }: { jobId: string; s
   const send = scope === 'staff' ? api.jobDiscussion.send : api.crewPortal.discussion.send;
   const editMessage = scope === 'staff' ? api.jobDiscussion.edit : api.crewPortal.discussion.edit;
   const remove = scope === 'staff' ? api.jobDiscussion.remove : api.crewPortal.discussion.remove;
+  const attachmentUrl = scope === 'staff' ? api.jobDiscussion.attachmentUrl : api.crewPortal.discussion.attachmentUrl;
   // Staff with the moderateDiscussion permission (ADMIN always has it) can remove anyone's
   // message and lock/unlock the thread; crew can only ever edit/remove their own and never
   // see a lock control - see routes/jobDiscussion.ts's and crewPortal.ts's matching
@@ -90,6 +106,7 @@ export default function JobDiscussionThread({ jobId, scope }: { jobId: string; s
     setGroupId(id);
     setMessages(null);
     setEditingId(null);
+    setReplyTo(null);
     stickToBottom.current = true;
     refresh(id);
   };
@@ -134,16 +151,56 @@ export default function JobDiscussionThread({ jobId, scope }: { jobId: string; s
     if (listRef.current && stickToBottom.current) listRef.current.scrollTop = listRef.current.scrollHeight;
   }, [messages]);
 
+  useEffect(() => {
+    if (!image) {
+      setImagePreview(null);
+      return;
+    }
+    const url = URL.createObjectURL(image);
+    setImagePreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [image]);
+
+  const pickImage = (file: File | undefined | null) => {
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setError('Only images and GIFs can be attached.');
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setError('That image is over 10 MB.');
+      return;
+    }
+    setError(null);
+    setImage(file);
+  };
+
+  const startReply = (m: DiscussionMessage) => {
+    setReplyTo(m);
+    draftRef.current?.focus();
+  };
+
+  const jumpTo = (messageId: string) => {
+    const el = document.getElementById(`msg-${messageId}`);
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    el.classList.add('is-highlighted');
+    setTimeout(() => el.classList.remove('is-highlighted'), 1600);
+  };
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!draft.trim()) return;
+    if (!draft.trim() && !image) return;
     setBusy(true);
     setError(null);
     try {
-      const message = await send(jobId, draft.trim(), groupId);
+      const message = await send(jobId, { body: draft.trim(), groupId, replyToId: replyTo?.id ?? null, image });
       stickToBottom.current = true;
       setMessages((prev) => [...(prev ?? []), message]);
       setDraft('');
+      setReplyTo(null);
+      setImage(null);
+      if (fileRef.current) fileRef.current.value = '';
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -161,8 +218,8 @@ export default function JobDiscussionThread({ jobId, scope }: { jobId: string; s
     setEditDraft('');
   };
 
-  const saveEdit = async (messageId: string) => {
-    if (!editDraft.trim()) return;
+  const saveEdit = async (messageId: string, hasImage: boolean) => {
+    if (!editDraft.trim() && !hasImage) return;
     setError(null);
     try {
       const updated = await editMessage(jobId, messageId, editDraft.trim());
@@ -270,14 +327,19 @@ export default function JobDiscussionThread({ jobId, scope }: { jobId: string; s
           const canEdit = !isDeleted && isOwn;
           const isEditing = editingId === m.id;
           return (
-            <div key={m.id} className={`discussion-message${isOwn ? ' is-own' : ''}${isDeleted ? ' is-deleted' : ''}`}>
+            <div key={m.id} id={`msg-${m.id}`} className={`discussion-message${isOwn ? ' is-own' : ''}${isDeleted ? ' is-deleted' : ''}`}>
               <div className="discussion-message-meta">
                 <UserName as="strong" name={m.authorName} role={m.authorRole} isProjectManager={m.authorIsProjectManager} />
                 <span className="chip chip-role">{m.authorRole}</span>
                 <span className="muted">{formatDateTime(m.createdAt)}</span>
                 {m.editedAt && !isDeleted && <span className="muted discussion-message-edited">(edited)</span>}
-                {(canEdit || canDelete) && !isEditing && (
+                {(canEdit || canDelete || (canCompose && !isDeleted)) && !isEditing && (
                   <span className="discussion-message-actions">
+                    {canCompose && !isDeleted && (
+                      <button type="button" className="secondary" onClick={() => startReply(m)} aria-label={`Reply to ${m.authorName}`}>
+                        Reply
+                      </button>
+                    )}
                     {canEdit && (
                       <button type="button" className="secondary" onClick={() => startEdit(m)}>
                         Edit
@@ -291,12 +353,25 @@ export default function JobDiscussionThread({ jobId, scope }: { jobId: string; s
                   </span>
                 )}
               </div>
+              {m.replyTo && !isDeleted && (
+                <button type="button" className="discussion-quote" onClick={() => jumpTo(m.replyTo!.id)} title="Show the original message">
+                  <UserName as="strong" name={m.replyTo.authorName} role={m.replyTo.authorRole} isProjectManager={m.replyTo.authorIsProjectManager} showPmChip={false} />
+                  <span className="discussion-quote-body">
+                    {m.replyTo.deleted ? <em>Message deleted</em> : m.replyTo.body || (m.replyTo.hasImage ? '📷 Photo' : '')}
+                  </span>
+                </button>
+              )}
+              {m.attachment && !isDeleted && (
+                <a className="discussion-image" href={attachmentUrl(jobId, m.id)} target="_blank" rel="noreferrer">
+                  <img src={attachmentUrl(jobId, m.id)} alt={m.attachment.name} loading="lazy" />
+                </a>
+              )}
               {isEditing ? (
                 <form
                   className="row discussion-edit-form"
                   onSubmit={(e) => {
                     e.preventDefault();
-                    saveEdit(m.id);
+                    saveEdit(m.id, Boolean(m.attachment));
                   }}
                 >
                   <input
@@ -305,7 +380,7 @@ export default function JobDiscussionThread({ jobId, scope }: { jobId: string; s
                     onChange={(e) => setEditDraft(e.target.value)}
                     autoFocus
                   />
-                  <button type="submit" disabled={!editDraft.trim()}>
+                  <button type="submit" disabled={!editDraft.trim() && !m.attachment}>
                     Save
                   </button>
                   <button type="button" className="secondary" onClick={cancelEdit}>
@@ -313,9 +388,11 @@ export default function JobDiscussionThread({ jobId, scope }: { jobId: string; s
                   </button>
                 </form>
               ) : (
-                <div className="discussion-message-body">
-                  {isDeleted ? <span className="muted">Message removed by {m.deletedByName ?? 'a moderator'}</span> : m.body}
-                </div>
+                (isDeleted || m.body) && (
+                  <div className="discussion-message-body">
+                    {isDeleted ? <span className="muted">Message removed by {m.deletedByName ?? 'a moderator'}</span> : m.body}
+                  </div>
+                )
               )}
             </div>
           );
@@ -323,7 +400,56 @@ export default function JobDiscussionThread({ jobId, scope }: { jobId: string; s
       </div>
       {canCompose ? (
         <form className="discussion-compose" onSubmit={submit}>
+          {(replyTo || imagePreview) && (
+            <div className="discussion-compose-extras">
+              {replyTo && (
+                <div className="discussion-quote is-draft">
+                  <span>
+                    Replying to <UserName as="strong" name={replyTo.authorName} role={replyTo.authorRole} isProjectManager={replyTo.authorIsProjectManager} showPmChip={false} />
+                  </span>
+                  <span className="discussion-quote-body">{replyTo.body || (replyTo.attachment ? '📷 Photo' : '')}</span>
+                  <button type="button" className="secondary discussion-chip-close" onClick={() => setReplyTo(null)} aria-label="Cancel reply">
+                    ×
+                  </button>
+                </div>
+              )}
+              {imagePreview && (
+                <div className="discussion-image-draft">
+                  <img src={imagePreview} alt="Image to send" />
+                  <button
+                    type="button"
+                    className="secondary discussion-chip-close"
+                    onClick={() => {
+                      setImage(null);
+                      if (fileRef.current) fileRef.current.value = '';
+                    }}
+                    aria-label="Remove image"
+                  >
+                    ×
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/png,image/jpeg,image/gif,image/webp"
+            hidden
+            onChange={(e) => pickImage(e.target.files?.[0])}
+          />
+          <button type="button" className="secondary discussion-attach" onClick={() => fileRef.current?.click()} disabled={busy} aria-label="Add an image or GIF" title="Add an image or GIF">
+            <ImageIcon />
+          </button>
           <textarea
+            ref={draftRef}
+            onPaste={(e) => {
+              const file = [...e.clipboardData.files].find((f) => f.type.startsWith('image/'));
+              if (file) {
+                e.preventDefault();
+                pickImage(file);
+              }
+            }}
             aria-label="Message"
             placeholder={`Message ${currentGroup?.name ?? 'the crew'}… (Enter to send, Shift+Enter for a new line)`}
             rows={Math.min(6, Math.max(1, draft.split('\n').length))}
@@ -334,10 +460,11 @@ export default function JobDiscussionThread({ jobId, scope }: { jobId: string; s
                 e.preventDefault();
                 e.currentTarget.form?.requestSubmit();
               }
+              if (e.key === 'Escape' && replyTo) setReplyTo(null);
             }}
             disabled={busy}
           />
-          <button type="submit" disabled={busy || !draft.trim()}>
+          <button type="submit" disabled={busy || (!draft.trim() && !image)}>
             Send
           </button>
         </form>

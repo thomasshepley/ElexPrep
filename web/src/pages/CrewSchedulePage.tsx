@@ -5,6 +5,7 @@ import { WhereIcon } from '../components/Icons';
 import MonthCalendar, { type CalendarEvent } from '../components/MonthCalendar';
 import LocationLinks from '../components/LocationLinks';
 import { formatDateRange, formatDayHeading, formatTime } from '../utils/format';
+import { isPointInTime } from '../components/DayTimeline';
 
 const NO_DATE = 'No date set yet';
 
@@ -94,25 +95,29 @@ function NextCall({ jobs }: { jobs: CrewMyJob[] }) {
   if (!next?.nextDay) return null;
   const { nextDay } = next;
   const first = nextDay.items[0];
+  // The admin-set call time for the day wins; otherwise the first thing they're on.
+  const callAt = nextDay.callTime ?? (first ? formatTime(first.startsAt) : null);
 
   return (
     <section className="panel next-call" aria-label="Your next call">
-      <p className="next-call-eyebrow">Your next call</p>
+      <p className="next-call-eyebrow">Next call time</p>
       <h2 className="next-call-when">
         {formatDayHeading(nextDay.date)}
-        {first && <span> · {formatTime(first.startsAt)}</span>}
+        {callAt && <span> at {callAt}</span>}
       </h2>
       <p className="next-call-job">
         <Link to={`/crew/jobs/${next.jobId}`}>{next.jobName}</Link>
         <span className="chip chip-role">{next.role}</span>
+        {nextDay.name && <span className="chip chip-neutral">{nextDay.name}</span>}
       </p>
+      {nextDay.wrapTime && <p className="muted" style={{ margin: '0 0 0.5rem' }}>Estimated wrap {nextDay.wrapTime}</p>}
       {nextDay.items.length > 0 && (
         <ul className="plain-list next-call-items">
           {nextDay.items.map((i, idx) => (
             <li key={idx}>
               <span className="week-time">
                 {formatTime(i.startsAt)}
-                {i.endsAt ? `–${formatTime(i.endsAt)}` : ''}
+                {i.endsAt && !isPointInTime(i) ? `–${formatTime(i.endsAt)}` : ''}
               </span>{' '}
               {i.title}
             </li>

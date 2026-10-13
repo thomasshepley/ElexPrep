@@ -1,5 +1,6 @@
 import { BASE, request } from '../http';
-import type { DiscussionGroupInput, DayRateSource, RoleRate, DashboardData, DiscussionMessage, DiscussionThreadData, Job, JobContact, JobCrewAssignment, JobDay, JobDocument, JobScheduleItem, Plot } from '../types';
+import { discussionSendBody } from '../types';
+import type { DiscussionSendInput, DiscussionGroupInput, DayRateSource, RoleRate, DashboardData, DiscussionMessage, DiscussionThreadData, Job, JobContact, JobCrewAssignment, JobDay, JobDocument, JobProjectManager, JobScheduleItem, Plot } from '../types';
 import type { CrewFeatures } from '@elexprep/shared';
 
 export const jobsApi = {
@@ -26,6 +27,8 @@ export const jobsApi = {
     create: (jobId: string, date: string) =>
       request<JobDay>(`/jobs/${jobId}/days`, { method: 'POST', body: JSON.stringify({ date }) }),
     remove: (jobId: string, id: string) => request<void>(`/jobs/${jobId}/days/${id}`, { method: 'DELETE' }),
+    update: (jobId: string, id: string, data: { name?: string | null; callTime?: string | null; wrapTime?: string | null }) =>
+      request<JobDay>(`/jobs/${jobId}/days/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     assignCrew: (jobId: string, dayId: string, jobCrewAssignmentId: string) =>
       request<{ id: string }>(`/jobs/${jobId}/days/${dayId}/crew`, {
         method: 'POST',
@@ -39,8 +42,9 @@ export const jobsApi = {
   jobDiscussion: {
     list: (jobId: string, groupId?: string | null) =>
       request<DiscussionThreadData>(`/jobs/${jobId}/discussion${groupId ? `?groupId=${encodeURIComponent(groupId)}` : ''}`),
-    send: (jobId: string, body: string, groupId?: string | null) =>
-      request<DiscussionMessage>(`/jobs/${jobId}/discussion`, { method: 'POST', body: JSON.stringify({ body, groupId }) }),
+    send: (jobId: string, input: DiscussionSendInput) =>
+      request<DiscussionMessage>(`/jobs/${jobId}/discussion`, { method: 'POST', body: discussionSendBody(input) }),
+    attachmentUrl: (jobId: string, messageId: string) => `${BASE}/jobs/${jobId}/discussion/${messageId}/attachment`,
     createGroup: (jobId: string, data: DiscussionGroupInput) =>
       request<{ id: string }>(`/jobs/${jobId}/discussion/groups`, { method: 'POST', body: JSON.stringify(data) }),
     updateGroup: (jobId: string, groupId: string, data: DiscussionGroupInput) =>
@@ -171,9 +175,10 @@ export const jobsApi = {
   jobs: {
     list: () => request<Job[]>('/jobs'),
     get: (id: string) => request<Job>(`/jobs/${id}`),
+    projectManagerOptions: () => request<JobProjectManager[]>('/jobs/project-manager-options'),
     update: (
       id: string,
-      data: Partial<Pick<Job, 'name' | 'venue' | 'description' | 'address' | 'startsAt' | 'endsAt' | 'isPublic'>> & {
+      data: Partial<Pick<Job, 'name' | 'venue' | 'description' | 'address' | 'startsAt' | 'endsAt' | 'isPublic' | 'projectManagerUserId'>> & {
         crewFeatures?: Partial<CrewFeatures> | null;
         logoScales?: Partial<Record<'left' | 'middle' | 'right', number>>;
       }

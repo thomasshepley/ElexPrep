@@ -5,6 +5,7 @@ import Modal from './Modal';
 import CrewPicker from './CrewPicker';
 import DateTimeInput from './DateTimeInput';
 import { formatDayHeading, formatTime, toDatetimeLocal } from '../utils/format';
+import { isPointInTime } from './DayTimeline';
 
 export const SCHEDULE_COLOR_PRESETS = ['#E53935', '#8E24AA', '#3949AB', '#1E88E5', '#00897B', '#43A047', '#F9A825', '#EF6C00'];
 
@@ -47,10 +48,13 @@ export default function ScheduleEntryModal({
   const [location, setLocation] = useState(item.location ?? '');
   const [notes, setNotes] = useState(item.notes ?? '');
   const [color, setColor] = useState<string | null>(item.color);
+  const [pointInTime, setPointInTime] = useState(isPointInTime(item));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const when = `${formatDayHeading(item.startsAt)}, ${formatTime(item.startsAt)}${item.endsAt ? `–${formatTime(item.endsAt)}` : ''}`;
+  const when = isPointInTime(item)
+    ? `${formatDayHeading(item.startsAt)}, at ${formatTime(item.startsAt)}`
+    : `${formatDayHeading(item.startsAt)}, ${formatTime(item.startsAt)}${item.endsAt ? `–${formatTime(item.endsAt)}` : ''}`;
 
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,7 +65,7 @@ export default function ScheduleEntryModal({
       await onSave({
         title: title.trim(),
         startsAt: new Date(startsAt).toISOString(),
-        endsAt: endsAt ? new Date(endsAt).toISOString() : null,
+        endsAt: pointInTime ? new Date(startsAt).toISOString() : endsAt ? new Date(endsAt).toISOString() : null,
         location: location.trim() || null,
         notes: notes.trim(),
         color,
@@ -105,7 +109,10 @@ export default function ScheduleEntryModal({
     return (
       <Modal title={item.title} onClose={onClose}>
         <div className="stack">
-          <p style={{ margin: 0 }}>{when}</p>
+          <p style={{ margin: 0 }}>
+            {when}
+            {isPointInTime(item) && <span className="chip chip-neutral schedule-point-chip">Point</span>}
+          </p>
           {item.location && (
             <p style={{ margin: 0 }}>
               <span className="muted">Where: </span>
@@ -131,11 +138,17 @@ export default function ScheduleEntryModal({
             <label htmlFor="entry-starts">Starts</label>
             <DateTimeInput id="entry-starts" stepMinutes={15} value={startsAt} onChange={setStartsAt} required />
           </div>
-          <div className="field">
-            <label htmlFor="entry-ends">Ends</label>
-            <DateTimeInput id="entry-ends" stepMinutes={15} value={endsAt} onChange={setEndsAt} defaultTime="18:00" />
-          </div>
+          {!pointInTime && (
+            <div className="field">
+              <label htmlFor="entry-ends">Ends</label>
+              <DateTimeInput id="entry-ends" stepMinutes={15} value={endsAt} onChange={setEndsAt} defaultTime="18:00" />
+            </div>
+          )}
         </div>
+        <label className="row" style={{ gap: '0.4rem' }}>
+          <input type="checkbox" checked={pointInTime} onChange={(e) => setPointInTime(e.target.checked)} />
+          Just a moment in time (deadline or info point)
+        </label>
         <div className="field">
           <label htmlFor="entry-location">Where</label>
           <input id="entry-location" value={location} onChange={(e) => setLocation(e.target.value)} maxLength={120} placeholder="e.g. Loading bay, Stage left" />

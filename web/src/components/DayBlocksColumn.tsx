@@ -2,14 +2,14 @@ import { useState } from 'react';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import { resolveCrewColor } from '@elexprep/shared';
-import { api, type JobCrewAssignment } from '../api/client';
+import { api, type JobCrewAssignment, type JobDay } from '../api/client';
 import { useToast } from './Toast';
 import { formatDate } from '../utils/format';
 
 export interface DayBlockView {
   dateKey: string;
   /** Null until something materializes this day server-side - see JobSchedulePanel. */
-  day: { id: string; crew: { id: string; crewProfileId: string; displayName: string; role: string; color: string | null }[] } | null;
+  day: JobDay | null;
   itemCount: number;
 }
 
@@ -76,7 +76,10 @@ function DayBlockCard({
       }}
     >
       <div className="day-block-header">
-        <span className="day-block-date">{formatDayLabel(block.dateKey)}</span>
+        <span className="day-block-date">
+          {formatDayLabel(block.dateKey)}
+          {block.day?.name && <span className="day-block-name">{block.day.name}</span>}
+        </span>
         {block.itemCount > 0 && (
           <span className="chip chip-neutral">
             {block.itemCount} {block.itemCount === 1 ? 'entry' : 'entries'}
@@ -96,6 +99,12 @@ function DayBlockCard({
           </button>
         )}
       </div>
+      {(block.day?.callTime || block.day?.wrapTime) && (
+        <div className="day-block-times">
+          {block.day.callTime && <span>Call {block.day.callTime}</span>}
+          {block.day.wrapTime && <span>Wrap ~{block.day.wrapTime}</span>}
+        </div>
+      )}
       <div className="day-block-crew">
         {(block.day?.crew ?? []).length === 0 ? (
           <span className="muted day-block-crew-empty">Drop crew here</span>

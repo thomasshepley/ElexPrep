@@ -5,10 +5,12 @@ import { api, type Job, type PrintQueueItem, type AdHocLabel, type PrintJob, typ
 import LabelTypeSection, { summarize } from './printQueue/LabelTypeSection';
 import PrintConfirmModal from './printQueue/PrintConfirmModal';
 import { useDialog } from './Dialog';
+import { useToast } from './Toast';
 import { labelTypeName } from '../utils/labelTypes';
 
 export default function PrintQueuePanel({ jobId, groupId = null }: { jobId: string; groupId?: string | null }) {
   const dialog = useDialog();
+  const { showToast } = useToast();
   const [queue, setQueue] = useState<PrintQueueItem[]>([]);
   const [adHoc, setAdHoc] = useState<AdHocLabel[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -71,6 +73,59 @@ export default function PrintQueuePanel({ jobId, groupId = null }: { jobId: stri
       else next.add(id);
       return next;
     });
+  };
+
+  const removeMany = async (ids: { queueIds?: string[]; adHocIds?: string[] }, success: string) => {
+    setBusy(true);
+    setError(null);
+    try {
+      await api.printQueue.removeMany(jobId, ids);
+      await refresh();
+      showToast(success);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const removeSelected = async () => {
+    const ids = pendingItems.filter((q) => selected.has(q.id)).map((q) => q.id);
+    if (ids.length === 0) return;
+    const ok = await dialog.confirm({
+      title: `Remove ${ids.length} label${ids.length === 1 ? '' : 's'} from the queue?`,
+      message: 'They can be added back with "Build from patch + cases".',
+      confirmLabel: 'Remove',
+      danger: true,
+    });
+    if (ok) await removeMany({ queueIds: ids }, `Removed ${ids.length} from the queue`);
+  };
+
+  const clearQueue = async () => {
+    const queueIds = pendingItems.map((q) => q.id);
+    const adHocIds = stageAdHoc.map((a) => a.id);
+    const parts = [
+      queueIds.length > 0 && `${queueIds.length} queued label${queueIds.length === 1 ? '' : 's'}`,
+      adHocIds.length > 0 && `${adHocIds.length} ad hoc label${adHocIds.length === 1 ? '' : 's'} (deleted for good)`,
+    ].filter(Boolean);
+    const ok = await dialog.confirm({
+      title: 'Clear the print queue?',
+      message: `This removes ${parts.join(' and ')}${groupId !== null ? ' from this stage' : ''}. Patch and case labels can be rebuilt afterwards.`,
+      confirmLabel: 'Clear queue',
+      danger: true,
+    });
+    if (ok) await removeMany({ queueIds, adHocIds }, 'Print queue cleared');
+  };
+
+  const clearHistory = async () => {
+    const queueIds = confirmedOrPrinted.map((q) => q.id);
+    const ok = await dialog.confirm({
+      title: 'Clear confirmed and printed labels?',
+      message: `Removes ${queueIds.length} row${queueIds.length === 1 ? '' : 's'} from this list. Print jobs above are kept.`,
+      confirmLabel: 'Clear',
+      danger: true,
+    });
+    if (ok) await removeMany({ queueIds }, 'Cleared');
   };
 
   const confirmSelected = async (override = false): Promise<boolean> => {
@@ -155,9 +210,21 @@ export default function PrintQueuePanel({ jobId, groupId = null }: { jobId: stri
       <div className="panel">
         <div className="row" style={{ justifyContent: 'space-between' }}>
           <h3>Print queue</h3>
-          <button onClick={build} disabled={busy}>
-            Build from patch + cases
-          </button>
+          <div className="row" style={{ gap: '0.5rem' }}>
+            {pendingItems.some((q) => selected.has(q.id)) && (
+              <button className="secondary" onClick={removeSelected} disabled={busy}>
+                Remove selected ({pendingItems.filter((q) => selected.has(q.id)).length})
+              </button>
+            )}
+            {!nothingToSend && (
+              <button className="secondary danger-text" onClick={clearQueue} disabled={busy}>
+                Clear queue
+              </button>
+            )}
+            <button onClick={build} disabled={busy}>
+              Build from patch + cases
+            </button>
+          </div>
         </div>
 
         {nothingToSend ? (
@@ -284,7 +351,12 @@ export default function PrintQueuePanel({ jobId, groupId = null }: { jobId: stri
 
       {confirmedOrPrinted.length > 0 && (
         <div className="panel">
-          <h3>Previously confirmed / printed</h3>
+          <div className="row" style={{ justifyContent: 'space-between' }}>
+            <h3>Previously confirmed / printed</h3>
+            <button className="secondary" onClick={clearHistory} disabled={busy}>
+              Clear list
+            </button>
+          </div>
           <div className="table-scroll">
             <table>
               <thead>

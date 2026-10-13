@@ -21,6 +21,41 @@ import DateTimeInput from '../components/DateTimeInput';
 import { useDialog } from '../components/Dialog';
 import { useAsyncAction } from '../hooks/useAsyncAction';
 import { toDatetimeLocal } from '../utils/format';
+import UserName from '../components/UserName';
+import type { JobProjectManager } from '../api/client';
+import { CrewJobView } from './CrewJobPage';
+
+type JobView = 'admin' | 'crew';
+
+function readViewPref(jobId: string): JobView | null {
+  try {
+    const v = localStorage.getItem(`jobView:${jobId}`);
+    return v === 'admin' || v === 'crew' ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveViewPref(jobId: string, view: JobView) {
+  try {
+    localStorage.setItem(`jobView:${jobId}`, view);
+  } catch {
+    // Private mode etc. - the switch still works for this visit.
+  }
+}
+
+/** Admin view / Crew view, for staff who are also on this job's crew. */
+function ViewSwitch({ view, onChange }: { view: JobView; onChange: (v: JobView) => void }) {
+  return (
+    <div className="segmented" role="group" aria-label="Job view">
+      {(['crew', 'admin'] as const).map((v) => (
+        <button key={v} type="button" className={view === v ? 'active' : ''} aria-pressed={view === v} onClick={() => onChange(v)}>
+          {v === 'crew' ? 'Crew view' : 'Admin view'}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 const TABS = ['Prep', 'Plots', 'Schedule', 'Documents', 'Contacts', 'Crew', 'Discussion', 'Current RMS', 'Job Settings'] as const;
 type Tab = (typeof TABS)[number];
@@ -30,13 +65,31 @@ export default function JobDetailPage() {
   const [job, setJob] = useState<Job | null>(null);
   const [tab, setTab] = useState<Tab>('Prep');
   const [loadError, setLoadError] = useState<string | null>(null);
+  // Whether the signed-in staff member is on this job's crew - if so they land on the crew
+  // view (what their crew-mates see) and can flip to the admin tabs.
+  const [onCrew, setOnCrew] = useState(false);
+  const [view, setView] = useState<JobView>('admin');
   usePageTitle(job?.name);
 
   useEffect(() => {
     if (!jobId) return;
     setLoadError(null);
+    setOnCrew(false);
+    setView('admin');
     api.jobs.get(jobId).then(setJob).catch((e) => setLoadError((e as Error).message));
+    api.crewPortal
+      .jobDetail(jobId)
+      .then(() => {
+        setOnCrew(true);
+        setView(readViewPref(jobId) ?? 'crew');
+      })
+      .catch(() => setOnCrew(false));
   }, [jobId]);
+
+  const changeView = (v: JobView) => {
+    setView(v);
+    if (jobId) saveViewPref(jobId, v);
+  };
 
   if (!jobId) return null;
   if (loadError) {
@@ -48,10 +101,27 @@ export default function JobDetailPage() {
     );
   }
 
+  if (onCrew && view === 'crew') {
+    return <CrewJobView jobId={jobId} setTitle={false} toolbar={<ViewSwitch view={view} onChange={changeView} />} />;
+  }
+
   return (
     <div>
-      <h1>{job?.name ?? 'Job'}</h1>
-      {job?.venue && <p className="muted">{job.venue}</p>}
+      <div className="row" style={{ justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
+        <h1 style={{ margin: 0 }}>{job?.name ?? 'Job'}</h1>
+        {onCrew && <ViewSwitch view={view} onChange={changeView} />}
+      </div>
+      {(job?.venue || job?.projectManager) && (
+        <p className="muted job-subtitle">
+          {job.venue}
+          {job.venue && job.projectManager && ' · '}
+          {job.projectManager && (
+            <span>
+              PM: <UserName name={job.projectManager.displayName} isProjectManager showPmChip={false} />
+            </span>
+          )}
+        </p>
+      )}
 
       <div className="secondary-shell">
         <nav className="secondary-nav">
@@ -227,6 +297,8 @@ function JobSettingsPanel({ job, onUpdate }: { job: Job; onUpdate: (j: Job) => v
         </form>
       </section>
 
+      <ProjectManagerPanel job={job} canEdit={canEditJob} onUpdate={onUpdate} />
+
       <section className="panel">
         <h3 className="mt-0">Visibility</h3>
         {canPublish ? (
@@ -314,6 +386,44 @@ function JobSettingsPanel({ job, onUpdate }: { job: Job; onUpdate: (j: Job) => v
 }
 
 type LogoSlot = 'left' | 'middle' | 'right';
+
+/** Who's running this job - shown under the job name and to its crew on their job page. */
+function ProjectManagerPanel({ job, canEdit, onUpdate }: { job: Job; canEdit: boolean; onUpdate: (j: Job) => void }) {
+  const { busy, run } = useAsyncAction();
+  const [options, setOptions] = useState<JobProjectManager[]>([]);
+
+  useEffect(() => {
+    api.jobs.projectManagerOptions().then(setOptions).catch(() => setOptions([]));
+  }, []);
+
+  const change = async (projectManagerUserId: string | null) => {
+    const updated = await run(() => api.jobs.update(job.id, { projectManagerUserId }), {
+      success: projectManagerUserId ? 'Project manager set' : 'Project manager cleared',
+    });
+    if (updated) onUpdate(updated);
+  };
+
+  return (
+    <section className="panel">
+      <h3 className="mt-0">Project manager</h3>
+      <p className="muted">Who's running this job. Shown under the job name and on the crew's job page.</p>
+      <div className="field" style={{ maxWidth: '18rem' }}>
+        <label htmlFor="job-pm">Project manager</label>
+        <select id="job-pm" value={job.projectManagerUserId ?? ''} disabled={!canEdit || busy} onChange={(e) => change(e.target.value || null)}>
+          <option value="">Nobody yet</option>
+          {options.map((o) => (
+            <option key={o.id} value={o.id}>
+              {o.displayName}
+            </option>
+          ))}
+          {job.projectManager && !options.some((o) => o.id === job.projectManager!.id) && (
+            <option value={job.projectManager.id}>{job.projectManager.displayName}</option>
+          )}
+        </select>
+      </div>
+    </section>
+  );
+}
 
 const LOGO_SCALE_FIELD = { left: 'logoScaleLeft', middle: 'logoScale', right: 'logoScaleRight' } as const;
 

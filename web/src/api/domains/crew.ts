@@ -1,5 +1,6 @@
 import { BASE, request } from '../http';
-import type { AdHocLabel, BankDetails, CrewApplicationDetail, CrewApplicationSummary, CrewDocumentSummary, CrewJobDetail, CrewLabelRequest, CrewMe, CrewMember, CrewMyJob, CrewRateLine, DiscussionMessage, DiscussionThreadData, JobContact, JobDay, JobDocument, JobScheduleItem, KitListItem, OnboardingInvite, OneDriveShare, Plot } from '../types';
+import { discussionSendBody } from '../types';
+import type { DiscussionSendInput, AdHocLabel, BankDetails, CrewApplicationDetail, CrewApplicationSummary, CrewDocumentSummary, CrewJobDetail, CrewLabelRequest, CrewMe, CrewMember, CrewMyJob, CrewRateLine, DiscussionMessage, DiscussionThreadData, JobContact, JobDay, JobDocument, JobScheduleItem, KitListItem, OnboardingInvite, OneDriveShare, Plot } from '../types';
 import type { CrewFeatures } from '@elexprep/shared';
 
 export const crewApi = {
@@ -154,8 +155,9 @@ export const crewApi = {
     discussion: {
       list: (jobId: string, groupId?: string | null) =>
         request<DiscussionThreadData>(`/crew/me/jobs/${jobId}/discussion${groupId ? `?groupId=${encodeURIComponent(groupId)}` : ''}`),
-      send: (jobId: string, body: string, groupId?: string | null) =>
-        request<DiscussionMessage>(`/crew/me/jobs/${jobId}/discussion`, { method: 'POST', body: JSON.stringify({ body, groupId }) }),
+      send: (jobId: string, input: DiscussionSendInput) =>
+        request<DiscussionMessage>(`/crew/me/jobs/${jobId}/discussion`, { method: 'POST', body: discussionSendBody(input) }),
+      attachmentUrl: (jobId: string, messageId: string) => `${BASE}/crew/me/jobs/${jobId}/discussion/${messageId}/attachment`,
       edit: (jobId: string, messageId: string, body: string) =>
         request<DiscussionMessage>(`/crew/me/jobs/${jobId}/discussion/${messageId}`, { method: 'PUT', body: JSON.stringify({ body }) }),
       remove: (jobId: string, messageId: string) =>

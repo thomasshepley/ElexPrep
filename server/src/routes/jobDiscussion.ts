@@ -3,7 +3,20 @@ import { prisma, logActivity } from '../db';
 import { requireRole } from '../auth';
 import { notifyDiscussionMessage } from '../notifications';
 import { resolvePermissionsForUser } from '../permissions';
+import path from 'path';
 import { ensureJobGroups, GROUP_VISIBILITIES, pickGroup, toGroupDto } from '../discussionGroups';
+import {
+  MESSAGE_INCLUDE,
+  checkReplyTarget,
+  discussionImageUpload,
+  discussionUploadsDir,
+  notificationText,
+  parseMessageInput,
+  removeDiscussionImage,
+  storeDiscussionImage,
+  toMessageDto,
+} from '../discussionMessages';
+import { sendStoredUpload } from '../uploadSafety';
 
 /**
  * A job's discussion thread - staff side (ADMIN/USER). The crew side lives in crewPortal.ts at
@@ -13,38 +26,6 @@ import { ensureJobGroups, GROUP_VISIBILITIES, pickGroup, toGroupDto } from '../d
  * ADMIN/USER-only so a SIGNAGE account can't post into a job's thread.
  */
 export const jobDiscussionRouter = Router();
-
-interface MessageRow {
-  id: string;
-  jobId: string;
-  authorUserId: string;
-  body: string;
-  createdAt: Date;
-  editedAt: Date | null;
-  deletedAt: Date | null;
-  deletedByName: string | null;
-  authorUser: { displayName: string; role: string; isProjectManager: boolean };
-}
-
-function toMessageDto(m: MessageRow) {
-  return {
-    id: m.id,
-    jobId: m.jobId,
-    authorUserId: m.authorUserId,
-    authorName: m.authorUser.displayName,
-    authorRole: m.authorUser.role,
-    authorIsProjectManager: m.authorUser.isProjectManager,
-    // A moderator-removed message never sends its original text to clients - only the
-    // placeholder metadata (see JobDiscussionThread.tsx's rendering of deletedByName).
-    body: m.deletedAt ? '' : m.body,
-    createdAt: m.createdAt,
-    editedAt: m.editedAt,
-    deletedAt: m.deletedAt,
-    deletedByName: m.deletedByName,
-  };
-}
-
-const MESSAGE_INCLUDE = { authorUser: { select: { displayName: true, role: true, isProjectManager: true } } } as const;
 
 // ?groupId= picks the chat group (General when absent); staff can see every group.
 jobDiscussionRouter.get('/:jobId/discussion', async (req, res) => {
@@ -65,24 +46,27 @@ jobDiscussionRouter.get('/:jobId/discussion', async (req, res) => {
   });
 });
 
-jobDiscussionRouter.post('/:jobId/discussion', requireRole('ADMIN', 'USER'), async (req, res) => {
-  const { body, groupId } = req.body ?? {};
-  if (!body || typeof body !== 'string' || !body.trim()) return res.status(400).json({ error: 'body is required' });
-  if (body.length > 5000) return res.status(400).json({ error: 'Message is too long' });
+// JSON, or multipart with an "image" file (an image or GIF) plus the same fields.
+jobDiscussionRouter.post('/:jobId/discussion', requireRole('ADMIN', 'USER'), discussionImageUpload.single('image'), async (req, res) => {
+  const input = parseMessageInput(req.body, Boolean(req.file));
+  if ('error' in input) return res.status(400).json({ error: input.error });
   const job = await prisma.job.findUnique({ where: { id: req.params.jobId }, select: { name: true, discussionLocked: true } });
   if (!job) return res.status(404).json({ error: 'Job not found' });
   if (job.discussionLocked) {
     const perms = await resolvePermissionsForUser(req.user!.id, req.user!.role);
     if (!perms.moderateDiscussion) return res.status(403).json({ error: 'This discussion is locked' });
   }
-  const group = pickGroup(await ensureJobGroups(req.params.jobId), groupId);
+  const group = pickGroup(await ensureJobGroups(req.params.jobId), input.groupId);
+  const replyError = await checkReplyTarget(req.params.jobId, group.id, input.replyToId);
+  if (replyError) return res.status(400).json({ error: replyError });
+  const image = req.file ? await storeDiscussionImage(req.file) : null;
 
   const message = await prisma.jobDiscussionMessage.create({
-    data: { jobId: req.params.jobId, authorUserId: req.user!.id, body: body.trim(), groupId: group.id },
+    data: { jobId: req.params.jobId, authorUserId: req.user!.id, body: input.text, groupId: group.id, replyToId: input.replyToId, ...image },
     include: MESSAGE_INCLUDE,
   });
   await logActivity('job_discussion.create', req.params.jobId, req.params.jobId, req.user!.id);
-  await notifyDiscussionMessage(req.params.jobId, job.name, req.user!.id, req.user!.displayName, message.body, group.id);
+  await notifyDiscussionMessage(req.params.jobId, job.name, req.user!.id, req.user!.displayName, notificationText(message.body, Boolean(image)), group.id);
   res.status(201).json(toMessageDto(message));
 });
 
@@ -151,22 +135,32 @@ jobDiscussionRouter.delete('/:jobId/discussion/groups/:groupId', requireRole('AD
   const group = await prisma.discussionGroup.findFirst({ where: { id: req.params.groupId, jobId: req.params.jobId } });
   if (!group) return res.status(404).json({ error: 'Group not found' });
   if (group.isDefault) return res.status(400).json({ error: "General can't be deleted - rename it instead" });
+  const images = await prisma.jobDiscussionMessage.findMany({ where: { groupId: group.id, attachmentPath: { not: null } }, select: { attachmentPath: true } });
   await prisma.discussionGroup.delete({ where: { id: group.id } });
+  await Promise.all(images.map((m) => removeDiscussionImage(m.attachmentPath)));
   await logActivity('job_discussion.group_delete', group.name, req.params.jobId, req.user!.id);
   res.status(204).end();
 });
 
+// An attached image or GIF. Staff can read every group, so the job is the only scope.
+jobDiscussionRouter.get('/:jobId/discussion/:messageId/attachment', async (req, res) => {
+  const message = await prisma.jobDiscussionMessage.findUnique({ where: { id: req.params.messageId } });
+  if (!message || message.jobId !== req.params.jobId || message.deletedAt || !message.attachmentPath) return res.status(404).end();
+  await sendStoredUpload(res, path.join(discussionUploadsDir, message.attachmentPath), message.attachmentName ?? 'image');
+});
+
 // Only the author can edit their own message - unlike delete, there's no moderator-edit path.
 jobDiscussionRouter.put('/:jobId/discussion/:messageId', requireRole('ADMIN', 'USER'), async (req, res) => {
-  const { body } = req.body ?? {};
-  if (!body || typeof body !== 'string' || !body.trim()) return res.status(400).json({ error: 'body is required' });
   const message = await prisma.jobDiscussionMessage.findUnique({ where: { id: req.params.messageId } });
   if (!message || message.jobId !== req.params.jobId || message.deletedAt) return res.status(404).json({ error: 'Message not found' });
+  const input = parseMessageInput(req.body, Boolean(message.attachmentPath));
+  if ('error' in input) return res.status(400).json({ error: input.error });
+  const body = input.text;
   if (message.authorUserId !== req.user!.id) return res.status(403).json({ error: 'You can only edit your own messages' });
 
   const updated = await prisma.jobDiscussionMessage.update({
     where: { id: message.id },
-    data: { body: body.trim(), editedAt: new Date() },
+    data: { body, editedAt: new Date() },
     include: MESSAGE_INCLUDE,
   });
   await logActivity('job_discussion.edit', req.params.jobId, req.params.jobId, req.user!.id);
@@ -182,13 +176,15 @@ jobDiscussionRouter.delete('/:jobId/discussion/:messageId', requireRole('ADMIN',
   if (!message || message.jobId !== req.params.jobId || message.deletedAt) return res.status(404).json({ error: 'Message not found' });
   if (message.authorUserId === req.user!.id) {
     await prisma.jobDiscussionMessage.delete({ where: { id: message.id } });
+    await removeDiscussionImage(message.attachmentPath);
   } else {
     const perms = await resolvePermissionsForUser(req.user!.id, req.user!.role);
     if (!perms.moderateDiscussion) return res.status(403).json({ error: 'Insufficient permissions' });
     await prisma.jobDiscussionMessage.update({
       where: { id: message.id },
-      data: { deletedAt: new Date(), deletedByName: req.user!.displayName },
+      data: { deletedAt: new Date(), deletedByName: req.user!.displayName, attachmentPath: null, attachmentMime: null, attachmentName: null },
     });
+    await removeDiscussionImage(message.attachmentPath);
   }
   await logActivity('job_discussion.delete', req.params.jobId, req.params.jobId, req.user!.id);
   res.status(204).end();

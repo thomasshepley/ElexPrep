@@ -4,6 +4,11 @@ Newest entries first. Each push/merge gets exactly one entry - see
 `scripts/bump-version.mjs` for how the version number itself advances. A `+` marks a
 feature addition, a `-` marks a bug fix.
 
+## v1.4.5 - 2026-10-13
+
++ Reply to a specific message and send images or GIFs in job discussions, named days with call and estimated wrap times, deadline-style schedule points (same start and end time), and your next call time on the crew home page
++ New admin features for the job page, Schedule tab and Print Queue
+
 ## v1.4.4 - 2026-10-13
 
 + Patch import now lets you choose the patch file from OneDrive in a popup, including one you've imported before

@@ -1683,8 +1683,106 @@ tbody tr:hover {
 
 .discussion-compose {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-end;
   gap: 0.6rem;
+}
+
+.discussion-compose-extras {
+  flex-basis: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+button.discussion-attach {
+  padding: 0.5rem 0.6rem;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* The quoted message above a reply, and the "Replying to" bar in the compose box. */
+.discussion-quote {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  width: 100%;
+  margin: 0 0 0.35rem;
+  padding: 0.35rem 0.6rem;
+  border: none;
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--content) 7%, transparent);
+  color: var(--content);
+  font-size: var(--text-xs);
+  font-weight: 400;
+  text-align: left;
+  box-shadow: none;
+}
+
+button.discussion-quote:hover:not(:disabled) {
+  transform: none;
+  box-shadow: none;
+  background: color-mix(in srgb, var(--content) 12%, transparent);
+}
+
+.discussion-quote-body {
+  color: var(--content-muted);
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.discussion-quote.is-draft {
+  position: relative;
+  padding-right: 2.2rem;
+  margin: 0;
+}
+
+.discussion-chip-close {
+  position: absolute;
+  top: 0.25rem;
+  right: 0.25rem;
+  padding: 0 0.45rem;
+  line-height: 1.4;
+}
+
+.discussion-image {
+  display: block;
+  margin: 0.15rem 0 0.35rem;
+}
+
+.discussion-image img {
+  display: block;
+  max-width: min(100%, 20rem);
+  max-height: 18rem;
+  border-radius: var(--radius-sm);
+  object-fit: contain;
+  background: var(--surface-sunken);
+}
+
+.discussion-image-draft {
+  position: relative;
+  align-self: flex-start;
+}
+
+.discussion-image-draft img {
+  display: block;
+  max-height: 7rem;
+  max-width: 12rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+}
+
+.discussion-message {
+  transition: box-shadow 200ms ease;
+}
+
+.discussion-message.is-highlighted {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 55%, transparent);
 }
 
 .discussion-compose input,
@@ -3162,4 +3260,118 @@ button.patch-picker-row[aria-busy='true'] {
   font-weight: 700;
   color: var(--accent);
   white-space: nowrap;
+}
+
+button.secondary.danger-text {
+  color: var(--danger);
+}
+
+/* Point-in-time schedule markers (same start and end) and a day's call / wrap lines. */
+.day-timeline-marker {
+  --marker-color: var(--warning);
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 0;
+  z-index: 2;
+  border-top: 2px dashed var(--marker-color);
+}
+
+.day-timeline-marker.tone-call {
+  --marker-color: var(--success);
+  border-top-style: solid;
+}
+
+.day-timeline-marker.tone-wrap {
+  --marker-color: var(--content-muted);
+}
+
+.day-timeline-marker.is-mine {
+  --marker-color: var(--pm);
+}
+
+.day-timeline-marker-pill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  max-width: 100%;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  background: var(--surface-raised);
+  border: 1.5px solid var(--marker-color);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-shadow: var(--shadow-sm);
+}
+
+.day-timeline-marker-pill::before {
+  content: '';
+  width: 0.5rem;
+  height: 0.5rem;
+  flex-shrink: 0;
+  background: var(--marker-color);
+  transform: rotate(45deg);
+}
+
+.day-timeline-marker-time {
+  color: var(--marker-color);
+  font-variant-numeric: tabular-nums;
+}
+
+.day-timeline-marker-extra {
+  font-weight: 400;
+  color: var(--content-muted);
+}
+
+.day-timeline-marker.is-openable .day-timeline-marker-pill {
+  cursor: pointer;
+}
+
+.day-timeline-marker.is-openable:focus-visible .day-timeline-marker-pill {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.schedule-entry.is-point .schedule-entry-time {
+  color: var(--warning);
+}
+
+.schedule-point-chip {
+  margin-left: 0.4rem;
+  font-size: var(--text-xs);
+}
+
+.day-summary {
+  margin: 0 0 0.6rem;
+  font-size: var(--text-sm);
+  color: var(--content-muted);
+  font-weight: 600;
+}
+
+.day-heading-name,
+.day-tab-name {
+  font-weight: 500;
+}
+
+.day-block-name {
+  display: block;
+  font-weight: 500;
+  font-size: var(--text-sm);
+  color: var(--content-muted);
+}
+
+.day-block-times {
+  display: flex;
+  gap: 0.6rem;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--content-muted);
+  margin: -0.15rem 0 0.35rem;
 }

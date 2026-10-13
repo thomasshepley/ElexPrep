@@ -4,7 +4,7 @@ import path from 'path';
 import fs from 'fs';
 import { prisma, logActivity } from '../db';
 import { requirePermission, resolvePermissionsForUser } from '../permissions';
-import { isAdminRole } from '../auth';
+import { isAdminRole, requireRole } from '../auth';
 import { IMAGE_KINDS, acceptDiskUpload, acceptFileAtPath, randomUploadName, sendStoredUpload } from '../uploadSafety';
 import { normalizeCrewFeaturesPatch } from '../crewFeatures';
 import { findLogoCandidate } from '../oneDrive/logo';
@@ -30,13 +30,20 @@ const LOGO_SCALE_FIELDS = { left: 'logoScaleLeft', middle: 'logoScale', right: '
 const LOGO_SCALE_MIN = 20;
 const LOGO_SCALE_MAX = 200;
 
+/** Who can be a job's project manager - staff who run jobs, not signage screens or crew logins. */
+const PM_ROLES = ['ADMIN', 'USER'];
+const PM_SELECT = { id: true, displayName: true, avatarPath: true } as const;
+
 /** ADMIN sees every job; USER/SIGNAGE only see jobs an admin has marked Public. */
 jobsRouter.get('/', async (req, res) => {
   const isAdmin = isAdminRole(req.user?.role);
   const jobs = await prisma.job.findMany({
     where: isAdmin ? undefined : { isPublic: true },
     orderBy: { createdAt: 'desc' },
-    include: { _count: { select: { fixtures: true, caseGroups: true, crewAssignments: true } } },
+    include: {
+      _count: { select: { fixtures: true, caseGroups: true, crewAssignments: true } },
+      projectManager: { select: PM_SELECT },
+    },
   });
   const ids = jobs.map((j) => j.id);
   const [queueCounts, opportunities] = await Promise.all([
@@ -70,20 +77,31 @@ jobsRouter.get('/', async (req, res) => {
   );
 });
 
+// Staff who can be picked as a job's project manager. Declared before /:id so it isn't
+// swallowed as a job id.
+jobsRouter.get('/project-manager-options', requireRole('ADMIN', 'USER'), async (_req, res) => {
+  const users = await prisma.user.findMany({
+    where: { role: { in: PM_ROLES } },
+    select: PM_SELECT,
+    orderBy: { displayName: 'asc' },
+  });
+  res.json(users);
+});
+
 // Jobs can no longer be created directly - every job enters the portal by onboarding a
 // Current RMS Quote/Order (see routes/currentRms.ts's import/bulk-import endpoints), so the
 // job list and its data (crew features, OneDrive folder, etc.) always starts from a real
 // opportunity rather than a blank admin-typed name.
 jobsRouter.get('/:id', async (req, res) => {
-  const job = await prisma.job.findUnique({ where: { id: req.params.id } });
+  const job = await prisma.job.findUnique({ where: { id: req.params.id }, include: { projectManager: { select: PM_SELECT } } });
   if (!job) return res.status(404).json({ error: 'not found' });
   if (!job.isPublic && !isAdminRole(req.user?.role)) return res.status(404).json({ error: 'not found' });
   res.json(job);
 });
 
 jobsRouter.put('/:id', async (req, res) => {
-  const { name, venue, description, address, startsAt, endsAt, isPublic, crewFeatures, logoScales } = req.body ?? {};
-  const editsDetails = [name, venue, description, address, startsAt, endsAt, logoScales].some((v) => v !== undefined);
+  const { name, venue, description, address, startsAt, endsAt, isPublic, crewFeatures, logoScales, projectManagerUserId } = req.body ?? {};
+  const editsDetails = [name, venue, description, address, startsAt, endsAt, logoScales, projectManagerUserId].some((v) => v !== undefined);
   if (editsDetails && !isAdminRole(req.user?.role)) {
     const perms = req.user?.role === 'USER' ? await resolvePermissionsForUser(req.user.id, 'USER') : null;
     if (!perms?.editJobs) {
@@ -110,6 +128,11 @@ jobsRouter.put('/:id', async (req, res) => {
   }
   for (const [key, value] of Object.entries({ startsAt, endsAt })) {
     if (value && Number.isNaN(new Date(value).getTime())) return res.status(400).json({ error: `${key} is not a valid date` });
+  }
+  if (projectManagerUserId !== undefined && projectManagerUserId !== null) {
+    if (typeof projectManagerUserId !== 'string') return res.status(400).json({ error: 'projectManagerUserId must be a user id or null' });
+    const pm = await prisma.user.findUnique({ where: { id: projectManagerUserId }, select: { role: true } });
+    if (!pm || !PM_ROLES.includes(pm.role)) return res.status(400).json({ error: 'The project manager must be an admin or prep account' });
   }
   if (isPublic !== undefined && typeof isPublic !== 'boolean') return res.status(400).json({ error: 'isPublic must be a boolean' });
   if (isPublic !== undefined && !isAdminRole(req.user?.role)) {
@@ -139,20 +162,24 @@ jobsRouter.put('/:id', async (req, res) => {
       ...(endsAt !== undefined ? { endsAt: endsAt ? new Date(endsAt) : null } : {}),
       ...(isPublic !== undefined ? { isPublic } : {}),
       ...(crewFeaturesJson !== undefined ? { crewFeaturesJson } : {}),
+      ...(projectManagerUserId !== undefined ? { projectManagerUserId } : {}),
       ...logoScaleData,
     },
+    include: { projectManager: { select: PM_SELECT } },
   });
   if (isPublic !== undefined) await logActivity('job.visibility', `isPublic=${isPublic}`, job.id, req.user?.id);
+  if (projectManagerUserId !== undefined) await logActivity('job.project_manager', job.projectManager?.displayName ?? '(none)', job.id, req.user?.id);
   if (crewFeaturesJson !== undefined) await logActivity('job.crew_features', crewFeaturesJson ?? 'reset to default', job.id, req.user?.id);
   res.json(job);
 });
 
 jobsRouter.delete('/:id', requirePermission('deleteJobs'), async (req, res) => {
   const jobId = req.params.id;
-  const [job, plots, printJobs] = await Promise.all([
+  const [job, plots, printJobs, chatImages] = await Promise.all([
     prisma.job.findUnique({ where: { id: jobId } }),
     prisma.plot.findMany({ where: { jobId } }),
     prisma.printJob.findMany({ where: { jobId } }),
+    prisma.jobDiscussionMessage.findMany({ where: { jobId, attachmentPath: { not: null } }, select: { attachmentPath: true } }),
   ]);
   if (!job) return res.status(404).json({ error: 'not found' });
 
@@ -167,6 +194,7 @@ jobsRouter.delete('/:id', requirePermission('deleteJobs'), async (req, res) => {
     ...(job.logoPathRight ? [path.join(uploadDir, job.logoPathRight)] : []),
     ...plots.map((p) => path.join(uploadDir, 'plots', p.fileName)),
     ...printJobs.map((pj) => path.join(uploadDir, 'print-jobs', pj.fileName)),
+    ...chatImages.map((m) => path.join(uploadDir, 'discussion', m.attachmentPath!)),
   ];
   await Promise.all(filesToRemove.map((f) => fs.promises.unlink(f).catch(() => {})));
 

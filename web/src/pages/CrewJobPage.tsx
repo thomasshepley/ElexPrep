@@ -11,6 +11,8 @@ import JobDiscussionThread from '../components/JobDiscussionThread';
 import CadPlotsViewer from '../components/CadPlotsViewer';
 import LocationLinks from '../components/LocationLinks';
 import WhatsAppButton from '../components/WhatsAppButton';
+import Avatar from '../components/Avatar';
+import UserName from '../components/UserName';
 import { usePageTitle } from '../pageTitle';
 import { formatDateTime } from '../utils/format';
 
@@ -115,8 +117,18 @@ function RequestLabelForm({ jobId }: { jobId: string }) {
 
 export default function CrewJobPage() {
   const { jobId } = useParams<{ jobId: string }>();
+  if (!jobId) return null;
+  return <CrewJobView jobId={jobId} />;
+}
+
+/**
+ * The crew's view of one job. Also shown inside the staff job page for an admin or prep user
+ * who's on that job's crew (see JobDetailPage's Admin view / Crew view switch), so `toolbar`
+ * lets that page put its switch beside the title.
+ */
+export function CrewJobView({ jobId, toolbar, setTitle = true }: { jobId: string; toolbar?: ReactNode; setTitle?: boolean }) {
   const [detail, setDetail] = useState<CrewJobDetail | null>(null);
-  usePageTitle(detail?.what.jobName);
+  usePageTitle(setTitle ? detail?.what.jobName : undefined);
   const [schedule, setSchedule] = useState<JobScheduleItem[]>([]);
   const [myProfileId, setMyProfileId] = useState<string | null>(null);
   const [openEntryId, setOpenEntryId] = useState<string | null>(null);
@@ -151,15 +163,18 @@ export default function CrewJobPage() {
   }, [jobId]);
 
   if (error) return <p className="error">{error}</p>;
-  if (!detail || !jobId) return <p className="muted">Loading…</p>;
+  if (!detail) return <p className="muted">Loading…</p>;
 
   return (
     <div>
       <div className="row" style={{ justifyContent: 'space-between', flexWrap: 'wrap' }}>
         <h1 style={{ margin: 0 }}>{detail.what.jobName}</h1>
-        <a className="button secondary" href={api.crewPortal.calendarUrl(jobId)} download>
-          <WhenIcon /> Add to calendar
-        </a>
+        <div className="row" style={{ gap: '0.5rem' }}>
+          {toolbar}
+          <a className="button secondary" href={api.crewPortal.calendarUrl(jobId)} download>
+            <WhenIcon /> Add to calendar
+          </a>
+        </div>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '0.9rem', marginTop: '1.25rem' }}>
@@ -168,6 +183,17 @@ export default function CrewJobPage() {
             You
           </p>
           <span className="chip chip-role">{detail.who.you.role}</span>
+          {detail.who.projectManager && (
+            <>
+              <p className="muted" style={{ margin: '1rem 0 0.5rem' }}>
+                Project manager
+              </p>
+              <div className="row" style={{ gap: '0.5rem' }}>
+                <Avatar userId={detail.who.projectManager.userId} displayName={detail.who.projectManager.displayName} hasAvatar={detail.who.projectManager.hasAvatar} size={26} />
+                <UserName name={detail.who.projectManager.displayName} isProjectManager showPmChip={false} />
+              </div>
+            </>
+          )}
           {detail.who.others.length > 0 && (
             <>
               <p className="muted" style={{ margin: '1rem 0 0.5rem' }}>
@@ -213,8 +239,8 @@ export default function CrewJobPage() {
             </WhySubsection>
 
             <WhySubsection title="Day schedule" defaultOpen>
-              {schedule.length > 0 ? (
-                <DayTimeline items={schedule} onOpen={setOpenEntryId} myCrewProfileId={myProfileId} />
+              {schedule.length > 0 || days.some((d) => d.callTime || d.wrapTime) ? (
+                <DayTimeline items={schedule} onOpen={setOpenEntryId} myCrewProfileId={myProfileId} jobDays={days} />
               ) : (
                 <p className="muted">No schedule has been set for this job yet.</p>
               )}

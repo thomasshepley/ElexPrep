@@ -31,9 +31,18 @@ export interface Job {
   oneDriveMatchStatus: 'MATCHED' | 'MANUAL' | null;
   crewFeaturesJson: string | null;
   discussionLocked: boolean;
+  projectManagerUserId: string | null;
+  projectManager: JobProjectManager | null;
   createdAt: string;
   /** Only on the jobs list response. */
   summary?: JobSummary;
+}
+
+/** The staff member running a job. */
+export interface JobProjectManager {
+  id: string;
+  displayName: string;
+  avatarPath: string | null;
 }
 
 export interface FixtureTypeRule {
@@ -345,6 +354,11 @@ export interface JobDayCrew {
 export interface JobDay {
   id: string;
   date: string;
+  /** e.g. "Prep Day". */
+  name: string | null;
+  /** "HH:MM" UK local time on this day; a wrap earlier than the call runs past midnight. */
+  callTime: string | null;
+  wrapTime: string | null;
   crew: JobDayCrew[];
 }
 
@@ -404,6 +418,10 @@ export interface CrewMyJob {
    * on that day (every entry that day when they're on none specifically). */
   nextDay: {
     date: string;
+    name: string | null;
+    /** "HH:MM" UK local; the day's call time when an admin set one. */
+    callTime: string | null;
+    wrapTime: string | null;
     items: { title: string; startsAt: string; endsAt: string | null }[];
     others: { name: string; role: string }[];
   } | null;
@@ -416,6 +434,7 @@ export interface CrewJobDetail {
   jobId: string;
   who: {
     you: { role: string };
+    projectManager: { userId: string; displayName: string; hasAvatar: boolean } | null;
     others: { displayName: string; role: string }[];
   };
   what: {
@@ -605,10 +624,40 @@ export interface DiscussionMessage {
   authorRole: string;
   authorIsProjectManager?: boolean;
   body: string;
+  /** An attached image or GIF; fetch it from the scope's attachmentUrl. */
+  attachment: { name: string; mime: string } | null;
+  /** The message this replies to, shown quoted above it. */
+  replyTo: {
+    id: string;
+    authorName: string;
+    authorRole: string;
+    authorIsProjectManager: boolean;
+    deleted: boolean;
+    body: string;
+    hasImage: boolean;
+  } | null;
   createdAt: string;
   editedAt: string | null;
   deletedAt: string | null;
   deletedByName: string | null;
+}
+
+export interface DiscussionSendInput {
+  body: string;
+  groupId?: string | null;
+  replyToId?: string | null;
+  image?: File | null;
+}
+
+/** JSON for a text message, multipart when there's an image to upload. */
+export function discussionSendBody({ body, groupId, replyToId, image }: DiscussionSendInput): string | FormData {
+  if (!image) return JSON.stringify({ body, groupId, replyToId });
+  const form = new FormData();
+  form.append('body', body);
+  if (groupId) form.append('groupId', groupId);
+  if (replyToId) form.append('replyToId', replyToId);
+  form.append('image', image);
+  return form;
 }
 
 export type DiscussionGroupVisibility = 'EVERYONE' | 'MEMBERS';

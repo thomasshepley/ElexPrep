@@ -57,19 +57,22 @@ model Job {
   /// Set when onboarding matched (or an admin manually picked) a folder under the OneDrive
   /// "Projects" root for this job — see server/src/oneDrive/matcher.ts. Null until OneDrive is
   /// configured and linked; the whole feature stays optional per-job.
-  oneDriveFolderId    String?
-  oneDriveFolderPath  String?
+  oneDriveFolderId     String?
+  oneDriveFolderPath   String?
   /// MATCHED (auto-matched by name at onboarding) | MANUAL (an admin picked it) | null (no
   /// OneDrive folder linked yet).
-  oneDriveMatchStatus String?
+  oneDriveMatchStatus  String?
   /// Per-job override of which crew-portal sections are visible for this job's crew, merged
   /// onto the global default (see server/src/crewFeatures.ts). Null = use the default as-is;
   /// set at onboarding time, editable later from Job Settings.
-  crewFeaturesJson    String?
+  crewFeaturesJson     String?
   /// Admin/moderator-set freeze on this job's discussion thread - while true, only an account
   /// with the moderateDiscussion permission can post a new message. Existing messages keep
   /// their normal edit/delete rules either way.
-  discussionLocked    Boolean @default(false)
+  discussionLocked     Boolean @default(false)
+  /// The staff member running this job - shown on the job page and to its crew.
+  projectManagerUserId String?
+  projectManager       User?   @relation("JobProjectManager", fields: [projectManagerUserId], references: [id], onDelete: SetNull)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -159,20 +162,28 @@ model OneDriveShare {
 /// as a placeholder in the thread instead of disappearing without a trace. Deleting your own
 /// message stays a hard delete — there's no moderation story to preserve there.
 model JobDiscussionMessage {
-  id            String           @id @default(cuid())
-  jobId         String
-  job           Job              @relation(fields: [jobId], references: [id], onDelete: Cascade)
-  authorUserId  String
-  authorUser    User             @relation(fields: [authorUserId], references: [id], onDelete: Cascade)
-  body          String
-  createdAt     DateTime         @default(now())
-  editedAt      DateTime?
-  deletedAt     DateTime?
-  deletedByName String?
+  id             String                 @id @default(cuid())
+  jobId          String
+  job            Job                    @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  authorUserId   String
+  authorUser     User                   @relation(fields: [authorUserId], references: [id], onDelete: Cascade)
+  body           String
+  createdAt      DateTime               @default(now())
+  editedAt       DateTime?
+  deletedAt      DateTime?
+  deletedByName  String?
   /// The chat group this was posted in - null only for messages from before groups existed,
   /// which are moved into the job's General group the first time its discussion is opened.
-  groupId       String?
-  group         DiscussionGroup? @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  groupId        String?
+  group          DiscussionGroup?       @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  /// The message this one replies to (shown quoted above it). Cleared if that one's deleted.
+  replyToId      String?
+  replyTo        JobDiscussionMessage?  @relation("DiscussionReply", fields: [replyToId], references: [id], onDelete: SetNull)
+  replies        JobDiscussionMessage[] @relation("DiscussionReply")
+  /// An attached image or GIF, stored under uploads/discussion (see routes/jobDiscussion.ts).
+  attachmentPath String?
+  attachmentMime String?
+  attachmentName String?
 
   @@index([jobId])
   @@index([groupId])
@@ -257,6 +268,12 @@ model JobDay {
   jobId     String
   job       Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
   date      DateTime
+  /// Optional label, e.g. "Prep Day" or "Show Day 1".
+  name      String?
+  /// Wall-clock "HH:MM" in UK local time on this day's date; wrap earlier than call means it
+  /// runs past midnight.
+  callTime  String?
+  wrapTime  String?
   createdAt DateTime @default(now())
 
   crewAssignments JobDayCrewAssignment[]
@@ -825,6 +842,7 @@ model User {
   crewProfile           CrewProfile?
   notifications         Notification[]
   jobDiscussionMessages JobDiscussionMessage[]
+  managedJobs           Job[]                  @relation("JobProjectManager")
   backupCodes           BackupCode[]
   bugReports            BugReport[]
 }
