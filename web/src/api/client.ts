@@ -78,7 +78,7 @@ export interface LocationColorRule {
 
 export interface Fixture {
   id: string;
-  address: number;
+  address: number | null;
   fixtureType: string;
   mainUniverse: number | null;
   mainAddress: number | null;
@@ -117,6 +117,18 @@ export interface PatchImportCandidate {
   reviewedAt: string | null;
   reviewedBy: string | null;
   rejectionNote: string | null;
+}
+
+/// A patch import now merges onto existing fixtures rather than wiping them - see
+/// routes/patch.ts's mergeFixtures. `matched` is how many existing (addressed) fixtures were
+/// updated in place from the new file, `created` is brand-new rows, `removed` is existing
+/// addressed fixtures struck from the new file.
+export interface PatchImportResult {
+  imported: number;
+  newFixtureTypes: string[];
+  matched: number;
+  created: number;
+  removed: number;
 }
 
 export interface CaseGroup {
@@ -951,7 +963,7 @@ export const api = {
       }>(`/jobs/${jobId}/patch/preview`, { method: 'POST', body: form });
     },
     import: (jobId: string, rows: Record<string, string>[], mapping?: Record<string, string>, groupId?: string | null) =>
-      request<{ imported: number; newFixtureTypes: string[] }>(`/jobs/${jobId}/patch/import`, {
+      request<PatchImportResult>(`/jobs/${jobId}/patch/import`, {
         method: 'POST',
         body: JSON.stringify({ ...(mapping ? { mapping } : {}), rows, groupId: groupId ?? null }),
       }),
@@ -969,7 +981,7 @@ export const api = {
     getOneDriveCandidate: (jobId: string) =>
       request<PatchImportCandidate | null>(`/jobs/${jobId}/patch/onedrive-candidate`),
     approveOneDriveCandidate: (jobId: string) =>
-      request<{ imported: number; newFixtureTypes: string[]; candidate: PatchImportCandidate }>(
+      request<PatchImportResult & { candidate: PatchImportCandidate }>(
         `/jobs/${jobId}/patch/onedrive-candidate/approve`,
         { method: 'POST' }
       ),

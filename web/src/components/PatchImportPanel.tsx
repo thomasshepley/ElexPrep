@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PATCH_FIELD_LABELS, type PatchFieldKey } from '@elexprep/shared';
-import { api, type Fixture, type PatchImportCandidate } from '../api/client';
+import { api, type Fixture, type PatchImportCandidate, type PatchImportResult } from '../api/client';
 import FileInput from './FileInput';
 import { useToast } from './Toast';
 
@@ -12,6 +12,16 @@ function announceNewFixtureTypes(showToast: ReturnType<typeof useToast>['showToa
     `${types.length === 1 ? 'New fixture type' : 'New fixture types'} added to case rules: ${list}`,
     'info'
   );
+}
+
+/** A re-import merges onto what's already there (see routes/patch.ts's mergeFixtures) rather
+ * than wiping it, so the summary says what actually happened instead of just a flat count. */
+function summarizeImport(res: PatchImportResult): string {
+  const parts: string[] = [];
+  if (res.matched > 0) parts.push(`${res.matched} updated`);
+  if (res.created > 0) parts.push(`${res.created} new`);
+  if (res.removed > 0) parts.push(`${res.removed} removed`);
+  return parts.length > 0 ? `${res.imported} fixtures (${parts.join(', ')})` : `${res.imported} fixtures`;
 }
 
 export default function PatchImportPanel({ jobId, groupId = null }: { jobId: string; groupId?: string | null }) {
@@ -61,7 +71,7 @@ export default function PatchImportPanel({ jobId, groupId = null }: { jobId: str
       const res = await api.patch.approveOneDriveCandidate(jobId);
       setCandidate(res.candidate);
       await loadFixtures();
-      showToast(`Imported ${res.imported} fixtures`);
+      showToast(`Imported ${summarizeImport(res)}`);
       announceNewFixtureTypes(showToast, res.newFixtureTypes);
     } catch (e) {
       setScanError((e as Error).message);
@@ -178,7 +188,7 @@ export default function PatchImportPanel({ jobId, groupId = null }: { jobId: str
       await loadFixtures();
       setRows([]);
       setFileName(null);
-      showToast(`Imported ${res.imported} fixtures`);
+      showToast(`Imported ${summarizeImport(res)}`);
       announceNewFixtureTypes(showToast, res.newFixtureTypes);
     } catch (e) {
       setError((e as Error).message);

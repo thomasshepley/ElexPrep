@@ -405,7 +405,10 @@ export function mergeTemplate(
 // ---------------------------------------------------------------------------
 
 export interface FixtureLabelContent {
-  address: number;
+  // Null when the source patch had no unit/spot number for this fixture yet (see
+  // schema.prisma's Fixture.address doc comment) - the label still prints, just with a blank
+  // address, until an admin fills one in and regenerates.
+  address: number | null;
   mainUniverse?: number | null;
   mainAddress?: number | null;
   pixUniverse?: number | null;
@@ -462,7 +465,7 @@ export function resolveLabelContent(labelType: LabelType, item: unknown): Record
         infoLines.push(`Pix: Uni: ${c.pixUniverse} Add: ${c.pixAddress}`);
       }
       if (c.mode) infoLines.push(`Mode: ${c.mode}`);
-      return { address: String(c.address), infoLines };
+      return { address: c.address === null ? '' : String(c.address), infoLines };
     }
     case 'TRUSS_SPIKE_POSITION': {
       const c = item as TrussSpikePositionContent;

@@ -27,7 +27,10 @@ export function formatCaseLabel(addresses: number[], unitsPerCase: number): stri
 /**
  * Groups fixtures of the same type into cases, chunking by address order in runs of
  * `unitsPerCase`. Fixture types with no matching rule default to one unit per case
- * (i.e. every fixture gets its own case label).
+ * (i.e. every fixture gets its own case label). A fixture with no address at all (not yet
+ * patched/numbered - see RawFixtureInput.address) can't be placed in an address-range case
+ * label, so it's silently excluded here rather than packed - it still exists as a Fixture and
+ * can get its own FIXTURE label once it has an address to pack with.
  */
 export function packFixturesIntoCases(
   fixtures: RawFixtureInput[],
@@ -36,11 +39,12 @@ export function packFixturesIntoCases(
   const ruleByType = new Map(rules.map((r) => [r.name.toLowerCase(), r]));
   // Grouped by fixture type AND stage together, so two stages' fixtures of the same type
   // never end up packed into the same case (see RawFixtureInput.groupId).
-  const byTypeAndGroup = new Map<string, RawFixtureInput[]>();
+  const byTypeAndGroup = new Map<string, (RawFixtureInput & { address: number })[]>();
   for (const f of fixtures) {
+    if (f.address === null) continue;
     const key = `${f.fixtureType}::${f.groupId ?? ''}`;
     if (!byTypeAndGroup.has(key)) byTypeAndGroup.set(key, []);
-    byTypeAndGroup.get(key)!.push(f);
+    byTypeAndGroup.get(key)!.push({ ...f, address: f.address });
   }
 
   const groups: CaseGroup[] = [];

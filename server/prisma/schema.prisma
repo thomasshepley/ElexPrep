@@ -468,7 +468,12 @@ model Fixture {
   id            String  @id @default(cuid())
   jobId         String
   job           Job     @relation(fields: [jobId], references: [id], onDelete: Cascade)
-  address       Int
+  /// Nullable because a real patch export sometimes has fixtures with no unit/spot number at
+  /// all (e.g. a fixed, unaddressed house light) - those still need to come in as real
+  /// Fixture rows so an admin can fill the address in later, rather than being silently
+  /// dropped by the importer. Also the match key a re-import uses to tell "the same physical
+  /// unit, now re-patched" from "a genuinely new fixture" - see routes/patch.ts's mergeFixtures.
+  address       Int?
   fixtureType   String
   mainUniverse  Int?
   mainAddress   Int?

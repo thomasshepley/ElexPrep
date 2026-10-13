@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import multer from 'multer';
+import type { Prisma } from '@prisma/client';
 import { PATCH_FIELD_KEYS, PatchFieldKey } from '@elexprep/shared';
 import { prisma, logActivity } from '../db';
 import { requirePermission } from '../permissions';
@@ -34,16 +35,59 @@ async function loadSavedPatchMapping(): Promise<Partial<Record<PatchFieldKey, st
   return saved ? JSON.parse(saved.valueJson) : null;
 }
 
-/** The destructive replace shared by the manual-upload import and the OneDrive auto-detect
- * approval flow: wipes the job's existing fixtures and writes the freshly-built set in one
- * transaction. Scoped to one stage (groupId, null meaning "ungrouped") rather than the whole
- * job, so a multi-stage job can re-import one stage's patch without touching any other
- * stage's already-imported fixtures - see routes/fixtureGroups.ts for the stage model. */
-async function replaceFixtures(jobId: string, fixtures: ReturnType<typeof buildFixturesFromRows>, groupId: string | null = null) {
-  await prisma.$transaction([
-    prisma.fixture.deleteMany({ where: { jobId, groupId } }),
-    prisma.fixture.createMany({
-      data: fixtures.map((f) => ({
+/**
+ * Shared by the manual-upload import and the OneDrive auto-detect approval flow. Re-importing
+ * a job's patch is expected to happen more than once - a venue-confirmed v2 of the same show -
+ * so this merges the new file onto what's already there instead of wiping it and starting
+ * over, using `address` (the Spot/unit number, not necessarily the live DMX patch - see
+ * schema.prisma's Fixture.address doc comment) as the one stable identity a re-import carries:
+ *
+ * - A new row whose address matches an existing fixture's address is the same physical unit,
+ *   so that fixture is UPDATED in place: fixtureType/mainUniverse/mainAddress/pixUniverse/
+ *   pixAddress/mode/rawJson (everything the patch file itself says) are overwritten from the
+ *   new row, while location/notes/ipAddress/subnetMask (whatever an admin set by hand) are left
+ *   untouched. This is the "renew addresses, keep my settings" behaviour - re-patching a unit
+ *   to a new DMX address in v2 updates mainUniverse/mainAddress without losing its location.
+ * - A new row whose address doesn't match anything existing (or has no address at all) becomes
+ *   a new Fixture.
+ * - An existing ADDRESSED fixture whose address isn't in the new file at all is struck from the
+ *   patch, so it's removed. An existing UNADDRESSED fixture is never auto-removed this way -
+ *   there's no way to tell whether it corresponds to anything in the new file (nothing to
+ *   match on), so it's left alone rather than risk deleting an admin's own notes/location on a
+ *   fixture they haven't gotten an address for yet; the cost is that re-importing repeatedly
+ *   without addressing it first can leave more than one unaddressed row for the same real unit,
+ *   which is cleaned up the same way any duplicate/extra row is - deleted by hand.
+ *
+ * Scoped to one stage (groupId, null meaning "ungrouped") rather than the whole job, so a
+ * multi-stage job can re-import one stage's patch without touching any other stage's already-
+ * imported fixtures - see routes/fixtureGroups.ts for the stage model.
+ */
+async function mergeFixtures(jobId: string, fixtures: ReturnType<typeof buildFixturesFromRows>, groupId: string | null = null) {
+  const existing = await prisma.fixture.findMany({ where: { jobId, groupId } });
+  const existingByAddress = new Map(
+    existing.filter((f) => f.address !== null).map((f) => [f.address as number, f])
+  );
+  const matchedIds = new Set<string>();
+
+  const operations: Prisma.PrismaPromise<unknown>[] = fixtures.map((f) => {
+    const match = f.address !== null ? existingByAddress.get(f.address) : undefined;
+    if (match) {
+      matchedIds.add(match.id);
+      return prisma.fixture.update({
+        where: { id: match.id },
+        data: {
+          fixtureType: f.fixtureType,
+          mainUniverse: f.mainUniverse ?? null,
+          mainAddress: f.mainAddress ?? null,
+          pixUniverse: f.pixUniverse ?? null,
+          pixAddress: f.pixAddress ?? null,
+          mode: f.mode ?? null,
+          rawJson: JSON.stringify(f.raw ?? {}),
+        },
+      });
+    }
+    return prisma.fixture.create({
+      data: {
         jobId,
         groupId,
         address: f.address,
@@ -58,9 +102,16 @@ async function replaceFixtures(jobId: string, fixtures: ReturnType<typeof buildF
         subnetMask: f.subnetMask ?? null,
         notes: f.notes ?? null,
         rawJson: JSON.stringify(f.raw ?? {}),
-      })),
-    }),
-  ]);
+      },
+    });
+  });
+
+  const removedIds = existing.filter((f) => f.address !== null && !matchedIds.has(f.id)).map((f) => f.id);
+  if (removedIds.length > 0) operations.push(prisma.fixture.deleteMany({ where: { id: { in: removedIds } } }));
+
+  await prisma.$transaction(operations);
+
+  return { matched: matchedIds.size, created: fixtures.length - matchedIds.size, removed: removedIds.length };
 }
 
 /**
@@ -104,14 +155,19 @@ patchRouter.post('/:jobId/patch/import', async (req, res) => {
   }
 
   const fixtures = buildFixturesFromRows(rows as Record<string, string>[], m);
-  await replaceFixtures(jobId, fixtures, groupId ?? null);
+  const result = await mergeFixtures(jobId, fixtures, groupId ?? null);
   const newFixtureTypes = await addMissingFixtureTypeRules(fixtures.map((f) => f.fixtureType));
 
-  await logActivity('patch.import', `${fixtures.length} fixtures`, jobId, req.user?.id);
+  await logActivity(
+    'patch.import',
+    `${result.matched} updated, ${result.created} new, ${result.removed} removed`,
+    jobId,
+    req.user?.id
+  );
   if (newFixtureTypes.length > 0) {
     await logActivity('fixture_type_rules.auto_create', newFixtureTypes.join(', '), jobId, req.user?.id);
   }
-  res.json({ imported: fixtures.length, newFixtureTypes });
+  res.json({ imported: fixtures.length, newFixtureTypes, ...result });
 });
 
 /**
@@ -226,18 +282,23 @@ patchRouter.post('/:jobId/patch/onedrive-candidate/approve', requirePermission('
 
   const rows = JSON.parse(candidate.rowsJson) as Record<string, string>[];
   const fixtures = buildFixturesFromRows(rows, m);
-  await replaceFixtures(jobId, fixtures);
+  const result = await mergeFixtures(jobId, fixtures);
   const newFixtureTypes = await addMissingFixtureTypeRules(fixtures.map((f) => f.fixtureType));
   const updated = await prisma.patchImportCandidate.update({
     where: { jobId },
     data: { status: 'APPROVED', reviewedAt: new Date(), reviewedBy: req.user?.id ?? null },
   });
 
-  await logActivity('patch.onedrive_import', `${fixtures.length} fixtures from ${candidate.fileName}`, jobId, req.user?.id);
+  await logActivity(
+    'patch.onedrive_import',
+    `${result.matched} updated, ${result.created} new, ${result.removed} removed from ${candidate.fileName}`,
+    jobId,
+    req.user?.id
+  );
   if (newFixtureTypes.length > 0) {
     await logActivity('fixture_type_rules.auto_create', newFixtureTypes.join(', '), jobId, req.user?.id);
   }
-  res.json({ imported: fixtures.length, newFixtureTypes, candidate: toCandidateResponse(updated) });
+  res.json({ imported: fixtures.length, newFixtureTypes, ...result, candidate: toCandidateResponse(updated) });
 });
 
 patchRouter.post('/:jobId/patch/onedrive-candidate/reject', requirePermission('manageOneDrive'), async (req, res) => {
@@ -312,11 +373,13 @@ patchRouter.put('/:jobId/fixtures/:id', async (req, res) => {
     if (req.body?.[field] === undefined) continue;
     const value = req.body[field];
     if (field === 'address') {
-      const n = Number(value);
-      if (value === '' || value === null || !Number.isFinite(n)) {
-        return res.status(400).json({ error: 'address is required and must be a number' });
+      if (value === '' || value === null) {
+        data.address = null;
+      } else {
+        const n = Number(value);
+        if (!Number.isFinite(n)) return res.status(400).json({ error: 'address must be a number' });
+        data.address = n;
       }
-      data.address = n;
     } else if (['mainUniverse', 'mainAddress', 'pixUniverse', 'pixAddress'].includes(field)) {
       data[field] = value === '' || value === null ? null : Number(value);
     } else if (field === 'fixtureType') {

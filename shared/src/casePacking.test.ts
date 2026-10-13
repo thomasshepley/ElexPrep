@@ -7,6 +7,16 @@ function fixture(address: number, fixtureType: string, location?: string): RawFi
   return { address, fixtureType, location: location ?? null };
 }
 
+test('packFixturesIntoCases: a fixture with no address is excluded, not crashed on', () => {
+  const fixtures: RawFixtureInput[] = [
+    fixture(101, 'AstraBlade'),
+    { address: null, fixtureType: 'AstraBlade' },
+  ];
+  const groups = packFixturesIntoCases(fixtures, []);
+  assert.equal(groups.length, 1);
+  assert.deepEqual(groups[0].addresses, [101]);
+});
+
 test('formatCaseLabel: single fixture, one unit per case', () => {
   assert.equal(formatCaseLabel([101], 1), '101');
 });

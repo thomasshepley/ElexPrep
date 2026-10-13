@@ -17,7 +17,11 @@ export interface FixtureTypeRule {
 }
 
 export interface RawFixtureInput {
-  address: number;
+  /// Null for a fixture with no unit/spot number in the source file (e.g. a fixed, unaddressed
+  /// house fixture) - still imported as a real row rather than dropped, but excluded from case
+  /// packing (see packFixturesIntoCases) since a case's address-range label needs real
+  /// addresses to work from.
+  address: number | null;
   fixtureType: string;
   mainUniverse?: number | null;
   mainAddress?: number | null;
