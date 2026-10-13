@@ -5,6 +5,7 @@ import fs from 'fs';
 import { prisma, logActivity } from '../db';
 import { requirePermission, resolvePermissionsForUser } from '../permissions';
 import { isAdminRole } from '../auth';
+import { IMAGE_KINDS, acceptDiskUpload, acceptFileAtPath, randomUploadName, sendStoredUpload } from '../uploadSafety';
 import { normalizeCrewFeaturesPatch } from '../crewFeatures';
 import { findLogoCandidate } from '../oneDrive/logo';
 import { getOneDriveConfig } from '../oneDrive/config';
@@ -17,10 +18,7 @@ fs.mkdirSync(uploadDir, { recursive: true });
 const upload = multer({
   storage: multer.diskStorage({
     destination: uploadDir,
-    filename: (_req, file, cb) => {
-      const ext = path.extname(file.originalname) || '';
-      cb(null, `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`);
-    },
+    filename: (_req, _file, cb) => cb(null, randomUploadName()),
   }),
   fileFilter: (_req, file, cb) => cb(null, file.mimetype.startsWith('image/')),
   limits: { fileSize: 10 * 1024 * 1024 },
@@ -51,6 +49,23 @@ jobsRouter.get('/:id', async (req, res) => {
 
 jobsRouter.put('/:id', async (req, res) => {
   const { name, venue, description, address, startsAt, endsAt, isPublic, crewFeatures } = req.body ?? {};
+  const editsDetails = [name, venue, description, address, startsAt, endsAt].some((v) => v !== undefined);
+  if (editsDetails && !isAdminRole(req.user?.role)) {
+    const perms = req.user?.role === 'USER' ? await resolvePermissionsForUser(req.user.id, 'USER') : null;
+    if (!perms?.editJobs) {
+      return res.status(403).json({ error: "Insufficient permissions to edit this job's details" });
+    }
+  }
+  for (const [key, value] of Object.entries({ name, venue, description, address })) {
+    if (value !== undefined && value !== null && typeof value !== 'string') {
+      return res.status(400).json({ error: `${key} must be a string` });
+    }
+  }
+  if (typeof name === 'string' && !name.trim()) return res.status(400).json({ error: 'name cannot be empty' });
+  for (const [key, value] of Object.entries({ startsAt, endsAt })) {
+    if (value && Number.isNaN(new Date(value).getTime())) return res.status(400).json({ error: `${key} is not a valid date` });
+  }
+  if (isPublic !== undefined && typeof isPublic !== 'boolean') return res.status(400).json({ error: 'isPublic must be a boolean' });
   if (isPublic !== undefined && !isAdminRole(req.user?.role)) {
     const perms = req.user?.role === 'USER' ? await resolvePermissionsForUser(req.user.id, 'USER') : null;
     if (!perms?.publishJobs) {
@@ -126,8 +141,12 @@ function resolveLogoSlot(raw: string | undefined): LogoSlot {
   return raw === 'left' || raw === 'right' ? raw : 'middle';
 }
 
-jobsRouter.post('/:id/logo/:slot?', upload.single('logo'), async (req, res) => {
+// The slot is constrained so /:id/logo/onedrive-candidate (below) isn't swallowed as a slot.
+const LOGO_PATH = '/:id/logo/:slot(left|middle|right)?';
+
+jobsRouter.post(LOGO_PATH, requirePermission('editJobs'), upload.single('logo'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'logo file is required' });
+  await acceptDiskUpload(req.file, IMAGE_KINDS);
   const slot = resolveLogoSlot(req.params.slot);
   const field = LOGO_SLOT_FIELDS[slot];
   const job = await prisma.job.update({
@@ -138,7 +157,7 @@ jobsRouter.post('/:id/logo/:slot?', upload.single('logo'), async (req, res) => {
   res.json(job);
 });
 
-jobsRouter.delete('/:id/logo/:slot?', async (req, res) => {
+jobsRouter.delete(LOGO_PATH, requirePermission('editJobs'), async (req, res) => {
   const slot = resolveLogoSlot(req.params.slot);
   const field = LOGO_SLOT_FIELDS[slot];
   const existing = await prisma.job.findUnique({ where: { id: req.params.id } });
@@ -152,14 +171,13 @@ jobsRouter.delete('/:id/logo/:slot?', async (req, res) => {
   res.json(job);
 });
 
-jobsRouter.get('/:id/logo/:slot?', async (req, res) => {
+jobsRouter.get(LOGO_PATH, async (req, res) => {
   const slot = resolveLogoSlot(req.params.slot);
   const field = LOGO_SLOT_FIELDS[slot];
   const job = await prisma.job.findUnique({ where: { id: req.params.id } });
   const logoPath = job?.[field];
   if (!logoPath) return res.status(404).end();
-  if (!job.isPublic && !isAdminRole(req.user?.role)) return res.status(404).end();
-  res.sendFile(path.join(uploadDir, logoPath));
+  await sendStoredUpload(res, path.join(uploadDir, logoPath), `logo-${slot}${path.extname(logoPath)}`);
 });
 
 // The automatic fallback alongside manual upload: if the job's matched OneDrive folder has
@@ -180,15 +198,16 @@ jobsRouter.post('/:id/logo/onedrive-candidate/apply', requirePermission('manageO
   if (!candidate) return res.status(404).json({ error: "No logo found in this job's OneDrive folder" });
 
   const config = await getOneDriveConfig();
-  const { stream, fileName } = await streamOneDriveFile(config, candidate.itemId);
-  const savedName = `${Date.now()}-${Math.round(Math.random() * 1e9)}${path.extname(fileName) || '.png'}`;
+  const { stream } = await streamOneDriveFile(config, candidate.itemId);
+  const tempPath = path.join(uploadDir, randomUploadName());
   await new Promise<void>((resolve, reject) => {
-    const writeStream = fs.createWriteStream(path.join(uploadDir, savedName));
+    const writeStream = fs.createWriteStream(tempPath);
     stream.pipe(writeStream);
     writeStream.on('finish', resolve);
     writeStream.on('error', reject);
     stream.on('error', reject);
   });
+  const { filename: savedName } = await acceptFileAtPath(tempPath, IMAGE_KINDS);
 
   const updated = await prisma.job.update({ where: { id: req.params.id }, data: { [field]: savedName } });
   await logActivity('job.logo_onedrive_import', `${candidate.name} (${slot})`, updated.id, req.user?.id);

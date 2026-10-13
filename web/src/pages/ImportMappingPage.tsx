@@ -9,6 +9,11 @@ import {
 } from '@elexprep/shared';
 import { api } from '../api/client';
 import FileInput from '../components/FileInput';
+import { useAuth } from '../auth/AuthContext';
+import { hasPermission } from '../auth/roles';
+import PermissionFieldset from '../components/PermissionFieldset';
+
+const PREP_SETTINGS_NOTE = 'You can view these settings, but changing them needs the "Manage prep settings" permission.';
 
 const normalizeHeader = (h: string) => h.toLowerCase().replace(/[^a-z]/g, '');
 
@@ -17,6 +22,8 @@ const normalizeHeader = (h: string) => h.toLowerCase().replace(/[^a-z]/g, '');
  * is configured once here and every import uses it automatically.
  */
 export default function ImportMappingPage() {
+  const { user } = useAuth();
+  const canEdit = hasPermission(user, 'managePrepSettings');
   const [mapping, setMapping] = useState<Partial<Record<PatchFieldKey, string>>>({});
   const [sampleHeaders, setSampleHeaders] = useState<string[]>([]);
   const [saved, setSaved] = useState(false);
@@ -74,6 +81,7 @@ export default function ImportMappingPage() {
   return (
     <div>
       <h1>Import mapping</h1>
+      <PermissionFieldset allowed={canEdit} note={PREP_SETTINGS_NOTE}>
       <p className="muted" style={{ maxWidth: 640 }}>
         Set once which CSV columns from your Wysiwyg patch export map onto each field - every
         patch import then uses this automatically. Upload a sample export to pick columns from a
@@ -130,6 +138,7 @@ export default function ImportMappingPage() {
           {error && <span className="error">{error}</span>}
         </div>
       </div>
+      </PermissionFieldset>
     </div>
   );
 }

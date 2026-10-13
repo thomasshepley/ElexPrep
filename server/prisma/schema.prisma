@@ -710,6 +710,9 @@ model ActivityLogEntry {
   ipAddress String?
   userAgent String?
   createdAt DateTime @default(now())
+
+  @@index([jobId, createdAt])
+  @@index([createdAt])
 }
 
 /// Free-form key/value app settings, e.g. key "patchMapping" holding the saved CSV
@@ -835,6 +838,7 @@ model Session {
   createdAt DateTime @default(now())
 
   @@index([userId])
+  @@index([expiresAt])
 }
 
 /// A physical print job: one PDF destined for one tray. status is one of:
@@ -854,6 +858,7 @@ model PrintJob {
   updatedAt DateTime @updatedAt
 
   @@index([status])
+  @@index([jobId])
 }
 
 model Plot {

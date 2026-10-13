@@ -6,10 +6,10 @@ import { isDevelopmentLockdownEnabled, isFullLockdownEnabled } from './lockdownM
 /**
  * Granular capabilities an admin can delegate to the USER role, beyond its fixed baseline.
  * ADMIN implicitly has every permission; SIGNAGE has none (it's hardcoded read-only elsewhere).
- * All default to false: introducing this system must not silently change existing behavior -
- * every one of these previously required ADMIN outright, so an admin has to opt in to delegate.
+ * Defaults are in DEFAULT_PERMISSIONS below - mostly off, so an admin opts in to delegate.
  */
 export const PERMISSION_KEYS = [
+  'editJobs',
   'deleteJobs',
   'publishJobs',
   'linkCurrentRms',
@@ -18,12 +18,14 @@ export const PERMISSION_KEYS = [
   'manageCrewAssignments',
   'manageCrewApplications',
   'moderateDiscussion',
+  'managePrepSettings',
 ] as const;
 
 export type PermissionKey = (typeof PERMISSION_KEYS)[number];
 export type RolePermissions = Record<PermissionKey, boolean>;
 
 export const PERMISSION_LABELS: Record<PermissionKey, string> = {
+  editJobs: "Edit a job's details (name, venue, address, dates) and upload or remove its logos and plots",
   deleteJobs: 'Delete jobs',
   publishJobs: "Publish/unpublish jobs (toggle a job's public visibility)",
   linkCurrentRms: 'Link or unlink a job to a Current RMS opportunity',
@@ -32,9 +34,14 @@ export const PERMISSION_LABELS: Record<PermissionKey, string> = {
   manageCrewAssignments: 'Attribute crew members to a job (add/remove/edit their role on it)',
   manageCrewApplications: 'Review freelance crew applications (approve/reject, view compliance documents)',
   moderateDiscussion: "Delete other people's messages in a job's discussion thread",
+  managePrepSettings: 'Edit global prep settings (Case Rules, Location Colours, Import Mapping)',
 };
 
+// managePrepSettings defaults on: USER accounts could always edit those pages, so introducing the
+// flag must not take that away until an admin chooses to.
 export const DEFAULT_PERMISSIONS: RolePermissions = {
+  editJobs: false,
+  managePrepSettings: true,
   deleteJobs: false,
   publishJobs: false,
   linkCurrentRms: false,

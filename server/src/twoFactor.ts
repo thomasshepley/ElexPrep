@@ -30,10 +30,11 @@ function generateBackupCode(): string {
  * only time they're ever available in plaintext; only bcrypt hashes are persisted. */
 export async function regenerateBackupCodes(userId: string): Promise<string[]> {
   const codes = Array.from({ length: BACKUP_CODE_COUNT }, generateBackupCode);
+  const hashes = await Promise.all(codes.map((code) => bcrypt.hash(code, 10)));
   await prisma.$transaction([
     prisma.backupCode.deleteMany({ where: { userId } }),
     prisma.backupCode.createMany({
-      data: codes.map((code) => ({ userId, codeHash: bcrypt.hashSync(code, 10) })),
+      data: hashes.map((codeHash) => ({ userId, codeHash })),
     }),
   ]);
   return codes;
@@ -49,9 +50,14 @@ export async function consumeBackupCode(userId: string, code: string): Promise<b
   const normalized = code.trim().toUpperCase();
   const candidates = await prisma.backupCode.findMany({ where: { userId, usedAt: null } });
   for (const candidate of candidates) {
-    if (bcrypt.compareSync(normalized, candidate.codeHash)) {
-      await prisma.backupCode.update({ where: { id: candidate.id }, data: { usedAt: new Date() } });
-      return true;
+    if (await bcrypt.compare(normalized, candidate.codeHash)) {
+      // Conditional on still being unused, so two simultaneous requests with the same code
+      // can't both succeed - only the one whose update actually flips usedAt wins.
+      const { count } = await prisma.backupCode.updateMany({
+        where: { id: candidate.id, usedAt: null },
+        data: { usedAt: new Date() },
+      });
+      return count === 1;
     }
   }
   return false;

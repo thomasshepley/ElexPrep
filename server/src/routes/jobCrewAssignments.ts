@@ -89,6 +89,9 @@ jobCrewAssignmentsRouter.post('/:jobId/crew', requirePermission('manageCrewAssig
 
 jobCrewAssignmentsRouter.put('/:jobId/crew/:id', requirePermission('manageCrewAssignments'), async (req, res) => {
   const { role, dayRate, days, zeroRated } = req.body ?? {};
+  if (!(await prisma.jobCrewAssignment.findFirst({ where: { id: req.params.id, jobId: req.params.jobId }, select: { id: true } }))) {
+    return res.status(404).json({ error: 'not found' });
+  }
   const assignment = await prisma.jobCrewAssignment.update({
     where: { id: req.params.id },
     data: {
@@ -104,7 +107,7 @@ jobCrewAssignmentsRouter.put('/:jobId/crew/:id', requirePermission('manageCrewAs
 
 jobCrewAssignmentsRouter.delete('/:jobId/crew/:id', requirePermission('manageCrewAssignments'), async (req, res) => {
   const assignment = await prisma.jobCrewAssignment.findUnique({ where: { id: req.params.id }, include: assignmentInclude });
-  if (!assignment) return res.status(404).json({ error: 'Assignment not found' });
+  if (!assignment || assignment.jobId !== req.params.jobId) return res.status(404).json({ error: 'Assignment not found' });
   await prisma.jobCrewAssignment.delete({ where: { id: req.params.id } });
   await logActivity('crew_assignment.remove', assignment.crewProfile.user.username, req.params.jobId, req.user?.id);
   res.status(204).end();

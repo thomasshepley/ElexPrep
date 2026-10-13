@@ -40,6 +40,9 @@ fixtureGroupsRouter.put('/:jobId/fixture-groups/:id', async (req, res) => {
     data.name = String(name).trim();
   }
   if (order !== undefined) data.order = Number(order);
+  if (!(await prisma.fixtureGroup.findFirst({ where: { id: req.params.id, jobId: req.params.jobId }, select: { id: true } }))) {
+    return res.status(404).json({ error: 'not found' });
+  }
   const group = await prisma.fixtureGroup.update({ where: { id: req.params.id }, data });
   res.json(group);
 });

@@ -1,7 +1,14 @@
 import { useEffect, useState } from 'react';
 import { api, type FixtureTypeRule } from '../api/client';
+import { useAuth } from '../auth/AuthContext';
+import { hasPermission } from '../auth/roles';
+import PermissionFieldset from '../components/PermissionFieldset';
+
+const PREP_SETTINGS_NOTE = 'You can view these settings, but changing them needs the "Manage prep settings" permission.';
 
 export default function FixtureTypeRulesPage() {
+  const { user } = useAuth();
+  const canEdit = hasPermission(user, 'managePrepSettings');
   const [rules, setRules] = useState<FixtureTypeRule[]>([]);
   const [name, setName] = useState('');
   const [unitsPerCase, setUnitsPerCase] = useState(1);
@@ -44,6 +51,7 @@ export default function FixtureTypeRulesPage() {
   return (
     <div>
       <h1>Case-packing rules</h1>
+      <PermissionFieldset allowed={canEdit} note={PREP_SETTINGS_NOTE}>
       <p className="muted">
         Defines how many units of each fixture type go in a case, e.g. AstraBlade in pairs
         (201 + 202, 203 + 204…), Reflecta in threes (401 - 403), Viper Profile one per case.
@@ -107,6 +115,7 @@ export default function FixtureTypeRulesPage() {
           ))}
         </tbody>
       </table>
+      </PermissionFieldset>
     </div>
   );
 }

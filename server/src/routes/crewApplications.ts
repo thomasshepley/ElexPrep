@@ -1,9 +1,10 @@
 import { Router } from 'express';
 import multer from 'multer';
+import rateLimit from 'express-rate-limit';
 import { prisma, logActivity } from '../db';
 import { MIN_PASSWORD_LENGTH, hashPassword, requireRole } from '../auth';
 import { requirePermission } from '../permissions';
-import { DOCUMENT_FIELDS, saveDocuments, streamDecryptedDocument } from '../crewDocumentsStorage';
+import { DOCUMENT_FIELDS, assertSafeDocuments, saveDocuments, streamDecryptedDocument } from '../crewDocumentsStorage';
 import { encryptBankDetails, decryptBankDetails, parseBankDetails } from '../bankDetails';
 import { notifyCrewApplicationSubmitted } from '../notifications';
 
@@ -24,7 +25,17 @@ const upload = multer({
   fileFilter: (_req, file, cb) => {
     cb(null, file.mimetype === 'application/pdf' || file.mimetype.startsWith('image/'));
   },
-  limits: { fileSize: 15 * 1024 * 1024, files: DOCUMENT_FIELDS.length },
+  limits: { fileSize: 15 * 1024 * 1024, files: DOCUMENT_FIELDS.length, fieldSize: 64 * 1024, fields: 30 },
+});
+
+// Anonymous and buffered in memory, so it runs before multer: a flood is turned away before any
+// upload is read.
+const publicSubmitLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many applications from this connection - try again later' },
 });
 
 interface ApplicationRow {
@@ -72,11 +83,14 @@ function toApplicationDto(a: ApplicationRow) {
 
 crewApplicationsRouter.post(
   '/',
+  publicSubmitLimiter,
   upload.fields(DOCUMENT_FIELDS.map((d) => ({ name: d.field, maxCount: 1 }))),
   async (req, res) => {
     const { fullName, email, phone, skills, certifications, dayRate, rightToWork, notes, gender, address, bankDetails } = req.body ?? {};
     if (!fullName || typeof fullName !== 'string') return res.status(400).json({ error: 'fullName is required' });
     if (!email || typeof email !== 'string') return res.status(400).json({ error: 'email is required' });
+    if (fullName.length > 200 || email.length > 320) return res.status(400).json({ error: 'Name or email is too long' });
+    assertSafeDocuments(req.files as Record<string, Express.Multer.File[]> | undefined);
 
     let bankEncrypted: { ciphertext: string; iv: string; authTag: string } | null = null;
     try {
@@ -177,7 +191,7 @@ crewApplicationsRouter.post('/:id/approve', requirePermission('manageCrewApplica
           create: {
             username,
             displayName: displayName || application.fullName,
-            passwordHash: hashPassword(password),
+            passwordHash: await hashPassword(password),
             role: 'CREW',
           },
         },

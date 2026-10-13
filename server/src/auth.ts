@@ -43,19 +43,35 @@ export const SESSION_COOKIE = 'elexprep_session';
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 export const MIN_PASSWORD_LENGTH = 8;
 
-export function hashPassword(password: string): string {
-  return bcrypt.hashSync(password, 10);
+// Async so a burst of login attempts can't block the event loop for everyone else.
+export function hashPassword(password: string): Promise<string> {
+  return bcrypt.hash(password, 10);
 }
 
-export function verifyPassword(password: string, hash: string): boolean {
-  return bcrypt.compareSync(password, hash);
+export function verifyPassword(password: string, hash: string): Promise<boolean> {
+  return bcrypt.compare(password, hash);
+}
+
+// Compared against when a username doesn't exist, so "no such user" takes as long as "wrong
+// password" and response timing doesn't reveal which usernames are real.
+const DUMMY_HASH = bcrypt.hashSync('timing-equaliser-not-a-real-password', 10);
+export async function burnPasswordCheck(password: string): Promise<void> {
+  await bcrypt.compare(password, DUMMY_HASH);
 }
 
 export async function createSession(userId: string): Promise<{ id: string; expiresAt: Date }> {
   const id = crypto.randomBytes(32).toString('hex');
   const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
   await prisma.session.create({ data: { id, userId, expiresAt } });
+  // Opportunistic cleanup - cheap with the expiresAt index, and logins are rare enough.
+  await prisma.session.deleteMany({ where: { expiresAt: { lt: new Date() } } });
   return { id, expiresAt };
+}
+
+/** After a password change: sign the account out everywhere except (optionally) the session
+ * that made the change. */
+export async function revokeOtherSessions(userId: string, keepSessionId?: string) {
+  await prisma.session.deleteMany({ where: { userId, ...(keepSessionId ? { id: { not: keepSessionId } } : {}) } });
 }
 
 export async function destroySession(id: string) {
@@ -164,6 +180,11 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
   }
   if (!isAdminRole(req.user.role) && (await isDevelopmentLockdownEnabled())) {
     return res.status(503).json({ error: 'The site is locked down for development - try again shortly' });
+  }
+  // A forced reset is enforced here, not just by the SPA: until the password is changed (via
+  // PUT /api/auth/me, exempt above), the account can't touch anything else.
+  if (req.user.mustChangePassword) {
+    return res.status(403).json({ error: 'You must set a new password before continuing' });
   }
   if (req.user.role === 'SIGNAGE' && req.method !== 'GET') {
     const allowed = SIGNAGE_WRITE_ALLOWLIST.some((re) => re.test(req.path));

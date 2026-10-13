@@ -1754,3 +1754,10 @@ tbody tr:hover {
   background: #b45309;
   color: #fff;
 }
+
+.plain-fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}

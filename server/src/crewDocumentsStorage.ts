@@ -4,6 +4,7 @@ import { Response } from 'express';
 import { prisma, logActivity } from './db';
 import { uploadDir } from './routes/jobs';
 import { encryptBuffer, decryptBuffer } from './crewDocCrypto';
+import { DOCUMENT_KINDS, acceptMemoryUpload, sendUploadBuffer } from './uploadSafety';
 
 /** Ciphertext only - see crewDocCrypto.ts. A dedicated subdirectory under the existing uploads
  * tree, served only through the decrypt-and-stream routes below, never res.sendFile. */
@@ -18,11 +19,22 @@ export const DOCUMENT_FIELDS: { field: string; kind: string }[] = [
   { field: 'insuranceDocument', kind: 'INSURANCE' },
 ];
 
+/** Throws RejectedUploadError if any supplied document isn't a real PDF/image. Call before
+ * creating anything the documents belong to. */
+export function assertSafeDocuments(files: Record<string, Express.Multer.File[]> | undefined) {
+  if (!files) return;
+  for (const { field } of DOCUMENT_FIELDS) {
+    const file = files[field]?.[0];
+    if (file) acceptMemoryUpload(file, DOCUMENT_KINDS);
+  }
+}
+
 export async function saveDocuments(
   encryptFor: { applicationId?: string; crewProfileId?: string },
   files: Record<string, Express.Multer.File[]> | undefined
 ) {
   if (!files) return;
+  assertSafeDocuments(files);
   for (const { field, kind } of DOCUMENT_FIELDS) {
     const file = files[field]?.[0];
     if (!file) continue;
@@ -48,9 +60,7 @@ export async function streamDecryptedDocument(res: Response, doc: StreamableDoc,
   const ciphertext = await fs.promises.readFile(path.join(crewDocumentsDir, doc.fileName));
   const plaintext = decryptBuffer(ciphertext, doc.iv, doc.authTag);
   await logActivity('crew_document.view', doc.originalName, undefined, userId);
-  res.setHeader('Content-Type', doc.mimeType);
-  res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(doc.originalName)}"`);
-  res.send(plaintext);
+  sendUploadBuffer(res, plaintext, doc.originalName);
 }
 
 export async function deleteDocumentFile(fileName: string) {

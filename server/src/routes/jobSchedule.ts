@@ -160,8 +160,13 @@ jobScheduleRouter.post('/:jobId/schedule/:id/crew', requirePermission('manageCre
 });
 
 jobScheduleRouter.delete('/:jobId/schedule/:id/crew/:crewRowId', requirePermission('manageCrewAssignments'), async (req, res) => {
-  const row = await prisma.jobScheduleItemCrewAssignment.findUnique({ where: { id: req.params.crewRowId } });
-  if (!row || row.scheduleItemId !== req.params.id) return res.status(404).json({ error: 'Not found' });
+  const row = await prisma.jobScheduleItemCrewAssignment.findUnique({
+    where: { id: req.params.crewRowId },
+    include: { scheduleItem: { select: { jobId: true } } },
+  });
+  if (!row || row.scheduleItemId !== req.params.id || row.scheduleItem.jobId !== req.params.jobId) {
+    return res.status(404).json({ error: 'Not found' });
+  }
   await prisma.jobScheduleItemCrewAssignment.delete({ where: { id: row.id } });
   await logActivity('job_schedule.unassign_crew', row.id, req.params.jobId, req.user?.id);
   res.status(204).end();

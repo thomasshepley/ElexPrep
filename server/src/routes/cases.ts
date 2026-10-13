@@ -106,6 +106,9 @@ casesRouter.delete('/:jobId/cases/bulk', async (req, res) => {
 
 casesRouter.put('/:jobId/cases/:id', async (req, res) => {
   const { fixtureType, label, location, groupId } = req.body ?? {};
+  if (!(await prisma.caseGroupRecord.findFirst({ where: { id: req.params.id, jobId: req.params.jobId }, select: { id: true } }))) {
+    return res.status(404).json({ error: 'not found' });
+  }
   const record = await prisma.caseGroupRecord.update({
     where: { id: req.params.id },
     data: {
@@ -119,6 +122,7 @@ casesRouter.put('/:jobId/cases/:id', async (req, res) => {
 });
 
 casesRouter.delete('/:jobId/cases/:id', async (req, res) => {
-  await prisma.caseGroupRecord.delete({ where: { id: req.params.id } });
+  const { count } = await prisma.caseGroupRecord.deleteMany({ where: { id: req.params.id, jobId: req.params.jobId } });
+  if (count === 0) return res.status(404).json({ error: 'not found' });
   res.status(204).end();
 });

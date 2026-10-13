@@ -233,9 +233,9 @@ From then on, e.g. `admin status` from any directory.
 |---|---|
 | `status` | Shows lockdown state, user counts by role, job count, active session count |
 | `list-users` | Lists every account (username, role, display name, and must-change-password/2FA flags) |
-| `add-user <user> <pass> [role] [name]` | Creates an account directly. `role` is one of `ADMIN`/`USER`/`SIGNAGE`/`CREW` (default `USER`) |
+| `add-user <user> [pass\|-] [role] [name]` | Creates an account directly. `role` is one of `ADMIN`/`USER`/`SIGNAGE`/`CREW` (default `USER`). Leave the password out (or pass `-`) to be prompted for it without it echoing or landing in shell history - run with `docker compose exec -it` for the prompt to work |
 | `remove-user <user> --confirm` | Permanently deletes an account and everything attached to it (crew profile, documents, rate lines) |
-| `set-password <user> <newPass>` | Sets an account's password directly - for when someone's genuinely locked out and can't use self-service reset |
+| `set-password <user> [newPass\|-]` | Sets an account's password directly - for when someone's genuinely locked out and can't use self-service reset. Prompts when the password is left out, and signs the account out of every existing session |
 | `force-password-reset <user>` | The account can still sign in with its current password, but the web app blocks everything else until it sets a new one |
 | `set-role <user> <role>` | Changes an account's role |
 | `revoke-sessions <user>` or `revoke-sessions --all` | Signs an account - or everyone - out everywhere immediately |

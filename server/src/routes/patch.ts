@@ -394,11 +394,13 @@ patchRouter.put('/:jobId/fixtures/:id', async (req, res) => {
       data[field] = value === '' ? null : value;
     }
   }
-  const fixture = await prisma.fixture.update({ where: { id: req.params.id }, data });
-  res.json(fixture);
+  const { count } = await prisma.fixture.updateMany({ where: { id: req.params.id, jobId: req.params.jobId }, data });
+  if (count === 0) return res.status(404).json({ error: 'not found' });
+  res.json(await prisma.fixture.findUniqueOrThrow({ where: { id: req.params.id } }));
 });
 
 patchRouter.delete('/:jobId/fixtures/:id', async (req, res) => {
-  await prisma.fixture.delete({ where: { id: req.params.id } });
+  const { count } = await prisma.fixture.deleteMany({ where: { id: req.params.id, jobId: req.params.jobId } });
+  if (count === 0) return res.status(404).json({ error: 'not found' });
   res.status(204).end();
 });

@@ -1,6 +1,11 @@
 import { useEffect, useState } from 'react';
 import { api, type LocationColorPattern, type LocationColorRule } from '../api/client';
 import { useToast } from '../components/Toast';
+import { useAuth } from '../auth/AuthContext';
+import { hasPermission } from '../auth/roles';
+import PermissionFieldset from '../components/PermissionFieldset';
+
+const PREP_SETTINGS_NOTE = 'You can view these settings, but changing them needs the "Manage prep settings" permission.';
 
 function contrastingText(hex: string): string {
   const clean = hex.replace('#', '');
@@ -25,6 +30,8 @@ function swatchBackground(rule: Pick<LocationColorRule, 'color' | 'pattern' | 's
 }
 
 export default function LocationColorsPage() {
+  const { user } = useAuth();
+  const canEdit = hasPermission(user, 'managePrepSettings');
   const { showToast } = useToast();
   const [rules, setRules] = useState<LocationColorRule[]>([]);
   const [location, setLocation] = useState('');
@@ -85,6 +92,7 @@ export default function LocationColorsPage() {
   return (
     <div>
       <h1>Location colors</h1>
+      <PermissionFieldset allowed={canEdit} note={PREP_SETTINGS_NOTE}>
       <p className="muted">
         Colors the PAL label's location bar so crew can spot a case's stage position at a
         glance. Match the location string exactly as it appears on the patch/ad hoc label
@@ -165,6 +173,7 @@ export default function LocationColorsPage() {
           ))}
         </tbody>
       </table>
+      </PermissionFieldset>
     </div>
   );
 }

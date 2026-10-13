@@ -48,6 +48,8 @@ import { jobDiscussionRouter } from './routes/jobDiscussion';
 import { dashboardRouter } from './routes/dashboard';
 import { notificationsRouter } from './routes/notifications';
 import { lockdownRouter } from './routes/lockdown';
+import { requireJobVisible } from './jobVisibility';
+import { RejectedUploadError } from './uploadSafety';
 import { seedDefaultLocationColorsIfEmpty, seedNewDefaultLocationColorsIfMissing } from './pdf/locationColors';
 import { prisma } from './db';
 
@@ -57,13 +59,34 @@ const app = express();
 // the real client address, not the proxy's. Harmless when there's no proxy (nothing sets the
 // header, so req.ip falls back to the direct connection's address same as before).
 app.set('trust proxy', 1);
-// CSP is left off: the SPA and its PDF previews/native viewers are all served same-origin
-// with no external resources, so the main risk it guards against doesn't apply here, and a
-// misconfigured policy is more likely to break a page (iframe/PDF embeds) than help.
-// HSTS is left off too: the default deployment here is plain HTTP on a LAN/home box (see
+// CSP is defence in depth behind upload sniffing (uploadSafety.ts): no inline or third-party
+// script can run on this origin. The only external embed is the Google Maps iframe in
+// LocationLinks.tsx; pdf.js needs blob: workers and wasm for some image codecs.
+// HSTS is left off: the default deployment here is plain HTTP on a LAN/home box (see
 // DEPLOY.md), and HSTS over plain HTTP just teaches the browser to refuse to reconnect.
 // A TLS-terminating reverse proxy (Caddy/nginx/Traefik) is the right place to add it.
-app.use(helmet({ contentSecurityPolicy: false, hsts: false }));
+app.use(
+  helmet({
+    hsts: false,
+    contentSecurityPolicy: {
+      useDefaults: false,
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'wasm-unsafe-eval'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", 'data:', 'blob:'],
+        fontSrc: ["'self'", 'data:'],
+        connectSrc: ["'self'"],
+        workerSrc: ["'self'", 'blob:'],
+        frameSrc: ["'self'", 'blob:', 'https://maps.google.com', 'https://www.google.com'],
+        objectSrc: ["'none'"],
+        baseUri: ["'self'"],
+        formAction: ["'self'"],
+        frameAncestors: ["'self'"],
+      },
+    },
+  })
+);
 // The SPA and API are always same-origin in practice - one Express server serves both in
 // production, and the Vite dev server proxies /api to this server rather than calling it
 // cross-origin (see web/vite.config.ts) - so no cross-origin access is actually needed.
@@ -90,6 +113,7 @@ app.use('/api/bug-reports', bugReportsRouter);
 app.use('/api/2fa', twoFactorRouter);
 app.use('/api/users', usersRouter);
 app.use('/api/settings', settingsRouter);
+app.use('/api/jobs/:jobId', requireJobVisible);
 app.use('/api/jobs', jobsRouter);
 app.use('/api/fixture-type-rules', fixtureTypeRulesRouter);
 app.use('/api/location-color-rules', locationColorRulesRouter);
@@ -148,6 +172,7 @@ app.use((err: unknown, req: Request, res: Response, _next: NextFunction) => {
     if (err.code === 'P2025') return res.status(404).json({ error: 'Not found' });
     if (err.code === 'P2002') return res.status(409).json({ error: 'Already exists' });
   }
+  if (err instanceof RejectedUploadError) return res.status(400).json({ error: err.message });
   if (err instanceof multer.MulterError) {
     if (err.code === 'LIMIT_FILE_SIZE') return res.status(413).json({ error: 'File is too large' });
     return res.status(400).json({ error: err.message });

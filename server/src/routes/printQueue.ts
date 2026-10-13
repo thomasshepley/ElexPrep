@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { Prisma } from '@prisma/client';
 import { prisma, logActivity } from '../db';
 import { MAX_COPIES_WITHOUT_OVERRIDE } from '../constants';
 import { buildCombinedPdf, buildPalAverySheetPdf, collectConfirmedContent, collectPendingContent } from '../printing/buildLabelPdfs';
@@ -22,37 +23,32 @@ printQueueRouter.post('/:jobId/print-queue/build', async (req, res) => {
   const includeFixtureLabels = req.body?.includeFixtureLabels ?? true;
   const includePalLabels = req.body?.includePalLabels ?? true;
 
-  await prisma.printQueueItem.deleteMany({
-    where: { jobId, sourceType: { in: ['FIXTURE', 'CASE'] }, status: 'PENDING' },
-  });
-
-  const created: string[] = [];
+  // Built up front then written in one transaction, so a failure part-way can't leave the queue
+  // half-rebuilt (old pending items gone, only some new ones created).
+  const rows: Prisma.PrintQueueItemCreateManyInput[] = [];
 
   if (includeFixtureLabels) {
     const fixtures = await prisma.fixture.findMany({ where: { jobId } });
     let order = await nextOrderStart(jobId, 'FIXTURE');
     for (const f of fixtures) {
-      const item = await prisma.printQueueItem.create({
-        data: {
-          jobId,
-          labelType: 'FIXTURE',
-          sourceType: 'FIXTURE',
-          sourceId: f.id,
-          groupId: f.groupId,
-          contentJson: JSON.stringify({
-            address: f.address,
-            mainUniverse: f.mainUniverse,
-            mainAddress: f.mainAddress,
-            pixUniverse: f.pixUniverse,
-            pixAddress: f.pixAddress,
-            mode: f.mode,
-            location: f.location,
-          }),
-          quantity: 1,
-          order: order++,
-        },
+      rows.push({
+        jobId,
+        labelType: 'FIXTURE',
+        sourceType: 'FIXTURE',
+        sourceId: f.id,
+        groupId: f.groupId,
+        contentJson: JSON.stringify({
+          address: f.address,
+          mainUniverse: f.mainUniverse,
+          mainAddress: f.mainAddress,
+          pixUniverse: f.pixUniverse,
+          pixAddress: f.pixAddress,
+          mode: f.mode,
+          location: f.location,
+        }),
+        quantity: 1,
+        order: order++,
       });
-      created.push(item.id);
     }
   }
 
@@ -60,28 +56,32 @@ printQueueRouter.post('/:jobId/print-queue/build', async (req, res) => {
     const cases = await prisma.caseGroupRecord.findMany({ where: { jobId } });
     let order = await nextOrderStart(jobId, 'PAL');
     for (const c of cases) {
-      const item = await prisma.printQueueItem.create({
-        data: {
-          jobId,
-          labelType: 'PAL',
-          sourceType: 'CASE',
-          sourceId: c.id,
-          groupId: c.groupId,
-          contentJson: JSON.stringify({
-            location: c.location ?? '',
-            title: c.fixtureType,
-            subtitle: c.label,
-          }),
-          quantity: 1,
-          order: order++,
-        },
+      rows.push({
+        jobId,
+        labelType: 'PAL',
+        sourceType: 'CASE',
+        sourceId: c.id,
+        groupId: c.groupId,
+        contentJson: JSON.stringify({
+          location: c.location ?? '',
+          title: c.fixtureType,
+          subtitle: c.label,
+        }),
+        quantity: 1,
+        order: order++,
       });
-      created.push(item.id);
     }
   }
 
-  await logActivity('print_queue.build', `${created.length} items`, jobId, req.user?.id);
-  res.json({ created: created.length });
+  const [, { count: createdCount }] = await prisma.$transaction([
+    prisma.printQueueItem.deleteMany({
+      where: { jobId, sourceType: { in: ['FIXTURE', 'CASE'] }, status: 'PENDING' },
+    }),
+    prisma.printQueueItem.createMany({ data: rows }),
+  ]);
+
+  await logActivity('print_queue.build', `${createdCount} items`, jobId, req.user?.id);
+  res.json({ created: createdCount });
 });
 
 printQueueRouter.get('/:jobId/print-queue', async (req, res) => {
@@ -166,18 +166,27 @@ printQueueRouter.get('/:jobId/print-queue/pal/avery.pdf', async (req, res) => {
 
 printQueueRouter.put('/:jobId/print-queue/:id', async (req, res) => {
   const { quantity, content } = req.body ?? {};
-  const item = await prisma.printQueueItem.update({
-    where: { id: req.params.id },
+  if (quantity !== undefined && (!Number.isInteger(quantity) || quantity < 1)) {
+    return res.status(400).json({ error: 'quantity must be a whole number of at least 1' });
+  }
+  if (content !== undefined && (typeof content !== 'object' || content === null || Array.isArray(content))) {
+    return res.status(400).json({ error: 'content must be an object' });
+  }
+  const { count } = await prisma.printQueueItem.updateMany({
+    where: { id: req.params.id, jobId: req.params.jobId },
     data: {
       ...(quantity !== undefined ? { quantity } : {}),
       ...(content !== undefined ? { contentJson: JSON.stringify(content) } : {}),
     },
   });
+  if (count === 0) return res.status(404).json({ error: 'not found' });
+  const item = await prisma.printQueueItem.findUniqueOrThrow({ where: { id: req.params.id } });
   res.json({ ...item, content: JSON.parse(item.contentJson) });
 });
 
 printQueueRouter.delete('/:jobId/print-queue/:id', async (req, res) => {
-  await prisma.printQueueItem.delete({ where: { id: req.params.id } });
+  const { count } = await prisma.printQueueItem.deleteMany({ where: { id: req.params.id, jobId: req.params.jobId } });
+  if (count === 0) return res.status(404).json({ error: 'not found' });
   res.status(204).end();
 });
 
@@ -186,7 +195,7 @@ printQueueRouter.post('/:jobId/print-queue/confirm', async (req, res) => {
   if (!Array.isArray(ids) || ids.length === 0) {
     return res.status(400).json({ error: 'ids array is required' });
   }
-  const items = await prisma.printQueueItem.findMany({ where: { id: { in: ids } } });
+  const items = await prisma.printQueueItem.findMany({ where: { id: { in: ids }, jobId: req.params.jobId } });
   const overLimit = items.filter((i) => i.quantity > MAX_COPIES_WITHOUT_OVERRIDE);
   if (overLimit.length && !override) {
     return res.status(409).json({
@@ -195,9 +204,12 @@ printQueueRouter.post('/:jobId/print-queue/confirm', async (req, res) => {
       overLimit: overLimit.map((i) => ({ id: i.id, quantity: i.quantity })),
     });
   }
-  await prisma.printQueueItem.updateMany({ where: { id: { in: ids } }, data: { status: 'CONFIRMED' } });
-  await logActivity('print_queue.confirm', `${ids.length} items`, req.params.jobId, req.user?.id);
-  res.json({ confirmed: ids.length });
+  const { count } = await prisma.printQueueItem.updateMany({
+    where: { id: { in: ids }, jobId: req.params.jobId },
+    data: { status: 'CONFIRMED' },
+  });
+  await logActivity('print_queue.confirm', `${count} items`, req.params.jobId, req.user?.id);
+  res.json({ confirmed: count });
 });
 
 printQueueRouter.get('/:jobId/print-queue/pdf', async (req, res) => {

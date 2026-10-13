@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { api, type Job, type CrewFeatures, CREW_FEATURE_KEYS, CREW_FEATURE_LABELS } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
-import { isAdminRole } from '../auth/roles';
+import { hasPermission, isAdminRole } from '../auth/roles';
 import JobPrepTab from '../components/JobPrepTab';
 import JobPlotsTab from '../components/JobPlotsTab';
 import LocationLinks from '../components/LocationLinks';
@@ -82,6 +82,7 @@ function JobSettingsPanel({ job, onUpdate }: { job: Job; onUpdate: (j: Job) => v
   const { user } = useAuth();
   const isAdmin = isAdminRole(user?.role);
   const canPublish = isAdmin || Boolean(user?.permissions?.publishJobs);
+  const canEditJob = hasPermission(user, 'editJobs');
   const [name, setName] = useState(job.name);
   const [venue, setVenue] = useState(job.venue ?? '');
   const [description, setDescription] = useState(job.description ?? '');
@@ -152,7 +153,9 @@ function JobSettingsPanel({ job, onUpdate }: { job: Job; onUpdate: (j: Job) => v
   return (
     <div className="panel">
       <h3>Job settings</h3>
-      <form onSubmit={save} className="row" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '0.6rem' }}>
+      {!canEditJob && <p className="muted">You can view this job's details, but editing them needs the "Edit jobs" permission.</p>}
+      <form onSubmit={save}>
+       <fieldset disabled={!canEditJob} className="row" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '0.6rem', border: 0, padding: 0, margin: 0 }}>
         <label>
           Name
           <br />
@@ -195,7 +198,8 @@ function JobSettingsPanel({ job, onUpdate }: { job: Job; onUpdate: (j: Job) => v
           e.g. to cover a prep day before the hire actually starts. Leave blank to fall back to
           the opportunity's dates.
         </p>
-        <button type="submit">Save</button>
+        {canEditJob && <button type="submit">Save</button>}
+       </fieldset>
       </form>
 
       <div style={{ marginTop: '1.25rem' }}>
@@ -219,7 +223,7 @@ function JobSettingsPanel({ job, onUpdate }: { job: Job; onUpdate: (j: Job) => v
           Used on PAL/generic labels and prep displays. Up to three logos print side by side
           across the label's logo bar - most jobs just use the middle slot.
         </p>
-        {oneDriveLogo && emptyLogoSlot && (
+        {canEditJob && oneDriveLogo && emptyLogoSlot && (
           <div className="panel onedrive-logo-suggestion" style={{ marginBottom: '0.9rem' }}>
             <p style={{ margin: 0 }}>
               Found a logo in this job's OneDrive folder: <strong>{oneDriveLogo.name}</strong>
@@ -240,12 +244,18 @@ function JobSettingsPanel({ job, onUpdate }: { job: Job; onUpdate: (j: Job) => v
                 {path && (
                   <div>
                     <img src={api.jobs.logoUrl(job.id, slot)} alt={`Job logo (${slot})`} style={{ maxHeight: 60, display: 'block', marginBottom: '0.3rem' }} />
-                    <button type="button" className="secondary" disabled={logoBusy} onClick={() => removeLogo(slot)} style={{ marginBottom: '0.3rem' }}>
-                      Remove
-                    </button>
+                    {canEditJob && (
+                      <button type="button" className="secondary" disabled={logoBusy} onClick={() => removeLogo(slot)} style={{ marginBottom: '0.3rem' }}>
+                        Remove
+                      </button>
+                    )}
                   </div>
                 )}
-                <FileInput accept="image/*" disabled={logoBusy} onFile={(file) => uploadLogo(file, slot)} label={path ? 'Replace' : 'Choose image'} />
+                {canEditJob ? (
+                  <FileInput accept="image/png,image/jpeg,image/gif,image/webp" disabled={logoBusy} onFile={(file) => uploadLogo(file, slot)} label={path ? 'Replace' : 'Choose image'} />
+                ) : (
+                  !path && <p className="muted" style={{ margin: 0 }}>None</p>
+                )}
               </div>
             );
           })}

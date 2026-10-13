@@ -36,7 +36,7 @@ export async function notifyUser(userId: string, type: string, title: string, bo
  * application, a new label request) rather than every USER, which would be noisier than useful
  * for a small team. */
 async function notifyAdmins(type: string, title: string, body?: string, link?: string) {
-  const admins = await prisma.user.findMany({ where: { role: 'ADMIN' }, select: { id: true, prefsJson: true } });
+  const admins = await prisma.user.findMany({ where: { role: { in: ['ADMIN', 'WEBMASTER'] } }, select: { id: true, prefsJson: true } });
   const recipients = admins.filter((a) => isCategoryEnabled(a.prefsJson, type));
   if (recipients.length === 0) return;
   await prisma.notification.createMany({
@@ -83,7 +83,7 @@ export async function notifyLabelRequestReviewed(userId: string, jobId: string, 
 const EXCERPT_LENGTH = 80;
 
 /**
- * A new message in a job's discussion thread - notifies every ADMIN/USER staff account and
+ * A new message in a job's discussion thread - notifies every staff account that can see the job and
  * every crew member assigned to the job, excluding whoever just posted it. Two batches because
  * the two audiences land on different shells (staff -> the job's Discussion tab, crew -> their
  * portal's job page), so they need different links.
@@ -92,8 +92,11 @@ export async function notifyDiscussionMessage(jobId: string, jobName: string, au
   const excerpt = body.length > EXCERPT_LENGTH ? `${body.slice(0, EXCERPT_LENGTH)}…` : body;
   const title = `${authorName} in ${jobName}`;
 
+  // USER accounts can't open a private job, so they aren't told about its messages either.
+  const job = await prisma.job.findUnique({ where: { id: jobId }, select: { isPublic: true } });
+  const staffRoles = job?.isPublic ? ['ADMIN', 'WEBMASTER', 'USER'] : ['ADMIN', 'WEBMASTER'];
   const staff = await prisma.user.findMany({
-    where: { role: { in: ['ADMIN', 'USER'] }, id: { not: authorUserId } },
+    where: { role: { in: staffRoles }, id: { not: authorUserId } },
     select: { id: true, prefsJson: true },
   });
   const staffRecipients = staff.filter((u) => isCategoryEnabled(u.prefsJson, 'job_discussion.message'));

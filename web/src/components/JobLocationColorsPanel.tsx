@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, type LocationColorPattern, type LocationColorRule } from '../api/client';
+import { useAuth } from '../auth/AuthContext';
+import { hasPermission } from '../auth/roles';
 
 function contrastingText(hex: string): string {
   const clean = hex.replace('#', '');
@@ -26,6 +28,8 @@ function swatchBackground(rule: Pick<LocationColorRule, 'color' | 'pattern' | 's
  * labels, and takes precedence over a global rule of the same name if one exists.
  */
 export default function JobLocationColorsPanel({ jobId }: { jobId: string }) {
+  const { user } = useAuth();
+  const canEdit = hasPermission(user, 'editJobs');
   const [rules, setRules] = useState<LocationColorRule[]>([]);
   const [location, setLocation] = useState('');
   const [color, setColor] = useState('#1FA34C');
@@ -92,6 +96,7 @@ export default function JobLocationColorsPanel({ jobId }: { jobId: string }) {
         for jobs whose patch uses different location names - match the location exactly as it
         appears in this job's patch (case-insensitive).
       </p>
+      {canEdit && (
       <form className="row" onSubmit={create}>
         <input
           placeholder="Location (e.g. Cube North)"
@@ -109,9 +114,11 @@ export default function JobLocationColorsPanel({ jobId }: { jobId: string }) {
         )}
         <button type="submit">Add override</button>
       </form>
+      )}
       {error && <p className="error">{error}</p>}
 
       {rules.length > 0 && (
+        <fieldset disabled={!canEdit} style={{ border: 0, padding: 0, margin: 0 }}>
         <table style={{ marginTop: '0.75rem' }}>
           <thead>
             <tr>
@@ -166,6 +173,7 @@ export default function JobLocationColorsPanel({ jobId }: { jobId: string }) {
             ))}
           </tbody>
         </table>
+        </fieldset>
       )}
       {rules.length === 0 && <p className="muted">No overrides yet for this job.</p>}
     </div>

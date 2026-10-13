@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import { Router } from 'express';
+import rateLimit from 'express-rate-limit';
 import { prisma, logActivity } from '../db';
 import { MIN_PASSWORD_LENGTH, hashPassword } from '../auth';
 import { requirePermission } from '../permissions';
@@ -28,11 +29,28 @@ function toInviteDto(i: { id: string; fullName: string; status: string; reviewed
   };
 }
 
-onboardingRouter.post('/', async (req, res) => {
+const publicLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests from this connection - try again later' },
+});
+
+// Invite links stop working this long after approval - long enough for someone to get round to it,
+// short enough that an old forwarded link doesn't stay a way in forever.
+const INVITE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+
+function inviteExpired(invite: { reviewedAt: Date | null }): boolean {
+  return !invite.reviewedAt || Date.now() - invite.reviewedAt.getTime() > INVITE_TTL_MS;
+}
+
+onboardingRouter.post('/', publicLimiter, async (req, res) => {
   const { fullName } = req.body ?? {};
   if (!fullName || typeof fullName !== 'string' || !fullName.trim()) {
     return res.status(400).json({ error: 'fullName is required' });
   }
+  if (fullName.length > 200) return res.status(400).json({ error: 'fullName is too long' });
   const invite = await prisma.onboardingInvite.create({ data: { fullName: fullName.trim() } });
   await notifyOnboardingRequestSubmitted(invite.fullName);
   res.status(201).json({ id: invite.id });
@@ -76,17 +94,21 @@ onboardingRouter.post('/:id/reject', requirePermission('manageCrewApplications')
 
 // Public: the invitee following their one-time link. Says just enough to greet them and decide
 // whether to show the completion form - never the full admin invite list shape.
-onboardingRouter.get('/invite/:token', async (req, res) => {
+onboardingRouter.get('/invite/:token', publicLimiter, async (req, res) => {
   const invite = await prisma.onboardingInvite.findUnique({ where: { token: req.params.token } });
   if (!invite || invite.status === 'PENDING' || invite.status === 'REJECTED') {
     return res.status(404).json({ error: 'Invite not found' });
   }
+  if (invite.status === 'APPROVED' && inviteExpired(invite)) {
+    return res.status(410).json({ error: 'This invite link has expired - ask ELEX for a new one' });
+  }
   res.json({ fullName: invite.fullName, status: invite.status });
 });
 
-onboardingRouter.post('/invite/:token/complete', async (req, res) => {
+onboardingRouter.post('/invite/:token/complete', publicLimiter, async (req, res) => {
   const invite = await prisma.onboardingInvite.findUnique({ where: { token: req.params.token } });
   if (!invite || invite.status !== 'APPROVED') return res.status(404).json({ error: 'Invite not found' });
+  if (inviteExpired(invite)) return res.status(410).json({ error: 'This invite link has expired - ask ELEX for a new one' });
 
   const { username, password, displayName, phone, skills, certifications, gender, address, dayRate, notes, bankDetails } = req.body ?? {};
   if (!username || !password) return res.status(400).json({ error: 'username and password are required' });
@@ -121,7 +143,7 @@ onboardingRouter.post('/invite/:token/complete', async (req, res) => {
           create: {
             username,
             displayName: displayName || invite.fullName,
-            passwordHash: hashPassword(password),
+            passwordHash: await hashPassword(password),
             role: 'CREW',
           },
         },

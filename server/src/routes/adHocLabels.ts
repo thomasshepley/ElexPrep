@@ -39,6 +39,9 @@ adHocLabelsRouter.post('/:jobId/adhoc-labels', async (req, res) => {
 
 adHocLabelsRouter.put('/:jobId/adhoc-labels/:id', async (req, res) => {
   const { content, quantity, labelType, excludeFromPrint, groupId } = req.body ?? {};
+  if (!(await prisma.adHocLabel.findFirst({ where: { id: req.params.id, jobId: req.params.jobId }, select: { id: true } }))) {
+    return res.status(404).json({ error: 'not found' });
+  }
   const item = await prisma.adHocLabel.update({
     where: { id: req.params.id },
     data: {
@@ -53,6 +56,7 @@ adHocLabelsRouter.put('/:jobId/adhoc-labels/:id', async (req, res) => {
 });
 
 adHocLabelsRouter.delete('/:jobId/adhoc-labels/:id', async (req, res) => {
-  await prisma.adHocLabel.delete({ where: { id: req.params.id } });
+  const { count } = await prisma.adHocLabel.deleteMany({ where: { id: req.params.id, jobId: req.params.jobId } });
+  if (count === 0) return res.status(404).json({ error: 'not found' });
   res.status(204).end();
 });

@@ -7,6 +7,7 @@ import { testOneDriveConnection, listChildren, getItemByPath, streamOneDriveFile
 import { matchJobFolder } from '../oneDrive/matcher';
 import { findSharedCadPdf } from '../oneDrive/cad';
 import { listJobShares, shareItemWithJob, unshareItem, setShareCadPlot } from '../oneDrive/shares';
+import { applyStreamHeaders } from '../uploadSafety';
 
 /** Global OneDrive config - ADMIN-only, holds the Azure app secret. */
 export const oneDriveRouter = Router();
@@ -148,8 +149,7 @@ jobOneDriveRouter.get('/:jobId/onedrive/file/:itemId', requirePermission('manage
   try {
     const config = await getOneDriveConfig();
     const { stream, contentType, fileName } = await streamOneDriveFile(config, req.params.itemId);
-    res.setHeader('Content-Type', contentType);
-    res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(fileName)}"`);
+    applyStreamHeaders(res, contentType, fileName);
     stream.pipe(res);
   } catch (err) {
     res.status(502).json({ error: (err as Error).message });

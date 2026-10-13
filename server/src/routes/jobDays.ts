@@ -165,8 +165,8 @@ jobDaysRouter.post('/:jobId/days/:dayId/crew', requirePermission('manageCrewAssi
 });
 
 jobDaysRouter.delete('/:jobId/days/:dayId/crew/:id', requirePermission('manageCrewAssignments'), async (req, res) => {
-  const row = await prisma.jobDayCrewAssignment.findUnique({ where: { id: req.params.id } });
-  if (!row || row.jobDayId !== req.params.dayId) return res.status(404).json({ error: 'Not found' });
+  const row = await prisma.jobDayCrewAssignment.findUnique({ where: { id: req.params.id }, include: { jobDay: { select: { jobId: true } } } });
+  if (!row || row.jobDayId !== req.params.dayId || row.jobDay.jobId !== req.params.jobId) return res.status(404).json({ error: 'Not found' });
   await prisma.jobDayCrewAssignment.delete({ where: { id: row.id } });
   await logActivity('job_day.unassign_crew', row.id, req.params.jobId, req.user?.id);
   res.status(204).end();

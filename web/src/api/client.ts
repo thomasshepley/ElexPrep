@@ -191,6 +191,8 @@ export interface ActivityLogEntry {
 export type Role = 'ADMIN' | 'USER' | 'SIGNAGE' | 'CREW' | 'WEBMASTER';
 
 export type PermissionKey =
+  | 'editJobs'
+  | 'managePrepSettings'
   | 'deleteJobs'
   | 'publishJobs'
   | 'linkCurrentRms'

@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { api, type Plot } from '../api/client';
 import FileInput from './FileInput';
+import { useAuth } from '../auth/AuthContext';
+import { hasPermission } from '../auth/roles';
 
 /**
  * Upload/manage uploaded CAD plot PDFs. Previewing lives in CadPlotsViewer, shown once above
@@ -8,6 +10,8 @@ import FileInput from './FileInput';
  * CAD-flagged OneDrive shares) - this panel only needs to handle add/remove.
  */
 export default function PlotsPanel({ jobId, onChange }: { jobId: string; onChange?: () => void }) {
+  const { user } = useAuth();
+  const canEdit = hasPermission(user, 'editJobs');
   const [plots, setPlots] = useState<Plot[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -44,7 +48,7 @@ export default function PlotsPanel({ jobId, onChange }: { jobId: string; onChang
   return (
     <div className="panel">
       <h3>Plot CAD PDFs</h3>
-      <FileInput accept="application/pdf,.pdf" disabled={busy} onFile={upload} label="Choose PDF" />
+      {canEdit && <FileInput accept="application/pdf,.pdf" disabled={busy} onFile={upload} label="Choose PDF" />}
       {error && <p className="error">{error}</p>}
       {plots.length > 0 && (
         <table style={{ marginTop: '0.75rem' }}>
@@ -61,9 +65,11 @@ export default function PlotsPanel({ jobId, onChange }: { jobId: string; onChang
                 <td>{p.originalName}</td>
                 <td className="muted">{new Date(p.createdAt).toLocaleString()}</td>
                 <td>
-                  <button className="secondary" onClick={() => remove(p)}>
-                    Delete
-                  </button>
+                  {canEdit && (
+                    <button className="secondary" onClick={() => remove(p)}>
+                      Delete
+                    </button>
+                  )}
                 </td>
               </tr>
             ))}

@@ -62,7 +62,7 @@ twoFactorRouter.post('/disable', sensitiveActionLimiter, async (req, res) => {
   if (!req.user) return res.status(401).json({ error: 'Not signed in' });
   const { password } = req.body ?? {};
   const user = await prisma.user.findUnique({ where: { id: req.user.id } });
-  if (!user || !password || !verifyPassword(password, user.passwordHash)) {
+  if (!user || !password || !(await verifyPassword(password, user.passwordHash))) {
     return res.status(403).json({ error: 'Current password is incorrect' });
   }
   await prisma.$transaction([
@@ -80,7 +80,7 @@ twoFactorRouter.post('/backup-codes/regenerate', sensitiveActionLimiter, async (
   if (!req.user) return res.status(401).json({ error: 'Not signed in' });
   const { password } = req.body ?? {};
   const user = await prisma.user.findUnique({ where: { id: req.user.id } });
-  if (!user || !password || !verifyPassword(password, user.passwordHash)) {
+  if (!user || !password || !(await verifyPassword(password, user.passwordHash))) {
     return res.status(403).json({ error: 'Current password is incorrect' });
   }
   if (!user.totpEnabled) return res.status(400).json({ error: 'Two-factor authentication is not enabled' });

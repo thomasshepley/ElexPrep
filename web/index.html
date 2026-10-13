@@ -5,17 +5,7 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>ELEX Portal</title>
-    <script>
-      // Applied synchronously, before first paint, so a stored "light" preference never flashes
-      // dark first. Dark is the default whenever nothing's been chosen yet (see web/src/theme.ts).
-      (function () {
-        var theme = 'dark';
-        try {
-          if (localStorage.getItem('elex-theme') === 'light') theme = 'light';
-        } catch (e) {}
-        document.documentElement.setAttribute('data-theme', theme);
-      })();
-    </script>
+    <script src="/theme-init.js"></script>
   </head>
   <body>
     <div id="root"></div>

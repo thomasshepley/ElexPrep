@@ -5,6 +5,7 @@ import fs from 'fs';
 import { prisma, logActivity } from '../db';
 import { requireRole } from '../auth';
 import { uploadDir } from './jobs';
+import { DOCUMENT_KINDS, acceptDiskUpload, randomUploadName, sendStoredUpload } from '../uploadSafety';
 
 /**
  * General job files (call sheets, info packs, contracts) - unencrypted, same pattern as
@@ -17,10 +18,7 @@ fs.mkdirSync(jobDocumentsDir, { recursive: true });
 const upload = multer({
   storage: multer.diskStorage({
     destination: jobDocumentsDir,
-    filename: (_req, file, cb) => {
-      const ext = path.extname(file.originalname) || '';
-      cb(null, `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`);
-    },
+    filename: (_req, _file, cb) => cb(null, randomUploadName()),
   }),
   fileFilter: (_req, file, cb) => {
     cb(null, file.mimetype === 'application/pdf' || file.mimetype.startsWith('image/'));
@@ -40,6 +38,7 @@ jobDocumentsRouter.get('/:jobId/documents', async (req, res) => {
 
 jobDocumentsRouter.post('/:jobId/documents', requireRole('ADMIN'), upload.single('document'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'A PDF or image file is required' });
+  await acceptDiskUpload(req.file, DOCUMENT_KINDS);
   const document = await prisma.jobDocument.create({
     data: {
       jobId: req.params.jobId,
@@ -55,9 +54,7 @@ jobDocumentsRouter.post('/:jobId/documents', requireRole('ADMIN'), upload.single
 jobDocumentsRouter.get('/:jobId/documents/:id/file', async (req, res) => {
   const document = await prisma.jobDocument.findUnique({ where: { id: req.params.id } });
   if (!document || document.jobId !== req.params.jobId) return res.status(404).end();
-  res.setHeader('Content-Type', document.mimeType);
-  res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(document.originalName)}"`);
-  res.sendFile(path.join(jobDocumentsDir, document.fileName));
+  await sendStoredUpload(res, path.join(jobDocumentsDir, document.fileName), document.originalName);
 });
 
 jobDocumentsRouter.delete('/:jobId/documents/:id', requireRole('ADMIN'), async (req, res) => {

@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import multer from 'multer';
 import { prisma, logActivity } from '../db';
-import { MIN_PASSWORD_LENGTH, hashPassword, isAdminRole, requireRole } from '../auth';
+import { MIN_PASSWORD_LENGTH, hashPassword, isAdminRole, requireRole, revokeOtherSessions } from '../auth';
 import { DOCUMENT_FIELDS, deleteDocumentFile, saveDocuments, streamDecryptedDocument } from '../crewDocumentsStorage';
 import { encryptBankDetails, decryptBankDetails, parseBankDetails } from '../bankDetails';
 
@@ -182,7 +182,7 @@ crewRouter.post('/', async (req, res) => {
         create: {
           username,
           displayName: displayName || username,
-          passwordHash: hashPassword(password),
+          passwordHash: await hashPassword(password),
           role: 'CREW',
         },
       },
@@ -223,9 +223,10 @@ crewRouter.put('/:id', async (req, res) => {
       where: { id: existing.userId },
       data: {
         ...(displayName !== undefined ? { displayName } : {}),
-        ...(password !== undefined ? { passwordHash: hashPassword(password) } : {}),
+        ...(password !== undefined ? { passwordHash: await hashPassword(password) } : {}),
       },
     });
+    if (password !== undefined) await revokeOtherSessions(existing.userId);
   }
   const profile = await prisma.crewProfile.update({
     where: { id: req.params.id },

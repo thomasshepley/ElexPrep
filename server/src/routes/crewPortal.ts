@@ -14,6 +14,7 @@ import { findSharedCadPdf } from '../oneDrive/cad';
 import { listJobShares, isItemSharedWithJob } from '../oneDrive/shares';
 import { streamOneDriveFile } from '../oneDrive/client';
 import { getOneDriveConfig } from '../oneDrive/config';
+import { applyStreamHeaders, sendStoredUpload } from '../uploadSafety';
 import { autoPopulateDaysFromOpportunity, dayInclude, toDayDto } from './jobDays';
 import { scheduleItemInclude, toScheduleItemDto } from './jobSchedule';
 
@@ -328,9 +329,7 @@ crewPortalRouter.get('/me/jobs/:jobId/documents/:docId/file', requireRole('CREW'
   if (!features.documents) return res.status(404).end();
   const document = await prisma.jobDocument.findUnique({ where: { id: req.params.docId } });
   if (!document || document.jobId !== req.params.jobId) return res.status(404).end();
-  res.setHeader('Content-Type', document.mimeType);
-  res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(document.originalName)}"`);
-  res.sendFile(path.join(uploadDir, 'job-documents', document.fileName));
+  await sendStoredUpload(res, path.join(uploadDir, 'job-documents', document.fileName), document.originalName);
 });
 
 crewPortalRouter.get('/me/jobs/:jobId/contacts', requireRole('CREW'), async (req, res) => {
@@ -361,9 +360,7 @@ crewPortalRouter.get('/me/jobs/:jobId/plots/:plotId/file', requireRole('CREW'), 
   if (!features.plots) return res.status(404).end();
   const plot = await prisma.plot.findUnique({ where: { id: req.params.plotId } });
   if (!plot || plot.jobId !== req.params.jobId) return res.status(404).end();
-  res.setHeader('Content-Type', 'application/pdf');
-  res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(plot.originalName)}"`);
-  res.sendFile(path.join(plotsDir, plot.fileName));
+  await sendStoredUpload(res, path.join(plotsDir, plot.fileName), plot.originalName);
 });
 
 /**
@@ -399,8 +396,7 @@ crewPortalRouter.get('/me/jobs/:jobId/onedrive/:itemId/file', requireRole('CREW'
   try {
     const config = await getOneDriveConfig();
     const { stream, contentType, fileName } = await streamOneDriveFile(config, itemId);
-    res.setHeader('Content-Type', contentType);
-    res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(fileName)}"`);
+    applyStreamHeaders(res, contentType, fileName);
     stream.pipe(res);
   } catch (err) {
     res.status(502).json({ error: (err as Error).message });

@@ -6,8 +6,8 @@
  * the whole database, bypassing a forgotten password) that should never be reachable over
  * HTTP, even by an authenticated admin account.
  */
-import { prisma } from './db';
-import { hashPassword } from './auth';
+import { prisma, logActivity } from './db';
+import { hashPassword, revokeOtherSessions } from './auth';
 import {
   setDevelopmentLockdown,
   isDevelopmentLockdownEnabled,
@@ -17,6 +17,7 @@ import {
 import { uploadDir } from './routes/jobs';
 import fs from 'fs';
 import path from 'path';
+import readline from 'readline';
 
 const ROLES = ['ADMIN', 'USER', 'SIGNAGE', 'CREW', 'WEBMASTER'];
 
@@ -27,6 +28,39 @@ function fail(message: string): never {
 
 function requireArgs(args: string[], count: number, usage: string) {
   if (args.length < count) fail(`Usage: ${usage}`);
+}
+
+/** Every operator action lands in the same activity log as web actions, tagged as CLI. */
+async function audit(action: string, detail?: string) {
+  await logActivity(`cli.${action}`, detail);
+}
+
+/** Reads a password from the terminal without echoing it, so it never sits in shell history or
+ * the process list. Used whenever the password argument is omitted or given as "-". */
+function promptHidden(question: string): Promise<string> {
+  return new Promise((resolve) => {
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout, terminal: true });
+    const write = (rl as unknown as { _writeToOutput: (s: string) => void })._writeToOutput.bind(rl);
+    (rl as unknown as { _writeToOutput: (s: string) => void })._writeToOutput = (s: string) => {
+      if (s.startsWith(question)) write(s);
+    };
+    rl.question(question, (answer) => {
+      rl.close();
+      process.stdout.write('\n');
+      resolve(answer);
+    });
+  });
+}
+
+async function resolvePassword(arg: string | undefined): Promise<string> {
+  if (arg && arg !== '-') {
+    console.warn('Warning: passing a password as an argument leaves it in shell history - use "-" to be prompted instead.');
+    return arg;
+  }
+  const first = await promptHidden('New password: ');
+  const second = await promptHidden('Repeat password: ');
+  if (first !== second) fail('passwords do not match');
+  return first;
 }
 
 async function cmdStatus() {
@@ -62,15 +96,17 @@ async function cmdListUsers() {
 }
 
 async function cmdAddUser(args: string[]) {
-  requireArgs(args, 2, 'add-user <username> <password> [role] [displayName]');
-  const [username, password, role = 'USER', displayName] = args;
+  requireArgs(args, 1, 'add-user <username> [password|-] [role] [displayName]');
+  const [username, passwordArg, role = 'USER', displayName] = args;
   if (!ROLES.includes(role)) fail(`role must be one of: ${ROLES.join(', ')}`);
+  const password = await resolvePassword(passwordArg);
   if (password.length < 8) fail('password must be at least 8 characters');
   const existing = await prisma.user.findUnique({ where: { username } });
   if (existing) fail(`a user named "${username}" already exists`);
   await prisma.user.create({
-    data: { username, displayName: displayName || username, passwordHash: hashPassword(password), role },
+    data: { username, displayName: displayName || username, passwordHash: await hashPassword(password), role },
   });
+  await audit('add_user', `${username} (${role})`);
   console.log(`Created ${role} user "${username}".`);
 }
 
@@ -81,17 +117,21 @@ async function cmdRemoveUser(args: string[]) {
   const user = await prisma.user.findUnique({ where: { username } });
   if (!user) fail(`no user named "${username}"`);
   await prisma.user.delete({ where: { username } });
+  await audit('remove_user', username);
   console.log(`Deleted user "${username}".`);
 }
 
 async function cmdSetPassword(args: string[]) {
-  requireArgs(args, 2, 'set-password <username> <newPassword>');
-  const [username, password] = args;
-  if (password.length < 8) fail('password must be at least 8 characters');
+  requireArgs(args, 1, 'set-password <username> [newPassword|-]');
+  const [username, passwordArg] = args;
   const user = await prisma.user.findUnique({ where: { username } });
   if (!user) fail(`no user named "${username}"`);
-  await prisma.user.update({ where: { username }, data: { passwordHash: hashPassword(password), mustChangePassword: false } });
-  console.log(`Password updated for "${username}".`);
+  const password = await resolvePassword(passwordArg);
+  if (password.length < 8) fail('password must be at least 8 characters');
+  await prisma.user.update({ where: { username }, data: { passwordHash: await hashPassword(password), mustChangePassword: false } });
+  await revokeOtherSessions(user.id);
+  await audit('set_password', username);
+  console.log(`Password updated for "${username}" and their existing sessions signed out.`);
 }
 
 async function cmdForcePasswordReset(args: string[]) {
@@ -100,6 +140,7 @@ async function cmdForcePasswordReset(args: string[]) {
   const user = await prisma.user.findUnique({ where: { username } });
   if (!user) fail(`no user named "${username}"`);
   await prisma.user.update({ where: { username }, data: { mustChangePassword: true } });
+  await audit('force_password_reset', username);
   console.log(`"${username}" will be required to set a new password on their next sign-in.`);
 }
 
@@ -110,6 +151,7 @@ async function cmdSetRole(args: string[]) {
   const user = await prisma.user.findUnique({ where: { username } });
   if (!user) fail(`no user named "${username}"`);
   await prisma.user.update({ where: { username }, data: { role } });
+  await audit('set_role', `${username} -> ${role}`);
   console.log(`"${username}" is now role ${role}.`);
 }
 
@@ -118,34 +160,40 @@ async function cmdRevokeSessions(args: string[]) {
   const [target] = args;
   if (target === '--all') {
     const { count } = await prisma.session.deleteMany({});
+    await audit('revoke_sessions', 'all');
     console.log(`Revoked ${count} session(s) - everyone will need to sign in again.`);
     return;
   }
   const user = await prisma.user.findUnique({ where: { username: target } });
   if (!user) fail(`no user named "${target}"`);
   const { count } = await prisma.session.deleteMany({ where: { userId: user.id } });
+  await audit('revoke_sessions', target);
   console.log(`Revoked ${count} session(s) for "${target}".`);
 }
 
 async function cmdLockdown() {
   await setDevelopmentLockdown(true);
+  await audit('development_lockdown_on');
   await prisma.session.deleteMany({ where: { user: { role: { notIn: ['ADMIN', 'WEBMASTER'] } } } });
   console.log('Development lockdown enabled - only ADMIN/WEBMASTER accounts can sign in or use the API; other sessions revoked.');
 }
 
 async function cmdUnlock() {
   await setDevelopmentLockdown(false);
+  await audit('development_lockdown_off');
   console.log('Development lockdown disabled - normal access restored.');
 }
 
 async function cmdFullLockdown() {
   await setFullLockdown(true);
+  await audit('full_lockdown_on');
   await prisma.session.deleteMany({ where: { user: { role: { not: 'WEBMASTER' } } } });
   console.log('Full lockdown enabled - only WEBMASTER accounts can sign in or use the API (ADMIN included); every other session revoked.');
 }
 
 async function cmdFullUnlock() {
   await setFullLockdown(false);
+  await audit('full_lockdown_off');
   console.log('Full lockdown disabled - normal access restored.');
 }
 
@@ -175,9 +223,9 @@ function printUsage() {
 
   status                                   Show user/job/session counts and lockdown state
   list-users                                List every account
-  add-user <user> <pass> [role] [name]      Create an account (role: ${ROLES.join('|')}, default USER)
+  add-user <user> [pass|-] [role] [name]    Create an account (role: ${ROLES.join('|')}, default USER); omit or "-" to be prompted for the password
   remove-user <user> --confirm              Permanently delete an account
-  set-password <user> <newPass>             Set an account's password directly
+  set-password <user> [newPass|-]           Set an account's password (prompted if omitted) and sign it out everywhere
   force-password-reset <user>               Require a new password on next sign-in
   set-role <user> <role>                    Change an account's role
   revoke-sessions <user|--all>              Sign an account (or everyone) out everywhere
