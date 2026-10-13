@@ -29,7 +29,9 @@ function parseChangelog(markdown: string): ChangelogEntry[] {
     const start = m.index! + m[0].length;
     const end = matches[i + 1]?.index ?? markdown.length;
     const body = markdown.slice(start, end);
-    const notes = [...body.matchAll(/^- (.+)$/gm)].map((n) => n[1].trim());
+    // Captures the +/- marker along with the text (not stripped) so the in-app changelog
+    // viewer shows the same feature/fix marker the changelog file itself uses.
+    const notes = [...body.matchAll(/^([+-] .+)$/gm)].map((n) => n[1].trim());
     entries.push({ version: m[1], date: m[2], notes });
   }
   return entries;
