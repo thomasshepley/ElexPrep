@@ -4,6 +4,7 @@ import { api, type BugReport } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { useToast } from '../components/Toast';
 import { formatDateTime, formatTime } from '../utils/format';
+import { bugReportsToMarkdown, downloadMarkdown } from '../bugReport/exportMarkdown';
 
 function SiteControlsPanel() {
   const { user, setUser } = useAuth();
@@ -137,11 +138,37 @@ export default function WebmasterPage() {
     }
   };
 
+  const copyAll = async () => {
+    try {
+      await navigator.clipboard.writeText(bugReportsToMarkdown(reports));
+      showToast(`Copied ${reports.length} report${reports.length === 1 ? '' : 's'} as Markdown`, 'success');
+    } catch {
+      showToast("Couldn't copy to the clipboard - use Download .md instead", 'error');
+    }
+  };
+
+  const download = () => {
+    const now = new Date();
+    downloadMarkdown(bugReportsToMarkdown(reports, now), now);
+  };
+
   return (
     <div>
       <h1>Webmaster</h1>
       <SiteControlsPanel />
-      <p className="muted">Bug reports submitted from anywhere in the app.</p>
+      <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+        <p className="muted" style={{ margin: 0 }}>
+          Bug reports submitted from anywhere in the app.
+        </p>
+        <div className="row" style={{ gap: '0.5rem' }}>
+          <button className="secondary" onClick={copyAll} disabled={reports.length === 0}>
+            Copy all
+          </button>
+          <button onClick={download} disabled={reports.length === 0}>
+            Download .md
+          </button>
+        </div>
+      </div>
       {error && <p className="error">{error}</p>}
       {reports.length === 0 ? (
         <p className="muted">No bug reports yet.</p>
