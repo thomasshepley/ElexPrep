@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PATCH_FIELD_LABELS, type PatchFieldKey } from '@elexprep/shared';
-import { api, type Fixture, type PatchImportCandidate, type PatchImportResult } from '../api/client';
+import { api, type Fixture, type PatchImportCandidate, type PatchImportResult, type PatchScanReport } from '../api/client';
 import FileInput from './FileInput';
 import { useToast } from './Toast';
 import { useDialog } from './Dialog';
@@ -55,6 +55,7 @@ export default function PatchImportPanel({ jobId, groupId = null }: { jobId: str
   const [candidate, setCandidate] = useState<PatchImportCandidate | null>(null);
   const [scanError, setScanError] = useState<string | null>(null);
   const [scanBusy, setScanBusy] = useState(false);
+  const [scanReport, setScanReport] = useState<PatchScanReport | null>(null);
 
   const loadFixtures = () => api.patch.fixtures(jobId).then(setFixtures);
   const loadCandidate = () => api.patch.getOneDriveCandidate(jobId).then(setCandidate);
@@ -71,8 +72,16 @@ export default function PatchImportPanel({ jobId, groupId = null }: { jobId: str
     setScanError(null);
     try {
       const res = await api.patch.scanOneDrive(jobId);
+      setScanReport(res.report ?? null);
       if (res.candidate) setCandidate(res.candidate);
-      else if (!res.detected) setScanError('No patch CSV in the "Patch" folder, and no usable table found in the CAD PDF either.');
+      else if (!res.detected) {
+        const checked = res.report?.checked.length ?? 0;
+        setScanError(
+          checked === 0
+            ? `No patch CSV in the "Patch" folder and no PDFs found${res.report?.foldersSearched ? ` in ${res.report.foldersSearched} folder(s)` : ''} or on the Plots tab.`
+            : `No patch CSV in the "Patch" folder, and none of the ${checked} PDF(s) checked had a patch table it could read.`
+        );
+      }
     } catch (e) {
       setScanError((e as Error).message);
     } finally {
@@ -234,12 +243,26 @@ export default function PatchImportPanel({ jobId, groupId = null }: { jobId: str
           </button>
         </div>
         <p className="muted">
-          Looks for a CSV in this job's OneDrive "Patch" subfolder, falling back to extracting a
-          table from the CAD PDF if there's no CSV. Nothing is applied automatically - a detected
+          Looks for a CSV in this job's OneDrive "Patch" subfolder; if there isn't one, reads the
+          patch table out of the PDFs in the job's OneDrive folder (and any uploaded on the Plots
+          tab), patch- and CAD-named ones first. Nothing is applied automatically - a detected
           file sits here for review until approved.
           {groupId !== null && ' This always imports into "Ungrouped" - use the CSV upload below to import straight into the current stage.'}
         </p>
         {scanError && <p className="error">{scanError}</p>}
+        {scanReport && scanReport.checked.length > 0 && (
+          <details className="scan-report" open={!candidate || candidate.status !== 'PENDING'}>
+            <summary className="muted">PDFs checked ({scanReport.checked.length})</summary>
+            <ul className="plain-list">
+              {scanReport.checked.map((c, i) => (
+                <li key={i} className="muted" style={{ fontSize: 'var(--text-sm)' }}>
+                  <strong style={{ color: 'var(--content)' }}>{c.name}</strong>
+                  {c.path && ` - ${c.path}`}: {c.error ? c.error : c.rows > 0 ? `${c.rows} patch rows` : 'no patch table found'}
+                </li>
+              ))}
+            </ul>
+          </details>
+        )}
 
         {candidate && candidate.status === 'PENDING' && (
           <div className="row panel" style={{ background: 'rgba(255,255,255,0.04)', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>

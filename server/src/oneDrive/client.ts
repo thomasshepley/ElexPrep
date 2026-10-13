@@ -72,7 +72,8 @@ async function graphRequest(
 ): Promise<unknown> {
   assertConfigured(config);
   const token = await getAccessToken(config);
-  const res = await fetch(`${GRAPH_API_BASE_URL}${path}`, {
+  // Paged responses hand back an absolute @odata.nextLink; everything else is a path.
+  const res = await fetch(/^https?:\/\//.test(path) ? path : `${GRAPH_API_BASE_URL}${path}`, {
     ...init,
     headers: { Authorization: `Bearer ${token}`, ...init?.headers },
   });
@@ -84,14 +85,20 @@ async function graphRequest(
   return res.json();
 }
 
-/** Lists the immediate children of a folder (or the drive root, if no folderId is given). */
+/** Lists the immediate children of a folder (or the drive root, if no folderId is given),
+ * following Graph's paging so a busy folder isn't cut off after the first page. */
 export async function listChildren(
   config: Pick<OneDriveConfig, 'enabled' | 'tenantId' | 'clientId' | 'clientSecret' | 'driveId'>,
   folderId?: string
 ): Promise<DriveItem[]> {
-  const path = folderId ? `/drives/${config.driveId}/items/${folderId}/children` : `/drives/${config.driveId}/root/children`;
-  const body = (await graphRequest(config, path)) as { value?: DriveItem[] };
-  return body.value ?? [];
+  let path: string | undefined = `${folderId ? `/drives/${config.driveId}/items/${folderId}/children` : `/drives/${config.driveId}/root/children`}?$top=200`;
+  const items: DriveItem[] = [];
+  for (let page = 0; path && page < 25; page++) {
+    const body = (await graphRequest(config, path)) as { value?: DriveItem[]; '@odata.nextLink'?: string };
+    items.push(...(body.value ?? []));
+    path = body['@odata.nextLink'];
+  }
+  return items;
 }
 
 /** Resolves a `/`-separated path (relative to the drive root) directly to its item, where the

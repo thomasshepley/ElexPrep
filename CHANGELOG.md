@@ -4,6 +4,10 @@ Newest entries first. Each push/merge gets exactly one entry - see
 `scripts/bump-version.mjs` for how the version number itself advances. A `+` marks a
 feature addition, a `-` marks a bug fix.
 
+## v1.4.2 - 2026-10-13
+
+- Patch auto-import now finds patch PDFs anywhere in the job's OneDrive folder (and on the Plots tab), picks the one with the most patch rows, and says which files it checked
+
 ## v1.4.1 - 2026-10-13
 
 - Crew on a schedule entry is now a searchable list you click to add people, and checkboxes in forms no longer drop onto their own line

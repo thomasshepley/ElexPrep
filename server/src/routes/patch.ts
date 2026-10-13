@@ -181,25 +181,51 @@ patchRouter.post('/:jobId/patch/import', async (req, res) => {
  * Graph lastModifiedDateTime) leaves the existing candidate's status alone; a re-scan that finds
  * a changed or new file overwrites it back to PENDING even if the old one was already reviewed.
  */
+const PDF_PATCH_MAPPING: Partial<Record<PatchFieldKey, string>> = {
+  address: 'Spot',
+  fixtureType: 'Type',
+  mainUniverseAddress: 'Patch',
+  location: 'Position',
+  mode: 'Mode',
+  notes: 'Fixture Options',
+};
+
+/** Pulls "Mode: Standard" out of a PDF row's Fixture Options into its own Mode column. */
+function withPdfMode(rows: Record<string, string>[], source: string): Record<string, string>[] {
+  if (source !== 'pdf') return rows;
+  return rows.map((r) => {
+    const mode = /mode:\s*([^;]+)/i.exec(r['Fixture Options'] ?? '')?.[1]?.trim();
+    return mode ? { ...r, Mode: mode } : r;
+  });
+}
+
 patchRouter.post('/:jobId/patch/onedrive-scan', requirePermission('manageOneDrive'), async (req, res) => {
   const { jobId } = req.params;
   const job = await prisma.job.findUnique({ where: { id: jobId } });
   if (!job) return res.status(404).json({ error: 'job not found' });
   const config = await getOneDriveConfig();
-  if (!config.enabled) return res.status(400).json({ error: 'OneDrive is not configured yet' });
-  if (!job.oneDriveFolderId) return res.status(400).json({ error: 'This job has no OneDrive folder linked yet' });
+  const hasOneDrive = config.enabled && Boolean(job.oneDriveFolderId);
+  const plotCount = await prisma.plot.count({ where: { jobId } });
+  if (!hasOneDrive && plotCount === 0) {
+    return res.status(400).json({
+      error: config.enabled
+        ? 'This job has no OneDrive folder linked yet, and no plots uploaded on the Plots tab to scan instead'
+        : 'OneDrive is not configured yet, and this job has no plots uploaded on the Plots tab to scan instead',
+    });
+  }
 
-  let found;
+  let scan;
   try {
-    found = await findPatchSource(job);
+    scan = await findPatchSource(job);
   } catch (err) {
     return res.status(502).json({ error: (err as Error).message });
   }
-  if (!found) return res.json({ detected: false });
+  const found = scan.found;
+  if (!found) return res.json({ detected: false, report: scan.report });
 
   const existing = await prisma.patchImportCandidate.findUnique({ where: { jobId } });
-  if (existing && existing.sourceModifiedAt.getTime() === found.modifiedAt.getTime()) {
-    return res.json({ detected: true, candidate: toCandidateResponse(existing) });
+  if (existing && existing.oneDriveItemId === found.itemId && existing.sourceModifiedAt.getTime() === found.modifiedAt.getTime()) {
+    return res.json({ detected: true, candidate: toCandidateResponse(existing), report: scan.report });
   }
   if (found.headers.length === 0) {
     return res.status(400).json({ error: `Could not find a header row in ${found.fileName}` });
@@ -232,7 +258,7 @@ patchRouter.post('/:jobId/patch/onedrive-scan', requirePermission('manageOneDriv
     },
   });
   await logActivity('patch.onedrive_detect', `${found.fileName} (${found.source})`, jobId, req.user?.id);
-  res.json({ detected: true, candidate: toCandidateResponse(candidate) });
+  res.json({ detected: true, candidate: toCandidateResponse(candidate), report: scan.report });
 });
 
 function toCandidateResponse(c: {
@@ -275,7 +301,9 @@ patchRouter.post('/:jobId/patch/onedrive-candidate/approve', requirePermission('
     return res.status(409).json({ error: `This import was already ${candidate.status.toLowerCase()}` });
   }
 
-  const m = await loadSavedPatchMapping();
+  // A PDF-extracted table always has the same columns (see patchPdfExtract.ts), so it gets its
+  // own fixed mapping rather than the CSV mapping from Settings, whose column names won't match.
+  const m = candidate.extractedFrom === 'pdf' ? PDF_PATCH_MAPPING : await loadSavedPatchMapping();
   if (!m || !m.address || !m.fixtureType) {
     return res.status(400).json({
       error:
@@ -283,7 +311,7 @@ patchRouter.post('/:jobId/patch/onedrive-candidate/approve', requirePermission('
     });
   }
 
-  const rows = JSON.parse(candidate.rowsJson) as Record<string, string>[];
+  const rows = withPdfMode(JSON.parse(candidate.rowsJson) as Record<string, string>[], candidate.extractedFrom);
   const fixtures = buildFixturesFromRows(rows, m);
   const result = await mergeFixtures(jobId, fixtures);
   const newFixtureTypes = await addMissingFixtureTypeRules(fixtures.map((f) => f.fixtureType));

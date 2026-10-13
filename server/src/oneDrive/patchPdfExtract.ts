@@ -180,7 +180,9 @@ export function extractPatchRowsFromText(pages: { text: string }[]): Record<stri
  * Returns empty headers/rows (not an error) when nothing patch-table-shaped could be found.
  */
 export async function extractPatchTableFromPdf(buffer: Buffer): Promise<{ headers: string[]; rows: Record<string, string>[] }> {
-  const parser = new PDFParse({ data: buffer });
+  // A copy in its own ArrayBuffer: small Buffers sit in Node's shared pool, which pdf.js can't
+  // transfer to its worker ("Cannot transfer object of unsupported type").
+  const parser = new PDFParse({ data: new Uint8Array(buffer) });
   try {
     const tableResult = await parser.getTable().catch(() => null);
     const tableCandidates = [

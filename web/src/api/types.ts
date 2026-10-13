@@ -674,3 +674,9 @@ export interface LoginRequiresTotp {
   requiresTotp: true;
   pendingToken: string;
 }
+
+/** What a OneDrive patch scan opened - shown when it finds nothing usable. */
+export interface PatchScanReport {
+  checked: { name: string; path: string; rows: number; error?: string }[];
+  foldersSearched: number;
+}
