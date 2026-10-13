@@ -136,6 +136,7 @@ export const crewApi = {
       remove: (lineId: string) => request<void>(`/crew/me/rate-lines/${lineId}`, { method: 'DELETE' }),
     },
     myJobs: () => request<CrewMyJob[]>('/crew/me/jobs'),
+    calendarUrl: (jobId: string) => `${BASE}/crew/me/jobs/${jobId}/calendar.ics`,
     jobDetail: (jobId: string) => request<CrewJobDetail>(`/crew/me/jobs/${jobId}`),
     schedule: (jobId: string) => request<JobScheduleItem[]>(`/crew/me/jobs/${jobId}/schedule`),
     days: (jobId: string) => request<JobDay[]>(`/crew/me/jobs/${jobId}/days`),

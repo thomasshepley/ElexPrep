@@ -95,19 +95,16 @@ export default function OneDriveSettingsPage() {
       <div className="panel">
         <h3>Connection</h3>
         <div className="row" style={{ flexWrap: 'wrap' }}>
-          <label>
-            Tenant ID
-            <br />
+          <label className="field">
+            <span className="field-label">Tenant ID</span>
             <input value={tenantId} onChange={(e) => setTenantId(e.target.value)} style={{ width: 260 }} />
           </label>
-          <label>
-            Client (application) ID
-            <br />
+          <label className="field">
+            <span className="field-label">Client (application) ID</span>
             <input value={clientId} onChange={(e) => setClientId(e.target.value)} style={{ width: 260 }} />
           </label>
-          <label>
-            Client secret
-            <br />
+          <label className="field">
+            <span className="field-label">Client secret</span>
             <PasswordInput
               value={clientSecret}
               placeholder={config.hasClientSecret ? '•••••••• (set - leave blank to keep)' : 'paste client secret'}
@@ -115,14 +112,12 @@ export default function OneDriveSettingsPage() {
               style={{ width: 260 }}
             />
           </label>
-          <label>
-            Drive ID
-            <br />
+          <label className="field">
+            <span className="field-label">Drive ID</span>
             <input value={driveId} onChange={(e) => setDriveId(e.target.value)} placeholder="SharePoint/OneDrive drive id" style={{ width: 260 }} />
           </label>
-          <label>
-            Root folder
-            <br />
+          <label className="field">
+            <span className="field-label">Root folder</span>
             <input value={rootFolderPath} onChange={(e) => setRootFolderPath(e.target.value)} style={{ width: 160 }} />
           </label>
           <label style={{ alignSelf: 'flex-end' }}>

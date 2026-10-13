@@ -22,3 +22,7 @@ export const NOTIFICATION_CATEGORY_LABELS: Record<NotificationCategory, string> 
   job_discussion: 'New discussion messages',
   onboarding: 'New onboarding requests',
 };
+
+/** Categories that only ever reach staff (they come from admin-side events), so the crew
+ * portal's preferences don't offer toggles that can never fire for a crew account. */
+export const STAFF_ONLY_NOTIFICATION_CATEGORIES: readonly NotificationCategory[] = ['crew_application', 'onboarding'];

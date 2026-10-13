@@ -146,9 +146,8 @@ export default function CurrentRmsSettingsPage() {
       <div className="panel">
         <h3>Connection</h3>
         <div className="row" style={{ flexWrap: 'wrap' }}>
-          <label>
-            Subdomain
-            <br />
+          <label className="field">
+            <span className="field-label">Subdomain</span>
             <input
               value={subdomain}
               placeholder="yourcompany"
@@ -159,9 +158,8 @@ export default function CurrentRmsSettingsPage() {
               from https://<strong>yourcompany</strong>.current-rms.com
             </div>
           </label>
-          <label>
-            API key
-            <br />
+          <label className="field">
+            <span className="field-label">API key</span>
             {!editingApiKey ? (
               <div className="row" style={{ marginTop: '0.1rem' }}>
                 <span className="success" style={{ fontWeight: 600 }}>
@@ -203,9 +201,8 @@ export default function CurrentRmsSettingsPage() {
                 : "Saved - Test connection below uses this saved key unless you click Replace and type a new one."}
             </div>
           </label>
-          <label>
-            Poll every (minutes)
-            <br />
+          <label className="field">
+            <span className="field-label">Poll every (minutes)</span>
             <input
               type="number"
               min={1}

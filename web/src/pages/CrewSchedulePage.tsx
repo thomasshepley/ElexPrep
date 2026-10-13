@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom';
 import { api, type CrewMyJob } from '../api/client';
 import { WhereIcon } from '../components/Icons';
 import MonthCalendar, { type CalendarEvent } from '../components/MonthCalendar';
-import { formatDateRange } from '../utils/format';
+import LocationLinks from '../components/LocationLinks';
+import { formatDateRange, formatDayHeading, formatTime } from '../utils/format';
 
 const NO_DATE = 'No date set yet';
 
@@ -48,6 +49,7 @@ export default function CrewSchedulePage() {
 
       {jobs !== null && jobs.length > 0 && (
         <>
+          <NextCall jobs={jobs} />
           <div style={{ marginTop: '1rem' }}>
             <MonthCalendar events={events} />
           </div>
@@ -81,5 +83,51 @@ export default function CrewSchedulePage() {
         </>
       )}
     </div>
+  );
+}
+
+/** The soonest booked day across every job: what, when the first call is, where, who else. */
+function NextCall({ jobs }: { jobs: CrewMyJob[] }) {
+  const next = jobs
+    .filter((j) => j.nextDay)
+    .sort((a, b) => new Date(a.nextDay!.date).getTime() - new Date(b.nextDay!.date).getTime())[0];
+  if (!next?.nextDay) return null;
+  const { nextDay } = next;
+  const first = nextDay.items[0];
+
+  return (
+    <section className="panel next-call" aria-label="Your next call">
+      <p className="next-call-eyebrow">Your next call</p>
+      <h2 className="next-call-when">
+        {formatDayHeading(nextDay.date)}
+        {first && <span> · {formatTime(first.startsAt)}</span>}
+      </h2>
+      <p className="next-call-job">
+        <Link to={`/crew/jobs/${next.jobId}`}>{next.jobName}</Link>
+        <span className="chip chip-role">{next.role}</span>
+      </p>
+      {nextDay.items.length > 0 && (
+        <ul className="plain-list next-call-items">
+          {nextDay.items.map((i, idx) => (
+            <li key={idx}>
+              <span className="week-time">
+                {formatTime(i.startsAt)}
+                {i.endsAt ? `–${formatTime(i.endsAt)}` : ''}
+              </span>{' '}
+              {i.title}
+            </li>
+          ))}
+        </ul>
+      )}
+      {(next.venue || next.address) && (
+        <div className="next-call-where">
+          {next.venue && <div>{next.venue}</div>}
+          <LocationLinks address={next.address} showMap={false} />
+        </div>
+      )}
+      <p className="muted" style={{ margin: 0 }}>
+        {nextDay.others.length > 0 ? `With ${nextDay.others.map((o) => `${o.name} (${o.role})`).join(', ')}` : "No one else is booked that day yet."}
+      </p>
+    </section>
   );
 }

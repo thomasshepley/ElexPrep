@@ -286,7 +286,7 @@ function OnboardOpportunitiesPanel({ existingOppIds, onOnboarded }: { existingOp
       <div className="toolbar">
         <div className="search-field">
           <SearchIcon />
-          <input
+          <input aria-label="Search by subject or customer"
             placeholder="Search by subject or customer"
             value={search}
             onChange={(e) => {

@@ -130,12 +130,21 @@ export default function PrintQueuePanel({ jobId, groupId = null }: { jobId: stri
     return [...types];
   }, [pendingItems, stageAdHoc]);
 
+  // What a confirm will send: copies per label type (selected queue rows plus every ad hoc
+  // label) and which trays that touches - shown beside the buttons so nobody confirms blind.
+  const copiesByType = new Map<string, number>();
+  for (const q of pendingItems) if (selected.has(q.id)) copiesByType.set(q.labelType, (copiesByType.get(q.labelType) ?? 0) + q.quantity);
+  for (const a of stageAdHoc) copiesByType.set(a.labelType, (copiesByType.get(a.labelType) ?? 0) + a.quantity);
+  const trays = [...new Set([...copiesByType.keys()].map((t) => trayMap[t]).filter(Boolean))];
+  const summary = [...copiesByType.entries()].map(([t, n]) => `${n} ${labelTypeName(t)}`).join(' · ');
+  const nothingToSend = pendingItems.length === 0 && stageAdHoc.length === 0;
+
   return (
     <div>
       <div className="panel">
         <h3>Printer routing</h3>
         <p className="muted">
-          {Object.entries(trayMap).map(([type, tray]) => `${type}: ${tray}`).join(' · ')}
+          {Object.entries(trayMap).map(([type, tray]) => `${labelTypeName(type)}: ${tray}`).join(' · ')}
         </p>
         <p className="muted">
           Delivery method: <strong>{method === 'DRY_RUN' ? 'Dry run (no printing)' : method === 'DIRECT_9100' ? 'Direct network (port 9100)' : 'Windows agent'}</strong>
@@ -151,24 +160,13 @@ export default function PrintQueuePanel({ jobId, groupId = null }: { jobId: stri
           </button>
         </div>
 
-        {pendingItems.length === 0 && stageAdHoc.length === 0 && (
+        {nothingToSend ? (
           <p className="muted">Nothing queued yet - build from patch/cases or add ad hoc labels.</p>
+        ) : (
+          <p className="muted">Review each label type below, then confirm from the bar at the bottom.</p>
         )}
 
         {error && <p className="error">{error}</p>}
-
-        <div className="row" style={{ marginTop: '1rem' }}>
-          <button onClick={() => setConfirmingPrint(true)} disabled={busy || (pendingItems.length === 0 && stageAdHoc.length === 0)}>
-            Confirm &amp; send to printer
-          </button>
-          <button
-            className="secondary"
-            onClick={confirmAndDownload}
-            disabled={busy || (pendingItems.length === 0 && stageAdHoc.length === 0)}
-          >
-            Confirm &amp; download PDF
-          </button>
-        </div>
       </div>
 
       {confirmingPrint && (
@@ -198,6 +196,29 @@ export default function PrintQueuePanel({ jobId, groupId = null }: { jobId: stri
           }
         />
       ))}
+
+      {!nothingToSend && (
+        <div className="queue-action-bar">
+          <span className="queue-summary">
+            {summary ? (
+              <>
+                <strong>{summary}</strong>
+                {trays.length > 0 && <span className="muted"> → {trays.join(', ')}</span>}
+              </>
+            ) : (
+              <span className="muted">Nothing selected</span>
+            )}
+          </span>
+          <div className="row">
+            <button onClick={() => setConfirmingPrint(true)} disabled={busy || copiesByType.size === 0}>
+              Confirm &amp; send to printer
+            </button>
+            <button className="secondary" onClick={confirmAndDownload} disabled={busy || copiesByType.size === 0}>
+              Confirm &amp; download PDF
+            </button>
+          </div>
+        </div>
+      )}
 
       {printJobs.length > 0 && (
         <div className="panel">

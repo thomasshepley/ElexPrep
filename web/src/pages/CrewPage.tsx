@@ -6,6 +6,8 @@ import SkillPicker from '../components/SkillPicker';
 import CertificationPicker from '../components/CertificationPicker';
 import BankDetailsForm from '../components/BankDetailsForm';
 import BankDetailsReveal from '../components/BankDetailsReveal';
+import RowMenu from '../components/RowMenu';
+import { PlusIcon } from '../components/Icons';
 import WhatsAppButton from '../components/WhatsAppButton';
 import PasswordInput from '../components/PasswordInput';
 import Avatar from '../components/Avatar';
@@ -29,6 +31,7 @@ export default function CrewPage() {
   const [skills, setSkills] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [adding, setAdding] = useState<'crew' | 'admin' | null>(null);
 
   const refresh = () => api.crew.list().then(setCrew).catch((e) => setError(e.message));
 
@@ -57,6 +60,7 @@ export default function CrewPage() {
       setConfirmPassword('');
       setPhone('');
       setSkills('');
+      setAdding(null);
       refresh();
     } catch (err) {
       setError((err as Error).message);
@@ -98,56 +102,72 @@ export default function CrewPage() {
         tab. Inactive crew stay in the roster (so past job history isn't lost) but can't be
         added to new jobs.
       </p>
-      <div className="panel">
-        <h3>Add crew member</h3>
-        <form onSubmit={create}>
-          <div className="row" style={{ alignItems: 'flex-end', flexWrap: 'wrap', gap: '0.9rem' }}>
-            <div className="field" style={{ width: '12rem' }}>
-              <label htmlFor="crew-username">Username</label>
-              <input id="crew-username" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="jsmith" required />
-            </div>
-            <div className="field" style={{ width: '12rem' }}>
-              <label htmlFor="crew-display-name">Display name</label>
-              <input id="crew-display-name" value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="Jamie Smith" />
-            </div>
-            <div className="field" style={{ width: '12rem' }}>
-              <label htmlFor="crew-password">Password</label>
-              <PasswordInput
-                id="crew-password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="At least 8 characters"
-                required
-              />
-            </div>
-            <div className="field" style={{ width: '12rem' }}>
-              <label htmlFor="crew-confirm-password">Confirm password</label>
-              <PasswordInput
-                id="crew-confirm-password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                required
-              />
-            </div>
-            <div className="field" style={{ width: '10rem' }}>
-              <label htmlFor="crew-phone">Phone</label>
-              <input id="crew-phone" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="07700 900000" />
-            </div>
-          </div>
-          <SkillPicker value={skills} onChange={setSkills} />
-          <p className="muted" style={{ marginTop: '0.4rem' }}>
-            Set a rate card after adding them - expand their row with "Details".
-          </p>
-          <button type="submit">Add crew member</button>
-        </form>
-        {error && <p className="error">{error}</p>}
+      <div className="row" style={{ gap: '0.5rem', marginBottom: 'var(--space-4)' }}>
+        <button type="button" onClick={() => setAdding(adding === 'crew' ? null : 'crew')} aria-expanded={adding === 'crew'}>
+          <PlusIcon /> Add crew member
+        </button>
+        <button type="button" className="secondary" onClick={() => setAdding(adding === 'admin' ? null : 'admin')} aria-expanded={adding === 'admin'}>
+          Add an admin as crew
+        </button>
       </div>
 
-      <DefaultRatePanel />
+      {adding === 'crew' && (
+        <div className="panel">
+          <h3>Add crew member</h3>
+          <form onSubmit={create}>
+            <div className="row" style={{ alignItems: 'flex-end', flexWrap: 'wrap', gap: '0.9rem' }}>
+              <div className="field" style={{ width: '12rem' }}>
+                <label htmlFor="crew-username">Username</label>
+                <input id="crew-username" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="jsmith" required />
+              </div>
+              <div className="field" style={{ width: '12rem' }}>
+                <label htmlFor="crew-display-name">Display name</label>
+                <input id="crew-display-name" value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="Jamie Smith" />
+              </div>
+              <div className="field" style={{ width: '12rem' }}>
+                <label htmlFor="crew-password">Password</label>
+                <PasswordInput
+                  id="crew-password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="At least 8 characters"
+                  required
+                />
+              </div>
+              <div className="field" style={{ width: '12rem' }}>
+                <label htmlFor="crew-confirm-password">Confirm password</label>
+                <PasswordInput
+                  id="crew-confirm-password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="field" style={{ width: '10rem' }}>
+                <label htmlFor="crew-phone">Phone</label>
+                <input id="crew-phone" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="07700 900000" />
+              </div>
+            </div>
+            <SkillPicker value={skills} onChange={setSkills} />
+            <p className="muted" style={{ marginTop: '0.4rem' }}>
+              Set a rate card after adding them - expand their row with "Details".
+            </p>
+            <button type="submit">Add crew member</button>
+          </form>
+          {error && <p className="error">{error}</p>}
+        </div>
+      )}
+      {adding === 'admin' && (
+        <AddAdminAsCrewPanel
+          onAdded={() => {
+            setAdding(null);
+            refresh();
+          }}
+        />
+      )}
 
-      <AddAdminAsCrewPanel onAdded={refresh} />
-
-      <div className="table-scroll">
+      <div className="panel table-scroll">
+        {crew.length === 0 && <p className="muted">No crew yet - add someone above, or approve an application.</p>}
         <table>
           <thead>
             <tr>
@@ -189,18 +209,17 @@ export default function CrewPage() {
                       {c.active ? 'Active' : 'Inactive'}
                     </label>
                   </td>
-                  <td className="row">
-                    <button className="secondary" onClick={() => setExpandedId(expandedId === c.id ? null : c.id)}>
-                      Details
+                  <td className="row" style={{ flexWrap: 'nowrap' }}>
+                    <button className="secondary" aria-expanded={expandedId === c.id} onClick={() => setExpandedId(expandedId === c.id ? null : c.id)}>
+                      {expandedId === c.id ? 'Close' : 'Details'}
                     </button>
-                    {c.userRole !== 'ADMIN' && (
-                      <button className="secondary" onClick={() => resetPassword(c)}>
-                        Reset password
-                      </button>
-                    )}
-                    <button className="secondary" onClick={() => remove(c)}>
-                      {c.userRole === 'ADMIN' ? 'Remove from crew' : 'Delete'}
-                    </button>
+                    <RowMenu
+                      label={`More actions for ${c.displayName}`}
+                      items={[
+                        ...(c.userRole !== 'ADMIN' ? [{ label: 'Reset password…', onSelect: () => resetPassword(c) }] : []),
+                        { label: c.userRole === 'ADMIN' ? 'Remove from crew…' : 'Delete…', onSelect: () => remove(c), danger: true },
+                      ]}
+                    />
                   </td>
                 </tr>
                 {expandedId === c.id && (
@@ -217,6 +236,8 @@ export default function CrewPage() {
           </tbody>
         </table>
       </div>
+
+      <DefaultRatePanel />
     </div>
   );
 }

@@ -114,7 +114,7 @@ export default function ImportMappingPage() {
                     {(key === 'address' || key === 'fixtureType') && <span className="error"> *</span>}
                   </td>
                   <td>
-                    <input
+                    <input aria-label={`Column for ${PATCH_FIELD_LABELS[key]}`}
                       list={sampleHeaders.length ? 'sample-headers' : undefined}
                       value={mapping[key] ?? ''}
                       placeholder="- not mapped -"

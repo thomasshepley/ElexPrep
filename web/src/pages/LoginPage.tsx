@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import PasswordInput from '../components/PasswordInput';
@@ -7,8 +7,11 @@ import PasswordInput from '../components/PasswordInput';
 export default function LoginPage() {
   const { user, setUser } = useAuth();
   const navigate = useNavigate();
+  // Set by the onboarding page after it creates an account, so the person lands here knowing it
+  // worked and with their username already filled in.
+  const createdUsername = (useLocation().state as { accountCreated?: string } | null)?.accountCreated;
   const [needsSetup, setNeedsSetup] = useState(false);
-  const [username, setUsername] = useState('');
+  const [username, setUsername] = useState(createdUsername ?? '');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
@@ -123,6 +126,11 @@ export default function LoginPage() {
           <h1>ELEX Portal</h1>
           <p>{needsSetup ? 'First run - create the admin account.' : 'Sign in to continue.'}</p>
         </div>
+        {createdUsername && (
+          <p className="auth-notice" role="status">
+            Your account's been created - sign in with the password you just chose.
+          </p>
+        )}
         <form onSubmit={submit}>
           <div className="field">
             <label htmlFor="login-username">Username</label>

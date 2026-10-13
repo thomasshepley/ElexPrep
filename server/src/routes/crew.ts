@@ -4,6 +4,7 @@ import { prisma, logActivity } from '../db';
 import { MIN_PASSWORD_LENGTH, hashPassword, isAdminRole, requireRole, revokeOtherSessions } from '../auth';
 import { DOCUMENT_FIELDS, deleteDocumentFile, saveDocuments, streamDecryptedDocument } from '../crewDocumentsStorage';
 import { encryptBankDetails, decryptBankDetails, parseBankDetails } from '../bankDetails';
+import { listRateLines, syncGeneralRateLine, syncProfileDayRate } from '../rateCard';
 
 /**
  * Admin-only crew roster: creates/edits/removes a CREW User + its CrewProfile together, so a
@@ -189,6 +190,7 @@ crewRouter.post('/', async (req, res) => {
     },
     include: { user: { select: { username: true, displayName: true, role: true, avatarPath: true } } },
   });
+  if (dayRate) await syncGeneralRateLine(profile.id, dayRate);
   await logActivity('crew.create', `${username}`, undefined, req.user!.id);
   res.status(201).json(toCrewDto(profile));
 });
@@ -248,6 +250,7 @@ crewRouter.put('/:id', async (req, res) => {
     },
     include: { user: { select: { username: true, displayName: true, role: true, avatarPath: true } } },
   });
+  if (dayRate !== undefined) await syncGeneralRateLine(profile.id, dayRate || null);
   await logActivity('crew.update', profile.user.username, undefined, req.user!.id);
   res.json(toCrewDto(profile));
 });
@@ -340,8 +343,7 @@ crewRouter.delete('/:id/documents/:docId', async (req, res) => {
 crewRouter.get('/:id/rate-lines', async (req, res) => {
   const profile = await prisma.crewProfile.findUnique({ where: { id: req.params.id } });
   if (!profile) return res.status(404).json({ error: 'Crew member not found' });
-  const lines = await prisma.crewRateLine.findMany({ where: { crewProfileId: profile.id }, orderBy: { order: 'asc' } });
-  res.json(lines);
+  res.json(await listRateLines(profile.id));
 });
 
 crewRouter.post('/:id/rate-lines', async (req, res) => {
@@ -353,6 +355,7 @@ crewRouter.post('/:id/rate-lines', async (req, res) => {
   const line = await prisma.crewRateLine.create({
     data: { crewProfileId: profile.id, label, amount, order: count },
   });
+  await syncProfileDayRate(profile.id);
   await logActivity('crew.rateLine.create', `${label}: ${amount}`, undefined, req.user!.id);
   res.status(201).json(line);
 });
@@ -368,6 +371,7 @@ crewRouter.put('/:id/rate-lines/:lineId', async (req, res) => {
       ...(amount !== undefined ? { amount } : {}),
     },
   });
+  await syncProfileDayRate(existing.crewProfileId);
   await logActivity('crew.rateLine.update', `${line.label}: ${line.amount}`, undefined, req.user!.id);
   res.json(line);
 });
@@ -376,6 +380,7 @@ crewRouter.delete('/:id/rate-lines/:lineId', async (req, res) => {
   const existing = await prisma.crewRateLine.findUnique({ where: { id: req.params.lineId } });
   if (!existing || existing.crewProfileId !== req.params.id) return res.status(404).json({ error: 'Rate line not found' });
   await prisma.crewRateLine.delete({ where: { id: existing.id } });
+  await syncProfileDayRate(existing.crewProfileId);
   await logActivity('crew.rateLine.delete', existing.label, undefined, req.user!.id);
   res.status(204).end();
 });

@@ -25,13 +25,39 @@ function prettifyAction(action: string): string {
     .join(' → ');
 }
 
+// ISO timestamps inside details ("startsAt: 2026-10-15T09:00:00.000Z") read as en-GB times.
+const ISO_PATTERN = /\b\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?Z\b/g;
+
+function readableDetail(detail: string | null): string | null {
+  return detail ? detail.replace(ISO_PATTERN, (iso) => formatDateTime(iso)) : detail;
+}
+
 export default function ActivityLogPage() {
   const [entries, setEntries] = useState<ActivityLogEntry[]>([]);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [jobFilter, setJobFilter] = useState('');
+  const [showIp, setShowIp] = useState(false);
+
+  const load = async (before?: string) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const page = await api.activity.list({ before });
+      setEntries((prev) => (before ? [...prev, ...page.entries] : page.entries));
+      setNextCursor(page.nextCursor);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    api.activity.list().then(setEntries);
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const jobs = useMemo(() => {
@@ -55,12 +81,13 @@ export default function ActivityLogPage() {
       <div className="panel">
         <div className="row">
           <input
+            aria-label="Search activity"
             placeholder="Search action, detail, job, or user"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             style={{ width: 280 }}
           />
-          <select value={jobFilter} onChange={(e) => setJobFilter(e.target.value)}>
+          <select aria-label="Job" value={jobFilter} onChange={(e) => setJobFilter(e.target.value)}>
             <option value="">All jobs</option>
             {jobs.map(([id, name]) => (
               <option key={id} value={id}>
@@ -68,10 +95,15 @@ export default function ActivityLogPage() {
               </option>
             ))}
           </select>
+          <label className="row" style={{ gap: '0.4rem' }}>
+            <input type="checkbox" checked={showIp} onChange={(e) => setShowIp(e.target.checked)} />
+            Show IP addresses
+          </label>
         </div>
       </div>
+      {error && <p className="error">{error}</p>}
 
-      <div className="table-scroll">
+      <div className="panel table-scroll">
         <table>
           <thead>
             <tr>
@@ -80,7 +112,7 @@ export default function ActivityLogPage() {
               <th>Job</th>
               <th>Action</th>
               <th>Detail</th>
-              <th>IP</th>
+              {showIp && <th>IP</th>}
             </tr>
           </thead>
           <tbody>
@@ -96,14 +128,24 @@ export default function ActivityLogPage() {
                   )}
                 </td>
                 <td>{prettifyAction(e.action)}</td>
-                <td>{e.detail}</td>
-                <td className="muted" title={e.userAgent ?? undefined}>{e.ipAddress ?? '-'}</td>
+                <td>{readableDetail(e.detail)}</td>
+                {showIp && (
+                  <td className="muted" title={e.userAgent ?? undefined}>
+                    {e.ipAddress ?? '-'}
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>
         </table>
       </div>
-      {filtered.length === 0 && <p className="muted">No matching activity.</p>}
+      {!loading && filtered.length === 0 && <p className="muted">No matching activity.</p>}
+      {loading && <p className="muted">Loading…</p>}
+      {nextCursor && !loading && (
+        <button type="button" className="secondary" style={{ marginTop: 'var(--space-3)' }} onClick={() => load(nextCursor)}>
+          Load older activity
+        </button>
+      )}
     </div>
   );
 }

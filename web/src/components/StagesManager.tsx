@@ -177,7 +177,7 @@ export default function StagesManager({
 
       <h4>Add a custom stage</h4>
       <form className="row" onSubmit={addCustom}>
-        <input placeholder="Stage name" value={newName} onChange={(e) => setNewName(e.target.value)} />
+        <input aria-label="Stage name" placeholder="Stage name" value={newName} onChange={(e) => setNewName(e.target.value)} />
         <button type="submit" disabled={busy || !newName.trim()}>
           Add
         </button>

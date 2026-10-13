@@ -218,7 +218,8 @@ export default function LabelTypeSection({
       </div>
 
       <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap', marginTop: '0.75rem' }}>
-        <div>
+        {/* Sticks while the rows scroll past, and follows whichever row was last clicked. */}
+        <div className={`queue-preview${customizing ? '' : ' is-compact'}`}>
           <SheetMirror
             template={displayTemplate}
             item={previewItem}
@@ -277,7 +278,7 @@ export default function LabelTypeSection({
           )}
         </div>
 
-        <div style={{ flex: 1, minWidth: 280 }}>
+        <div style={{ flex: '1 1 24rem', minWidth: 0 }}>
           <DndContext sensors={sensors} onDragEnd={onDragEnd}>
             <SortableContext items={rows.map((r) => r.key)} strategy={verticalListSortingStrategy}>
               <table>
@@ -304,6 +305,8 @@ export default function LabelTypeSection({
                       editing={editingRow === row.key}
                       onToggleEdit={() => setEditingRow(editingRow === row.key ? null : row.key)}
                       onSaveContent={(patch) => updateRowContent(row, patch)}
+                      previewing={rows[clampedPreviewIndex]?.key === row.key}
+                      onPreview={() => setPreviewIndex(rows.findIndex((r) => r.key === row.key))}
                     />
                   ))}
                 </tbody>
@@ -327,6 +330,8 @@ function SortableRow({
   editing,
   onToggleEdit,
   onSaveContent,
+  previewing,
+  onPreview,
 }: {
   row: Row;
   labelType: string;
@@ -338,13 +343,15 @@ function SortableRow({
   editing: boolean;
   onToggleEdit: () => void;
   onSaveContent: (patch: Record<string, unknown>) => void;
+  previewing: boolean;
+  onPreview: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: row.key });
   const style = { transform: CSS.Transform.toString(transform), transition };
 
   return (
     <>
-      <tr ref={setNodeRef} style={style}>
+      <tr ref={setNodeRef} style={style} className={previewing ? 'is-previewing' : undefined}>
         <td {...attributes} {...listeners} style={{ cursor: 'grab', color: 'var(--content-muted)' }} title="Drag to reorder">
           ⠿
         </td>
@@ -352,7 +359,9 @@ function SortableRow({
           <input type="checkbox" checked={selected} disabled={!selectable} onChange={onToggleSelect} title={selectable ? '' : 'Ad hoc labels are always included'} />
         </td>
         <td>
-          {summarize(labelType, row.content)}
+          <button type="button" className="link-button queue-row-preview" onClick={onPreview} title="Show this label in the preview">
+            {summarize(labelType, row.content)}
+          </button>
           <button className="secondary" style={{ marginLeft: '0.5rem', padding: '0.1rem 0.5rem' }} onClick={onToggleEdit}>
             {editing ? 'Close' : 'Edit'}
           </button>

@@ -136,17 +136,11 @@ export default function JobCrewPanel({ jobId }: { jobId: string }) {
                 <label htmlFor="assign-days">Days</label>
                 <input id="assign-days" value={days} onChange={(e) => setDays(e.target.value)} placeholder="1" />
               </div>
-              <div className="field" style={{ width: 'auto' }}>
-                <label htmlFor="assign-zero-rated" className="row" style={{ gap: '0.4rem', alignItems: 'center' }}>
-                  <input
-                    id="assign-zero-rated"
-                    type="checkbox"
-                    checked={zeroRated}
-                    onChange={(e) => setZeroRated(e.target.checked)}
-                  />
-                  Zero-rate
-                </label>
-              </div>
+              {/* A plain checkbox label rather than an uppercase .field label, which wrapped awkwardly. */}
+              <label className="row" style={{ gap: '0.4rem', whiteSpace: 'nowrap', alignSelf: 'center' }} title="Cost this person at zero on the crew margin, whatever their rate">
+                <input type="checkbox" checked={zeroRated} onChange={(e) => setZeroRated(e.target.checked)} />
+                Zero-rate
+              </label>
               <button type="submit" disabled={!crewProfileId}>
                 Add to job
               </button>

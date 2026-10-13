@@ -78,12 +78,14 @@ function StaticCard({ icon, label, children }: { icon: ReactNode; label: string;
   );
 }
 
-function WhySubsection({ title, children }: { title: string; children: ReactNode }) {
+/** A collapsible part of the Why card - on a phone the whole card was a 4000px scroll, so only
+ * the day schedule starts open. */
+function WhySubsection({ title, children, defaultOpen = false }: { title: string; children: ReactNode; defaultOpen?: boolean }) {
   return (
-    <div style={{ marginBottom: '1.25rem' }}>
-      <h4 style={{ marginBottom: '0.5rem' }}>{title}</h4>
-      {children}
-    </div>
+    <details className="why-subsection" open={defaultOpen}>
+      <summary>{title}</summary>
+      <div className="why-subsection-body">{children}</div>
+    </details>
   );
 }
 
@@ -147,7 +149,12 @@ export default function CrewJobPage() {
 
   return (
     <div>
-      <h1>{detail.what.jobName}</h1>
+      <div className="row" style={{ justifyContent: 'space-between', flexWrap: 'wrap' }}>
+        <h1 style={{ margin: 0 }}>{detail.what.jobName}</h1>
+        <a className="button secondary" href={api.crewPortal.calendarUrl(jobId)} download>
+          <WhenIcon /> Add to calendar
+        </a>
+      </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '0.9rem', marginTop: '1.25rem' }}>
         <StaticCard icon={<WhoIcon />} label="Who">
@@ -194,12 +201,12 @@ export default function CrewJobPage() {
 
       <div style={{ marginTop: '0.9rem' }}>
         <StaticCard icon={<WhyIcon />} label="Why">
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))', gap: '1.5rem 2rem' }}>
+          <div className="why-grid">
             <WhySubsection title="Week overview">
               <DayBlocksReadOnly days={days} />
             </WhySubsection>
 
-            <WhySubsection title="Day schedule">
+            <WhySubsection title="Day schedule" defaultOpen>
               {schedule.length > 0 ? <DayTimeline items={schedule} /> : <p className="muted">No schedule has been set for this job yet.</p>}
             </WhySubsection>
 
