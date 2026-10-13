@@ -9,7 +9,7 @@ import { prisma } from './db';
  *   1. zero-rated on this job            -> 0
  *   2. this person's rate on this job    (JobCrewAssignment.dayRate)
  *   3. this job's rate for their role    (RoleRate with jobId)
- *   4. this person's agreed rate         (CrewProfile.dayRate, admin-set on the Crew page)
+ *   4. this person's agreed rate         (CrewProfile.dayRate, admin-set on Users & crew)
  *   5. the portal rate for their role    (RoleRate with no job)
  *   6. the portal default day rate       (Crew settings page)
  * A day can then override that for one day only (JobDayCrewAssignment.dayRate).
@@ -113,7 +113,7 @@ export function assignmentCost(
   return { days, fromSchedule: false, cost: rate.rate * days, dayOverrides: 0 };
 }
 
-/** The portal-wide fallback rate set on the Crew settings page (routes/crew.ts). */
+/** The portal-wide fallback rate set on the Users & crew settings page (routes/crew.ts). */
 export async function loadGlobalDefaultDayRate(): Promise<number> {
   const setting = await prisma.appSetting.findUnique({ where: { key: 'defaultCrewDayRate' } });
   if (!setting) return 0;

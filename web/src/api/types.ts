@@ -208,8 +208,8 @@ export interface CrewMember {
   username: string;
   displayName: string;
   hasAvatar: boolean;
-  /// ADMIN means this row is a staff admin's own account also assigned as crew (see
-  /// api.crew.fromAdmin), not a freelancer - their login/password lives on the Users page.
+  /// Anything but CREW means this is a staff login (admin or prep) that also works as crew (see
+  /// api.crew.fromAdmin), not a freelancer.
   userRole: Role;
   phone: string | null;
   color: string | null;

@@ -30,7 +30,7 @@ usersRouter.post('/', async (req, res) => {
     return res.status(400).json({ error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters` });
   }
   if (role && !['ADMIN', 'USER', 'SIGNAGE'].includes(role)) {
-    return res.status(400).json({ error: 'role must be ADMIN, USER, or SIGNAGE (crew accounts are created on the Crew settings page)' });
+    return res.status(400).json({ error: 'role must be ADMIN, USER, or SIGNAGE (crew accounts are added as crew members)' });
   }
   const existing = await prisma.user.findUnique({ where: { username } });
   if (existing) return res.status(409).json({ error: 'Username already taken' });
@@ -52,7 +52,7 @@ usersRouter.put('/:id', async (req, res) => {
     return res.status(400).json({ error: 'isProjectManager must be a boolean' });
   }
   if (role && !['ADMIN', 'USER', 'SIGNAGE'].includes(role)) {
-    return res.status(400).json({ error: 'role must be ADMIN, USER, or SIGNAGE (crew accounts are managed on the Crew settings page)' });
+    return res.status(400).json({ error: 'role must be ADMIN, USER, or SIGNAGE (crew logins are managed as crew members)' });
   }
   if (role && role !== req.user!.role && req.params.id === req.user!.id) {
     return res.status(400).json({ error: 'You cannot change your own role' });

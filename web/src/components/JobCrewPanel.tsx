@@ -216,7 +216,7 @@ export default function JobCrewPanel({ jobId }: { jobId: string }) {
             <p className="muted">Every active crew member is already assigned to this job.</p>
           )}
           {roster.length === 0 && (
-            <p className="muted">No crew in the roster yet - add some on the Crew settings page.</p>
+            <p className="muted">No crew in the roster yet - add some on the Users &amp; crew settings page.</p>
           )}
           {error && <p className="error">{error}</p>}
         </>
@@ -414,7 +414,7 @@ export default function JobCrewPanel({ jobId }: { jobId: string }) {
         <div style={{ marginTop: '1.5rem' }}>
           <h4 style={{ marginBottom: '0.25rem' }}>Role rates on this job</h4>
           <p className="muted" style={{ marginTop: 0, fontSize: 'var(--text-sm)' }}>
-            What this job pays per day for each role. Anyone without their own rate above gets this, then their agreed rate, then the portal rate for the role (set on the Crew settings page).
+            What this job pays per day for each role. Anyone without their own rate above gets this, then their agreed rate, then the portal rate for the role (set on the Users &amp; crew settings page).
           </p>
           {roleRows.length > 0 && (
             <div className="table-scroll">

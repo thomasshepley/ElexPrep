@@ -33,8 +33,7 @@ const GROUPS: { title: string; sections: SettingsSection[] }[] = [
   {
     title: 'People',
     sections: [
-      { to: '/settings/users', label: 'Users', adminOnly: true },
-      { to: '/settings/crew', label: 'Crew', adminOnly: true },
+      { to: '/settings/people', label: 'Users & crew', adminOnly: true },
       { to: '/settings/crew-applications', label: 'Applications', permission: 'manageCrewApplications' },
       { to: '/settings/onboarding', label: 'Onboarding', permission: 'manageCrewApplications' },
       { to: '/settings/crew-portal', label: 'Crew Portal', adminOnly: true },

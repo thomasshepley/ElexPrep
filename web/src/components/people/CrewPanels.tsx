@@ -1,251 +1,19 @@
-import { Fragment, useEffect, useState } from 'react';
+/** Crew profile, rate card, documents and role-rate panels used on the Users & crew page. */
+import { useEffect, useState } from 'react';
 import { resolveCrewColor } from '@elexprep/shared';
-import { api, type RoleRate, type BankDetails, type CrewMember, type CrewDocumentSummary, type CrewRateLine } from '../api/client';
-import FileInput from '../components/FileInput';
-import SkillPicker from '../components/SkillPicker';
-import CertificationPicker from '../components/CertificationPicker';
-import BankDetailsForm from '../components/BankDetailsForm';
-import BankDetailsReveal from '../components/BankDetailsReveal';
-import RowMenu from '../components/RowMenu';
-import { useToast } from '../components/Toast';
-import { PlusIcon } from '../components/Icons';
-import WhatsAppButton from '../components/WhatsAppButton';
-import PasswordInput from '../components/PasswordInput';
-import Avatar from '../components/Avatar';
-import { useDialog } from '../components/Dialog';
-import { useAsyncAction } from '../hooks/useAsyncAction';
+import { api, type RoleRate, type BankDetails, type CrewMember, type CrewDocumentSummary, type CrewRateLine } from '../../api/client';
+import FileInput from '../FileInput';
+import CertificationPicker from '../CertificationPicker';
+import BankDetailsForm from '../BankDetailsForm';
+import BankDetailsReveal from '../BankDetailsReveal';
+import { useToast } from '../Toast';
 
 const DOCUMENT_SLOTS = [
   { field: 'idDocument', label: 'Photo ID' },
   { field: 'insuranceDocument', label: 'Insurance' },
 ] as const;
 
-export default function CrewPage() {
-  const dialog = useDialog();
-  const { run } = useAsyncAction();
-  const [crew, setCrew] = useState<CrewMember[]>([]);
-  const [username, setUsername] = useState('');
-  const [displayName, setDisplayName] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [phone, setPhone] = useState('');
-  const [skills, setSkills] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [adding, setAdding] = useState<'crew' | 'admin' | null>(null);
-
-  const refresh = () => api.crew.list().then(setCrew).catch((e) => setError(e.message));
-
-  useEffect(() => {
-    refresh();
-  }, []);
-
-  const create = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    if (password !== confirmPassword) {
-      setError('Passwords do not match.');
-      return;
-    }
-    try {
-      await api.crew.create({
-        username,
-        password,
-        displayName: displayName || undefined,
-        phone: phone || undefined,
-        skills: skills || undefined,
-      });
-      setUsername('');
-      setDisplayName('');
-      setPassword('');
-      setConfirmPassword('');
-      setPhone('');
-      setSkills('');
-      setAdding(null);
-      refresh();
-    } catch (err) {
-      setError((err as Error).message);
-    }
-  };
-
-  const toggleActive = async (c: CrewMember) => {
-    await api.crew.update(c.id, { active: !c.active });
-    refresh();
-  };
-
-  const resetPassword = async (c: CrewMember) => {
-    const pw = await dialog.prompt({ title: `Reset ${c.username}'s password`, message: 'They will be signed out everywhere and need the new password to sign back in.', label: 'New password', inputType: 'password', minLength: 8, confirmEntry: true, confirmLabel: 'Set password' });
-    if (!pw) return;
-    await run(() => api.crew.update(c.id, { password: pw }), { success: 'Password updated' });
-  };
-
-  const remove = async (c: CrewMember) => {
-    const confirmMessage =
-      c.userRole === 'ADMIN'
-        ? `Remove ${c.displayName} from the crew roster? Their admin login is unaffected.`
-        : `Delete crew member ${c.displayName}? This removes their login and any job assignments.`;
-    if (!(await dialog.confirm({ title: c.userRole === 'ADMIN' ? 'Remove from the crew roster?' : `Delete ${c.displayName}?`, message: confirmMessage, confirmLabel: c.userRole === 'ADMIN' ? 'Remove' : 'Delete', danger: true }))) return;
-    setError(null);
-    try {
-      await api.crew.remove(c.id);
-      refresh();
-    } catch (err) {
-      setError((err as Error).message);
-    }
-  };
-
-  return (
-    <div>
-      <h1>Crew</h1>
-      <p className="muted">
-        Freelance crew accounts. Each one gets a login on the crew portal once it's ready; for
-        now this manages their profile and lets you attribute them to jobs from the job's Crew
-        tab. Inactive crew stay in the roster (so past job history isn't lost) but can't be
-        added to new jobs.
-      </p>
-      <div className="row" style={{ gap: '0.5rem', marginBottom: 'var(--space-4)' }}>
-        <button type="button" onClick={() => setAdding(adding === 'crew' ? null : 'crew')} aria-expanded={adding === 'crew'}>
-          <PlusIcon /> Add crew member
-        </button>
-        <button type="button" className="secondary" onClick={() => setAdding(adding === 'admin' ? null : 'admin')} aria-expanded={adding === 'admin'}>
-          Add an admin as crew
-        </button>
-      </div>
-
-      {adding === 'crew' && (
-        <div className="panel">
-          <h3>Add crew member</h3>
-          <form onSubmit={create}>
-            <div className="row" style={{ alignItems: 'flex-end', flexWrap: 'wrap', gap: '0.9rem' }}>
-              <div className="field" style={{ width: '12rem' }}>
-                <label htmlFor="crew-username">Username</label>
-                <input id="crew-username" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="jsmith" required />
-              </div>
-              <div className="field" style={{ width: '12rem' }}>
-                <label htmlFor="crew-display-name">Display name</label>
-                <input id="crew-display-name" value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="Jamie Smith" />
-              </div>
-              <div className="field" style={{ width: '12rem' }}>
-                <label htmlFor="crew-password">Password</label>
-                <PasswordInput
-                  id="crew-password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="At least 8 characters"
-                  required
-                />
-              </div>
-              <div className="field" style={{ width: '12rem' }}>
-                <label htmlFor="crew-confirm-password">Confirm password</label>
-                <PasswordInput
-                  id="crew-confirm-password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="field" style={{ width: '10rem' }}>
-                <label htmlFor="crew-phone">Phone</label>
-                <input id="crew-phone" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="07700 900000" />
-              </div>
-            </div>
-            <SkillPicker value={skills} onChange={setSkills} />
-            <p className="muted" style={{ marginTop: '0.4rem' }}>
-              Set a rate card after adding them - expand their row with "Details".
-            </p>
-            <button type="submit">Add crew member</button>
-          </form>
-          {error && <p className="error">{error}</p>}
-        </div>
-      )}
-      {adding === 'admin' && (
-        <AddAdminAsCrewPanel
-          onAdded={() => {
-            setAdding(null);
-            refresh();
-          }}
-        />
-      )}
-
-      <div className="panel table-scroll">
-        {crew.length === 0 && <p className="muted">No crew yet - add someone above, or approve an application.</p>}
-        <table>
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Phone</th>
-              <th>Skills</th>
-              <th>Status</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {crew.map((c) => (
-              <Fragment key={c.id}>
-                <tr>
-                  <td>
-                    <div className="row" style={{ gap: '0.4rem' }}>
-                      <Avatar userId={c.userId} displayName={c.displayName} hasAvatar={c.hasAvatar} size={28} />
-                      <span
-                        className="crew-swatch-dot"
-                        style={{ background: resolveCrewColor(c.id, c.color) }}
-                        title="Schedule swatch color"
-                      />
-                      <div style={{ fontWeight: 600 }}>{c.displayName}</div>
-                      {c.userRole === 'ADMIN' && <span className="chip chip-role">Staff</span>}
-                    </div>
-                    <span className="muted">{c.username}</span>
-                  </td>
-                  <td>
-                    <div className="row" style={{ gap: '0.4rem' }}>
-                      {c.phone ?? '-'}
-                      <WhatsAppButton phone={c.phone} label="WhatsApp" compact />
-                    </div>
-                  </td>
-                  <td>{c.skills ?? '-'}</td>
-                  <td>
-                    <label className="switch">
-                      <input type="checkbox" checked={c.active} onChange={() => toggleActive(c)} />
-                      <span className="switch-track" />
-                      {c.active ? 'Active' : 'Inactive'}
-                    </label>
-                  </td>
-                  <td>
-                    <div className="row" style={{ flexWrap: 'nowrap' }}>
-                      <button className="secondary" aria-expanded={expandedId === c.id} onClick={() => setExpandedId(expandedId === c.id ? null : c.id)}>
-                        {expandedId === c.id ? 'Close' : 'Details'}
-                      </button>
-                      <RowMenu
-                        label={`More actions for ${c.displayName}`}
-                        items={[
-                          ...(c.userRole !== 'ADMIN' ? [{ label: 'Reset password…', onSelect: () => resetPassword(c) }] : []),
-                          { label: c.userRole === 'ADMIN' ? 'Remove from crew…' : 'Delete…', onSelect: () => remove(c), danger: true },
-                        ]}
-                      />
-                    </div>
-                  </td>
-                </tr>
-                {expandedId === c.id && (
-                  <tr>
-                    <td colSpan={5}>
-                      <ProfileEditPanel crew={c} onChanged={refresh} />
-                      <RateCardPanel crewId={c.id} />
-                      <CrewDocumentsPanel crewId={c.id} />
-                    </td>
-                  </tr>
-                )}
-              </Fragment>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      <DefaultRatePanel />
-    </div>
-  );
-}
-
-function ProfileEditPanel({ crew, onChanged }: { crew: CrewMember; onChanged: () => void }) {
+export function ProfileEditPanel({ crew, onChanged }: { crew: CrewMember; onChanged: () => void }) {
   const [color, setColor] = useState(resolveCrewColor(crew.id, crew.color));
   const [certifications, setCertifications] = useState(crew.certifications ?? '');
   const [gender, setGender] = useState(crew.gender ?? '');
@@ -359,7 +127,7 @@ function ProfileEditPanel({ crew, onChanged }: { crew: CrewMember; onChanged: ()
   );
 }
 
-function RateCardPanel({ crewId }: { crewId: string }) {
+export function RateCardPanel({ crewId }: { crewId: string }) {
   const [lines, setLines] = useState<CrewRateLine[]>([]);
   const [label, setLabel] = useState('');
   const [amount, setAmount] = useState('');
@@ -423,7 +191,7 @@ function RateCardPanel({ crewId }: { crewId: string }) {
   );
 }
 
-function CrewDocumentsPanel({ crewId }: { crewId: string }) {
+export function CrewDocumentsPanel({ crewId }: { crewId: string }) {
   const [documents, setDocuments] = useState<CrewDocumentSummary[]>([]);
   const [error, setError] = useState<string | null>(null);
 
@@ -489,7 +257,7 @@ function CrewDocumentsPanel({ crewId }: { crewId: string }) {
  * Portal-wide fallback day rate - applied on the crew margin calculator when a job
  * assignment has no rate override and the crew member has no profile default of their own.
  */
-function DefaultRatePanel() {
+export function DefaultRatePanel() {
   const [dayRate, setDayRate] = useState('');
   const [roleRates, setRoleRates] = useState<RoleRate[]>([]);
   const [newRole, setNewRole] = useState('');
@@ -599,73 +367,6 @@ function DefaultRatePanel() {
           <input id="default-day-rate" inputMode="decimal" value={dayRate} onChange={(e) => setDayRate(e.target.value)} placeholder="e.g. 200" />
         </div>
         <button type="submit">Save</button>
-      </form>
-      {error && <p className="error">{error}</p>}
-    </div>
-  );
-}
-
-/**
- * Lets an ADMIN who also works shifts show up as assignable crew without a second login -
- * picks from admin accounts that don't already have a crew profile (see
- * api.crew.adminCandidates), then calls api.crew.fromAdmin to attach a bare CrewProfile to
- * their existing User row.
- */
-function AddAdminAsCrewPanel({ onAdded }: { onAdded: () => void }) {
-  const [candidates, setCandidates] = useState<{ id: string; username: string; displayName: string }[]>([]);
-  const [selected, setSelected] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-
-  const refresh = () => api.crew.adminCandidates().then(setCandidates).catch((e) => setError(e.message));
-
-  useEffect(() => {
-    refresh();
-  }, []);
-
-  if (candidates.length === 0) return null;
-
-  const add = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selected) return;
-    setBusy(true);
-    setError(null);
-    try {
-      await api.crew.fromAdmin(selected);
-      setSelected('');
-      refresh();
-      onAdded();
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <div className="panel">
-      <h3>Add an admin as crew</h3>
-      <p className="muted">
-        For staff who also work shifts - this makes their existing login assignable to jobs
-        without creating a second account.
-      </p>
-      <form onSubmit={add} className="row" style={{ alignItems: 'flex-end', gap: '0.6rem' }}>
-        <div className="field" style={{ width: '14rem' }}>
-          <label htmlFor="admin-as-crew-select">Admin account</label>
-          <select id="admin-as-crew-select" value={selected} onChange={(e) => setSelected(e.target.value)} required>
-            <option value="" disabled>
-              Choose an admin…
-            </option>
-            {candidates.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.displayName} ({c.username})
-              </option>
-            ))}
-          </select>
-        </div>
-        <button type="submit" disabled={busy || !selected}>
-          Add as crew
-        </button>
       </form>
       {error && <p className="error">{error}</p>}
     </div>

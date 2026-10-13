@@ -23,8 +23,7 @@ const SettingsLayout = lazy(() => import('./pages/SettingsLayout'))
 const FixtureTypeRulesPage = lazy(() => import('./pages/FixtureTypeRulesPage'))
 const LocationColorsPage = lazy(() => import('./pages/LocationColorsPage'))
 const ImportMappingPage = lazy(() => import('./pages/ImportMappingPage'))
-const UsersPage = lazy(() => import('./pages/UsersPage'))
-const CrewPage = lazy(() => import('./pages/CrewPage'))
+const PeoplePage = lazy(() => import('./pages/PeoplePage'))
 const CrewApplicationsPage = lazy(() => import('./pages/CrewApplicationsPage'))
 const PreferencesPage = lazy(() => import('./pages/PreferencesPage'))
 const PrinterSettingsPage = lazy(() => import('./pages/PrinterSettingsPage'))
@@ -63,8 +62,9 @@ export default function AppRoutes() {
               <Route path="fixture-types" element={<FixtureTypeRulesPage />} />
               <Route path="location-colors" element={<LocationColorsPage />} />
               <Route path="import-mapping" element={<ImportMappingPage />} />
-              <Route path="users" element={<UsersPage />} />
-              <Route path="crew" element={<CrewPage />} />
+              <Route path="people" element={<PeoplePage />} />
+              <Route path="users" element={<Navigate to="/settings/people" replace />} />
+              <Route path="crew" element={<Navigate to="/settings/people" replace />} />
               <Route path="crew-applications" element={<CrewApplicationsPage />} />
               <Route path="onboarding" element={<OnboardingPage />} />
               <Route path="printer" element={<PrinterSettingsPage />} />
