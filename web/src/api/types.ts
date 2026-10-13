@@ -675,8 +675,16 @@ export interface LoginRequiresTotp {
   pendingToken: string;
 }
 
-/** What a OneDrive patch scan opened - shown when it finds nothing usable. */
-export interface PatchScanReport {
-  checked: { name: string; path: string; rows: number; error?: string }[];
-  foldersSearched: number;
+/** A file that can be picked as a job's patch (OneDrive CSV/PDF or a Plots-tab PDF). */
+export interface PatchSourceFile {
+  key: string;
+  kind: 'csv' | 'pdf';
+  origin: 'onedrive' | 'plots';
+  name: string;
+  path: string;
+  modifiedAt: string;
+  size: number | null;
+  /** Patch-named, in a Patch folder, or a CAD drawing - the likeliest picks. */
+  suggested: boolean;
+  lastImportedAt: string | null;
 }

@@ -1,5 +1,5 @@
 import { BASE, request } from '../http';
-import type { AdHocLabel, CaseGroup, Fixture, FixtureGroup, FixtureTypeRule, LocationColorPattern, LocationColorRule, PatchImportCandidate, PatchImportResult, PrintJob, PrintMethod, PrintQueueItem, PrinterSettings, RmsHeadingGroup, PatchScanReport } from '../types';
+import type { AdHocLabel, CaseGroup, Fixture, FixtureGroup, FixtureTypeRule, LocationColorPattern, LocationColorRule, PatchImportCandidate, PatchImportResult, PrintJob, PrintMethod, PrintQueueItem, PrinterSettings, RmsHeadingGroup, PatchSourceFile } from '../types';
 import type { LabelElementDef, LabelTypeTemplate } from '@elexprep/shared';
 
 export const prepApi = {
@@ -61,8 +61,10 @@ export const prepApi = {
       request<{ updated: number }>(`/jobs/${jobId}/fixtures/bulk`, { method: 'PUT', body: JSON.stringify({ ids, location }) }),
     bulkRemoveFixtures: (jobId: string, ids: string[]) =>
       request<{ deleted: number }>(`/jobs/${jobId}/fixtures/bulk`, { method: 'DELETE', body: JSON.stringify({ ids }) }),
-    scanOneDrive: (jobId: string) =>
-      request<{ detected: boolean; candidate?: PatchImportCandidate; report?: PatchScanReport }>(`/jobs/${jobId}/patch/onedrive-scan`, { method: 'POST' }),
+    listOneDriveFiles: (jobId: string) =>
+      request<{ files: PatchSourceFile[]; foldersSearched: number; truncated: boolean }>(`/jobs/${jobId}/patch/onedrive-files`),
+    readOneDriveFile: (jobId: string, key: string) =>
+      request<{ candidate: PatchImportCandidate }>(`/jobs/${jobId}/patch/onedrive-files/read`, { method: 'POST', body: JSON.stringify({ key }) }),
     getOneDriveCandidate: (jobId: string) =>
       request<PatchImportCandidate | null>(`/jobs/${jobId}/patch/onedrive-candidate`),
     approveOneDriveCandidate: (jobId: string) =>

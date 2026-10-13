@@ -157,7 +157,7 @@ export function extractPatchRowsFromText(pages: { text: string }[]): Record<stri
 /**
  * Best-effort extraction of a patch table out of a CAD PDF, for the auto-import fallback used
  * when a job's OneDrive "Patch" folder has no CSV (see oneDrive/patchDetect.ts and
- * routes/patch.ts's /onedrive-scan). Tries two strategies, in order:
+ * routes/patch.ts's /onedrive-files/read). Tries two strategies, in order:
  *
  * 1. pdf-parse's structural table detection (getTable), for PDFs where the patch table is
  *    actually drawn with a ruled/grid-aligned border - scored against PATCH_HEADER_KEYWORDS so

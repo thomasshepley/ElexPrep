@@ -1,12 +1,12 @@
 import { Router } from 'express';
 import multer from 'multer';
-import type { Prisma } from '@prisma/client';
+import type { Job, Prisma } from '@prisma/client';
 import { PATCH_FIELD_KEYS, PatchFieldKey } from '@elexprep/shared';
 import { prisma, logActivity } from '../db';
 import { requirePermission } from '../permissions';
 import { parseWysiwygCsv, buildFixturesFromRows } from '../patchCsv';
 import { getOneDriveConfig } from '../oneDrive/config';
-import { findPatchSource } from '../oneDrive/patchDetect';
+import { listPatchFiles, readPatchFile } from '../oneDrive/patchDetect';
 
 // Every other multer instance in this app bounds upload size explicitly (jobs.ts, plots.ts,
 // jobDocuments.ts, crew.ts) - this one didn't, so an arbitrarily large request body could be
@@ -173,14 +173,7 @@ patchRouter.post('/:jobId/patch/import', async (req, res) => {
   res.json({ imported: fixtures.length, newFixtureTypes, ...result });
 });
 
-/**
- * Looks for a patch source in the job's OneDrive folder - an exported CSV in the "Patch"
- * subfolder first, falling back to extracting a table out of the job's CAD PDF when there's no
- * CSV (see oneDrive/patchDetect.ts's findPatchSource) - and, if found, stores it as a PENDING
- * candidate for review - never applied directly. A re-scan that finds the same file (by its
- * Graph lastModifiedDateTime) leaves the existing candidate's status alone; a re-scan that finds
- * a changed or new file overwrites it back to PENDING even if the old one was already reviewed.
- */
+/** A PDF-extracted table always has these columns (see patchPdfExtract.ts). */
 const PDF_PATCH_MAPPING: Partial<Record<PatchFieldKey, string>> = {
   address: 'Spot',
   fixtureType: 'Type',
@@ -199,66 +192,113 @@ function withPdfMode(rows: Record<string, string>[], source: string): Record<str
   });
 }
 
-patchRouter.post('/:jobId/patch/onedrive-scan', requirePermission('manageOneDrive'), async (req, res) => {
-  const { jobId } = req.params;
+async function loadPatchJob(jobId: string): Promise<{ job: Job } | { error: string; status: number }> {
   const job = await prisma.job.findUnique({ where: { id: jobId } });
-  if (!job) return res.status(404).json({ error: 'job not found' });
+  if (!job) return { error: 'job not found', status: 404 } as const;
   const config = await getOneDriveConfig();
   const hasOneDrive = config.enabled && Boolean(job.oneDriveFolderId);
-  const plotCount = await prisma.plot.count({ where: { jobId } });
-  if (!hasOneDrive && plotCount === 0) {
-    return res.status(400).json({
+  if (!hasOneDrive && (await prisma.plot.count({ where: { jobId } })) === 0) {
+    return {
+      status: 400,
       error: config.enabled
-        ? 'This job has no OneDrive folder linked yet, and no plots uploaded on the Plots tab to scan instead'
-        : 'OneDrive is not configured yet, and this job has no plots uploaded on the Plots tab to scan instead',
-    });
+        ? 'This job has no OneDrive folder linked yet, and no plots uploaded on the Plots tab to choose from'
+        : 'OneDrive is not configured yet, and this job has no plots uploaded on the Plots tab to choose from',
+    };
   }
+  return { job };
+}
 
-  let scan;
+/** When each file name was last imported from OneDrive for this job (from the activity log). */
+async function lastImportedByName(jobId: string): Promise<Map<string, Date>> {
+  const entries = await prisma.activityLogEntry.findMany({
+    where: { jobId, action: 'patch.onedrive_import' },
+    select: { detail: true, createdAt: true },
+    orderBy: { createdAt: 'desc' },
+  });
+  const out = new Map<string, Date>();
+  for (const e of entries) {
+    const name = /\bfrom (.+)$/.exec(e.detail ?? '')?.[1];
+    if (name && !out.has(name)) out.set(name, e.createdAt);
+  }
+  return out;
+}
+
+/**
+ * The files someone can pick as this job's patch: every CSV and PDF in its OneDrive folder tree
+ * plus its Plots-tab PDFs, likeliest first (see oneDrive/patchDetect.ts's listPatchFiles).
+ */
+patchRouter.get('/:jobId/patch/onedrive-files', requirePermission('manageOneDrive'), async (req, res) => {
+  const loaded = await loadPatchJob(req.params.jobId);
+  if ('error' in loaded) return res.status(loaded.status).json({ error: loaded.error });
+  let listing;
   try {
-    scan = await findPatchSource(job);
+    listing = await listPatchFiles(loaded.job);
   } catch (err) {
     return res.status(502).json({ error: (err as Error).message });
   }
-  const found = scan.found;
-  if (!found) return res.json({ detected: false, report: scan.report });
+  const imported = await lastImportedByName(req.params.jobId);
+  res.json({
+    foldersSearched: listing.foldersSearched,
+    truncated: listing.truncated,
+    files: listing.files.map((f) => ({
+      key: f.key,
+      kind: f.kind,
+      origin: f.origin,
+      name: f.name,
+      path: f.path,
+      modifiedAt: f.modifiedAt,
+      size: f.size,
+      suggested: f.priority >= 2,
+      lastImportedAt: imported.get(f.name) ?? null,
+    })),
+  });
+});
 
-  const existing = await prisma.patchImportCandidate.findUnique({ where: { jobId } });
-  if (existing && existing.oneDriveItemId === found.itemId && existing.sourceModifiedAt.getTime() === found.modifiedAt.getTime()) {
-    return res.json({ detected: true, candidate: toCandidateResponse(existing), report: scan.report });
+/**
+ * Reads the picked file and puts its rows up for review as the job's PENDING candidate - never
+ * applied directly. Always replaces whatever candidate was there, even when it's the same file
+ * already approved, so a patch can be imported again on purpose.
+ */
+patchRouter.post('/:jobId/patch/onedrive-files/read', requirePermission('manageOneDrive'), async (req, res) => {
+  const { jobId } = req.params;
+  const { key } = req.body ?? {};
+  if (typeof key !== 'string' || !key) return res.status(400).json({ error: 'key is required' });
+  const loaded = await loadPatchJob(jobId);
+  if ('error' in loaded) return res.status(loaded.status).json({ error: loaded.error });
+
+  // Re-list rather than trusting the key, so only a file inside this job's folder (or on its
+  // Plots tab) can ever be read.
+  let found;
+  try {
+    const { files } = await listPatchFiles(loaded.job);
+    const file = files.find((f) => f.key === key);
+    if (!file) return res.status(404).json({ error: "That file isn't in this job's OneDrive folder or Plots tab any more" });
+    found = await readPatchFile(file);
+  } catch (err) {
+    return res.status(502).json({ error: (err as Error).message });
   }
-  if (found.headers.length === 0) {
-    return res.status(400).json({ error: `Could not find a header row in ${found.fileName}` });
+  if (found.headers.length === 0 || found.rows.length === 0) {
+    return res.status(422).json({
+      error: found.source === 'pdf' ? `No patch table found in ${found.fileName}` : `Could not find any patch rows in ${found.fileName}`,
+    });
   }
 
+  const data = {
+    oneDriveItemId: found.itemId,
+    oneDriveItemPath: found.path,
+    fileName: found.fileName,
+    extractedFrom: found.source,
+    sourceModifiedAt: found.modifiedAt,
+    rowsJson: JSON.stringify(found.rows),
+    status: 'PENDING',
+  };
   const candidate = await prisma.patchImportCandidate.upsert({
     where: { jobId },
-    create: {
-      jobId,
-      oneDriveItemId: found.itemId,
-      oneDriveItemPath: found.path,
-      fileName: found.fileName,
-      extractedFrom: found.source,
-      sourceModifiedAt: found.modifiedAt,
-      rowsJson: JSON.stringify(found.rows),
-      status: 'PENDING',
-    },
-    update: {
-      oneDriveItemId: found.itemId,
-      oneDriveItemPath: found.path,
-      fileName: found.fileName,
-      extractedFrom: found.source,
-      sourceModifiedAt: found.modifiedAt,
-      rowsJson: JSON.stringify(found.rows),
-      status: 'PENDING',
-      detectedAt: new Date(),
-      reviewedAt: null,
-      reviewedBy: null,
-      rejectionNote: null,
-    },
+    create: { jobId, ...data },
+    update: { ...data, detectedAt: new Date(), reviewedAt: null, reviewedBy: null, rejectionNote: null },
   });
   await logActivity('patch.onedrive_detect', `${found.fileName} (${found.source})`, jobId, req.user?.id);
-  res.json({ detected: true, candidate: toCandidateResponse(candidate), report: scan.report });
+  res.json({ candidate: toCandidateResponse(candidate) });
 });
 
 function toCandidateResponse(c: {

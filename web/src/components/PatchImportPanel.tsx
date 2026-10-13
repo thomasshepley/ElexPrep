@@ -1,13 +1,14 @@
 import { Fragment, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PATCH_FIELD_LABELS, type PatchFieldKey } from '@elexprep/shared';
-import { api, type Fixture, type PatchImportCandidate, type PatchImportResult, type PatchScanReport } from '../api/client';
+import { api, type Fixture, type PatchImportCandidate, type PatchImportResult } from '../api/client';
 import FileInput from './FileInput';
 import { useToast } from './Toast';
 import { useDialog } from './Dialog';
 import { formatDateTime } from '../utils/format';
 import InlineEdit from './InlineEdit';
 import LocationSelect, { useJobLocations } from './LocationSelect';
+import PatchFilePicker from './PatchFilePicker';
 
 /** Fixture types that actually take a separate pixel-map patch - only these get the Pix
  * Uni/Pix Addr columns in the fixtures table. Matched on letters and digits only, so
@@ -55,7 +56,7 @@ export default function PatchImportPanel({ jobId, groupId = null }: { jobId: str
   const [candidate, setCandidate] = useState<PatchImportCandidate | null>(null);
   const [scanError, setScanError] = useState<string | null>(null);
   const [scanBusy, setScanBusy] = useState(false);
-  const [scanReport, setScanReport] = useState<PatchScanReport | null>(null);
+  const [picking, setPicking] = useState(false);
 
   const loadFixtures = () => api.patch.fixtures(jobId).then(setFixtures);
   const loadCandidate = () => api.patch.getOneDriveCandidate(jobId).then(setCandidate);
@@ -66,28 +67,6 @@ export default function PatchImportPanel({ jobId, groupId = null }: { jobId: str
     loadCandidate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [jobId]);
-
-  const scanOneDrive = async () => {
-    setScanBusy(true);
-    setScanError(null);
-    try {
-      const res = await api.patch.scanOneDrive(jobId);
-      setScanReport(res.report ?? null);
-      if (res.candidate) setCandidate(res.candidate);
-      else if (!res.detected) {
-        const checked = res.report?.checked.length ?? 0;
-        setScanError(
-          checked === 0
-            ? `No patch CSV in the "Patch" folder and no PDFs found${res.report?.foldersSearched ? ` in ${res.report.foldersSearched} folder(s)` : ''} or on the Plots tab.`
-            : `No patch CSV in the "Patch" folder, and none of the ${checked} PDF(s) checked had a patch table it could read.`
-        );
-      }
-    } catch (e) {
-      setScanError((e as Error).message);
-    } finally {
-      setScanBusy(false);
-    }
-  };
 
   const approveCandidate = async () => {
     setScanBusy(true);
@@ -238,45 +217,43 @@ export default function PatchImportPanel({ jobId, groupId = null }: { jobId: str
       <div className="panel">
         <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
           <h3>OneDrive patch import</h3>
-          <button className="secondary" onClick={scanOneDrive} disabled={scanBusy}>
-            Scan OneDrive for patch file
+          <button className="secondary" onClick={() => setPicking(true)} disabled={scanBusy}>
+            Choose from OneDrive
           </button>
         </div>
         <p className="muted">
-          Looks for a CSV in this job's OneDrive "Patch" subfolder; if there isn't one, reads the
-          patch table out of the PDFs in the job's OneDrive folder (and any uploaded on the Plots
-          tab), patch- and CAD-named ones first. Nothing is applied automatically - a detected
-          file sits here for review until approved.
+          Pick the patch from this job's OneDrive folder (or a PDF on the Plots tab): a CSV export,
+          a patch PDF, or a CAD drawing with the patch table on it. Nothing is applied
+          automatically - the file's rows wait here for review until approved. A file that's been
+          imported before can be chosen again.
           {groupId !== null && ' This always imports into "Ungrouped" - use the CSV upload below to import straight into the current stage.'}
         </p>
         {scanError && <p className="error">{scanError}</p>}
-        {scanReport && scanReport.checked.length > 0 && (
-          <details className="scan-report" open={!candidate || candidate.status !== 'PENDING'}>
-            <summary className="muted">PDFs checked ({scanReport.checked.length})</summary>
-            <ul className="plain-list">
-              {scanReport.checked.map((c, i) => (
-                <li key={i} className="muted" style={{ fontSize: 'var(--text-sm)' }}>
-                  <strong style={{ color: 'var(--content)' }}>{c.name}</strong>
-                  {c.path && ` - ${c.path}`}: {c.error ? c.error : c.rows > 0 ? `${c.rows} patch rows` : 'no patch table found'}
-                </li>
-              ))}
-            </ul>
-          </details>
+        {picking && (
+          <PatchFilePicker
+            jobId={jobId}
+            onClose={() => setPicking(false)}
+            onPicked={(c) => {
+              setPicking(false);
+              setScanError(null);
+              setCandidate(c);
+            }}
+          />
         )}
 
         {candidate && candidate.status === 'PENDING' && (
           <div className="row panel" style={{ background: 'rgba(255,255,255,0.04)', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
             <div>
               <strong>{candidate.fileName}</strong>
-              {candidate.extractedFrom === 'pdf' && <span className="chip chip-warning"> Extracted from CAD PDF</span>}
+              {candidate.extractedFrom === 'pdf' && <span className="chip chip-warning"> Read from PDF</span>}
               <p className="muted" style={{ margin: 0 }}>
                 {candidate.rowCount} rows &middot; detected {formatDateTime(candidate.detectedAt)} &middot;{' '}
                 {candidate.oneDriveItemPath}
               </p>
               {candidate.extractedFrom === 'pdf' && (
                 <p className="error" style={{ margin: '0.3rem 0 0' }}>
-                  No patch CSV was found - these rows were lifted from the CAD PDF by fuzzy table
-                  extraction, not a real export. Check them carefully before approving.
+                  These rows were read out of a PDF's patch table, not a CSV export. Check them
+                  carefully before approving.
                 </p>
               )}
             </div>
