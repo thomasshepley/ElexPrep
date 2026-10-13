@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react';
 import type { PickListDiff } from '@elexprep/shared';
 import { api, type CaseGroup, type CurrentRmsPickItem, type Job } from '../api/client';
 import { formatDate, formatTime } from '../utils/format';
+import { Link, Navigate } from 'react-router-dom';
+import { useAuth } from '../auth/AuthContext';
+import { SignOutIcon } from '../components/Icons';
 
 const DATA_REFRESH_MS = 60_000;
 const DIFF_POLL_MS = 20_000;
@@ -40,7 +43,33 @@ function useClock() {
  * Works with the read-only SIGNAGE role - the one exception is ticking an item's prepped checkbox,
  * which is explicitly allowlisted since prep is the whole point here.
  */
+/**
+ * /signage sits outside the normal shell, so it needs its own signed-in guard and its own way
+ * out: a sign-out button (and a link back to the portal for staff), kept small and faded so it
+ * doesn't distract on a TV, but always reachable.
+ */
 export default function SignagePage() {
+  const { user, loading, logout } = useAuth();
+  if (loading) return null;
+  if (!user) return <Navigate to="/login" replace />;
+  return (
+    <>
+      <div className="signage-exit">
+        {user.role !== 'SIGNAGE' && (
+          <Link to="/" className="button secondary">
+            Back to portal
+          </Link>
+        )}
+        <button type="button" className="secondary" onClick={logout}>
+          <SignOutIcon /> Sign out
+        </button>
+      </div>
+      <SignageScreen />
+    </>
+  );
+}
+
+function SignageScreen() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [job, setJob] = useState<Job | null>(null);
   const [choosing, setChoosing] = useState(false);

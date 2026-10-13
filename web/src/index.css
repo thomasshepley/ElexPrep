@@ -2945,3 +2945,76 @@ button.crew-picker-row.is-on .crew-picker-state {
   padding: 0.6rem 0.75rem;
   font-size: var(--text-sm);
 }
+
+/* Crew margin: charge lines left out of the crew charge, and the every-job list. */
+button.margin-line-button {
+  padding: 0.2rem 0.55rem;
+  font-size: var(--text-xs);
+  white-space: nowrap;
+}
+
+details.margin-left-out {
+  margin-top: var(--space-3);
+}
+
+details.margin-left-out > summary {
+  cursor: pointer;
+  font-size: var(--text-sm);
+}
+
+.margin-left-out-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--border);
+  font-size: var(--text-sm);
+}
+
+.margin-left-out-name {
+  min-width: 0;
+}
+
+button.chip-remove {
+  background: transparent;
+  color: inherit;
+  border: none;
+  box-shadow: none;
+  padding: 0 0 0 0.35rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+button.chip-remove:hover:not(:disabled) {
+  transform: none;
+  filter: none;
+  box-shadow: none;
+  color: var(--danger);
+}
+
+/* Signage: a faded way out in the corner, full strength on hover or keyboard focus. */
+.signage-exit {
+  position: fixed;
+  bottom: 0.75rem;
+  right: 0.75rem;
+  z-index: 50;
+  display: flex;
+  gap: 0.4rem;
+  opacity: 0.35;
+  transition: opacity 150ms ease;
+}
+
+.signage-exit:hover,
+.signage-exit:focus-within {
+  opacity: 1;
+}
+
+.signage-exit button,
+.signage-exit a {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: var(--text-sm);
+  padding: 0.35rem 0.7rem;
+}

@@ -3,6 +3,7 @@ import { api } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { isAdminRole } from '../auth/roles';
 import { formatMoney, isIntegrationOff } from '../utils/format';
+import { useToast } from './Toast';
 
 
 /**
@@ -42,7 +43,7 @@ function CrewMarginPanelInner({ jobId }: { jobId: string }) {
   return (
     <div>
       <LinkedOpportunitiesPanel jobId={jobId} onChanged={load} />
-      <MarginDisplay data={data} error={error} loading={loading} onRefresh={load} />
+      <MarginDisplay jobId={jobId} data={data} error={error} loading={loading} onRefresh={load} />
     </div>
   );
 }
@@ -137,17 +138,54 @@ const MARGIN_RATE_SOURCES: Record<string, string> = {
   none: 'nowhere - no rate set',
 };
 
+type MarginData = Awaited<ReturnType<typeof api.jobCrewMargin.get>>;
+type ChargeLine = MarginData['chargeBreakdown'][number]['lines'][number];
+
 function MarginDisplay({
+  jobId,
   data,
   error,
   loading,
   onRefresh,
 }: {
-  data: Awaited<ReturnType<typeof api.jobCrewMargin.get>> | null;
+  jobId: string;
+  data: MarginData | null;
   error: string | null;
   loading: boolean;
   onRefresh: () => void;
 }) {
+  const { showToast } = useToast();
+  const [newName, setNewName] = useState('');
+
+  const setLine = async (line: ChargeLine, excluded: boolean | null) => {
+    try {
+      await api.jobCrewMargin.setLine(jobId, line.key, line.name, excluded);
+      onRefresh();
+    } catch (e) {
+      showToast((e as Error).message, 'error');
+    }
+  };
+
+  const saveNames = async (names: string[], message: string) => {
+    try {
+      await api.jobCrewMargin.setExcludedLineNames(names);
+      showToast(message);
+      onRefresh();
+    } catch (e) {
+      showToast((e as Error).message, 'error');
+    }
+  };
+
+  // Moves a line onto the every-job list, dropping this job's own override so the list governs it.
+  const alwaysLeaveOut = async (line: ChargeLine) => {
+    if (!data) return;
+    await api.jobCrewMargin.setLine(jobId, line.key, line.name, null).catch(() => {});
+    await saveNames([...data.excludedLineNames, line.name.trim()], `"${line.name}" is now left out on every job`);
+  };
+
+  const allLines = data ? data.chargeBreakdown.flatMap((b) => b.lines.map((line) => ({ line, subject: b.subject }))) : [];
+  const counted = allLines.filter((l) => !l.line.excluded);
+  const leftOut = allLines.filter((l) => l.line.excluded);
 
   return (
     <div className="panel" style={{ marginTop: '1rem' }}>
@@ -224,26 +262,40 @@ function MarginDisplay({
                       <th>Qty</th>
                       <th>Rate</th>
                       <th>Total</th>
+                      <th></th>
                     </tr>
                   </thead>
                   <tbody>
-                    {data.chargeBreakdown.flatMap((b) =>
-                      b.lines.map((line, i) => (
-                        <tr key={`${b.opportunityId}-${i}`}>
-                          <td>
-                            {line.name}
-                            {data.chargeBreakdown.length > 1 && <div className="muted" style={{ fontSize: 'var(--text-xs)' }}>{b.subject}</div>}
-                          </td>
-                          <td>{line.quantity}</td>
-                          <td>{formatMoney(line.rate)}</td>
-                          <td>{formatMoney(line.total)}</td>
-                        </tr>
-                      ))
-                    )}
-                    {data.chargeBreakdown.every((b) => b.lines.length === 0) && (
+                    {counted.map(({ line, subject }) => (
+                      <tr key={line.key}>
+                        <td>
+                          {line.name}
+                          {data.chargeBreakdown.length > 1 && <div className="muted" style={{ fontSize: 'var(--text-xs)' }}>{subject}</div>}
+                          {line.onPortalList && (
+                            <div className="muted" style={{ fontSize: 'var(--text-xs)' }}>
+                              Counted on this job (normally left out)
+                            </div>
+                          )}
+                        </td>
+                        <td>{line.quantity}</td>
+                        <td>{formatMoney(line.rate)}</td>
+                        <td>{formatMoney(line.total)}</td>
+                        <td>
+                          <button
+                            type="button"
+                            className="secondary margin-line-button"
+                            title="Leave this line out of the crew charge on this job"
+                            onClick={() => setLine(line, line.onPortalList ? null : true)}
+                          >
+                            Leave out
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                    {counted.length === 0 && (
                       <tr>
-                        <td colSpan={4} className="muted">
-                          No Service-type charge lines found.
+                        <td colSpan={5} className="muted">
+                          {leftOut.length ? 'Every Service line is left out.' : 'No Service-type charge lines found.'}
                         </td>
                       </tr>
                     )}
@@ -256,10 +308,81 @@ function MarginDisplay({
                       <td>
                         <strong>{formatMoney(data.chargeTotal)}</strong>
                       </td>
+                      <td></td>
                     </tr>
                   </tfoot>
                 </table>
               </div>
+              {leftOut.length > 0 && (
+                <details className="margin-left-out">
+                  <summary className="muted">
+                    Left out of the charge: {leftOut.length} line{leftOut.length === 1 ? '' : 's'}, {formatMoney(data.excludedChargeTotal)}
+                  </summary>
+                  <ul className="plain-list">
+                    {leftOut.map(({ line, subject }) => (
+                      <li key={line.key} className="margin-left-out-line">
+                        <span className="margin-left-out-name">
+                          <s>{line.name}</s> <span className="muted">{formatMoney(line.total)}</span>
+                          <span className="muted" style={{ display: 'block', fontSize: 'var(--text-xs)' }}>
+                            {line.excludedBy === 'portal' ? 'Left out on every job' : 'Left out on this job'}
+                            {data.chargeBreakdown.length > 1 ? ` · ${subject}` : ''}
+                          </span>
+                        </span>
+                        <span className="row" style={{ gap: '0.4rem' }}>
+                          {line.excludedBy === 'job' && !line.onPortalList && (
+                            <button type="button" className="secondary margin-line-button" onClick={() => alwaysLeaveOut(line)}>
+                              Always leave out
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            className="secondary margin-line-button"
+                            onClick={() => setLine(line, line.excludedBy === 'portal' ? false : null)}
+                          >
+                            Put back
+                          </button>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              )}
+              <details className="margin-left-out">
+                <summary className="muted">Always left out on every job ({data.excludedLineNames.length})</summary>
+                <p className="muted" style={{ fontSize: 'var(--text-sm)', margin: '0.3rem 0' }}>
+                  Charge lines with these names never count as crew charge, on any job (capitals and spacing don&apos;t matter).
+                </p>
+                <div className="row" style={{ gap: '0.4rem', flexWrap: 'wrap' }}>
+                  {data.excludedLineNames.map((n) => (
+                    <span key={n} className="chip chip-neutral">
+                      {n}
+                      <button
+                        type="button"
+                        className="chip-remove"
+                        aria-label={`Stop leaving out ${n}`}
+                        onClick={() => saveNames(data.excludedLineNames.filter((x) => x !== n), `"${n}" counts again`)}
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+                <form
+                  className="row"
+                  style={{ gap: '0.4rem', marginTop: '0.5rem' }}
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (!newName.trim()) return;
+                    saveNames([...data.excludedLineNames, newName.trim()], `"${newName.trim()}" is now left out on every job`);
+                    setNewName('');
+                  }}
+                >
+                  <input aria-label="Line name to always leave out" placeholder="e.g. Transport" value={newName} onChange={(e) => setNewName(e.target.value)} />
+                  <button type="submit" className="secondary" disabled={!newName.trim()}>
+                    Add
+                  </button>
+                </form>
+              </details>
             </div>
 
             <div style={{ flex: '1 1 20rem', minWidth: '20rem' }}>

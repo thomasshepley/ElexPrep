@@ -74,27 +74,28 @@ model Job {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  fixtures               Fixture[]
-  caseGroups             CaseGroupRecord[]
-  adHocLabels            AdHocLabel[]
-  printQueueItems        PrintQueueItem[]
-  plots                  Plot[]
-  locationColorRules     LocationColorRule[]
-  pickListItemStatuses   PickListItemStatus[]
-  labelTemplates         LabelTemplate[]
-  crewAssignments        JobCrewAssignment[]
-  scheduleItems          JobScheduleItem[]
-  jobDays                JobDay[]
-  documents              JobDocument[]
-  contacts               JobContact[]
-  labelRequests          CrewLabelRequest[]
-  discussionMessages     JobDiscussionMessage[]
-  oneDriveShares         OneDriveShare[]
-  patchImportCandidate   PatchImportCandidate?
-  linkedRmsOpportunities JobLinkedRmsOpportunity[]
-  fixtureGroups          FixtureGroup[]
-  roleRates              RoleRate[]
-  discussionGroups       DiscussionGroup[]
+  fixtures                Fixture[]
+  caseGroups              CaseGroupRecord[]
+  adHocLabels             AdHocLabel[]
+  printQueueItems         PrintQueueItem[]
+  plots                   Plot[]
+  locationColorRules      LocationColorRule[]
+  pickListItemStatuses    PickListItemStatus[]
+  labelTemplates          LabelTemplate[]
+  crewAssignments         JobCrewAssignment[]
+  scheduleItems           JobScheduleItem[]
+  jobDays                 JobDay[]
+  documents               JobDocument[]
+  contacts                JobContact[]
+  labelRequests           CrewLabelRequest[]
+  discussionMessages      JobDiscussionMessage[]
+  oneDriveShares          OneDriveShare[]
+  patchImportCandidate    PatchImportCandidate?
+  linkedRmsOpportunities  JobLinkedRmsOpportunity[]
+  fixtureGroups           FixtureGroup[]
+  roleRates               RoleRate[]
+  discussionGroups        DiscussionGroup[]
+  crewMarginLineOverrides CrewMarginLineOverride[]
 }
 
 /// A named subdivision of one job's prep - a "stage" at a multi-stage event, or any other
@@ -1002,5 +1003,21 @@ model RoleRate {
   updatedAt DateTime @updatedAt
 
   @@unique([jobId, roleKey])
+  @@index([jobId])
+}
+
+/// A job's own choice about one Current RMS charge line in its crew margin: leave it out of the
+/// charge total, or put back one the portal-wide "always leave out" list would drop. lineKey is
+/// "<opportunity id>:<opportunity item id>".
+model CrewMarginLineOverride {
+  id        String   @id @default(cuid())
+  jobId     String
+  job       Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  lineKey   String
+  name      String
+  excluded  Boolean
+  createdAt DateTime @default(now())
+
+  @@unique([jobId, lineKey])
   @@index([jobId])
 }

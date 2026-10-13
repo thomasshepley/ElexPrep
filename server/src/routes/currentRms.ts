@@ -15,6 +15,7 @@ import { matchJobFolder } from '../oneDrive/matcher';
 import { getItemByPath } from '../oneDrive/client';
 import { normalizeCrewFeaturesPatch } from '../crewFeatures';
 import { assignmentCost, crewSuggestedRate, effectiveDayRate, loadRateTables } from '../crewRates';
+import { lineExclusion, lineNameKey, loadExcludedLineNames, saveExcludedLineNames } from '../crewMarginLines';
 
 export const currentRmsRouter = Router();
 
@@ -376,11 +377,12 @@ function sumServiceCharge(items: RawOpportunityItem[]): number {
 /** Per-line detail behind sumServiceCharge's total, for the side-by-side CRM-vs-ElexPrep
  * cross-reference on the crew margin view - lets an admin see e.g. "3x Lighting Technician"
  * on the Current RMS side next to their own crew assignments, to sanity-check man days. */
-function serviceLineItems(items: RawOpportunityItem[]): { name: string; quantity: number; rate: number; total: number }[] {
+function serviceLineItems(items: RawOpportunityItem[], opportunityId: number): { key: string; name: string; quantity: number; rate: number; total: number }[] {
   return serviceItems(items).map((i) => {
     const total = toMoney(i.charge_excluding_tax_total ?? i.charge_total);
     const quantity = i.quantity && i.quantity > 0 ? i.quantity : 1;
     return {
+      key: `${opportunityId}:${i.id}`,
       name: i.name ?? i.product_name ?? i.description ?? 'Service item',
       quantity,
       rate: total / quantity,
@@ -420,6 +422,14 @@ jobCurrentRmsRouter.get('/:jobId/current-rms/crew-margin', requireRole('ADMIN'),
     ...new Set([primaryRmsId, ...siblings.map((s) => s.rmsId), ...manualLinks.map((l) => l.rmsId)]),
   ];
 
+  // Lines left out of the charge (delivery, collection...) - see crewMarginLines.ts.
+  const [overrideRows, excludedNames] = await Promise.all([
+    prisma.crewMarginLineOverride.findMany({ where: { jobId: job.id } }),
+    loadExcludedLineNames(),
+  ]);
+  const overrides = new Map(overrideRows.map((o) => [o.lineKey, o.excluded]));
+  const portalNames = new Set(excludedNames.map(lineNameKey));
+
   let chargeBreakdown;
   try {
     chargeBreakdown = await Promise.all(
@@ -427,11 +437,16 @@ jobCurrentRmsRouter.get('/:jobId/current-rms/crew-margin', requireRole('ADMIN'),
         const items = await fetchOpportunityItems(config, rmsId);
         const cached = siblings.find((s) => s.rmsId === rmsId) ?? (rmsId === primaryRmsId ? primary : undefined);
         const manualLink = manualLinks.find((l) => l.rmsId === rmsId);
+        const lines = serviceLineItems(items, rmsId).map((line) => {
+          const ex = lineExclusion(line.key, line.name, overrides, portalNames);
+          return { ...line, excluded: ex.excluded, excludedBy: ex.by, onPortalList: ex.onPortalList };
+        });
         return {
           opportunityId: rmsId,
           subject: cached?.subject ?? manualLink?.subject ?? `Opportunity #${rmsId}`,
-          serviceCharge: sumServiceCharge(items),
-          lines: serviceLineItems(items),
+          serviceCharge: lines.filter((l) => !l.excluded).reduce((sum, l) => sum + l.total, 0),
+          excludedCharge: lines.filter((l) => l.excluded).reduce((sum, l) => sum + l.total, 0),
+          lines,
         };
       })
     );
@@ -439,6 +454,7 @@ jobCurrentRmsRouter.get('/:jobId/current-rms/crew-margin', requireRole('ADMIN'),
     return res.status(502).json({ error: (err as Error).message });
   }
   const chargeTotal = chargeBreakdown.reduce((sum, b) => sum + b.serviceCharge, 0);
+  const excludedChargeTotal = chargeBreakdown.reduce((sum, b) => sum + b.excludedCharge, 0);
 
   const assignments = await prisma.jobCrewAssignment.findMany({
     where: { jobId: job.id },
@@ -478,10 +494,46 @@ jobCurrentRmsRouter.get('/:jobId/current-rms/crew-margin', requireRole('ADMIN'),
   const margin = chargeTotal - costTotal;
   res.json({
     chargeTotal,
+    excludedChargeTotal,
+    excludedLineNames: excludedNames,
     chargeBreakdown,
     costTotal,
     costBreakdown,
     margin,
     marginPercent: chargeTotal > 0 ? (margin / chargeTotal) * 100 : null,
   });
+});
+
+// Leave a charge line out of this job's crew margin (excluded: true), put back one the
+// portal-wide list drops (false), or go back to the default (null).
+jobCurrentRmsRouter.put('/:jobId/current-rms/crew-margin/lines', requireRole('ADMIN'), async (req, res) => {
+  const { lineKey, name, excluded } = req.body ?? {};
+  if (typeof lineKey !== 'string' || !/^\d+:\d+$/.test(lineKey)) return res.status(400).json({ error: 'lineKey is required' });
+  if (excluded !== null && typeof excluded !== 'boolean') return res.status(400).json({ error: 'excluded must be true, false or null' });
+  const jobId = req.params.jobId;
+  if (excluded === null) {
+    await prisma.crewMarginLineOverride.deleteMany({ where: { jobId, lineKey } });
+  } else {
+    const label = typeof name === 'string' ? name.slice(0, 200) : '';
+    await prisma.crewMarginLineOverride.upsert({
+      where: { jobId_lineKey: { jobId, lineKey } },
+      create: { jobId, lineKey, name: label, excluded },
+      update: { excluded, ...(label ? { name: label } : {}) },
+    });
+  }
+  await logActivity('crew_margin.line', `${typeof name === 'string' ? name : lineKey}: ${excluded === null ? 'default' : excluded ? 'left out' : 'counted'}`, jobId, req.user!.id);
+  res.json({ ok: true });
+});
+
+// The portal-wide list of charge line names left out of every job's crew margin.
+currentRmsRouter.get('/crew-margin/excluded-lines', requireRole('ADMIN'), async (_req, res) => {
+  res.json({ names: await loadExcludedLineNames() });
+});
+
+currentRmsRouter.put('/crew-margin/excluded-lines', requireRole('ADMIN'), async (req, res) => {
+  const { names } = req.body ?? {};
+  if (!Array.isArray(names) || names.some((n) => typeof n !== 'string')) return res.status(400).json({ error: 'names must be a list of line names' });
+  const saved = await saveExcludedLineNames(names);
+  await logActivity('crew_margin.excluded_names', saved.join(', ') || '(none)', undefined, req.user!.id);
+  res.json({ names: saved });
 });

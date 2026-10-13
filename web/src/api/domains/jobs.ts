@@ -96,14 +96,34 @@ export const jobsApi = {
     set: (role: string, dayRate: string) => request<RoleRate | null>('/role-rates', { method: 'PUT', body: JSON.stringify({ role, dayRate }) }),
   },
   jobCrewMargin: {
+    /** excluded: true leaves the line out on this job, false counts it anyway, null = default. */
+    setLine: (jobId: string, lineKey: string, name: string, excluded: boolean | null) =>
+      request<{ ok: true }>(`/jobs/${jobId}/current-rms/crew-margin/lines`, { method: 'PUT', body: JSON.stringify({ lineKey, name, excluded }) }),
+    setExcludedLineNames: (names: string[]) =>
+      request<{ names: string[] }>('/current-rms/crew-margin/excluded-lines', { method: 'PUT', body: JSON.stringify({ names }) }),
     get: (jobId: string) =>
       request<{
         chargeTotal: number;
+        /** Charge lines left out of chargeTotal (delivery, collection...). */
+        excludedChargeTotal: number;
+        /** The portal-wide "always leave out" line names. */
+        excludedLineNames: string[];
         chargeBreakdown: {
           opportunityId: number;
           subject: string;
           serviceCharge: number;
-          lines: { name: string; quantity: number; rate: number; total: number }[];
+          excludedCharge: number;
+          lines: {
+            key: string;
+            name: string;
+            quantity: number;
+            rate: number;
+            total: number;
+            excluded: boolean;
+            /** 'job' = left out on this job, 'portal' = on the always-leave-out list. */
+            excludedBy: 'job' | 'portal' | null;
+            onPortalList: boolean;
+          }[];
         }[];
         costTotal: number;
         costBreakdown: {
