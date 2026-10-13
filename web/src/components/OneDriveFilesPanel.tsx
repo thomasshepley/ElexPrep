@@ -120,16 +120,12 @@ export default function OneDriveFilesPanel({ jobId, onChange }: { jobId: string;
 
   if (!status) return error ? <p className="error">Could not load OneDrive details: {error}</p> : <p className="muted">Loading…</p>;
 
+  // Not set up: one line rather than a panel of explanation; manual plot upload works regardless.
   if (!status.enabled) {
     return (
-      <div className="panel">
-        <h3>OneDrive</h3>
-        <p className="muted">
-          Not connected yet. An admin can set up the Azure app credentials in Settings → OneDrive
-          to enable automatic project-folder matching, file sharing with crew, and CAD plan
-          auto-detection. Uploading plots manually below works either way.
-        </p>
-      </div>
+      <p className="muted" style={{ margin: 'var(--space-3) 0' }}>
+        Connect OneDrive in Settings → OneDrive to auto-detect plots and share project files with crew.
+      </p>
     );
   }
 

@@ -2,8 +2,12 @@ import { useEffect, useState } from 'react';
 import { api, type JobDocument } from '../api/client';
 import FileInput from './FileInput';
 import { formatDate } from '../utils/format';
+import { useDialog } from './Dialog';
+import { useToast } from './Toast';
 
 export default function JobDocumentsPanel({ jobId }: { jobId: string }) {
+  const dialog = useDialog();
+  const { showToast } = useToast();
   const [documents, setDocuments] = useState<JobDocument[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -28,8 +32,14 @@ export default function JobDocumentsPanel({ jobId }: { jobId: string }) {
     }
   };
 
-  const remove = async (id: string) => {
-    await api.jobDocuments.remove(jobId, id);
+  const remove = async (d: JobDocument) => {
+    if (!(await dialog.confirm({ title: `Remove ${d.originalName}?`, message: 'Crew on this job will no longer see it.', confirmLabel: 'Remove', danger: true }))) return;
+    try {
+      await api.jobDocuments.remove(jobId, d.id);
+      showToast('Document removed', 'info');
+    } catch (err) {
+      showToast((err as Error).message, 'error');
+    }
     refresh();
   };
 
@@ -40,6 +50,7 @@ export default function JobDocumentsPanel({ jobId }: { jobId: string }) {
       <FileInput accept="application/pdf,image/*" disabled={busy} onFile={upload} label="Upload document" />
       {error && <p className="error">{error}</p>}
 
+      {documents.length === 0 && !error && <p className="muted">No documents yet.</p>}
       {documents.length > 0 && (
         <div className="table-scroll">
           <table style={{ marginTop: '0.75rem' }}>
@@ -60,7 +71,7 @@ export default function JobDocumentsPanel({ jobId }: { jobId: string }) {
                   </td>
                   <td className="muted">{formatDate(d.createdAt)}</td>
                   <td>
-                    <button className="secondary" onClick={() => remove(d.id)}>
+                    <button className="secondary" onClick={() => remove(d)}>
                       Remove
                     </button>
                   </td>

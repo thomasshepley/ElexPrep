@@ -208,8 +208,8 @@ export default function PatchImportPanel({ jobId, groupId = null }: { jobId: str
     (m) => m.field === 'address' || m.field === 'fixtureType'
   );
 
-  return (
-    <div>
+  const importSection = (
+    <>
       <div className="panel">
         <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
           <h3>OneDrive patch import</h3>
@@ -330,117 +330,140 @@ export default function PatchImportPanel({ jobId, groupId = null }: { jobId: str
           )}
         </div>
       )}
+    </>
+  );
 
-      <div className="panel">
-        <div className="row" style={{ justifyContent: 'space-between' }}>
-          <h3>Imported fixtures</h3>
-          <button className="secondary" onClick={loadFixtures}>
-            Refresh
-          </button>
-        </div>
-        {!fixtures && <p className="muted">Not loaded yet.</p>}
-        {fixtures && stageFixtures.length === 0 && <p className="muted">No fixtures imported for this stage yet.</p>}
-        {fixtures && stageFixtures.length > 0 && (
-          <>
-            <p className="muted">Click any value to edit it - Enter or clicking away saves, Escape cancels.</p>
-            <input
-              placeholder="Search fixtures…"
-              value={fixtureSearch}
-              onChange={(e) => setFixtureSearch(e.target.value)}
-              style={{ width: '16rem', marginBottom: '0.6rem' }}
-            />
-            {selected.size > 0 && (
-              <div className="row panel" style={{ background: 'rgba(255,255,255,0.04)', alignItems: 'center', gap: '0.6rem' }}>
-                <strong>{selected.size} selected</strong>
-                <input
-                  placeholder="Set location to…"
-                  value={bulkLocation}
-                  onChange={(e) => setBulkLocation(e.target.value)}
-                  style={{ width: 160 }}
-                />
-                <button onClick={bulkSetLocation}>Set location</button>
-                <button className="secondary" onClick={bulkDelete}>
-                  Delete selected
-                </button>
-                <button className="secondary" onClick={() => setSelected(new Set())}>
-                  Clear selection
-                </button>
-              </div>
-            )}
-            <div className="table-scroll">
-              <table>
-                <thead>
-                  <tr>
-                    <th>
-                      <input
-                        type="checkbox"
-                        checked={selected.size === stageFixtures.length && stageFixtures.length > 0}
-                        onChange={toggleSelectAll}
-                      />
-                    </th>
-                    <th>Address</th>
-                    <th>Type</th>
-                    <th>Main Uni</th>
-                    <th>Main Addr</th>
-                    <th>Pix Uni</th>
-                    <th>Pix Addr</th>
-                    <th>Mode</th>
-                    <th>Location</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {fixtureGroups.map((group) => (
-                    <Fragment key={group.type}>
-                      <tr>
-                        <td colSpan={10} style={{ fontWeight: 700, paddingTop: '0.75rem' }}>
-                          {group.type} <span className="muted" style={{ fontWeight: 400 }}>({group.items.length})</span>
-                        </td>
-                      </tr>
-                      {group.items.map((f) => (
-                    <tr key={f.id}>
-                      <td>
-                        <input type="checkbox" checked={selected.has(f.id)} onChange={() => toggleSelected(f.id)} />
-                      </td>
-                      <td>
-                        <InlineEdit type="number" label="Address" value={f.address} width={60} onSave={(v) => updateFixture(f, 'address', v)} />
-                      </td>
-                      <td>
-                        <InlineEdit label="Type" value={f.fixtureType} width={150} onSave={(v) => updateFixture(f, 'fixtureType', v)} />
-                      </td>
-                      <td>
-                        <InlineEdit type="number" label="Main universe" value={f.mainUniverse} width={55} onSave={(v) => updateFixture(f, 'mainUniverse', v)} />
-                      </td>
-                      <td>
-                        <InlineEdit type="number" label="Main address" value={f.mainAddress} width={55} onSave={(v) => updateFixture(f, 'mainAddress', v)} />
-                      </td>
-                      <td>
-                        <InlineEdit type="number" label="Pixel universe" value={f.pixUniverse} width={55} onSave={(v) => updateFixture(f, 'pixUniverse', v)} />
-                      </td>
-                      <td>
-                        <InlineEdit type="number" label="Pixel address" value={f.pixAddress} width={55} onSave={(v) => updateFixture(f, 'pixAddress', v)} />
-                      </td>
-                      <td>
-                        <InlineEdit label="Mode" value={f.mode} width={120} onSave={(v) => updateFixture(f, 'mode', v)} />
-                      </td>
-                      <td>
-                        <InlineEdit label="Location" value={f.location} width={120} onSave={(v) => updateFixture(f, 'location', v)} />
-                      </td>
-                      <td>
-                        <button className="secondary" onClick={() => removeFixture(f.id)}>
-                          Delete
-                        </button>
+  const fixturesSection = (
+    <div className="panel">
+      <div className="row" style={{ justifyContent: 'space-between' }}>
+        <h3>Imported fixtures</h3>
+        <button className="secondary" onClick={loadFixtures}>
+          Refresh
+        </button>
+      </div>
+      {!fixtures && <p className="muted">Not loaded yet.</p>}
+      {fixtures && stageFixtures.length === 0 && <p className="muted">No fixtures imported for this stage yet.</p>}
+      {fixtures && stageFixtures.length > 0 && (
+        <>
+          <p className="muted">Click any value to edit it - Enter or clicking away saves, Escape cancels.</p>
+          <input
+            placeholder="Search fixtures…"
+            value={fixtureSearch}
+            onChange={(e) => setFixtureSearch(e.target.value)}
+            style={{ width: '16rem', marginBottom: '0.6rem' }}
+          />
+          {selected.size > 0 && (
+            <div className="row panel" style={{ background: 'rgba(255,255,255,0.04)', alignItems: 'center', gap: '0.6rem' }}>
+              <strong>{selected.size} selected</strong>
+              <input
+                placeholder="Set location to…"
+                value={bulkLocation}
+                onChange={(e) => setBulkLocation(e.target.value)}
+                style={{ width: 160 }}
+              />
+              <button onClick={bulkSetLocation}>Set location</button>
+              <button className="secondary" onClick={bulkDelete}>
+                Delete selected
+              </button>
+              <button className="secondary" onClick={() => setSelected(new Set())}>
+                Clear selection
+              </button>
+            </div>
+          )}
+          <div className="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>
+                    <input
+                      type="checkbox"
+                      checked={selected.size === stageFixtures.length && stageFixtures.length > 0}
+                      onChange={toggleSelectAll}
+                    />
+                  </th>
+                  <th>Address</th>
+                  <th>Type</th>
+                  <th>Main Uni</th>
+                  <th>Main Addr</th>
+                  <th>Pix Uni</th>
+                  <th>Pix Addr</th>
+                  <th>Mode</th>
+                  <th>Location</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {fixtureGroups.map((group) => (
+                  <Fragment key={group.type}>
+                    <tr>
+                      <td colSpan={10} style={{ fontWeight: 700, paddingTop: '0.75rem' }}>
+                        {group.type} <span className="muted" style={{ fontWeight: 400 }}>({group.items.length})</span>
                       </td>
                     </tr>
-                      ))}
-                    </Fragment>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </>
-        )}
-      </div>
+                    {group.items.map((f) => (
+                  <tr key={f.id}>
+                    <td>
+                      <input type="checkbox" checked={selected.has(f.id)} onChange={() => toggleSelected(f.id)} />
+                    </td>
+                    <td>
+                      <InlineEdit type="number" label="Address" value={f.address} width={60} onSave={(v) => updateFixture(f, 'address', v)} />
+                    </td>
+                    <td>
+                      <InlineEdit label="Type" value={f.fixtureType} width={150} onSave={(v) => updateFixture(f, 'fixtureType', v)} />
+                    </td>
+                    <td>
+                      <InlineEdit type="number" label="Main universe" value={f.mainUniverse} width={55} onSave={(v) => updateFixture(f, 'mainUniverse', v)} />
+                    </td>
+                    <td>
+                      <InlineEdit type="number" label="Main address" value={f.mainAddress} width={55} onSave={(v) => updateFixture(f, 'mainAddress', v)} />
+                    </td>
+                    <td>
+                      <InlineEdit type="number" label="Pixel universe" value={f.pixUniverse} width={55} onSave={(v) => updateFixture(f, 'pixUniverse', v)} />
+                    </td>
+                    <td>
+                      <InlineEdit type="number" label="Pixel address" value={f.pixAddress} width={55} onSave={(v) => updateFixture(f, 'pixAddress', v)} />
+                    </td>
+                    <td>
+                      <InlineEdit label="Mode" value={f.mode} width={120} onSave={(v) => updateFixture(f, 'mode', v)} />
+                    </td>
+                    <td>
+                      <InlineEdit label="Location" value={f.location} width={120} onSave={(v) => updateFixture(f, 'location', v)} />
+                    </td>
+                    <td>
+                      <button className="secondary" onClick={() => removeFixture(f.id)}>
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                    ))}
+                  </Fragment>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </div>
+  );
+
+  // Once a stage has fixtures, they're what people come here for: lead with them and tuck the
+  // import tools into a collapsed "Re-import" section (opened automatically while a file or a
+  // detected candidate is waiting for review).
+  const hasFixtures = stageFixtures.length > 0;
+  const reviewPending = rows.length > 0 || candidate?.status === 'PENDING';
+
+  return (
+    <div>
+      {hasFixtures && !reviewPending && fixturesSection}
+      {hasFixtures ? (
+        <details className="reimport" open={reviewPending}>
+          <summary>Re-import patch</summary>
+          {importSection}
+        </details>
+      ) : (
+        importSection
+      )}
+      {(!hasFixtures || reviewPending) && fixturesSection}
     </div>
   );
 }

@@ -4,7 +4,7 @@ import { useAuth } from '../auth/AuthContext';
 import { isAdminRole } from '../auth/roles';
 import { useDialog } from './Dialog';
 import { useAsyncAction } from '../hooks/useAsyncAction';
-import { formatDate, formatDateTime } from '../utils/format';
+import { formatDate, formatDateTime, isIntegrationOff } from '../utils/format';
 
 /** Current RMS sends quantity as a decimal string (e.g. "12.0"), same quirk as its money
  * fields - Number() strips the trailing .0 for a whole number while still showing real
@@ -232,11 +232,20 @@ export default function CurrentRmsPanel({ jobId }: { jobId: string }) {
           <div style={{ marginTop: '1rem' }}>
             <div className="row" style={{ justifyContent: 'space-between' }}>
               <h4 style={{ margin: 0 }}>Pick list</h4>
-              <button className="secondary" onClick={loadPickList}>
-                Refresh
-              </button>
+              {!isIntegrationOff(pickListError) && (
+                <button className="secondary" onClick={loadPickList}>
+                  Refresh
+                </button>
+              )}
             </div>
-            {pickListError && <p className="error">{pickListError}</p>}
+            {pickListError &&
+              (isIntegrationOff(pickListError) ? (
+                <p className="muted">
+                  Current RMS is turned off, so the pick list can't be fetched. An admin can turn it on in Settings → Current RMS.
+                </p>
+              ) : (
+                <p className="error">{pickListError}</p>
+              ))}
             {items && items.length === 0 && <p className="muted">No items returned.</p>}
             {items && items.length > 0 && (
               <>

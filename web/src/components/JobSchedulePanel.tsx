@@ -7,8 +7,11 @@ import DayBlocksColumn, { localMidnightIso, useDayBlockActions, type DayBlockVie
 import { useAuth } from '../auth/AuthContext';
 import { isAdminRole } from '../auth/roles';
 import { useToast } from './Toast';
-import { formatDateTime, formatDayHeading, formatTime } from '../utils/format';
+import { formatDayHeading, formatTime } from '../utils/format';
 import DateTimeInput from './DateTimeInput';
+import Modal from './Modal';
+import { useDialog } from './Dialog';
+import { PlusIcon } from './Icons';
 
 // The native datetime-local spinner/scroll-wheel snaps to this step, so picking a time quickly
 // moves in 15-minute jumps - typing a value directly (e.g. 09:07) is still unrestricted, so an
@@ -42,6 +45,7 @@ function sixPmSameDay(datetimeLocal: string): string {
 export default function JobSchedulePanel({ jobId }: { jobId: string }) {
   const { user } = useAuth();
   const { showToast } = useToast();
+  const dialog = useDialog();
   const [items, setItems] = useState<JobScheduleItem[]>([]);
   const [jobDays, setJobDays] = useState<JobDay[]>([]);
   const [roster, setRoster] = useState<JobCrewAssignment[]>([]);
@@ -56,6 +60,8 @@ export default function JobSchedulePanel({ jobId }: { jobId: string }) {
   const [color, setColor] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [activeRosterAssignmentId, setActiveRosterAssignmentId] = useState<string | null>(null);
+  const [addingEntry, setAddingEntry] = useState(false);
+  const [assigningItemId, setAssigningItemId] = useState<string | null>(null);
 
   const canManageCrew = isAdminRole(user?.role) || Boolean(user?.permissions?.manageCrewAssignments);
   const canManageDays = isAdminRole(user?.role);
@@ -141,16 +147,35 @@ export default function JobSchedulePanel({ jobId }: { jobId: string }) {
       setEndsAt(sixPmSameDay(next));
       setEndsAtTouched(false);
       refresh();
+      setAddingEntry(false);
       showToast(`Added "${title}" to the schedule`);
     } catch (err) {
       setError((err as Error).message);
     }
   };
 
-  const remove = async (id: string) => {
-    await api.jobSchedule.remove(jobId, id);
+  const remove = async (item: JobScheduleItem) => {
+    if (!(await dialog.confirm({ title: `Remove "${item.title}"?`, confirmLabel: 'Remove', danger: true }))) return;
+    try {
+      await api.jobSchedule.remove(jobId, item.id);
+      showToast('Schedule entry removed', 'info');
+    } catch (err) {
+      showToast((err as Error).message, 'error');
+    }
     refresh();
-    showToast('Schedule entry removed', 'info');
+  };
+
+  // The keyboard/tap alternative to dragging a crew chip onto a block.
+  const toggleTaskCrew = async (item: JobScheduleItem, assignment: JobCrewAssignment) => {
+    const existing = item.crew.find((c) => c.jobCrewAssignmentId === assignment.id);
+    try {
+      if (existing) await api.jobSchedule.unassignCrew(jobId, item.id, existing.id);
+      else await api.jobSchedule.assignCrew(jobId, item.id, assignment.id, localMidnightIso(dateKey(new Date(item.startsAt))));
+      refresh();
+      refreshDays();
+    } catch (err) {
+      showToast((err as Error).message, 'error');
+    }
   };
 
   const unassignTaskCrew = async (itemId: string, crewRowId: string) => {
@@ -210,6 +235,7 @@ export default function JobSchedulePanel({ jobId }: { jobId: string }) {
   };
 
   const activeAssignment = roster.find((a) => a.id === activeRosterAssignmentId);
+  const assigningItem = items.find((i) => i.id === assigningItemId) ?? null;
 
   return (
     <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
@@ -227,8 +253,8 @@ export default function JobSchedulePanel({ jobId }: { jobId: string }) {
         />
 
         <div className="schedule-hour-view">
-          <div className="panel">
-            <h3>Add schedule entry</h3>
+          {addingEntry && (
+            <Modal title="Add schedule entry" onClose={() => setAddingEntry(false)}>
             <p className="muted" style={{ marginTop: 0 }}>
               Not limited to the Current RMS opportunity's own dates - add a Prep entry on an
               earlier day if kit needs building before the hire starts.
@@ -277,55 +303,81 @@ export default function JobSchedulePanel({ jobId }: { jobId: string }) {
               <button type="submit">Add</button>
             </form>
             {error && <p className="error">{error}</p>}
-          </div>
+            </Modal>
+          )}
 
-          {selectedDate && itemsForSelectedDate.length > 0 ? (
-            <>
-              <div className="panel">
-                <h3>{formatDayHeading(`${selectedDate}T00:00:00`)}</h3>
+          <div className="panel">
+            <div className="row" style={{ justifyContent: 'space-between' }}>
+              <h3 style={{ margin: 0 }}>{selectedDate ? formatDayHeading(`${selectedDate}T00:00:00`) : 'Schedule'}</h3>
+              <button type="button" onClick={() => setAddingEntry(true)} aria-label="Add schedule entry">
+                <PlusIcon /> Entry
+              </button>
+            </div>
+            {selectedDate && itemsForSelectedDate.length > 0 ? (
+              <>
                 <SingleDayTimeline
                   items={itemsForSelectedDate}
                   dropTargets
                   canManageCrew={canManageCrew}
                   onUnassignCrew={unassignTaskCrew}
                 />
-              </div>
-              <div className="table-scroll">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Title</th>
-                      <th>Starts</th>
-                      <th>Ends</th>
-                      <th>Notes</th>
-                      <th></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {itemsForSelectedDate.map((i) => (
-                      <tr key={i.id}>
-                        <td>{i.title}</td>
-                        <td>{formatDateTime(i.startsAt)}</td>
-                        <td>{i.endsAt ? formatTime(i.endsAt) : '-'}</td>
-                        <td className="muted">{i.notes ?? '-'}</td>
-                        <td>
-                          <button className="secondary" onClick={() => remove(i.id)}>
-                            Remove
+                {/* Doubles as the colour legend, and gives every block keyboard/tap actions. */}
+                <ul className="plain-list schedule-entries">
+                  {itemsForSelectedDate.map((i) => (
+                    <li key={i.id} className="schedule-entry">
+                      <span className="crew-swatch-dot" style={{ background: i.color ?? 'var(--accent)' }} aria-hidden="true" />
+                      <span className="schedule-entry-time">
+                        {formatTime(i.startsAt)}
+                        {i.endsAt ? `–${formatTime(i.endsAt)}` : ''}
+                      </span>
+                      <span className="schedule-entry-title">
+                        <strong>{i.title}</strong>
+                        {i.notes && <span className="muted"> · {i.notes}</span>}
+                        {i.crew.length > 0 && <span className="muted"> · {i.crew.map((c) => c.displayName).join(', ')}</span>}
+                      </span>
+                      <span className="row" style={{ gap: '0.4rem' }}>
+                        {canManageCrew && roster.length > 0 && (
+                          <button type="button" className="secondary" onClick={() => setAssigningItemId(i.id)}>
+                            Assign crew…
                           </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </>
-          ) : (
-            <p className="muted">
-              {selectedDate ? 'No schedule entries for this day yet.' : 'Add a day on the left, or add a schedule entry to get started.'}
-            </p>
-          )}
+                        )}
+                        <button type="button" className="secondary" onClick={() => remove(i)}>
+                          Remove
+                        </button>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            ) : (
+              <p className="muted">
+                {selectedDate ? 'No schedule entries for this day yet.' : 'Add a day on the left, or add a schedule entry to get started.'}
+              </p>
+            )}
+          </div>
         </div>
       </div>
+      {assigningItem && (
+        <Modal title={`Crew on "${assigningItem.title}"`} onClose={() => setAssigningItemId(null)}>
+          <p className="muted" style={{ marginTop: 0 }}>Ticking someone also puts them on this day.</p>
+          <ul className="plain-list">
+            {roster.map((a) => (
+              <li key={a.id}>
+                <label className="row" style={{ gap: '0.5rem' }}>
+                  <input
+                    type="checkbox"
+                    checked={assigningItem.crew.some((c) => c.jobCrewAssignmentId === a.id)}
+                    onChange={() => toggleTaskCrew(assigningItem, a)}
+                  />
+                  <span className="crew-swatch-dot" style={{ background: resolveCrewColor(a.crewProfileId, a.color) }} />
+                  {a.displayName}
+                  {a.role && <span className="muted">{a.role}</span>}
+                </label>
+              </li>
+            ))}
+          </ul>
+        </Modal>
+      )}
       <DragOverlay>
         {activeAssignment && (
           <div className="day-block-crew-chip">

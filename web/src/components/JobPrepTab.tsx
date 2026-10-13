@@ -53,11 +53,12 @@ export default function JobPrepTab({ jobId }: { jobId: string }) {
         </div>
       )}
       {!hasStages && (
-        <p className="muted" style={{ marginBottom: '0.75rem' }}>
-          <button className="secondary" onClick={() => setManagingStages(true)}>
-            + Split into stages
+        <p className="muted" style={{ marginBottom: '0.75rem', fontSize: 'var(--text-sm)' }}>
+          Multi-stage job?{' '}
+          <button type="button" className="link-button" onClick={() => setManagingStages(true)}>
+            Split it into stages
           </button>{' '}
-          - for multi-stage jobs that need a separate patch import/cases/labels run per stage.
+          to run patch import, cases and labels separately per stage.
         </p>
       )}
 

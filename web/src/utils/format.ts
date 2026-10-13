@@ -105,3 +105,9 @@ export function toDatetimeLocal(iso: string | null | undefined): string {
   const { date, time } = toDateAndTimeInputs(iso);
   return date ? `${date}T${time}` : '';
 }
+
+/** The server's "integration is turned off" errors are an expected state, not a failure: pages
+ * show them as a muted note and hide actions that can't work. */
+export function isIntegrationOff(message: string | null | undefined): boolean {
+  return Boolean(message && /integration is disabled/i.test(message));
+}

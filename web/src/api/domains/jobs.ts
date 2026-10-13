@@ -1,5 +1,5 @@
 import { BASE, request } from '../http';
-import type { DashboardOrder, DiscussionMessage, DiscussionThreadData, Job, JobContact, JobCrewAssignment, JobDay, JobDocument, JobScheduleItem, Plot } from '../types';
+import type { DashboardData, DiscussionMessage, DiscussionThreadData, Job, JobContact, JobCrewAssignment, JobDay, JobDocument, JobScheduleItem, Plot } from '../types';
 import type { CrewFeatures } from '@elexprep/shared';
 
 export const jobsApi = {
@@ -66,7 +66,7 @@ export const jobsApi = {
     remove: (jobId: string, id: string) => request<void>(`/jobs/${jobId}/contacts/${id}`, { method: 'DELETE' }),
   },
   dashboard: {
-    get: () => request<{ orders: DashboardOrder[] }>('/dashboard'),
+    get: () => request<DashboardData>('/dashboard'),
   },
   jobCrewAssignments: {
     list: (jobId: string) => request<JobCrewAssignment[]>(`/jobs/${jobId}/crew`),

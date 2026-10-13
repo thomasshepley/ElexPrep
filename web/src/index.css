@@ -2340,3 +2340,204 @@ button.inline-edit-value.is-error {
   font-size: var(--text-sm);
   color: var(--content-muted);
 }
+
+.plain-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.panel-danger {
+  border-color: var(--danger);
+}
+
+@media (max-width: 760px) {
+  .desktop-only {
+    display: none !important;
+  }
+}
+
+/* Dashboard: this week's job days, one column per date. */
+.week-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  gap: var(--space-3);
+}
+
+.week-day {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.week-day.is-today {
+  border-color: var(--accent);
+}
+
+.week-day h4 {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--content-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.week-day.is-today h4 {
+  color: var(--accent);
+}
+
+.week-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: var(--text-sm);
+}
+
+.week-items {
+  gap: 0.15rem;
+}
+
+.week-time {
+  font-variant-numeric: tabular-nums;
+  color: var(--content-muted);
+}
+
+.week-crew {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+/* Dashboard orders as cards on phones (the table wraps a name one word per line there). */
+.order-cards {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.order-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--content);
+  text-decoration: none;
+  font-size: var(--text-sm);
+}
+
+.order-card:hover {
+  border-color: var(--border-strong);
+}
+
+/* Patch tab: once fixtures exist, the import tools sit behind this. */
+details.reimport {
+  margin-bottom: var(--space-4);
+}
+
+details.reimport > summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--accent);
+  padding: var(--space-2) 0;
+  margin-bottom: var(--space-2);
+}
+
+/* Print queue: the label preview follows the rows as they scroll, and the confirm buttons sit
+   in a bar pinned to the bottom of the screen with a summary of what they'll send. */
+.queue-preview {
+  position: sticky;
+  top: var(--space-4);
+  align-self: flex-start;
+}
+
+/* Scaled down while just reviewing so the rows fit beside it; full size while customising,
+   where dragging maps screen pixels straight to inches. */
+.queue-preview.is-compact > :first-child {
+  zoom: 0.65;
+}
+
+tr.is-previewing > td {
+  background: var(--accent-wash);
+}
+
+.queue-row-preview {
+  color: var(--content);
+  font-weight: 400;
+  text-decoration: none;
+  text-align: left;
+}
+
+.queue-row-preview:hover {
+  text-decoration: underline;
+}
+
+.queue-action-bar {
+  position: sticky;
+  bottom: 0;
+  z-index: 20;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-4);
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+}
+
+@media (max-width: 760px) {
+  .queue-preview {
+    position: static;
+  }
+
+  /* Clear the bottom tab bar. */
+  .queue-action-bar {
+    bottom: calc(4.2rem + env(safe-area-inset-bottom));
+  }
+}
+
+/* Schedule: the selected day's entries under the timeline - legend, crew and actions in one. */
+.schedule-entries {
+  margin-top: var(--space-3);
+  gap: 0;
+}
+
+.schedule-entry {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.75rem;
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--border);
+  font-size: var(--text-sm);
+}
+
+.schedule-entry-time {
+  font-variant-numeric: tabular-nums;
+  color: var(--content-muted);
+  min-width: 6.5rem;
+}
+
+.schedule-entry-title {
+  flex: 1;
+  min-width: 10rem;
+}
+
+.schedule-entry button {
+  padding: 0.25rem 0.6rem;
+  font-size: var(--text-sm);
+}

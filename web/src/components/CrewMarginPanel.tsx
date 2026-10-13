@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { isAdminRole } from '../auth/roles';
-import { formatMoney } from '../utils/format';
+import { formatMoney, isIntegrationOff } from '../utils/format';
 
 
 /**
@@ -144,9 +144,11 @@ function MarginDisplay({
     <div className="panel" style={{ marginTop: '1rem' }}>
       <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
         <h3 style={{ margin: 0 }}>Crew margin</h3>
-        <button className="secondary" onClick={onRefresh} disabled={loading}>
-          Refresh
-        </button>
+        {!isIntegrationOff(error) && (
+          <button className="secondary" onClick={onRefresh} disabled={loading}>
+            Refresh
+          </button>
+        )}
       </div>
       <p className="muted">
         Charge is what Current RMS says the client is billed for crew/labour, across this job's
@@ -154,7 +156,12 @@ function MarginDisplay({
         separate crewing quote). Cost is this job's crew assignments (day rate × days). Admin-only
         - never shown to crew.
       </p>
-      {error && <p className="error">{error}</p>}
+      {error &&
+        (isIntegrationOff(error) ? (
+          <p className="muted">Current RMS is turned off, so there's no charge to compare against. Turn it on in Settings → Current RMS.</p>
+        ) : (
+          <p className="error">{error}</p>
+        ))}
       {loading && !data && <p className="muted">Loading…</p>}
       {data && (
         <>

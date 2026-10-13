@@ -527,6 +527,31 @@ export interface DashboardOrder {
   crew: CrewScheduleSwatch[];
 }
 
+export interface DashboardDay {
+  id: string;
+  date: string;
+  jobId: string;
+  jobName: string;
+  venue: string | null;
+  crew: CrewScheduleSwatch[];
+  items: { id: string; title: string; startsAt: string; endsAt: string | null }[];
+}
+
+export interface DashboardFailedPrint {
+  id: string;
+  jobId: string;
+  jobName: string;
+  labelType: string;
+  error: string | null;
+  createdAt: string;
+}
+
+export interface DashboardData {
+  orders: DashboardOrder[];
+  thisWeek: DashboardDay[];
+  failedPrints: DashboardFailedPrint[];
+}
+
 export interface DiscussionMessage {
   id: string;
   jobId: string;
