@@ -141,54 +141,56 @@ function RequestedLabelsPanel({ jobId, onChanged }: { jobId: string; onChanged: 
           </button>
         </div>
       )}
-      <table>
-        <thead>
-          <tr>
-            <th>
-              <input
-                type="checkbox"
-                aria-label="Select all requests"
-                checked={selected.size === requests.length}
-                onChange={toggleSelectAll}
-              />
-            </th>
-            <th>From</th>
-            <th>Type</th>
-            <th>Content</th>
-            <th>Qty</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {requests.map((r) => (
-            <tr key={r.id}>
-              <td>
+      <div className="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>
                 <input
                   type="checkbox"
-                  aria-label={`Select request from ${r.requestedByDisplayName}`}
-                  checked={selected.has(r.id)}
-                  onChange={() => toggleSelected(r.id)}
+                  aria-label="Select all requests"
+                  checked={selected.size === requests.length}
+                  onChange={toggleSelectAll}
                 />
-              </td>
-              <td>
-                <span className="row" style={{ gap: '0.3rem' }}>
-                  <WhoIcon />
-                  {r.requestedByDisplayName}
-                </span>
-              </td>
-              <td>{TYPE_LABELS[r.labelType as AdHocType] ?? r.labelType}</td>
-              <td>{summarizeContent(r.labelType, r.content)}</td>
-              <td>{r.quantity}</td>
-              <td className="row">
-                <button onClick={() => approve(r.id)}>Approve</button>
-                <button className="secondary" onClick={() => reject(r.id)}>
-                  Deny
-                </button>
-              </td>
+              </th>
+              <th>From</th>
+              <th>Type</th>
+              <th>Content</th>
+              <th>Qty</th>
+              <th></th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {requests.map((r) => (
+              <tr key={r.id}>
+                <td>
+                  <input
+                    type="checkbox"
+                    aria-label={`Select request from ${r.requestedByDisplayName}`}
+                    checked={selected.has(r.id)}
+                    onChange={() => toggleSelected(r.id)}
+                  />
+                </td>
+                <td>
+                  <span className="row" style={{ gap: '0.3rem' }}>
+                    <WhoIcon />
+                    {r.requestedByDisplayName}
+                  </span>
+                </td>
+                <td>{TYPE_LABELS[r.labelType as AdHocType] ?? r.labelType}</td>
+                <td>{summarizeContent(r.labelType, r.content)}</td>
+                <td>{r.quantity}</td>
+                <td className="row">
+                  <button onClick={() => approve(r.id)}>Approve</button>
+                  <button className="secondary" onClick={() => reject(r.id)}>
+                    Deny
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -316,45 +318,47 @@ function LabelSection({
           <p className="muted" style={{ marginTop: '1rem' }}>
             Every field is editable in place (click and type, saves on blur).
           </p>
-          <table>
-            <thead>
-              <tr>
-                <th>Type</th>
-                <th>Content</th>
-                <th>Qty</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {sectionItems.map((i) => (
-                <tr key={i.id}>
-                  <td>
-                    {TYPE_LABELS[i.labelType as AdHocType] ?? i.labelType}
-                    {i.requestedByDisplayName && (
-                      <div className="chip chip-neutral" style={{ marginTop: '0.3rem', gap: '0.3rem' }}>
-                        <WhoIcon /> {i.requestedByDisplayName}
-                      </div>
-                    )}
-                  </td>
-                  <td>{renderEditableContent(i)}</td>
-                  <td>
-                    <input
-                      type="number"
-                      min={1}
-                      defaultValue={i.quantity}
-                      style={{ width: 60 }}
-                      onBlur={(e) => updateQuantity(i.id, Number(e.target.value))}
-                    />
-                  </td>
-                  <td>
-                    <button className="secondary" onClick={() => remove(i.id)}>
-                      Remove
-                    </button>
-                  </td>
+          <div className="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Type</th>
+                  <th>Content</th>
+                  <th>Qty</th>
+                  <th></th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {sectionItems.map((i) => (
+                  <tr key={i.id}>
+                    <td>
+                      {TYPE_LABELS[i.labelType as AdHocType] ?? i.labelType}
+                      {i.requestedByDisplayName && (
+                        <div className="chip chip-neutral" style={{ marginTop: '0.3rem', gap: '0.3rem' }}>
+                          <WhoIcon /> {i.requestedByDisplayName}
+                        </div>
+                      )}
+                    </td>
+                    <td>{renderEditableContent(i)}</td>
+                    <td>
+                      <input
+                        type="number"
+                        min={1}
+                        defaultValue={i.quantity}
+                        style={{ width: 60 }}
+                        onBlur={(e) => updateQuantity(i.id, Number(e.target.value))}
+                      />
+                    </td>
+                    <td>
+                      <button className="secondary" onClick={() => remove(i.id)}>
+                        Remove
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </>
       )}
       {sectionItems.length === 0 && <p className="muted">No labels yet in this section.</p>}

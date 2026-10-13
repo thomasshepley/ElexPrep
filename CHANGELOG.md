@@ -4,6 +4,10 @@ Newest entries first. Each push/merge gets exactly one entry - see
 `scripts/bump-version.mjs` for how the version number itself advances. A `+` marks a
 feature addition, a `-` marks a bug fix.
 
+## v1.3.4 - 2026-10-13
+
+- Fix job dates on the dashboard and crew schedule, phone layout, signage fallback and spare labels
+
 ## v1.3.3 - 2026-10-13
 
 - Security hardening for file uploads, job access and sign-in

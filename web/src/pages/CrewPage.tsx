@@ -144,74 +144,76 @@ export default function CrewPage() {
 
       <AddAdminAsCrewPanel onAdded={refresh} />
 
-      <table>
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Phone</th>
-            <th>Skills</th>
-            <th>Status</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {crew.map((c) => (
-            <Fragment key={c.id}>
-              <tr>
-                <td>
-                  <div className="row" style={{ gap: '0.4rem' }}>
-                    <Avatar userId={c.userId} displayName={c.displayName} hasAvatar={c.hasAvatar} size={28} />
-                    <span
-                      className="crew-swatch-dot"
-                      style={{ background: resolveCrewColor(c.id, c.color) }}
-                      title="Schedule swatch color"
-                    />
-                    <div style={{ fontWeight: 600 }}>{c.displayName}</div>
-                    {c.userRole === 'ADMIN' && <span className="chip chip-role">Staff</span>}
-                  </div>
-                  <span className="muted">{c.username}</span>
-                </td>
-                <td>
-                  <div className="row" style={{ gap: '0.4rem' }}>
-                    {c.phone ?? '-'}
-                    <WhatsAppButton phone={c.phone} label="WhatsApp" />
-                  </div>
-                </td>
-                <td>{c.skills ?? '-'}</td>
-                <td>
-                  <label className="switch">
-                    <input type="checkbox" checked={c.active} onChange={() => toggleActive(c)} />
-                    <span className="switch-track" />
-                    {c.active ? 'Active' : 'Inactive'}
-                  </label>
-                </td>
-                <td className="row">
-                  <button className="secondary" onClick={() => setExpandedId(expandedId === c.id ? null : c.id)}>
-                    Details
-                  </button>
-                  {c.userRole !== 'ADMIN' && (
-                    <button className="secondary" onClick={() => resetPassword(c)}>
-                      Reset password
-                    </button>
-                  )}
-                  <button className="secondary" onClick={() => remove(c)}>
-                    {c.userRole === 'ADMIN' ? 'Remove from crew' : 'Delete'}
-                  </button>
-                </td>
-              </tr>
-              {expandedId === c.id && (
+      <div className="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Phone</th>
+              <th>Skills</th>
+              <th>Status</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {crew.map((c) => (
+              <Fragment key={c.id}>
                 <tr>
-                  <td colSpan={5}>
-                    <ProfileEditPanel crew={c} onChanged={refresh} />
-                    <RateCardPanel crewId={c.id} />
-                    <CrewDocumentsPanel crewId={c.id} />
+                  <td>
+                    <div className="row" style={{ gap: '0.4rem' }}>
+                      <Avatar userId={c.userId} displayName={c.displayName} hasAvatar={c.hasAvatar} size={28} />
+                      <span
+                        className="crew-swatch-dot"
+                        style={{ background: resolveCrewColor(c.id, c.color) }}
+                        title="Schedule swatch color"
+                      />
+                      <div style={{ fontWeight: 600 }}>{c.displayName}</div>
+                      {c.userRole === 'ADMIN' && <span className="chip chip-role">Staff</span>}
+                    </div>
+                    <span className="muted">{c.username}</span>
+                  </td>
+                  <td>
+                    <div className="row" style={{ gap: '0.4rem' }}>
+                      {c.phone ?? '-'}
+                      <WhatsAppButton phone={c.phone} label="WhatsApp" />
+                    </div>
+                  </td>
+                  <td>{c.skills ?? '-'}</td>
+                  <td>
+                    <label className="switch">
+                      <input type="checkbox" checked={c.active} onChange={() => toggleActive(c)} />
+                      <span className="switch-track" />
+                      {c.active ? 'Active' : 'Inactive'}
+                    </label>
+                  </td>
+                  <td className="row">
+                    <button className="secondary" onClick={() => setExpandedId(expandedId === c.id ? null : c.id)}>
+                      Details
+                    </button>
+                    {c.userRole !== 'ADMIN' && (
+                      <button className="secondary" onClick={() => resetPassword(c)}>
+                        Reset password
+                      </button>
+                    )}
+                    <button className="secondary" onClick={() => remove(c)}>
+                      {c.userRole === 'ADMIN' ? 'Remove from crew' : 'Delete'}
+                    </button>
                   </td>
                 </tr>
-              )}
-            </Fragment>
-          ))}
-        </tbody>
-      </table>
+                {expandedId === c.id && (
+                  <tr>
+                    <td colSpan={5}>
+                      <ProfileEditPanel crew={c} onChanged={refresh} />
+                      <RateCardPanel crewId={c.id} />
+                      <CrewDocumentsPanel crewId={c.id} />
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

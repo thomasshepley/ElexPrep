@@ -40,32 +40,34 @@ export default function JobDocumentsPanel({ jobId }: { jobId: string }) {
       {error && <p className="error">{error}</p>}
 
       {documents.length > 0 && (
-        <table style={{ marginTop: '0.75rem' }}>
-          <thead>
-            <tr>
-              <th>File</th>
-              <th>Uploaded</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {documents.map((d) => (
-              <tr key={d.id}>
-                <td>
-                  <a href={api.jobDocuments.fileUrl(jobId, d.id)} target="_blank" rel="noreferrer">
-                    {d.originalName}
-                  </a>
-                </td>
-                <td className="muted">{new Date(d.createdAt).toLocaleDateString()}</td>
-                <td>
-                  <button className="secondary" onClick={() => remove(d.id)}>
-                    Remove
-                  </button>
-                </td>
+        <div className="table-scroll">
+          <table style={{ marginTop: '0.75rem' }}>
+            <thead>
+              <tr>
+                <th>File</th>
+                <th>Uploaded</th>
+                <th></th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {documents.map((d) => (
+                <tr key={d.id}>
+                  <td>
+                    <a href={api.jobDocuments.fileUrl(jobId, d.id)} target="_blank" rel="noreferrer">
+                      {d.originalName}
+                    </a>
+                  </td>
+                  <td className="muted">{new Date(d.createdAt).toLocaleDateString()}</td>
+                  <td>
+                    <button className="secondary" onClick={() => remove(d.id)}>
+                      Remove
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );

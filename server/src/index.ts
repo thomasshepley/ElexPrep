@@ -198,7 +198,9 @@ process.on('SIGTERM', () => shutdown('SIGTERM'));
 process.on('SIGINT', () => shutdown('SIGINT'));
 
 restartCurrentRmsPolling().catch((err) => console.error('Could not start Current RMS polling:', err));
-seedDefaultLocationColorsIfEmpty().catch((err) => console.error('Could not seed location colors:', err));
-seedNewDefaultLocationColorsIfMissing(['Spare', 'Rigging', 'Everywhere']).catch((err) =>
-  console.error('Could not top up new default location colors:', err)
-);
+// Sequential on purpose: run concurrently on an empty table, both passes saw the newer
+// defaults as missing and inserted them twice.
+(async () => {
+  await seedDefaultLocationColorsIfEmpty();
+  await seedNewDefaultLocationColorsIfMissing(['Spare', 'Rigging', 'Everywhere']);
+})().catch((err) => console.error('Could not seed location colors:', err));

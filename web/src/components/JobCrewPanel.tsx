@@ -135,66 +135,68 @@ export default function JobCrewPanel({ jobId }: { jobId: string }) {
       )}
 
       {assignments.length > 0 ? (
-        <table style={{ marginTop: '0.75rem' }}>
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Role</th>
-              <th>Day rate</th>
-              <th>Days</th>
-              <th>Zero-rate</th>
-              <th></th>
-              {canManage && <th></th>}
-            </tr>
-          </thead>
-          <tbody>
-            {assignments.map((a) => (
-              <tr key={a.id}>
-                <td>
-                  {a.displayName}
-                  {!a.active && <span className="muted"> (inactive)</span>}
-                </td>
-                <td>
-                  {canManage ? (
-                    <input value={a.role} onChange={(e) => updateRole(a, e.target.value)} style={{ width: '10rem' }} />
-                  ) : (
-                    <span className="chip chip-role">{a.role}</span>
-                  )}
-                </td>
-                <td>{a.zeroRated ? <span className="muted">Zero-rated</span> : a.dayRate ?? a.profileDayRate ?? '-'}</td>
-                <td>
-                  {canManage ? (
-                    <input
-                      defaultValue={a.days ?? ''}
-                      placeholder="1"
-                      style={{ width: '3.5rem' }}
-                      onBlur={(e) => updateDays(a, e.target.value)}
-                    />
-                  ) : (
-                    a.days ?? '1'
-                  )}
-                </td>
-                <td>
-                  {canManage ? (
-                    <input type="checkbox" checked={a.zeroRated} onChange={(e) => updateZeroRated(a, e.target.checked)} />
-                  ) : (
-                    a.zeroRated ? 'Yes' : ''
-                  )}
-                </td>
-                <td>
-                  <WhatsAppButton phone={a.phone} label="WhatsApp" />
-                </td>
-                {canManage && (
-                  <td>
-                    <button type="button" className="secondary" onClick={() => remove(a)}>
-                      Remove
-                    </button>
-                  </td>
-                )}
+        <div className="table-scroll">
+          <table style={{ marginTop: '0.75rem' }}>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Role</th>
+                <th>Day rate</th>
+                <th>Days</th>
+                <th>Zero-rate</th>
+                <th></th>
+                {canManage && <th></th>}
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {assignments.map((a) => (
+                <tr key={a.id}>
+                  <td>
+                    {a.displayName}
+                    {!a.active && <span className="muted"> (inactive)</span>}
+                  </td>
+                  <td>
+                    {canManage ? (
+                      <input value={a.role} onChange={(e) => updateRole(a, e.target.value)} style={{ width: '10rem' }} />
+                    ) : (
+                      <span className="chip chip-role">{a.role}</span>
+                    )}
+                  </td>
+                  <td>{a.zeroRated ? <span className="muted">Zero-rated</span> : a.dayRate ?? a.profileDayRate ?? '-'}</td>
+                  <td>
+                    {canManage ? (
+                      <input
+                        defaultValue={a.days ?? ''}
+                        placeholder="1"
+                        style={{ width: '3.5rem' }}
+                        onBlur={(e) => updateDays(a, e.target.value)}
+                      />
+                    ) : (
+                      a.days ?? '1'
+                    )}
+                  </td>
+                  <td>
+                    {canManage ? (
+                      <input type="checkbox" checked={a.zeroRated} onChange={(e) => updateZeroRated(a, e.target.checked)} />
+                    ) : (
+                      a.zeroRated ? 'Yes' : ''
+                    )}
+                  </td>
+                  <td>
+                    <WhatsAppButton phone={a.phone} label="WhatsApp" />
+                  </td>
+                  {canManage && (
+                    <td>
+                      <button type="button" className="secondary" onClick={() => remove(a)}>
+                        Remove
+                      </button>
+                    </td>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       ) : (
         <p className="muted">No crew assigned to this job yet.</p>
       )}

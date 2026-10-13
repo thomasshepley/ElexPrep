@@ -116,63 +116,65 @@ export default function LocationColorsPage() {
         {error && <p className="error">{error}</p>}
       </div>
 
-      <table>
-        <thead>
-          <tr>
-            <th>Location</th>
-            <th>Color</th>
-            <th>Pattern</th>
-            <th>Preview</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {rules.map((r) => (
-            <tr key={r.id}>
-              <td>{r.location}</td>
-              <td className="row" style={{ gap: '0.3rem' }}>
-                {r.pattern !== 'RAINBOW' && <input type="color" value={r.color} onChange={(e) => updateColor(r, e.target.value)} />}
-                {r.pattern === 'DIAGONAL_STRIPES' && (
-                  <input
-                    type="color"
-                    value={r.secondaryColor ?? '#FFFFFF'}
-                    title="Second stripe color"
-                    onChange={(e) => updateSecondaryColor(r, e.target.value)}
-                  />
-                )}
-                {r.pattern === 'RAINBOW' && <span className="muted">(fixed colors)</span>}
-              </td>
-              <td>
-                <select value={r.pattern} onChange={(e) => updatePattern(r, e.target.value as LocationColorPattern)}>
-                  <option value="SOLID">Solid</option>
-                  <option value="DIAGONAL_STRIPES">Diagonal stripes</option>
-                  <option value="RAINBOW">Rainbow</option>
-                </select>
-              </td>
-              <td>
-                <span
-                  style={{
-                    display: 'inline-block',
-                    padding: '0.25rem 0.75rem',
-                    borderRadius: 4,
-                    background: swatchBackground(r),
-                    color: r.pattern === 'RAINBOW' ? '#fff' : contrastingText(r.color),
-                    textShadow: r.pattern === 'RAINBOW' ? '0 1px 2px rgba(0,0,0,0.8)' : undefined,
-                    fontWeight: 600,
-                  }}
-                >
-                  {r.location}
-                </span>
-              </td>
-              <td>
-                <button type="button" className="secondary" onClick={() => remove(r.id)}>
-                  Delete
-                </button>
-              </td>
+      <div className="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Location</th>
+              <th>Color</th>
+              <th>Pattern</th>
+              <th>Preview</th>
+              <th></th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {rules.map((r) => (
+              <tr key={r.id}>
+                <td>{r.location}</td>
+                <td className="row" style={{ gap: '0.3rem' }}>
+                  {r.pattern !== 'RAINBOW' && <input type="color" value={r.color} onChange={(e) => updateColor(r, e.target.value)} />}
+                  {r.pattern === 'DIAGONAL_STRIPES' && (
+                    <input
+                      type="color"
+                      value={r.secondaryColor ?? '#FFFFFF'}
+                      title="Second stripe color"
+                      onChange={(e) => updateSecondaryColor(r, e.target.value)}
+                    />
+                  )}
+                  {r.pattern === 'RAINBOW' && <span className="muted">(fixed colors)</span>}
+                </td>
+                <td>
+                  <select value={r.pattern} onChange={(e) => updatePattern(r, e.target.value as LocationColorPattern)}>
+                    <option value="SOLID">Solid</option>
+                    <option value="DIAGONAL_STRIPES">Diagonal stripes</option>
+                    <option value="RAINBOW">Rainbow</option>
+                  </select>
+                </td>
+                <td>
+                  <span
+                    style={{
+                      display: 'inline-block',
+                      padding: '0.25rem 0.75rem',
+                      borderRadius: 4,
+                      background: swatchBackground(r),
+                      color: r.pattern === 'RAINBOW' ? '#fff' : contrastingText(r.color),
+                      textShadow: r.pattern === 'RAINBOW' ? '0 1px 2px rgba(0,0,0,0.8)' : undefined,
+                      fontWeight: 600,
+                    }}
+                  >
+                    {r.location}
+                  </span>
+                </td>
+                <td>
+                  <button type="button" className="secondary" onClick={() => remove(r.id)}>
+                    Delete
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
       </PermissionFieldset>
     </div>
   );

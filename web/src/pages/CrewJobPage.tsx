@@ -10,6 +10,7 @@ import JobDiscussionThread from '../components/JobDiscussionThread';
 import CadPlotsViewer from '../components/CadPlotsViewer';
 import LocationLinks from '../components/LocationLinks';
 import WhatsAppButton from '../components/WhatsAppButton';
+import { usePageTitle } from '../pageTitle';
 
 const NO_DATE = 'No date set yet';
 const NO_VENUE = 'No venue set yet';
@@ -118,6 +119,7 @@ function RequestLabelForm({ jobId }: { jobId: string }) {
 export default function CrewJobPage() {
   const { jobId } = useParams<{ jobId: string }>();
   const [detail, setDetail] = useState<CrewJobDetail | null>(null);
+  usePageTitle(detail?.what.jobName);
   const [schedule, setSchedule] = useState<JobScheduleItem[]>([]);
   const [days, setDays] = useState<JobDay[]>([]);
   const [kitList, setKitList] = useState<KitListItem[]>([]);
@@ -222,22 +224,24 @@ export default function CrewJobPage() {
             <WhySubsection title="Kit list">
               {kitList.length === 0 && <p className="muted">No kit list available for this job.</p>}
               {kitList.length > 0 && (
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Item</th>
-                      <th>Qty</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {kitList.map((item) => (
-                      <tr key={item.id}>
-                        <td>{item.name}</td>
-                        <td>{item.quantity}</td>
+                <div className="table-scroll">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Item</th>
+                        <th>Qty</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {kitList.map((item) => (
+                        <tr key={item.id}>
+                          <td>{item.name}</td>
+                          <td>{item.quantity}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               )}
             </WhySubsection>
 

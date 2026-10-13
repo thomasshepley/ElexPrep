@@ -98,33 +98,35 @@ export default function ImportMappingPage() {
 
       <div className="panel">
         <h3>Column mapping</h3>
-        <table>
-          <thead>
-            <tr>
-              <th>Field</th>
-              <th>CSV column name</th>
-            </tr>
-          </thead>
-          <tbody>
-            {PATCH_FIELD_KEYS.map((key) => (
-              <tr key={key}>
-                <td>
-                  {PATCH_FIELD_LABELS[key]}
-                  {(key === 'address' || key === 'fixtureType') && <span className="error"> *</span>}
-                </td>
-                <td>
-                  <input
-                    list={sampleHeaders.length ? 'sample-headers' : undefined}
-                    value={mapping[key] ?? ''}
-                    placeholder="- not mapped -"
-                    onChange={(e) => setMapping((m) => ({ ...m, [key]: e.target.value }))}
-                    style={{ width: 260 }}
-                  />
-                </td>
+        <div className="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Field</th>
+                <th>CSV column name</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {PATCH_FIELD_KEYS.map((key) => (
+                <tr key={key}>
+                  <td>
+                    {PATCH_FIELD_LABELS[key]}
+                    {(key === 'address' || key === 'fixtureType') && <span className="error"> *</span>}
+                  </td>
+                  <td>
+                    <input
+                      list={sampleHeaders.length ? 'sample-headers' : undefined}
+                      value={mapping[key] ?? ''}
+                      placeholder="- not mapped -"
+                      onChange={(e) => setMapping((m) => ({ ...m, [key]: e.target.value }))}
+                      style={{ width: 260 }}
+                    />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
         {sampleHeaders.length > 0 && (
           <datalist id="sample-headers">
             {sampleHeaders.map((h) => (

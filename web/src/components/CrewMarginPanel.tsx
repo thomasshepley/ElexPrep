@@ -16,11 +16,15 @@ function formatMoney(n: number): string {
  */
 export default function CrewMarginPanel({ jobId }: { jobId: string }) {
   const { user } = useAuth();
+  // The role gate lives in a wrapper so the inner component's hooks always run in the same order.
+  if (!isAdminRole(user?.role)) return null;
+  return <CrewMarginPanelInner jobId={jobId} />;
+}
+
+function CrewMarginPanelInner({ jobId }: { jobId: string }) {
   const [data, setData] = useState<Awaited<ReturnType<typeof api.jobCrewMargin.get>> | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-
-  if (!isAdminRole(user?.role)) return null;
 
   const load = () => {
     setLoading(true);
@@ -191,94 +195,98 @@ function MarginDisplay({
           <div className="row" style={{ gap: '1.5rem', flexWrap: 'wrap', alignItems: 'flex-start' }}>
             <div style={{ flex: '1 1 20rem', minWidth: '20rem' }}>
               <strong>Current RMS (charged)</strong>
-              <table>
-                <thead>
-                  <tr>
-                    <th>Item</th>
-                    <th>Qty</th>
-                    <th>Rate</th>
-                    <th>Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.chargeBreakdown.flatMap((b) =>
-                    b.lines.map((line, i) => (
-                      <tr key={`${b.opportunityId}-${i}`}>
-                        <td>
-                          {line.name}
-                          {data.chargeBreakdown.length > 1 && <div className="muted" style={{ fontSize: 'var(--text-xs)' }}>{b.subject}</div>}
-                        </td>
-                        <td>{line.quantity}</td>
-                        <td>{formatMoney(line.rate)}</td>
-                        <td>{formatMoney(line.total)}</td>
-                      </tr>
-                    ))
-                  )}
-                  {data.chargeBreakdown.every((b) => b.lines.length === 0) && (
+              <div className="table-scroll">
+                <table>
+                  <thead>
                     <tr>
-                      <td colSpan={4} className="muted">
-                        No Service-type charge lines found.
+                      <th>Item</th>
+                      <th>Qty</th>
+                      <th>Rate</th>
+                      <th>Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.chargeBreakdown.flatMap((b) =>
+                      b.lines.map((line, i) => (
+                        <tr key={`${b.opportunityId}-${i}`}>
+                          <td>
+                            {line.name}
+                            {data.chargeBreakdown.length > 1 && <div className="muted" style={{ fontSize: 'var(--text-xs)' }}>{b.subject}</div>}
+                          </td>
+                          <td>{line.quantity}</td>
+                          <td>{formatMoney(line.rate)}</td>
+                          <td>{formatMoney(line.total)}</td>
+                        </tr>
+                      ))
+                    )}
+                    {data.chargeBreakdown.every((b) => b.lines.length === 0) && (
+                      <tr>
+                        <td colSpan={4} className="muted">
+                          No Service-type charge lines found.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                  <tfoot>
+                    <tr>
+                      <td colSpan={3}>
+                        <strong>Total</strong>
+                      </td>
+                      <td>
+                        <strong>{formatMoney(data.chargeTotal)}</strong>
                       </td>
                     </tr>
-                  )}
-                </tbody>
-                <tfoot>
-                  <tr>
-                    <td colSpan={3}>
-                      <strong>Total</strong>
-                    </td>
-                    <td>
-                      <strong>{formatMoney(data.chargeTotal)}</strong>
-                    </td>
-                  </tr>
-                </tfoot>
-              </table>
+                  </tfoot>
+                </table>
+              </div>
             </div>
 
             <div style={{ flex: '1 1 20rem', minWidth: '20rem' }}>
               <strong>ElexPrep (crew cost)</strong>
-              <table>
-                <thead>
-                  <tr>
-                    <th>Item</th>
-                    <th>Qty</th>
-                    <th>Rate</th>
-                    <th>Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.costBreakdown.map((b) => (
-                    <tr key={b.crewProfileId}>
-                      <td>
-                        {b.name}
-                        <div className="muted" style={{ fontSize: 'var(--text-xs)' }}>{b.role}</div>
-                      </td>
-                      <td>{b.days}</td>
-                      <td title={`Suggested rate (profile/global default): ${formatMoney(b.suggestedRate)}`}>
-                        {b.zeroRated ? <span className="muted">Zero-rated</span> : formatMoney(b.dayRate)}
-                      </td>
-                      <td>{formatMoney(b.cost)}</td>
-                    </tr>
-                  ))}
-                  {data.costBreakdown.length === 0 && (
+              <div className="table-scroll">
+                <table>
+                  <thead>
                     <tr>
-                      <td colSpan={4} className="muted">
-                        No crew assigned to this job yet.
+                      <th>Item</th>
+                      <th>Qty</th>
+                      <th>Rate</th>
+                      <th>Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.costBreakdown.map((b) => (
+                      <tr key={b.crewProfileId}>
+                        <td>
+                          {b.name}
+                          <div className="muted" style={{ fontSize: 'var(--text-xs)' }}>{b.role}</div>
+                        </td>
+                        <td>{b.days}</td>
+                        <td title={`Suggested rate (profile/global default): ${formatMoney(b.suggestedRate)}`}>
+                          {b.zeroRated ? <span className="muted">Zero-rated</span> : formatMoney(b.dayRate)}
+                        </td>
+                        <td>{formatMoney(b.cost)}</td>
+                      </tr>
+                    ))}
+                    {data.costBreakdown.length === 0 && (
+                      <tr>
+                        <td colSpan={4} className="muted">
+                          No crew assigned to this job yet.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                  <tfoot>
+                    <tr>
+                      <td colSpan={3}>
+                        <strong>Total</strong>
+                      </td>
+                      <td>
+                        <strong>{formatMoney(data.costTotal)}</strong>
                       </td>
                     </tr>
-                  )}
-                </tbody>
-                <tfoot>
-                  <tr>
-                    <td colSpan={3}>
-                      <strong>Total</strong>
-                    </td>
-                    <td>
-                      <strong>{formatMoney(data.costTotal)}</strong>
-                    </td>
-                  </tr>
-                </tfoot>
-              </table>
+                  </tfoot>
+                </table>
+              </div>
             </div>
           </div>
         </>

@@ -196,38 +196,40 @@ export default function OneDriveFilesPanel({ jobId, onChange }: { jobId: string;
               </span>
             ))}
           </p>
-          <table>
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((item) => (
-                <tr key={item.id}>
-                  <td>
-                    {item.folder ? (
-                      <button type="button" className="link-button" onClick={() => browse(item.id, item.name)}>
-                        📁 {item.name}
-                      </button>
-                    ) : (
-                      item.name
-                    )}
-                  </td>
-                  <td>
-                    {sharedIds.has(item.id) ? (
-                      <span className="chip chip-success">Shared with crew</span>
-                    ) : (
-                      <button type="button" className="secondary" onClick={() => share(item)} disabled={busy}>
-                        Share with crew
-                      </button>
-                    )}
-                  </td>
+          <div className="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th></th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {items.map((item) => (
+                  <tr key={item.id}>
+                    <td>
+                      {item.folder ? (
+                        <button type="button" className="link-button" onClick={() => browse(item.id, item.name)}>
+                          📁 {item.name}
+                        </button>
+                      ) : (
+                        item.name
+                      )}
+                    </td>
+                    <td>
+                      {sharedIds.has(item.id) ? (
+                        <span className="chip chip-success">Shared with crew</span>
+                      ) : (
+                        <button type="button" className="secondary" onClick={() => share(item)} disabled={busy}>
+                          Share with crew
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </>
       )}
 

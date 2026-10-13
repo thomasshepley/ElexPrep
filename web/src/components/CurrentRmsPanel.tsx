@@ -189,31 +189,33 @@ export default function CurrentRmsPanel({ jobId }: { jobId: string }) {
             )}
           </div>
           {opportunity && (
-            <table style={{ maxWidth: 480 }}>
-              <tbody>
-                <tr>
-                  <td>Customer</td>
-                  <td>{opportunity.memberName}</td>
-                </tr>
-                <tr>
-                  <td>Status</td>
-                  <td>{opportunity.status}</td>
-                </tr>
-                <tr>
-                  <td>Dates</td>
-                  <td>
-                    {opportunity.startsAt ? new Date(opportunity.startsAt).toLocaleDateString() : '?'} –{' '}
-                    {opportunity.endsAt ? new Date(opportunity.endsAt).toLocaleDateString() : '?'}
-                  </td>
-                </tr>
-                <tr>
-                  <td>RMS last updated</td>
-                  <td className="muted">
-                    {opportunity.rmsUpdatedAt ? new Date(opportunity.rmsUpdatedAt).toLocaleString() : '-'}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+            <div className="table-scroll">
+              <table style={{ maxWidth: 480 }}>
+                <tbody>
+                  <tr>
+                    <td>Customer</td>
+                    <td>{opportunity.memberName}</td>
+                  </tr>
+                  <tr>
+                    <td>Status</td>
+                    <td>{opportunity.status}</td>
+                  </tr>
+                  <tr>
+                    <td>Dates</td>
+                    <td>
+                      {opportunity.startsAt ? new Date(opportunity.startsAt).toLocaleDateString() : '?'} –{' '}
+                      {opportunity.endsAt ? new Date(opportunity.endsAt).toLocaleDateString() : '?'}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>RMS last updated</td>
+                    <td className="muted">
+                      {opportunity.rmsUpdatedAt ? new Date(opportunity.rmsUpdatedAt).toLocaleString() : '-'}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           )}
 
           <div style={{ marginTop: '1rem' }}>
@@ -269,61 +271,63 @@ export default function CurrentRmsPanel({ jobId }: { jobId: string }) {
                     </>
                   )}
                 </p>
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Item</th>
-                      <th>Current RMS status</th>
-                      <th>Prepped</th>
-                      <th></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {visibleItems.map((i) =>
-                      i.isGroup ? (
-                        <tr key={i.id}>
-                          <td colSpan={4} style={{ fontWeight: 700, paddingTop: '0.75rem' }}>
-                            {i.name ?? i.product_name ?? i.description ?? `#${i.id}`}
-                          </td>
-                        </tr>
-                      ) : (
-                        <tr key={i.id}>
-                          <td>
-                            <span className="muted" style={{ display: 'inline-block', minWidth: '2.5rem', textAlign: 'left' }}>
-                              {formatQuantity(i.quantity)}×
-                            </span>
-                            {i.name ?? i.product_name ?? i.description ?? `#${i.id}`}
-                            {i.transaction_type_name && i.transaction_type_name !== 'Rental' && (
-                              <span className="chip chip-neutral" style={{ marginLeft: '0.4rem' }}>
-                                {i.transaction_type_name}
+                <div className="table-scroll">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Item</th>
+                        <th>Current RMS status</th>
+                        <th>Prepped</th>
+                        <th></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {visibleItems.map((i) =>
+                        i.isGroup ? (
+                          <tr key={i.id}>
+                            <td colSpan={4} style={{ fontWeight: 700, paddingTop: '0.75rem' }}>
+                              {i.name ?? i.product_name ?? i.description ?? `#${i.id}`}
+                            </td>
+                          </tr>
+                        ) : (
+                          <tr key={i.id}>
+                            <td>
+                              <span className="muted" style={{ display: 'inline-block', minWidth: '2.5rem', textAlign: 'left' }}>
+                                {formatQuantity(i.quantity)}×
                               </span>
-                            )}
-                          </td>
-                          <td>
-                            <span
-                              style={{
-                                fontSize: '0.85rem',
-                                fontWeight: 600,
-                                padding: '0.15rem 0.5rem',
-                                borderRadius: 999,
-                                background: i.bookedOut ? '#1FA34C' : '#555',
-                                color: '#fff',
-                              }}
-                            >
-                              {i.status_name ?? (i.bookedOut ? 'Booked out' : 'Not booked out')}
-                            </span>
-                          </td>
-                          <td>{i.prepped ? '✓' : ''}</td>
-                          <td>
-                            <button type="button" className="link-button" onClick={() => hideItem(i.id)}>
-                              Hide
-                            </button>
-                          </td>
-                        </tr>
-                      )
-                    )}
-                  </tbody>
-                </table>
+                              {i.name ?? i.product_name ?? i.description ?? `#${i.id}`}
+                              {i.transaction_type_name && i.transaction_type_name !== 'Rental' && (
+                                <span className="chip chip-neutral" style={{ marginLeft: '0.4rem' }}>
+                                  {i.transaction_type_name}
+                                </span>
+                              )}
+                            </td>
+                            <td>
+                              <span
+                                style={{
+                                  fontSize: '0.85rem',
+                                  fontWeight: 600,
+                                  padding: '0.15rem 0.5rem',
+                                  borderRadius: 999,
+                                  background: i.bookedOut ? '#1FA34C' : '#555',
+                                  color: '#fff',
+                                }}
+                              >
+                                {i.status_name ?? (i.bookedOut ? 'Booked out' : 'Not booked out')}
+                              </span>
+                            </td>
+                            <td>{i.prepped ? '✓' : ''}</td>
+                            <td>
+                              <button type="button" className="link-button" onClick={() => hideItem(i.id)}>
+                                Hide
+                              </button>
+                            </td>
+                          </tr>
+                        )
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </>
             )}
           </div>

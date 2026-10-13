@@ -296,6 +296,9 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
    gets ordinary button focus/hover/keyboard behavior for free instead of re-implementing it on
    a label. The native input is removed from the tab order (its own UI is never shown). */
 .file-input {
+  /* Anchors the visually-hidden native input below; without it that 1px input was positioned
+     against the page and pushed the document wider than the viewport. */
+  position: relative;
   display: flex;
   align-items: center;
   gap: 0.75rem;
@@ -741,6 +744,11 @@ tbody tr:hover {
     gap: 1rem;
   }
 
+  .secondary-shell > * {
+    width: 100%;
+    min-width: 0;
+  }
+
   .secondary-nav {
     flex: none;
     flex-direction: row;
@@ -748,14 +756,23 @@ tbody tr:hover {
     overflow-x: auto;
     position: static;
     width: 100%;
+    max-width: 100%;
     border-bottom: 1px solid var(--border);
     padding-bottom: 0.4rem;
+    scroll-snap-type: x proximity;
+    scrollbar-width: thin;
+    /* Fades the trailing edge so a row that scrolls reads as scrollable. */
+    mask-image: linear-gradient(to right, #000 85%, transparent);
   }
 
+  /* The desktop rule above makes each tab full-width; as a horizontal row that made every tab
+     viewport-wide, so only the first was visible. */
   .secondary-nav a,
   .secondary-nav button {
-    flex: none;
+    flex: 0 0 auto;
+    width: auto;
     white-space: nowrap;
+    scroll-snap-align: start;
   }
 }
 
@@ -1760,4 +1777,141 @@ tbody tr:hover {
   padding: 0;
   margin: 0;
   min-width: 0;
+}
+
+.error-page {
+  max-width: 34rem;
+  padding: 3rem 0;
+}
+
+.error-page-detail {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: var(--text-sm);
+  word-break: break-word;
+}
+
+.route-loading {
+  padding: 2rem 0;
+}
+
+/* Signage (prep-bay TV) */
+.signage {
+  padding: 2rem 3rem;
+  min-height: 100vh;
+}
+
+.signage-chooser {
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+  padding: 1rem;
+}
+
+.signage-chooser-option {
+  display: block;
+  width: 100%;
+  margin-bottom: 8px;
+  text-align: left;
+}
+
+.signage-header {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.signage-logo {
+  max-height: 90px;
+}
+
+.signage-title {
+  font-size: 2.6rem;
+  margin: 0;
+}
+
+.signage-venue {
+  font-size: 1.3rem;
+  margin: 0;
+}
+
+.signage-meta {
+  margin-left: auto;
+  text-align: right;
+}
+
+.signage-clock {
+  font-size: 2.2rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.signage-refreshed {
+  font-size: 0.95rem;
+}
+
+.signage-fallback-note,
+.signage-empty {
+  font-size: 1.3rem;
+}
+
+.signage-case-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 1rem;
+}
+
+.signage-case-type {
+  font-size: 1.6rem;
+}
+
+.signage-case-row {
+  font-size: 1.5rem;
+  padding: 0.25rem 0;
+}
+
+.signage-case-row .muted {
+  font-size: 1.1rem;
+}
+
+.signage-progress {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  font-size: 1.2rem;
+  margin-bottom: 1rem;
+  color: var(--content-muted);
+}
+
+.signage-progress-bar {
+  flex: 0 0 40%;
+  height: 14px;
+  border-radius: 999px;
+  background: var(--surface-sunken);
+  overflow: hidden;
+}
+
+.signage-progress-fill {
+  height: 100%;
+  background: var(--success);
+  transition: width 300ms ease;
+}
+
+/* Wraps every data table so a table wider than its panel scrolls on its own instead of
+   clipping its last column or widening the page. */
+.table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+td input[type='number'] {
+  min-width: 6ch;
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+td input[type='number']::-webkit-outer-spin-button,
+td input[type='number']::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }

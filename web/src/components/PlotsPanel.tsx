@@ -51,30 +51,32 @@ export default function PlotsPanel({ jobId, onChange }: { jobId: string; onChang
       {canEdit && <FileInput accept="application/pdf,.pdf" disabled={busy} onFile={upload} label="Choose PDF" />}
       {error && <p className="error">{error}</p>}
       {plots.length > 0 && (
-        <table style={{ marginTop: '0.75rem' }}>
-          <thead>
-            <tr>
-              <th>File</th>
-              <th>Uploaded</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {plots.map((p) => (
-              <tr key={p.id}>
-                <td>{p.originalName}</td>
-                <td className="muted">{new Date(p.createdAt).toLocaleString()}</td>
-                <td>
-                  {canEdit && (
-                    <button className="secondary" onClick={() => remove(p)}>
-                      Delete
-                    </button>
-                  )}
-                </td>
+        <div className="table-scroll">
+          <table style={{ marginTop: '0.75rem' }}>
+            <thead>
+              <tr>
+                <th>File</th>
+                <th>Uploaded</th>
+                <th></th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {plots.map((p) => (
+                <tr key={p.id}>
+                  <td>{p.originalName}</td>
+                  <td className="muted">{new Date(p.createdAt).toLocaleString()}</td>
+                  <td>
+                    {canEdit && (
+                      <button className="secondary" onClick={() => remove(p)}>
+                        Delete
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
       {plots.length === 0 && <p className="muted">No plots uploaded yet.</p>}
     </div>

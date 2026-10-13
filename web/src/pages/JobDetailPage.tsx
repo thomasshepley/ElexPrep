@@ -15,6 +15,7 @@ import JobCrewPanel from '../components/JobCrewPanel';
 import CrewMarginPanel from '../components/CrewMarginPanel';
 import JobDiscussionThread from '../components/JobDiscussionThread';
 import FileInput from '../components/FileInput';
+import { usePageTitle } from '../pageTitle';
 
 const TABS = ['Prep', 'Plots', 'Schedule', 'Documents', 'Contacts', 'Crew', 'Discussion', 'Current RMS', 'Job Settings'] as const;
 type Tab = (typeof TABS)[number];
@@ -23,12 +24,24 @@ export default function JobDetailPage() {
   const { jobId } = useParams<{ jobId: string }>();
   const [job, setJob] = useState<Job | null>(null);
   const [tab, setTab] = useState<Tab>('Prep');
+  const [loadError, setLoadError] = useState<string | null>(null);
+  usePageTitle(job?.name);
 
   useEffect(() => {
-    if (jobId) api.jobs.get(jobId).then(setJob);
+    if (!jobId) return;
+    setLoadError(null);
+    api.jobs.get(jobId).then(setJob).catch((e) => setLoadError((e as Error).message));
   }, [jobId]);
 
   if (!jobId) return null;
+  if (loadError) {
+    return (
+      <div className="error-page">
+        <h1>Job not available</h1>
+        <p className="muted">{loadError === 'not found' ? "This job doesn't exist, or you don't have access to it." : loadError}</p>
+      </div>
+    );
+  }
 
   return (
     <div>

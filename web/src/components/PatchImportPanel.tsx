@@ -281,27 +281,29 @@ export default function PatchImportPanel({ jobId, groupId = null }: { jobId: str
 
           {mappingOk && (
             <>
-              <table style={{ maxWidth: 480 }}>
-                <thead>
-                  <tr>
-                    <th>Field</th>
-                    <th>CSV column</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {Object.entries(savedMapping).map(([field, column]) => (
-                    <tr key={field}>
-                      <td>{PATCH_FIELD_LABELS[field as PatchFieldKey] ?? field}</td>
-                      <td>
-                        {column}
-                        {missingColumns.some((m) => m.field === field) && (
-                          <span className="error"> - not in this file</span>
-                        )}
-                      </td>
+              <div className="table-scroll">
+                <table style={{ maxWidth: 480 }}>
+                  <thead>
+                    <tr>
+                      <th>Field</th>
+                      <th>CSV column</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {Object.entries(savedMapping).map(([field, column]) => (
+                      <tr key={field}>
+                        <td>{PATCH_FIELD_LABELS[field as PatchFieldKey] ?? field}</td>
+                        <td>
+                          {column}
+                          {missingColumns.some((m) => m.field === field) && (
+                            <span className="error"> - not in this file</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
               {requiredMissing && (
                 <p className="error">
                   This file is missing the mapped Address/Fixture Type columns - check the file or
@@ -359,112 +361,114 @@ export default function PatchImportPanel({ jobId, groupId = null }: { jobId: str
                 </button>
               </div>
             )}
-            <table>
-              <thead>
-                <tr>
-                  <th>
-                    <input
-                      type="checkbox"
-                      checked={selected.size === stageFixtures.length && stageFixtures.length > 0}
-                      onChange={toggleSelectAll}
-                    />
-                  </th>
-                  <th>Address</th>
-                  <th>Type</th>
-                  <th>Main Uni</th>
-                  <th>Main Addr</th>
-                  <th>Pix Uni</th>
-                  <th>Pix Addr</th>
-                  <th>Mode</th>
-                  <th>Location</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {fixtureGroups.map((group) => (
-                  <Fragment key={group.type}>
-                    <tr>
-                      <td colSpan={10} style={{ fontWeight: 700, paddingTop: '0.75rem' }}>
-                        {group.type} <span className="muted" style={{ fontWeight: 400 }}>({group.items.length})</span>
+            <div className="table-scroll">
+              <table>
+                <thead>
+                  <tr>
+                    <th>
+                      <input
+                        type="checkbox"
+                        checked={selected.size === stageFixtures.length && stageFixtures.length > 0}
+                        onChange={toggleSelectAll}
+                      />
+                    </th>
+                    <th>Address</th>
+                    <th>Type</th>
+                    <th>Main Uni</th>
+                    <th>Main Addr</th>
+                    <th>Pix Uni</th>
+                    <th>Pix Addr</th>
+                    <th>Mode</th>
+                    <th>Location</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {fixtureGroups.map((group) => (
+                    <Fragment key={group.type}>
+                      <tr>
+                        <td colSpan={10} style={{ fontWeight: 700, paddingTop: '0.75rem' }}>
+                          {group.type} <span className="muted" style={{ fontWeight: 400 }}>({group.items.length})</span>
+                        </td>
+                      </tr>
+                      {group.items.map((f) => (
+                    <tr key={f.id}>
+                      <td>
+                        <input type="checkbox" checked={selected.has(f.id)} onChange={() => toggleSelected(f.id)} />
+                      </td>
+                      <td>
+                        <input
+                          type="number"
+                          defaultValue={f.address ?? ''}
+                          style={{ width: 60 }}
+                          onBlur={(e) => updateFixture(f, 'address', e.target.value)}
+                        />
+                      </td>
+                      <td>
+                        <input
+                          defaultValue={f.fixtureType}
+                          style={{ width: 150 }}
+                          onBlur={(e) => updateFixture(f, 'fixtureType', e.target.value)}
+                        />
+                      </td>
+                      <td>
+                        <input
+                          type="number"
+                          defaultValue={f.mainUniverse ?? ''}
+                          style={{ width: 55 }}
+                          onBlur={(e) => updateFixture(f, 'mainUniverse', e.target.value)}
+                        />
+                      </td>
+                      <td>
+                        <input
+                          type="number"
+                          defaultValue={f.mainAddress ?? ''}
+                          style={{ width: 55 }}
+                          onBlur={(e) => updateFixture(f, 'mainAddress', e.target.value)}
+                        />
+                      </td>
+                      <td>
+                        <input
+                          type="number"
+                          defaultValue={f.pixUniverse ?? ''}
+                          style={{ width: 55 }}
+                          onBlur={(e) => updateFixture(f, 'pixUniverse', e.target.value)}
+                        />
+                      </td>
+                      <td>
+                        <input
+                          type="number"
+                          defaultValue={f.pixAddress ?? ''}
+                          style={{ width: 55 }}
+                          onBlur={(e) => updateFixture(f, 'pixAddress', e.target.value)}
+                        />
+                      </td>
+                      <td>
+                        <input
+                          defaultValue={f.mode ?? ''}
+                          style={{ width: 120 }}
+                          onBlur={(e) => updateFixture(f, 'mode', e.target.value)}
+                        />
+                      </td>
+                      <td>
+                        <input
+                          defaultValue={f.location ?? ''}
+                          style={{ width: 120 }}
+                          onBlur={(e) => updateFixture(f, 'location', e.target.value)}
+                        />
+                      </td>
+                      <td>
+                        <button className="secondary" onClick={() => removeFixture(f.id)}>
+                          Delete
+                        </button>
                       </td>
                     </tr>
-                    {group.items.map((f) => (
-                  <tr key={f.id}>
-                    <td>
-                      <input type="checkbox" checked={selected.has(f.id)} onChange={() => toggleSelected(f.id)} />
-                    </td>
-                    <td>
-                      <input
-                        type="number"
-                        defaultValue={f.address ?? ''}
-                        style={{ width: 60 }}
-                        onBlur={(e) => updateFixture(f, 'address', e.target.value)}
-                      />
-                    </td>
-                    <td>
-                      <input
-                        defaultValue={f.fixtureType}
-                        style={{ width: 150 }}
-                        onBlur={(e) => updateFixture(f, 'fixtureType', e.target.value)}
-                      />
-                    </td>
-                    <td>
-                      <input
-                        type="number"
-                        defaultValue={f.mainUniverse ?? ''}
-                        style={{ width: 55 }}
-                        onBlur={(e) => updateFixture(f, 'mainUniverse', e.target.value)}
-                      />
-                    </td>
-                    <td>
-                      <input
-                        type="number"
-                        defaultValue={f.mainAddress ?? ''}
-                        style={{ width: 55 }}
-                        onBlur={(e) => updateFixture(f, 'mainAddress', e.target.value)}
-                      />
-                    </td>
-                    <td>
-                      <input
-                        type="number"
-                        defaultValue={f.pixUniverse ?? ''}
-                        style={{ width: 55 }}
-                        onBlur={(e) => updateFixture(f, 'pixUniverse', e.target.value)}
-                      />
-                    </td>
-                    <td>
-                      <input
-                        type="number"
-                        defaultValue={f.pixAddress ?? ''}
-                        style={{ width: 55 }}
-                        onBlur={(e) => updateFixture(f, 'pixAddress', e.target.value)}
-                      />
-                    </td>
-                    <td>
-                      <input
-                        defaultValue={f.mode ?? ''}
-                        style={{ width: 120 }}
-                        onBlur={(e) => updateFixture(f, 'mode', e.target.value)}
-                      />
-                    </td>
-                    <td>
-                      <input
-                        defaultValue={f.location ?? ''}
-                        style={{ width: 120 }}
-                        onBlur={(e) => updateFixture(f, 'location', e.target.value)}
-                      />
-                    </td>
-                    <td>
-                      <button className="secondary" onClick={() => removeFixture(f.id)}>
-                        Delete
-                      </button>
-                    </td>
-                  </tr>
-                    ))}
-                  </Fragment>
-                ))}
-              </tbody>
-            </table>
+                      ))}
+                    </Fragment>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </>
         )}
       </div>

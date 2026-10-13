@@ -119,60 +119,62 @@ export default function JobLocationColorsPanel({ jobId }: { jobId: string }) {
 
       {rules.length > 0 && (
         <fieldset disabled={!canEdit} style={{ border: 0, padding: 0, margin: 0 }}>
-        <table style={{ marginTop: '0.75rem' }}>
-          <thead>
-            <tr>
-              <th>Location</th>
-              <th>Color</th>
-              <th>Pattern</th>
-              <th>Preview</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {rules.map((r) => (
-              <tr key={r.id}>
-                <td>{r.location}</td>
-                <td className="row" style={{ gap: '0.3rem' }}>
-                  <input type="color" value={r.color} onChange={(e) => updateColor(r, e.target.value)} />
-                  {r.pattern === 'DIAGONAL_STRIPES' && (
-                    <input
-                      type="color"
-                      value={r.secondaryColor ?? '#FFFFFF'}
-                      title="Second stripe color"
-                      onChange={(e) => updateSecondaryColor(r, e.target.value)}
-                    />
-                  )}
-                </td>
-                <td>
-                  <select value={r.pattern} onChange={(e) => updatePattern(r, e.target.value as LocationColorPattern)}>
-                    <option value="SOLID">Solid</option>
-                    <option value="DIAGONAL_STRIPES">Diagonal stripes</option>
-                  </select>
-                </td>
-                <td>
-                  <span
-                    style={{
-                      display: 'inline-block',
-                      padding: '0.25rem 0.75rem',
-                      borderRadius: 4,
-                      background: swatchBackground(r),
-                      color: contrastingText(r.color),
-                      fontWeight: 600,
-                    }}
-                  >
-                    {r.location}
-                  </span>
-                </td>
-                <td>
-                  <button type="button" className="secondary" onClick={() => remove(r.id)}>
-                    Delete
-                  </button>
-                </td>
+        <div className="table-scroll">
+          <table style={{ marginTop: '0.75rem' }}>
+            <thead>
+              <tr>
+                <th>Location</th>
+                <th>Color</th>
+                <th>Pattern</th>
+                <th>Preview</th>
+                <th></th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {rules.map((r) => (
+                <tr key={r.id}>
+                  <td>{r.location}</td>
+                  <td className="row" style={{ gap: '0.3rem' }}>
+                    <input type="color" value={r.color} onChange={(e) => updateColor(r, e.target.value)} />
+                    {r.pattern === 'DIAGONAL_STRIPES' && (
+                      <input
+                        type="color"
+                        value={r.secondaryColor ?? '#FFFFFF'}
+                        title="Second stripe color"
+                        onChange={(e) => updateSecondaryColor(r, e.target.value)}
+                      />
+                    )}
+                  </td>
+                  <td>
+                    <select value={r.pattern} onChange={(e) => updatePattern(r, e.target.value as LocationColorPattern)}>
+                      <option value="SOLID">Solid</option>
+                      <option value="DIAGONAL_STRIPES">Diagonal stripes</option>
+                    </select>
+                  </td>
+                  <td>
+                    <span
+                      style={{
+                        display: 'inline-block',
+                        padding: '0.25rem 0.75rem',
+                        borderRadius: 4,
+                        background: swatchBackground(r),
+                        color: contrastingText(r.color),
+                        fontWeight: 600,
+                      }}
+                    >
+                      {r.location}
+                    </span>
+                  </td>
+                  <td>
+                    <button type="button" className="secondary" onClick={() => remove(r.id)}>
+                      Delete
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
         </fieldset>
       )}
       {rules.length === 0 && <p className="muted">No overrides yet for this job.</p>}

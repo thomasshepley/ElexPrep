@@ -211,8 +211,10 @@ crewPortalRouter.get('/me/jobs', requireRole('CREW'), async (req, res) => {
         jobName: a.job.name,
         venue: a.job.venue,
         role: a.role,
-        startsAt: opp?.startsAt ?? null,
-        endsAt: opp?.endsAt ?? null,
+        // The job's own dates override the opportunity's (see Job Settings), same as the
+        // crew job page below.
+        startsAt: a.job.startsAt ?? opp?.startsAt ?? null,
+        endsAt: a.job.endsAt ?? opp?.endsAt ?? null,
         // The full crew roster for this job (not just the caller), so the crew schedule
         // calendar can show per-crew swatches for everyone working the same day.
         crew: a.job.crewAssignments.map((ca) => ({

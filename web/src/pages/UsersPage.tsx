@@ -135,63 +135,65 @@ export default function UsersPage() {
         {error && <p className="error">{error}</p>}
       </div>
 
-      <table>
-        <thead>
-          <tr>
-            <th>Username</th>
-            <th>Display name</th>
-            <th>Role</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {users.map((u) => (
-            <Fragment key={u.id}>
-              <tr>
-                <td>
-                  <div className="row" style={{ gap: '0.4rem', alignItems: 'center' }}>
-                    <Avatar userId={u.id} displayName={u.displayName} hasAvatar={Boolean(u.avatarPath)} size={24} />
-                    {u.username}
-                    {u.id === me?.id && <span className="muted"> (you)</span>}
-                  </div>
-                </td>
-                <td>{u.displayName}</td>
-                <td>
-                  <select value={u.role} onChange={(e) => changeRole(u, e.target.value as Role)}>
-                    {ROLES.map((r) => (
-                      <option key={r} value={r}>
-                        {r}
-                      </option>
-                    ))}
-                  </select>
-                </td>
-                <td className="row">
-                  {u.role === 'USER' && (
-                    <button className="secondary" onClick={() => setExpandedId(expandedId === u.id ? null : u.id)}>
-                      Permissions
-                    </button>
-                  )}
-                  <button className="secondary" onClick={() => resetPassword(u)}>
-                    Reset password
-                  </button>
-                  {u.id !== me?.id && (
-                    <button className="secondary" onClick={() => remove(u)}>
-                      Delete
-                    </button>
-                  )}
-                </td>
-              </tr>
-              {expandedId === u.id && u.role === 'USER' && (
+      <div className="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Username</th>
+              <th>Display name</th>
+              <th>Role</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {users.map((u) => (
+              <Fragment key={u.id}>
                 <tr>
-                  <td colSpan={4}>
-                    <UserPermissionsPanel userId={u.id} />
+                  <td>
+                    <div className="row" style={{ gap: '0.4rem', alignItems: 'center' }}>
+                      <Avatar userId={u.id} displayName={u.displayName} hasAvatar={Boolean(u.avatarPath)} size={24} />
+                      {u.username}
+                      {u.id === me?.id && <span className="muted"> (you)</span>}
+                    </div>
+                  </td>
+                  <td>{u.displayName}</td>
+                  <td>
+                    <select value={u.role} onChange={(e) => changeRole(u, e.target.value as Role)}>
+                      {ROLES.map((r) => (
+                        <option key={r} value={r}>
+                          {r}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td className="row">
+                    {u.role === 'USER' && (
+                      <button className="secondary" onClick={() => setExpandedId(expandedId === u.id ? null : u.id)}>
+                        Permissions
+                      </button>
+                    )}
+                    <button className="secondary" onClick={() => resetPassword(u)}>
+                      Reset password
+                    </button>
+                    {u.id !== me?.id && (
+                      <button className="secondary" onClick={() => remove(u)}>
+                        Delete
+                      </button>
+                    )}
                   </td>
                 </tr>
-              )}
-            </Fragment>
-          ))}
-        </tbody>
-      </table>
+                {expandedId === u.id && u.role === 'USER' && (
+                  <tr>
+                    <td colSpan={4}>
+                      <UserPermissionsPanel userId={u.id} />
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -260,23 +262,25 @@ function UserPermissionsPanel({ userId }: { userId: string }) {
       {error && <p className="error">{error}</p>}
       {!permissions && <p className="muted">Loading…</p>}
       {permissions && (
-        <table>
-          <tbody>
-            {keys.map((key) => (
-              <tr key={key}>
-                <td>{labels[key] ?? key}</td>
-                <td style={{ textAlign: 'right' }}>
-                  <label className="switch">
-                    <input type="checkbox" checked={permissions[key]} onChange={(e) => toggle(key, e.target.checked)} />
-                    <span className="switch-track" />
-                    {permissions[key] ? 'Allowed' : 'Not allowed'}
-                    {override?.[key] !== undefined && <span className="chip chip-role">Overridden</span>}
-                  </label>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div className="table-scroll">
+          <table>
+            <tbody>
+              {keys.map((key) => (
+                <tr key={key}>
+                  <td>{labels[key] ?? key}</td>
+                  <td style={{ textAlign: 'right' }}>
+                    <label className="switch">
+                      <input type="checkbox" checked={permissions[key]} onChange={(e) => toggle(key, e.target.checked)} />
+                      <span className="switch-track" />
+                      {permissions[key] ? 'Allowed' : 'Not allowed'}
+                      {override?.[key] !== undefined && <span className="chip chip-role">Overridden</span>}
+                    </label>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );
@@ -311,26 +315,28 @@ function RoleBaselinePanel() {
     <div style={{ paddingTop: '0.5rem' }}>
       {!permissions && <p className="muted">Loading…</p>}
       {permissions && (
-        <table>
-          <tbody>
-            {keys.map((key) => (
-              <tr key={key}>
-                <td>{labels[key] ?? key}</td>
-                <td style={{ textAlign: 'right' }}>
-                  <label className="switch">
-                    <input
-                      type="checkbox"
-                      checked={permissions[key]}
-                      onChange={(e) => toggle(key, e.target.checked)}
-                    />
-                    <span className="switch-track" />
-                    {permissions[key] ? 'Allowed' : 'Not allowed'}
-                  </label>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div className="table-scroll">
+          <table>
+            <tbody>
+              {keys.map((key) => (
+                <tr key={key}>
+                  <td>{labels[key] ?? key}</td>
+                  <td style={{ textAlign: 'right' }}>
+                    <label className="switch">
+                      <input
+                        type="checkbox"
+                        checked={permissions[key]}
+                        onChange={(e) => toggle(key, e.target.checked)}
+                      />
+                      <span className="switch-track" />
+                      {permissions[key] ? 'Allowed' : 'Not allowed'}
+                    </label>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
       {saved && <p className="muted">Saved ✓</p>}
     </div>

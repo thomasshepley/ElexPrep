@@ -155,38 +155,40 @@ export default function PrinterSettingsPage() {
 
       <div className="panel">
         <h3>Trays</h3>
-        <table>
-          <thead>
-            <tr>
-              <th>Tray</th>
-              <th>Display name</th>
-              <th>PJL value (direct mode)</th>
-              <th>Agent bin (SumatraPDF)</th>
-            </tr>
-          </thead>
-          <tbody>
-            {TRAY_KEYS.map((key) => (
-              <tr key={key}>
-                <td>{key}</td>
-                {(['label', 'pjl', 'bin'] as const).map((field) => (
-                  <td key={field}>
-                    <input
-                      value={settings.trays[key][field]}
-                      onChange={(e) =>
-                        update({
-                          trays: {
-                            ...settings.trays,
-                            [key]: { ...settings.trays[key], [field]: e.target.value },
-                          },
-                        })
-                      }
-                    />
-                  </td>
-                ))}
+        <div className="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Tray</th>
+                <th>Display name</th>
+                <th>PJL value (direct mode)</th>
+                <th>Agent bin (SumatraPDF)</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {TRAY_KEYS.map((key) => (
+                <tr key={key}>
+                  <td>{key}</td>
+                  {(['label', 'pjl', 'bin'] as const).map((field) => (
+                    <td key={field}>
+                      <input
+                        value={settings.trays[key][field]}
+                        onChange={(e) =>
+                          update({
+                            trays: {
+                              ...settings.trays,
+                              [key]: { ...settings.trays[key], [field]: e.target.value },
+                            },
+                          })
+                        }
+                      />
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
         <p className="muted">
           PJL values are typically TRAY1 / TRAY2 / MANUALFEED on the bizhub/ineo family; confirm by
           capturing a driver print job if the wrong tray fires. Agent bin names come from
@@ -196,29 +198,31 @@ export default function PrinterSettingsPage() {
 
       <div className="panel">
         <h3>Label type → tray</h3>
-        <table style={{ maxWidth: 480 }}>
-          <tbody>
-            {LABEL_TYPES.map((t) => (
-              <tr key={t}>
-                <td>{t}</td>
-                <td>
-                  <select
-                    value={settings.typeToTray[t] ?? 'BYPASS'}
-                    onChange={(e) =>
-                      update({ typeToTray: { ...settings.typeToTray, [t]: e.target.value as TrayKey } })
-                    }
-                  >
-                    {TRAY_KEYS.map((k) => (
-                      <option key={k} value={k}>
-                        {settings.trays[k].label}
-                      </option>
-                    ))}
-                  </select>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div className="table-scroll">
+          <table style={{ maxWidth: 480 }}>
+            <tbody>
+              {LABEL_TYPES.map((t) => (
+                <tr key={t}>
+                  <td>{t}</td>
+                  <td>
+                    <select
+                      value={settings.typeToTray[t] ?? 'BYPASS'}
+                      onChange={(e) =>
+                        update({ typeToTray: { ...settings.typeToTray, [t]: e.target.value as TrayKey } })
+                      }
+                    >
+                      {TRAY_KEYS.map((k) => (
+                        <option key={k} value={k}>
+                          {settings.trays[k].label}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <button onClick={save} disabled={busy}>

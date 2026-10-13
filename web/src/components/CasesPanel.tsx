@@ -135,52 +135,54 @@ export default function CasesPanel({ jobId, groupId = null }: { jobId: string; g
               </button>
             </div>
           )}
-          <table>
-            <thead>
-              <tr>
-                <th>
-                  <input
-                    type="checkbox"
-                    checked={selected.size === stageCases.length && stageCases.length > 0}
-                    onChange={toggleSelectAll}
-                  />
-                </th>
-                <th>Fixture type</th>
-                <th>Case label</th>
-                <th>Location</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {stageCases.map((c) => (
-                <tr key={c.id}>
-                  <td>
-                    <input type="checkbox" checked={selected.has(c.id)} onChange={() => toggleSelected(c.id)} />
-                  </td>
-                  <td>
+          <div className="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>
                     <input
-                      defaultValue={c.fixtureType}
-                      onBlur={(e) => updateField(c, 'fixtureType', e.target.value)}
+                      type="checkbox"
+                      checked={selected.size === stageCases.length && stageCases.length > 0}
+                      onChange={toggleSelectAll}
                     />
-                  </td>
-                  <td>
-                    <input defaultValue={c.label} onBlur={(e) => updateField(c, 'label', e.target.value)} />
-                  </td>
-                  <td>
-                    <input
-                      defaultValue={c.location ?? ''}
-                      onBlur={(e) => updateField(c, 'location', e.target.value)}
-                    />
-                  </td>
-                  <td>
-                    <button className="secondary" onClick={() => remove(c.id)}>
-                      Delete
-                    </button>
-                  </td>
+                  </th>
+                  <th>Fixture type</th>
+                  <th>Case label</th>
+                  <th>Location</th>
+                  <th></th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {stageCases.map((c) => (
+                  <tr key={c.id}>
+                    <td>
+                      <input type="checkbox" checked={selected.has(c.id)} onChange={() => toggleSelected(c.id)} />
+                    </td>
+                    <td>
+                      <input
+                        defaultValue={c.fixtureType}
+                        onBlur={(e) => updateField(c, 'fixtureType', e.target.value)}
+                      />
+                    </td>
+                    <td>
+                      <input defaultValue={c.label} onBlur={(e) => updateField(c, 'label', e.target.value)} />
+                    </td>
+                    <td>
+                      <input
+                        defaultValue={c.location ?? ''}
+                        onBlur={(e) => updateField(c, 'location', e.target.value)}
+                      />
+                    </td>
+                    <td>
+                      <button className="secondary" onClick={() => remove(c.id)}>
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </>
       )}
 

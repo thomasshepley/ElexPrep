@@ -1,27 +1,75 @@
 import { useEffect, useState } from 'react';
 import type { PickListDiff } from '@elexprep/shared';
 import { api, type CaseGroup, type CurrentRmsPickItem, type Job } from '../api/client';
+import { formatDate, formatTime } from '../utils/format';
 
 const DATA_REFRESH_MS = 60_000;
 const DIFF_POLL_MS = 20_000;
+const STORED_JOB_KEY = 'elex-signage-job';
+
+function readStoredJobId(): string | null {
+  try {
+    return localStorage.getItem(STORED_JOB_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function storeJobId(id: string | null) {
+  try {
+    if (id) localStorage.setItem(STORED_JOB_KEY, id);
+    else localStorage.removeItem(STORED_JOB_KEY);
+  } catch {
+    // A locked-down kiosk browser may block storage - the screen still works, it just asks again.
+  }
+}
+
+function useClock() {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 15_000);
+    return () => clearInterval(t);
+  }, []);
+  return now;
+}
 
 /**
- * Chromeless fullscreen view for prep-bay TV screens: pick a job once, then it shows either
- * that job's Current RMS pick list (if linked) or the locally-generated case list (if not),
- * refreshing itself. Works with the read-only SIGNAGE role - the one exception is ticking an
- * item's prepped checkbox, which is explicitly allowlisted since prep is the whole point here.
+ * Chromeless fullscreen view for prep-bay TV screens: shows a job's Current RMS pick list (if
+ * linked and reachable) or its locally-generated case list, refreshing itself. The chosen job is
+ * remembered so a TV reboot comes straight back to it; on first boot it picks the next job by date.
+ * Works with the read-only SIGNAGE role - the one exception is ticking an item's prepped checkbox,
+ * which is explicitly allowlisted since prep is the whole point here.
  */
 export default function SignagePage() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [job, setJob] = useState<Job | null>(null);
+  const [choosing, setChoosing] = useState(false);
   const [cases, setCases] = useState<CaseGroup[]>([]);
   const [pickItems, setPickItems] = useState<CurrentRmsPickItem[] | null>(null);
   const [pickListError, setPickListError] = useState<string | null>(null);
   const [diff, setDiff] = useState<PickListDiff | null>(null);
   const [logoOk, setLogoOk] = useState(true);
+  const [refreshedAt, setRefreshedAt] = useState<Date | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const now = useClock();
 
   useEffect(() => {
-    api.jobs.list().then(setJobs);
+    Promise.all([api.jobs.list(), api.dashboard.get().catch(() => ({ orders: [] }))])
+      .then(([list, dashboard]) => {
+        setJobs(list);
+        const stored = readStoredJobId();
+        const remembered = stored ? list.find((j) => j.id === stored) : undefined;
+        if (remembered) return setJob(remembered);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const next = dashboard.orders
+          .filter((o) => o.startsAt && new Date(o.endsAt ?? o.startsAt) >= today)
+          .sort((a, b) => new Date(a.startsAt!).getTime() - new Date(b.startsAt!).getTime())[0];
+        const pick = next ? list.find((j) => j.id === next.jobId) : list.length === 1 ? list[0] : undefined;
+        if (pick) setJob(pick);
+        else setChoosing(true);
+      })
+      .catch((e) => setLoadError((e as Error).message));
   }, []);
 
   const linked = Boolean(job?.currentRmsOpportunityId);
@@ -29,17 +77,25 @@ export default function SignagePage() {
   useEffect(() => {
     if (!job) return;
     const load = () => {
-      api.jobs.get(job.id).then(setJob);
+      api.jobs.get(job.id).then(setJob).catch(() => {});
+      // The case list is always loaded so it can stand in if the pick list can't be reached
+      // (integration off, RMS down) instead of the screen going dark.
+      api.cases
+        .list(job.id)
+        .then((c) => {
+          setCases(c);
+          setRefreshedAt(new Date());
+        })
+        .catch(() => {});
       if (job.currentRmsOpportunityId) {
         api.jobCurrentRms
           .pickList(job.id)
           .then((res) => {
             setPickItems(res.items);
             setPickListError(null);
+            setRefreshedAt(new Date());
           })
-          .catch((e) => setPickListError(e.message));
-      } else {
-        api.cases.list(job.id).then(setCases);
+          .catch((e) => setPickListError((e as Error).message));
       }
     };
     load();
@@ -53,13 +109,25 @@ export default function SignagePage() {
   useEffect(() => {
     if (!job || !linked) return;
     const check = () =>
-      api.jobCurrentRms.itemsDiff(job.id).then((res) => {
-        if (res.diff) setDiff(res.diff);
-      });
+      api.jobCurrentRms
+        .itemsDiff(job.id)
+        .then((res) => {
+          if (res.diff) setDiff(res.diff);
+        })
+        .catch(() => {});
     check();
     const t = setInterval(check, DIFF_POLL_MS);
     return () => clearInterval(t);
   }, [job?.id, linked]);
+
+  const choose = (j: Job | null) => {
+    storeJobId(j?.id ?? null);
+    setPickItems(null);
+    setPickListError(null);
+    setCases([]);
+    setJob(j);
+    setChoosing(!j);
+  };
 
   const togglePrepped = async (item: CurrentRmsPickItem) => {
     if (!job) return;
@@ -78,22 +146,25 @@ export default function SignagePage() {
 
   if (!job) {
     return (
-      <div style={{ display: 'grid', placeItems: 'center', minHeight: '100vh' }}>
+      <div className="signage-chooser">
         <div className="panel" style={{ width: 420 }}>
           <h2>Prep display</h2>
-          <p className="muted">Choose the job this screen should show.</p>
-          {jobs.map((j) => (
-            <button
-              key={j.id}
-              className="secondary"
-              style={{ display: 'block', width: '100%', marginBottom: 8, textAlign: 'left' }}
-              onClick={() => setJob(j)}
-            >
-              {j.name}
-              {j.venue ? ` - ${j.venue}` : ''}
-            </button>
-          ))}
-          {jobs.length === 0 && <p className="muted">No jobs found.</p>}
+          {loadError ? (
+            <p className="error">Could not load jobs: {loadError}</p>
+          ) : !choosing ? (
+            <p className="muted">Loading…</p>
+          ) : (
+            <>
+              <p className="muted">Choose the job this screen should show. It will be remembered on this screen.</p>
+              {jobs.map((j) => (
+                <button key={j.id} className="secondary signage-chooser-option" onClick={() => choose(j)}>
+                  {j.name}
+                  {j.venue ? ` - ${j.venue}` : ''}
+                </button>
+              ))}
+              {jobs.length === 0 && <p className="muted">No jobs found.</p>}
+            </>
+          )}
         </div>
       </div>
     );
@@ -104,42 +175,47 @@ export default function SignagePage() {
     if (!byType.has(c.fixtureType)) byType.set(c.fixtureType, []);
     byType.get(c.fixtureType)!.push(c);
   }
+  const showPickList = linked && !pickListError;
 
   return (
-    <div style={{ padding: '2rem 3rem', minHeight: '100vh' }}>
+    <div className="signage">
       {diff && <ItemsDiffOverlay diff={diff} onDismiss={dismissDiff} />}
 
-      <header style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', marginBottom: '1.5rem' }}>
-        {job.logoPath && logoOk && (
-          <img
-            src={api.jobs.logoUrl(job.id)}
-            alt=""
-            style={{ maxHeight: 90 }}
-            onError={() => setLogoOk(false)}
-          />
-        )}
+      <header className="signage-header">
+        {job.logoPath && logoOk && <img src={api.jobs.logoUrl(job.id)} alt="" className="signage-logo" onError={() => setLogoOk(false)} />}
         <div>
-          <h1 style={{ fontSize: '2.6rem', margin: 0 }}>{job.name}</h1>
-          {job.venue && <p className="muted" style={{ fontSize: '1.3rem', margin: 0 }}>{job.venue}</p>}
+          <h1 className="signage-title">{job.name}</h1>
+          {job.venue && <p className="muted signage-venue">{job.venue}</p>}
         </div>
-        <button className="secondary" style={{ marginLeft: 'auto' }} onClick={() => setJob(null)}>
+        <div className="signage-meta">
+          <div className="signage-clock">{formatTime(now)}</div>
+          <div className="muted">{formatDate(now)}</div>
+          {refreshedAt && <div className="muted signage-refreshed">Updated {formatTime(refreshedAt)}</div>}
+        </div>
+        <button className="secondary" onClick={() => choose(null)}>
           Change job
         </button>
       </header>
 
-      {linked ? (
-        <PickListView items={pickItems} error={pickListError} onToggle={togglePrepped} />
+      {linked && pickListError && (
+        <p className="muted signage-fallback-note">
+          The Current RMS pick list isn't available right now ({pickListError}) - showing this job's case list instead.
+        </p>
+      )}
+
+      {showPickList ? (
+        <PickListView items={pickItems} onToggle={togglePrepped} />
       ) : (
         <>
-          {cases.length === 0 && <p className="muted" style={{ fontSize: '1.4rem' }}>No cases generated for this job yet.</p>}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1rem' }}>
+          {cases.length === 0 && <p className="muted signage-empty">No cases generated for this job yet.</p>}
+          <div className="signage-case-grid">
             {[...byType.entries()].map(([type, groups]) => (
               <div key={type} className="panel" style={{ marginBottom: 0 }}>
-                <h2 style={{ fontSize: '1.6rem' }}>{type}</h2>
+                <h2 className="signage-case-type">{type}</h2>
                 {groups.map((g) => (
-                  <div key={g.id} style={{ fontSize: '1.5rem', padding: '0.25rem 0' }}>
+                  <div key={g.id} className="signage-case-row">
                     <strong>{g.label}</strong>
-                    {g.location && <span className="muted" style={{ fontSize: '1.1rem' }}> - {g.location}</span>}
+                    {g.location && <span className="muted"> - {g.location}</span>}
                   </div>
                 ))}
               </div>
@@ -151,16 +227,7 @@ export default function SignagePage() {
   );
 }
 
-function PickListView({
-  items,
-  error,
-  onToggle,
-}: {
-  items: CurrentRmsPickItem[] | null;
-  error: string | null;
-  onToggle: (item: CurrentRmsPickItem) => void;
-}) {
-  if (error) return <p className="error" style={{ fontSize: '1.3rem' }}>Could not load pick list: {error}</p>;
+function PickListView({ items, onToggle }: { items: CurrentRmsPickItem[] | null; onToggle: (item: CurrentRmsPickItem) => void }) {
   if (!items) return <p className="muted" style={{ fontSize: '1.4rem' }}>Loading pick list…</p>;
   if (items.length === 0) return <p className="muted" style={{ fontSize: '1.4rem' }}>No items on this opportunity yet.</p>;
 
@@ -171,9 +238,14 @@ function PickListView({
 
   return (
     <div>
-      <p className="muted" style={{ fontSize: '1.2rem', marginBottom: '1rem' }}>
-        {preppedCount} / {pickable.length} prepped - tap a row as you pull it
-      </p>
+      <div className="signage-progress" aria-label={`${preppedCount} of ${pickable.length} prepped`}>
+        <div className="signage-progress-bar">
+          <div className="signage-progress-fill" style={{ width: `${pickable.length ? (preppedCount / pickable.length) * 100 : 0}%` }} />
+        </div>
+        <span>
+          {preppedCount} / {pickable.length} prepped - tap a row as you pull it
+        </span>
+      </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
         {items.map((item) => {
           const name = item.name || item.product_name || item.description || `Item #${item.id}`;

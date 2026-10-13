@@ -69,36 +69,38 @@ export default function ActivityLogPage() {
         </div>
       </div>
 
-      <table>
-        <thead>
-          <tr>
-            <th>When</th>
-            <th>Who</th>
-            <th>Job</th>
-            <th>Action</th>
-            <th>Detail</th>
-            <th>IP</th>
-          </tr>
-        </thead>
-        <tbody>
-          {filtered.map((e) => (
-            <tr key={e.id}>
-              <td className="muted">{new Date(e.createdAt).toLocaleString()}</td>
-              <td>{e.userName ?? <span className="muted">system</span>}</td>
-              <td>
-                {e.jobId && e.jobName ? (
-                  <Link to={`/jobs/${e.jobId}`}>{e.jobName}</Link>
-                ) : (
-                  <span className="muted">-</span>
-                )}
-              </td>
-              <td>{prettifyAction(e.action)}</td>
-              <td>{e.detail}</td>
-              <td className="muted" title={e.userAgent ?? undefined}>{e.ipAddress ?? '-'}</td>
+      <div className="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>When</th>
+              <th>Who</th>
+              <th>Job</th>
+              <th>Action</th>
+              <th>Detail</th>
+              <th>IP</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {filtered.map((e) => (
+              <tr key={e.id}>
+                <td className="muted">{new Date(e.createdAt).toLocaleString()}</td>
+                <td>{e.userName ?? <span className="muted">system</span>}</td>
+                <td>
+                  {e.jobId && e.jobName ? (
+                    <Link to={`/jobs/${e.jobId}`}>{e.jobName}</Link>
+                  ) : (
+                    <span className="muted">-</span>
+                  )}
+                </td>
+                <td>{prettifyAction(e.action)}</td>
+                <td>{e.detail}</td>
+                <td className="muted" title={e.userAgent ?? undefined}>{e.ipAddress ?? '-'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
       {filtered.length === 0 && <p className="muted">No matching activity.</p>}
     </div>
   );

@@ -309,41 +309,43 @@ function OnboardOpportunitiesPanel({ existingOppIds, onOnboarded }: { existingOp
       )}
 
       {unOnboarded.length > 0 && (
-        <table>
-          <thead>
-            <tr>
-              <th></th>
-              <th>Subject</th>
-              <th>Customer</th>
-              <th>Status</th>
-              <th>Dates</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {unOnboarded.map((o) => (
-              <tr key={o.id}>
-                <td>
-                  <input type="checkbox" checked={selected.has(o.rmsId)} onChange={() => toggle(o.rmsId)} />
-                </td>
-                <td>{o.subject}</td>
-                <td>{o.memberName}</td>
-                <td className="row" style={{ gap: '0.4rem' }}>
-                  <OpportunityKindChip kind={o.kind} /> <span className="muted">{o.status}</span>
-                </td>
-                <td className="muted">
-                  {o.startsAt ? new Date(o.startsAt).toLocaleDateString() : ''}
-                  {o.endsAt ? ` – ${new Date(o.endsAt).toLocaleDateString()}` : ''}
-                </td>
-                <td>
-                  <button type="button" className="secondary" onClick={() => setPendingSingle(o)}>
-                    Onboard
-                  </button>
-                </td>
+        <div className="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th></th>
+                <th>Subject</th>
+                <th>Customer</th>
+                <th>Status</th>
+                <th>Dates</th>
+                <th></th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {unOnboarded.map((o) => (
+                <tr key={o.id}>
+                  <td>
+                    <input type="checkbox" checked={selected.has(o.rmsId)} onChange={() => toggle(o.rmsId)} />
+                  </td>
+                  <td>{o.subject}</td>
+                  <td>{o.memberName}</td>
+                  <td className="row" style={{ gap: '0.4rem' }}>
+                    <OpportunityKindChip kind={o.kind} /> <span className="muted">{o.status}</span>
+                  </td>
+                  <td className="muted">
+                    {o.startsAt ? new Date(o.startsAt).toLocaleDateString() : ''}
+                    {o.endsAt ? ` – ${new Date(o.endsAt).toLocaleDateString()}` : ''}
+                  </td>
+                  <td>
+                    <button type="button" className="secondary" onClick={() => setPendingSingle(o)}>
+                      Onboard
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );

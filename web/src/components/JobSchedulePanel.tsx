@@ -301,32 +301,34 @@ export default function JobSchedulePanel({ jobId }: { jobId: string }) {
                   onUnassignCrew={unassignTaskCrew}
                 />
               </div>
-              <table>
-                <thead>
-                  <tr>
-                    <th>Title</th>
-                    <th>Starts</th>
-                    <th>Ends</th>
-                    <th>Notes</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {itemsForSelectedDate.map((i) => (
-                    <tr key={i.id}>
-                      <td>{i.title}</td>
-                      <td>{new Date(i.startsAt).toLocaleString(undefined, { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</td>
-                      <td>{i.endsAt ? new Date(i.endsAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) : '-'}</td>
-                      <td className="muted">{i.notes ?? '-'}</td>
-                      <td>
-                        <button className="secondary" onClick={() => remove(i.id)}>
-                          Remove
-                        </button>
-                      </td>
+              <div className="table-scroll">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Title</th>
+                      <th>Starts</th>
+                      <th>Ends</th>
+                      <th>Notes</th>
+                      <th></th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {itemsForSelectedDate.map((i) => (
+                      <tr key={i.id}>
+                        <td>{i.title}</td>
+                        <td>{new Date(i.startsAt).toLocaleString(undefined, { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</td>
+                        <td>{i.endsAt ? new Date(i.endsAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) : '-'}</td>
+                        <td className="muted">{i.notes ?? '-'}</td>
+                        <td>
+                          <button className="secondary" onClick={() => remove(i.id)}>
+                            Remove
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </>
           ) : (
             <p className="muted">

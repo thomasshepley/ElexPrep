@@ -134,39 +134,41 @@ export default function StagesManager({
       {error && <p className="error">{error}</p>}
 
       {groups.length > 0 && (
-        <table style={{ marginBottom: '1rem' }}>
-          <thead>
-            <tr>
-              <th>Stage</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {groups.map((g) => (
-              <tr key={g.id}>
-                <td>
-                  <input
-                    value={renaming[g.id] ?? g.name}
-                    onChange={(e) => setRenaming((r) => ({ ...r, [g.id]: e.target.value }))}
-                    onBlur={() => renaming[g.id] !== undefined && renaming[g.id] !== g.name && rename(g.id)}
-                    style={{ width: 200 }}
-                  />
-                  {g.rmsGroupName && <span className="muted" style={{ marginLeft: '0.5rem' }}>from Current RMS</span>}
-                </td>
-                <td className="row">
-                  {g.rmsGroupName && (
-                    <button className="secondary" disabled={busy} onClick={() => rematch(g)}>
-                      Re-match from RMS
-                    </button>
-                  )}
-                  <button className="secondary" disabled={busy} onClick={() => remove(g)}>
-                    Delete
-                  </button>
-                </td>
+        <div className="table-scroll">
+          <table style={{ marginBottom: '1rem' }}>
+            <thead>
+              <tr>
+                <th>Stage</th>
+                <th></th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {groups.map((g) => (
+                <tr key={g.id}>
+                  <td>
+                    <input
+                      value={renaming[g.id] ?? g.name}
+                      onChange={(e) => setRenaming((r) => ({ ...r, [g.id]: e.target.value }))}
+                      onBlur={() => renaming[g.id] !== undefined && renaming[g.id] !== g.name && rename(g.id)}
+                      style={{ width: 200 }}
+                    />
+                    {g.rmsGroupName && <span className="muted" style={{ marginLeft: '0.5rem' }}>from Current RMS</span>}
+                  </td>
+                  <td className="row">
+                    {g.rmsGroupName && (
+                      <button className="secondary" disabled={busy} onClick={() => rematch(g)}>
+                        Re-match from RMS
+                      </button>
+                    )}
+                    <button className="secondary" disabled={busy} onClick={() => remove(g)}>
+                      Delete
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
 
       <h4>Add a custom stage</h4>

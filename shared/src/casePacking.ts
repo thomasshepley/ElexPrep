@@ -4,8 +4,8 @@ import { CaseGroup, FixtureTypeRule, RawFixtureInput } from './types';
  * Formats the address list for a single case, matching the conventions seen in Elex's
  * existing PAL labels: pairs join with "+" ("201 + 202"), any run of 3+ real addresses
  * (whether it's a full case or the real portion of a partial one) collapses to a range
- * ("401 - 403"), and a case left short of a full group fills the missing slot(s) with
- * "Spare" ("303 + Spare", "401 - 404 + Spare").
+ * ("401 - 403"), and a case left short of a full group counts its empty slots instead of
+ * listing each one ("303 + Spare", "513 - 514 + 4× Spare").
  */
 export function formatCaseLabel(addresses: number[], unitsPerCase: number): string {
   const n = addresses.length;
@@ -15,13 +15,18 @@ export function formatCaseLabel(addresses: number[], unitsPerCase: number): stri
     if (n >= 3) return `${addresses[0]} - ${addresses[n - 1]}`;
     return `${addresses[0]}`;
   }
-  // Leftover/partial case: short by (unitsPerCase - n) slots. The real addresses still
-  // collapse to a range once there are 3+ of them, same as a full case would.
-  const missing = unitsPerCase - n;
+  // Leftover/partial case: the real addresses collapse to a range (two consecutive ones too,
+  // so the label reads as "this run, plus spares"), and the empty slots are counted.
+  const missing = Math.max(unitsPerCase - n, 0);
+  const consecutivePair = n === 2 && addresses[1] === addresses[0] + 1;
   const realPart =
-    n === 1 ? `${addresses[0]}` : n === 2 ? `${addresses[0]} + ${addresses[1]}` : `${addresses[0]} - ${addresses[n - 1]}`;
-  const spareParts = Array(Math.max(missing, 0)).fill('Spare');
-  return [realPart, ...spareParts].join(' + ');
+    n === 1
+      ? `${addresses[0]}`
+      : n === 2 && !consecutivePair
+        ? `${addresses[0]} + ${addresses[1]}`
+        : `${addresses[0]} - ${addresses[n - 1]}`;
+  if (missing === 0) return realPart;
+  return `${realPart} + ${missing === 1 ? 'Spare' : `${missing}× Spare`}`;
 }
 
 /**

@@ -88,48 +88,50 @@ export default function JobContactsPanel({ jobId }: { jobId: string }) {
       {error && <p className="error">{error}</p>}
 
       {contacts.length > 0 ? (
-        <table style={{ marginTop: '0.75rem' }}>
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Role</th>
-              <th>Phone</th>
-              <th>Email</th>
-              <th>Notes</th>
-              <th></th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {contacts.map((c) => (
-              <tr key={c.id}>
-                <td>
-                  <input defaultValue={c.name} style={{ width: '10rem' }} onBlur={(e) => updateField(c, 'name', e.target.value)} />
-                </td>
-                <td>
-                  <input defaultValue={c.role ?? ''} style={{ width: '9rem' }} onBlur={(e) => updateField(c, 'role', e.target.value)} />
-                </td>
-                <td>
-                  <input defaultValue={c.phone ?? ''} style={{ width: '8rem' }} onBlur={(e) => updateField(c, 'phone', e.target.value)} />
-                </td>
-                <td>
-                  <input defaultValue={c.email ?? ''} style={{ width: '10rem' }} onBlur={(e) => updateField(c, 'email', e.target.value)} />
-                </td>
-                <td>
-                  <input defaultValue={c.notes ?? ''} style={{ width: '11rem' }} onBlur={(e) => updateField(c, 'notes', e.target.value)} />
-                </td>
-                <td>
-                  <WhatsAppButton phone={c.phone} label="WhatsApp" />
-                </td>
-                <td>
-                  <button type="button" className="secondary" onClick={() => remove(c)}>
-                    Remove
-                  </button>
-                </td>
+        <div className="table-scroll">
+          <table style={{ marginTop: '0.75rem' }}>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Role</th>
+                <th>Phone</th>
+                <th>Email</th>
+                <th>Notes</th>
+                <th></th>
+                <th></th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {contacts.map((c) => (
+                <tr key={c.id}>
+                  <td>
+                    <input defaultValue={c.name} style={{ width: '10rem' }} onBlur={(e) => updateField(c, 'name', e.target.value)} />
+                  </td>
+                  <td>
+                    <input defaultValue={c.role ?? ''} style={{ width: '9rem' }} onBlur={(e) => updateField(c, 'role', e.target.value)} />
+                  </td>
+                  <td>
+                    <input defaultValue={c.phone ?? ''} style={{ width: '8rem' }} onBlur={(e) => updateField(c, 'phone', e.target.value)} />
+                  </td>
+                  <td>
+                    <input defaultValue={c.email ?? ''} style={{ width: '10rem' }} onBlur={(e) => updateField(c, 'email', e.target.value)} />
+                  </td>
+                  <td>
+                    <input defaultValue={c.notes ?? ''} style={{ width: '11rem' }} onBlur={(e) => updateField(c, 'notes', e.target.value)} />
+                  </td>
+                  <td>
+                    <WhatsAppButton phone={c.phone} label="WhatsApp" />
+                  </td>
+                  <td>
+                    <button type="button" className="secondary" onClick={() => remove(c)}>
+                      Remove
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       ) : (
         <p className="muted">No contacts added yet.</p>
       )}

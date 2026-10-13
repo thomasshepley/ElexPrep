@@ -203,79 +203,83 @@ export default function PrintQueuePanel({ jobId, groupId = null }: { jobId: stri
               Refresh
             </button>
           </div>
-          <table>
-            <thead>
-              <tr>
-                <th>Type</th>
-                <th>Tray</th>
-                <th>Pages</th>
-                <th>Method</th>
-                <th>Status</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {printJobs.map((pj) => (
-                <tr key={pj.id}>
-                  <td>{pj.labelType}</td>
-                  <td>{trayMap[pj.labelType] ?? pj.tray}</td>
-                  <td>{pj.pages}</td>
-                  <td className="muted">{pj.method}</td>
-                  <td>
-                    {pj.status}
-                    {pj.error && <div className="error">{pj.error}</div>}
-                  </td>
-                  <td className="row">
-                    <a href={api.printJobs.pdfUrl(pj.id)} target="_blank" rel="noreferrer">
-                      PDF
-                    </a>
-                    {(pj.status === 'FAILED' || pj.status === 'CANCELLED') && (
-                      <button
-                        className="secondary"
-                        onClick={() => api.printJobs.retry(pj.id).then(refreshPrintJobs)}
-                      >
-                        Retry
-                      </button>
-                    )}
-                    {pj.status === 'QUEUED' && (
-                      <button
-                        className="secondary"
-                        onClick={() => api.printJobs.cancel(pj.id).then(refreshPrintJobs)}
-                      >
-                        Cancel
-                      </button>
-                    )}
-                  </td>
+          <div className="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Type</th>
+                  <th>Tray</th>
+                  <th>Pages</th>
+                  <th>Method</th>
+                  <th>Status</th>
+                  <th></th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {printJobs.map((pj) => (
+                  <tr key={pj.id}>
+                    <td>{pj.labelType}</td>
+                    <td>{trayMap[pj.labelType] ?? pj.tray}</td>
+                    <td>{pj.pages}</td>
+                    <td className="muted">{pj.method}</td>
+                    <td>
+                      {pj.status}
+                      {pj.error && <div className="error">{pj.error}</div>}
+                    </td>
+                    <td className="row">
+                      <a href={api.printJobs.pdfUrl(pj.id)} target="_blank" rel="noreferrer">
+                        PDF
+                      </a>
+                      {(pj.status === 'FAILED' || pj.status === 'CANCELLED') && (
+                        <button
+                          className="secondary"
+                          onClick={() => api.printJobs.retry(pj.id).then(refreshPrintJobs)}
+                        >
+                          Retry
+                        </button>
+                      )}
+                      {pj.status === 'QUEUED' && (
+                        <button
+                          className="secondary"
+                          onClick={() => api.printJobs.cancel(pj.id).then(refreshPrintJobs)}
+                        >
+                          Cancel
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
       {confirmedOrPrinted.length > 0 && (
         <div className="panel">
           <h3>Previously confirmed / printed</h3>
-          <table>
-            <thead>
-              <tr>
-                <th>Type</th>
-                <th>Content</th>
-                <th>Qty</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {confirmedOrPrinted.map((item) => (
-                <tr key={item.id}>
-                  <td>{item.labelType}</td>
-                  <td>{summarize(item.labelType, item.content)}</td>
-                  <td>{item.quantity}</td>
-                  <td className="muted">{item.status}</td>
+          <div className="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Type</th>
+                  <th>Content</th>
+                  <th>Qty</th>
+                  <th>Status</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {confirmedOrPrinted.map((item) => (
+                  <tr key={item.id}>
+                    <td>{item.labelType}</td>
+                    <td>{summarize(item.labelType, item.content)}</td>
+                    <td>{item.quantity}</td>
+                    <td className="muted">{item.status}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>

@@ -75,46 +75,48 @@ export default function FixtureTypeRulesPage() {
         {error && <p className="error">{error}</p>}
       </div>
 
-      <table>
-        <thead>
-          <tr>
-            <th>Fixture type</th>
-            <th>Units per case</th>
-            <th>Case label override</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {rules.map((r) => (
-            <tr key={r.id}>
-              <td>
-                <input defaultValue={r.name} onBlur={(e) => update(r, 'name', e.target.value)} />
-              </td>
-              <td>
-                <input
-                  type="number"
-                  min={1}
-                  defaultValue={r.unitsPerCase}
-                  style={{ width: 70 }}
-                  onBlur={(e) => update(r, 'unitsPerCase', Number(e.target.value))}
-                />
-              </td>
-              <td>
-                <input
-                  placeholder="(uses fixture type)"
-                  defaultValue={r.caseLabelOverride ?? ''}
-                  onBlur={(e) => update(r, 'caseLabelOverride', e.target.value)}
-                />
-              </td>
-              <td>
-                <button type="button" className="secondary" onClick={() => remove(r.id)}>
-                  Delete
-                </button>
-              </td>
+      <div className="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Fixture type</th>
+              <th>Units per case</th>
+              <th>Case label override</th>
+              <th></th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {rules.map((r) => (
+              <tr key={r.id}>
+                <td>
+                  <input defaultValue={r.name} onBlur={(e) => update(r, 'name', e.target.value)} />
+                </td>
+                <td>
+                  <input
+                    type="number"
+                    min={1}
+                    defaultValue={r.unitsPerCase}
+                    style={{ width: 70 }}
+                    onBlur={(e) => update(r, 'unitsPerCase', Number(e.target.value))}
+                  />
+                </td>
+                <td>
+                  <input
+                    placeholder="(uses fixture type)"
+                    defaultValue={r.caseLabelOverride ?? ''}
+                    onBlur={(e) => update(r, 'caseLabelOverride', e.target.value)}
+                  />
+                </td>
+                <td>
+                  <button type="button" className="secondary" onClick={() => remove(r.id)}>
+                    Delete
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
       </PermissionFieldset>
     </div>
   );

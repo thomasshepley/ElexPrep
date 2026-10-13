@@ -260,37 +260,39 @@ export default function CurrentRmsSettingsPage() {
           </p>
         )}
         {opportunities.length > 0 && (
-          <table>
-            <thead>
-              <tr>
-                <th>Subject</th>
-                <th>Customer</th>
-                <th>Status</th>
-                <th>Dates</th>
-                <th>Updated</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {opportunities.map((o) => (
-                <tr key={o.id}>
-                  <td>{o.subject}</td>
-                  <td>{o.memberName}</td>
-                  <td>{o.status}</td>
-                  <td className="muted">
-                    {o.startsAt ? new Date(o.startsAt).toLocaleDateString() : ''}
-                    {o.endsAt ? ` – ${new Date(o.endsAt).toLocaleDateString()}` : ''}
-                  </td>
-                  <td className="muted">{o.rmsUpdatedAt ? new Date(o.rmsUpdatedAt).toLocaleString() : ''}</td>
-                  <td>
-                    <button className="secondary" onClick={() => importOpportunity(o.rmsId)}>
-                      Import as job
-                    </button>
-                  </td>
+          <div className="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Subject</th>
+                  <th>Customer</th>
+                  <th>Status</th>
+                  <th>Dates</th>
+                  <th>Updated</th>
+                  <th></th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {opportunities.map((o) => (
+                  <tr key={o.id}>
+                    <td>{o.subject}</td>
+                    <td>{o.memberName}</td>
+                    <td>{o.status}</td>
+                    <td className="muted">
+                      {o.startsAt ? new Date(o.startsAt).toLocaleDateString() : ''}
+                      {o.endsAt ? ` – ${new Date(o.endsAt).toLocaleDateString()}` : ''}
+                    </td>
+                    <td className="muted">{o.rmsUpdatedAt ? new Date(o.rmsUpdatedAt).toLocaleString() : ''}</td>
+                    <td>
+                      <button className="secondary" onClick={() => importOpportunity(o.rmsId)}>
+                        Import as job
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
     </div>

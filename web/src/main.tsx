@@ -1,46 +1,53 @@
-import { StrictMode } from 'react'
+import { StrictMode, Suspense, lazy } from 'react'
 import { createRoot } from 'react-dom/client'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import './index.css'
 import App from './App.tsx'
 import { AuthProvider } from './auth/AuthContext'
 import { ToastProvider } from './components/Toast'
 import LoginPage from './pages/LoginPage'
-import ApplyPage from './pages/ApplyPage'
-import OnboardPage from './pages/OnboardPage'
-import OnboardCompletePage from './pages/OnboardCompletePage'
-import SignagePage from './pages/SignagePage'
-import CrewLayout from './pages/CrewLayout'
-import CrewSchedulePage from './pages/CrewSchedulePage'
-import CrewJobPage from './pages/CrewJobPage'
-import CrewAccountPage from './pages/CrewAccountPage'
 import DashboardPage from './pages/DashboardPage'
 import JobsListPage from './pages/JobsListPage'
 import JobDetailPage from './pages/JobDetailPage'
-import SettingsLayout from './pages/SettingsLayout'
-import FixtureTypeRulesPage from './pages/FixtureTypeRulesPage'
-import LocationColorsPage from './pages/LocationColorsPage'
-import ImportMappingPage from './pages/ImportMappingPage'
-import UsersPage from './pages/UsersPage'
-import CrewPage from './pages/CrewPage'
-import CrewApplicationsPage from './pages/CrewApplicationsPage'
-import PreferencesPage from './pages/PreferencesPage'
-import PrinterSettingsPage from './pages/PrinterSettingsPage'
-import CurrentRmsSettingsPage from './pages/CurrentRmsSettingsPage'
-import OneDriveSettingsPage from './pages/OneDriveSettingsPage'
-import CrewPortalSettingsPage from './pages/CrewPortalSettingsPage'
-import ActivityLogPage from './pages/ActivityLogPage'
-import OnboardingPage from './pages/OnboardingPage'
-import WebmasterPage from './pages/WebmasterPage'
+import CrewLayout from './pages/CrewLayout'
+import CrewSchedulePage from './pages/CrewSchedulePage'
+import NotFoundPage from './pages/NotFoundPage'
+import ErrorBoundary from './components/ErrorBoundary'
+import { RouteTitle } from './pageTitle'
 import { startActionTracking } from './bugReport/actionTracker'
+
+// Everything off the main staff/crew landing paths loads on demand, so first paint doesn't
+// carry signage, settings, onboarding or the label editor.
+const ApplyPage = lazy(() => import('./pages/ApplyPage'))
+const OnboardPage = lazy(() => import('./pages/OnboardPage'))
+const OnboardCompletePage = lazy(() => import('./pages/OnboardCompletePage'))
+const SignagePage = lazy(() => import('./pages/SignagePage'))
+const CrewJobPage = lazy(() => import('./pages/CrewJobPage'))
+const CrewAccountPage = lazy(() => import('./pages/CrewAccountPage'))
+const SettingsLayout = lazy(() => import('./pages/SettingsLayout'))
+const FixtureTypeRulesPage = lazy(() => import('./pages/FixtureTypeRulesPage'))
+const LocationColorsPage = lazy(() => import('./pages/LocationColorsPage'))
+const ImportMappingPage = lazy(() => import('./pages/ImportMappingPage'))
+const UsersPage = lazy(() => import('./pages/UsersPage'))
+const CrewPage = lazy(() => import('./pages/CrewPage'))
+const CrewApplicationsPage = lazy(() => import('./pages/CrewApplicationsPage'))
+const PreferencesPage = lazy(() => import('./pages/PreferencesPage'))
+const PrinterSettingsPage = lazy(() => import('./pages/PrinterSettingsPage'))
+const CurrentRmsSettingsPage = lazy(() => import('./pages/CurrentRmsSettingsPage'))
+const OneDriveSettingsPage = lazy(() => import('./pages/OneDriveSettingsPage'))
+const CrewPortalSettingsPage = lazy(() => import('./pages/CrewPortalSettingsPage'))
+const ActivityLogPage = lazy(() => import('./pages/ActivityLogPage'))
+const OnboardingPage = lazy(() => import('./pages/OnboardingPage'))
+const WebmasterPage = lazy(() => import('./pages/WebmasterPage'))
 
 startActionTracking()
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <ToastProvider>
-    <AuthProvider>
-      <BrowserRouter>
+function AppRoutes() {
+  const { pathname } = useLocation()
+  return (
+    <ErrorBoundary resetKey={pathname}>
+      <RouteTitle />
+      <Suspense fallback={<p className="muted route-loading">Loading…</p>}>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/apply" element={<ApplyPage />} />
@@ -51,6 +58,7 @@ createRoot(document.getElementById('root')!).render(
             <Route index element={<CrewSchedulePage />} />
             <Route path="jobs/:jobId" element={<CrewJobPage />} />
             <Route path="account" element={<CrewAccountPage />} />
+            <Route path="*" element={<NotFoundPage home="/crew" />} />
           </Route>
           <Route path="/" element={<App />}>
             <Route index element={<DashboardPage />} />
@@ -72,11 +80,24 @@ createRoot(document.getElementById('root')!).render(
               <Route path="crew-portal" element={<CrewPortalSettingsPage />} />
               <Route path="activity" element={<ActivityLogPage />} />
               <Route path="preferences" element={<PreferencesPage />} />
+              <Route path="*" element={<NotFoundPage home="/settings" />} />
             </Route>
+            <Route path="*" element={<NotFoundPage />} />
           </Route>
         </Routes>
-      </BrowserRouter>
-    </AuthProvider>
+      </Suspense>
+    </ErrorBoundary>
+  )
+}
+
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <ToastProvider>
+      <AuthProvider>
+        <BrowserRouter>
+          <AppRoutes />
+        </BrowserRouter>
+      </AuthProvider>
     </ToastProvider>
   </StrictMode>,
 )

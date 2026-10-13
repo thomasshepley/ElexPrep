@@ -66,36 +66,38 @@ export default function DashboardPage() {
           <p className="muted">No jobs are linked to a Current RMS order yet.</p>
         )}
         {orders !== null && orders.length > 0 && (
-          <table>
-            <thead>
-              <tr>
-                <th>Job</th>
-                <th>Venue</th>
-                <th>Dates</th>
-                <th>Status</th>
-                <th>Crew</th>
-                <th>Value</th>
-              </tr>
-            </thead>
-            <tbody>
-              {orders.map((o) => (
-                <tr key={o.jobId}>
-                  <td>
-                    <Link to={`/jobs/${o.jobId}`}>{o.jobName}</Link>
-                  </td>
-                  <td>{o.venue ?? '-'}</td>
-                  <td>
-                    <span className={o.startsAt ? 'chip chip-accent' : 'chip chip-neutral'}>
-                      {formatDateRange(o.startsAt, o.endsAt)}
-                    </span>
-                  </td>
-                  <td className="muted">{o.status ?? '-'}</td>
-                  <td>{o.crewCount}</td>
-                  <td>{formatValue(o.value)}</td>
+          <div className="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Job</th>
+                  <th>Venue</th>
+                  <th>Dates</th>
+                  <th>Status</th>
+                  <th>Crew</th>
+                  <th>Value</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {orders.map((o) => (
+                  <tr key={o.jobId}>
+                    <td>
+                      <Link to={`/jobs/${o.jobId}`}>{o.jobName}</Link>
+                    </td>
+                    <td>{o.venue ?? '-'}</td>
+                    <td>
+                      <span className={o.startsAt ? 'chip chip-accent' : 'chip chip-neutral'}>
+                        {formatDateRange(o.startsAt, o.endsAt)}
+                      </span>
+                    </td>
+                    <td className="muted">{o.status ?? '-'}</td>
+                    <td>{o.crewCount}</td>
+                    <td>{formatValue(o.value)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
     </div>
