@@ -126,7 +126,7 @@ export default function CasesPanel({ jobId, groupId = null }: { jobId: string; g
           {selected.size > 0 && (
             <div className="row panel" style={{ background: 'rgba(255,255,255,0.04)', alignItems: 'center', gap: '0.6rem' }}>
               <strong>{selected.size} selected</strong>
-              <input
+              <input aria-label="Set location to"
                 placeholder="Set location to…"
                 value={bulkLocation}
                 onChange={(e) => setBulkLocation(e.target.value)}
@@ -188,9 +188,9 @@ export default function CasesPanel({ jobId, groupId = null }: { jobId: string; g
 
       <h4 style={{ marginTop: '1.25rem' }}>Add a case</h4>
       <form className="row" onSubmit={addCase}>
-        <input placeholder="Fixture type" value={newType} onChange={(e) => setNewType(e.target.value)} />
-        <input placeholder="Case label (e.g. 501 + 502)" value={newLabel} onChange={(e) => setNewLabel(e.target.value)} />
-        <input placeholder="Location (optional)" value={newLocation} onChange={(e) => setNewLocation(e.target.value)} />
+        <input aria-label="Fixture type" placeholder="Fixture type" value={newType} onChange={(e) => setNewType(e.target.value)} />
+        <input aria-label="Case label" placeholder="Case label (e.g. 501 + 502)" value={newLabel} onChange={(e) => setNewLabel(e.target.value)} />
+        <input aria-label="Location" placeholder="Location (optional)" value={newLocation} onChange={(e) => setNewLocation(e.target.value)} />
         <button type="submit">Add case</button>
       </form>
       {error && <p className="error">{error}</p>}

@@ -99,7 +99,7 @@ export default function JobLocationColorsPanel({ jobId }: { jobId: string }) {
       </p>
       {canEdit && (
       <form className="row" onSubmit={create}>
-        <input
+        <input aria-label="Location"
           placeholder="Location (e.g. Cube North)"
           value={location}
           onChange={(e) => setLocation(e.target.value)}

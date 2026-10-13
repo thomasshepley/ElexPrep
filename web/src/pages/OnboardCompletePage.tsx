@@ -66,7 +66,7 @@ export default function OnboardCompletePage() {
         notes: notes || undefined,
         bankDetails: bankDetails || undefined,
       });
-      navigate('/login', { replace: true });
+      navigate('/login', { replace: true, state: { accountCreated: username } });
     } catch (err) {
       setError((err as Error).message);
     } finally {

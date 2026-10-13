@@ -102,7 +102,7 @@ export default function LocationColorsPage() {
       <div className="panel">
         <h3>Add rule</h3>
         <form className="row" onSubmit={create}>
-          <input placeholder="Location (e.g. Downstage)" value={location} onChange={(e) => setLocation(e.target.value)} required />
+          <input aria-label="Location" placeholder="Location (e.g. Downstage)" value={location} onChange={(e) => setLocation(e.target.value)} required />
           {pattern !== 'RAINBOW' && <input type="color" value={color} aria-label="Colour" onChange={(e) => setColor(e.target.value)} />}
           <select value={pattern} onChange={(e) => setPattern(e.target.value as LocationColorPattern)}>
             <option value="SOLID">Solid</option>

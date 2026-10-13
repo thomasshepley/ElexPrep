@@ -171,7 +171,7 @@ export default function CurrentRmsPanel({ jobId }: { jobId: string }) {
                 directly from there instead.
               </p>
               <div className="row">
-                <input
+                <input aria-label="Opportunity ID"
                   placeholder="Opportunity ID"
                   value={linkInput}
                   onChange={(e) => setLinkInput(e.target.value)}
@@ -250,7 +250,7 @@ export default function CurrentRmsPanel({ jobId }: { jobId: string }) {
             {items && items.length > 0 && (
               <>
                 <div className="row" style={{ gap: '0.6rem', margin: '0.5rem 0', flexWrap: 'wrap' }}>
-                  <input
+                  <input aria-label="Search items"
                     placeholder="Search items…"
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}

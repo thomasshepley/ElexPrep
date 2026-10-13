@@ -346,7 +346,7 @@ export default function PatchImportPanel({ jobId, groupId = null }: { jobId: str
       {fixtures && stageFixtures.length > 0 && (
         <>
           <p className="muted">Click any value to edit it - Enter or clicking away saves, Escape cancels.</p>
-          <input
+          <input aria-label="Search fixtures"
             placeholder="Search fixtures…"
             value={fixtureSearch}
             onChange={(e) => setFixtureSearch(e.target.value)}
@@ -355,7 +355,7 @@ export default function PatchImportPanel({ jobId, groupId = null }: { jobId: str
           {selected.size > 0 && (
             <div className="row panel" style={{ background: 'rgba(255,255,255,0.04)', alignItems: 'center', gap: '0.6rem' }}>
               <strong>{selected.size} selected</strong>
-              <input
+              <input aria-label="Set location to"
                 placeholder="Set location to…"
                 value={bulkLocation}
                 onChange={(e) => setBulkLocation(e.target.value)}

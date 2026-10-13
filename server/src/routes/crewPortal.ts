@@ -17,6 +17,8 @@ import { getOneDriveConfig } from '../oneDrive/config';
 import { applyStreamHeaders, sendStoredUpload } from '../uploadSafety';
 import { autoPopulateDaysFromOpportunity, dayInclude, toDayDto } from './jobDays';
 import { scheduleItemInclude, toScheduleItemDto } from './jobSchedule';
+import { buildIcs, type IcsEvent } from '../calendar/ics';
+import { listRateLines, syncProfileDayRate } from '../rateCard';
 
 /**
  * Self-service data for a logged-in CREW account: their own profile, the jobs they're
@@ -148,8 +150,7 @@ crewPortalRouter.get('/me/bank-details', requireRole('CREW'), async (req, res) =
 crewPortalRouter.get('/me/rate-lines', requireRole('CREW'), async (req, res) => {
   const profile = await ownProfile(req.user!.id);
   if (!profile) return res.status(404).json({ error: 'No crew profile found for this account' });
-  const lines = await prisma.crewRateLine.findMany({ where: { crewProfileId: profile.id }, orderBy: { order: 'asc' } });
-  res.json(lines);
+  res.json(await listRateLines(profile.id));
 });
 
 crewPortalRouter.post('/me/rate-lines', requireRole('CREW'), async (req, res) => {
@@ -159,6 +160,7 @@ crewPortalRouter.post('/me/rate-lines', requireRole('CREW'), async (req, res) =>
   if (!label || !amount) return res.status(400).json({ error: 'label and amount are required' });
   const count = await prisma.crewRateLine.count({ where: { crewProfileId: profile.id } });
   const line = await prisma.crewRateLine.create({ data: { crewProfileId: profile.id, label, amount, order: count } });
+  await syncProfileDayRate(profile.id);
   await logActivity('crew.rateLine.selfCreate', `${label}: ${amount}`, undefined, req.user!.id);
   res.status(201).json(line);
 });
@@ -173,6 +175,7 @@ crewPortalRouter.put('/me/rate-lines/:lineId', requireRole('CREW'), async (req, 
     where: { id: existing.id },
     data: { ...(label !== undefined ? { label } : {}), ...(amount !== undefined ? { amount } : {}) },
   });
+  await syncProfileDayRate(profile.id);
   await logActivity('crew.rateLine.selfUpdate', `${line.label}: ${line.amount}`, undefined, req.user!.id);
   res.json(line);
 });
@@ -183,6 +186,7 @@ crewPortalRouter.delete('/me/rate-lines/:lineId', requireRole('CREW'), async (re
   const existing = await prisma.crewRateLine.findUnique({ where: { id: req.params.lineId } });
   if (!existing || existing.crewProfileId !== profile.id) return res.status(404).json({ error: 'Rate line not found' });
   await prisma.crewRateLine.delete({ where: { id: existing.id } });
+  await syncProfileDayRate(profile.id);
   await logActivity('crew.rateLine.selfDelete', existing.label, undefined, req.user!.id);
   res.status(204).end();
 });
@@ -203,14 +207,58 @@ crewPortalRouter.get('/me/jobs', requireRole('CREW'), async (req, res) => {
   });
   const opportunities = await loadOpportunitiesFor(assignments.map((a) => a.job));
 
+  // Each job's next day this person is booked on (from today), with the earliest entry they're
+  // on that day as the call time and who else is working it - feeds the "Your next call" hero.
+  const today = new Date();
+  today.setUTCHours(0, 0, 0, 0);
+  const upcomingDays = await prisma.jobDayCrewAssignment.findMany({
+    where: { jobCrewAssignmentId: { in: assignments.map((a) => a.id) }, jobDay: { date: { gte: today } } },
+    include: {
+      jobDay: {
+        include: {
+          crewAssignments: { include: { jobCrewAssignment: { include: { crewProfile: { include: { user: { select: { displayName: true } } } } } } } },
+        },
+      },
+    },
+    orderBy: { jobDay: { date: 'asc' } },
+  });
+  const nextDayByAssignment = new Map<string, (typeof upcomingDays)[number]['jobDay']>();
+  for (const d of upcomingDays) if (!nextDayByAssignment.has(d.jobCrewAssignmentId)) nextDayByAssignment.set(d.jobCrewAssignmentId, d.jobDay);
+  const nextDays = [...nextDayByAssignment.entries()];
+  const dayItems = nextDays.length
+    ? await prisma.jobScheduleItem.findMany({
+        where: {
+          OR: nextDays.map(([, day]) => ({
+            jobId: day.jobId,
+            startsAt: { gte: new Date(day.date.getTime() - 12 * 3600_000), lt: new Date(day.date.getTime() + 36 * 3600_000) },
+          })),
+        },
+        include: { crewAssignments: { select: { jobCrewAssignmentId: true } } },
+        orderBy: { startsAt: 'asc' },
+      })
+    : [];
+
   const jobs = assignments
     .map((a) => {
       const opp = opportunities.get(a.job.currentRmsOpportunityId ?? '');
+      const day = nextDayByAssignment.get(a.id);
+      const items = day ? dayItems.filter((i) => i.jobId === a.jobId && Math.abs(i.startsAt.getTime() - (day.date.getTime() + 12 * 3600_000)) < 24 * 3600_000) : [];
+      const mine = items.filter((i) => i.crewAssignments.some((c) => c.jobCrewAssignmentId === a.id));
       return {
         jobId: a.jobId,
         jobName: a.job.name,
         venue: a.job.venue,
+        address: a.job.address,
         role: a.role,
+        nextDay: day
+          ? {
+              date: day.date,
+              items: (mine.length ? mine : items).map((i) => ({ title: i.title, startsAt: i.startsAt, endsAt: i.endsAt })),
+              others: day.crewAssignments
+                .filter((c) => c.jobCrewAssignmentId !== a.id)
+                .map((c) => ({ name: c.jobCrewAssignment.crewProfile.user.displayName, role: c.jobCrewAssignment.role })),
+            }
+          : null,
         // The job's own dates override the opportunity's (see Job Settings), same as the
         // crew job page below.
         startsAt: a.job.startsAt ?? opp?.startsAt ?? null,
@@ -310,6 +358,43 @@ crewPortalRouter.get('/me/jobs/:jobId/days', requireRole('CREW'), async (req, re
     orderBy: { date: 'asc' },
   });
   res.json(days.map(toDayDto));
+});
+
+// "Add to calendar": the days this person is booked on (all-day) plus the entries they're on,
+// falling back to the job's own dates when no days are set up yet.
+crewPortalRouter.get('/me/jobs/:jobId/calendar.ics', requireRole('CREW'), async (req, res) => {
+  const found = await requireAssignedJob(req.user!.id, req.params.jobId);
+  if (!found) return res.status(404).json({ error: 'Job not found' });
+  const { assignment } = found;
+  const job = assignment.job;
+  const location = job.address ?? job.venue;
+  const events: IcsEvent[] = [];
+
+  const days = await prisma.jobDay.findMany({
+    where: { jobId: job.id, crewAssignments: { some: { jobCrewAssignmentId: assignment.id } } },
+    orderBy: { date: 'asc' },
+  });
+  for (const d of days) {
+    events.push({ uid: `day-${d.id}@elex-portal`, summary: `${job.name} (${assignment.role})`, allDay: d.date.toISOString().slice(0, 10), location });
+  }
+  const items = await prisma.jobScheduleItem.findMany({
+    where: { jobId: job.id, crewAssignments: { some: { jobCrewAssignmentId: assignment.id } } },
+    orderBy: { startsAt: 'asc' },
+  });
+  for (const i of items) {
+    events.push({ uid: `entry-${i.id}@elex-portal`, summary: `${i.title} - ${job.name}`, start: i.startsAt, end: i.endsAt, location, description: i.notes });
+  }
+  if (events.length === 0) {
+    const opp = (await loadOpportunitiesFor([job])).get(job.currentRmsOpportunityId ?? '');
+    const startsAt = job.startsAt ?? opp?.startsAt ?? null;
+    const endsAt = job.endsAt ?? opp?.endsAt ?? null;
+    if (startsAt) events.push({ uid: `job-${job.id}@elex-portal`, summary: `${job.name} (${assignment.role})`, start: startsAt, end: endsAt, location });
+  }
+
+  const safeName = job.name.replace(/[^A-Za-z0-9 _-]+/g, '').trim() || 'job';
+  res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="${safeName}.ics"`);
+  res.send(buildIcs(job.name, events));
 });
 
 crewPortalRouter.get('/me/jobs/:jobId/documents', requireRole('CREW'), async (req, res) => {

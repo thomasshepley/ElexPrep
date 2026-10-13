@@ -112,8 +112,8 @@ export default function UsersPage() {
       <div className="panel">
         <h3>Add user</h3>
         <form className="row" onSubmit={create}>
-          <input placeholder="Username" value={username} onChange={(e) => setUsername(e.target.value)} required />
-          <input placeholder="Display name" value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
+          <input aria-label="Username" placeholder="Username" value={username} onChange={(e) => setUsername(e.target.value)} required />
+          <input aria-label="Display name" placeholder="Display name" value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
           <PasswordInput
             placeholder="Password"
             value={password}

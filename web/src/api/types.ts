@@ -363,7 +363,15 @@ export interface CrewMyJob {
   jobId: string;
   jobName: string;
   venue: string | null;
+  address: string | null;
   role: string;
+  /** The next day (from today) this person is booked on, or null. Items are the entries they're
+   * on that day (every entry that day when they're on none specifically). */
+  nextDay: {
+    date: string;
+    items: { title: string; startsAt: string; endsAt: string | null }[];
+    others: { name: string; role: string }[];
+  } | null;
   startsAt: string | null;
   endsAt: string | null;
   crew: CrewScheduleSwatch[];

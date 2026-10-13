@@ -104,18 +104,16 @@ export default function PrinterSettingsPage() {
         <div className="panel">
           <h3>Direct network</h3>
           <div className="row">
-            <label>
-              Printer IP
-              <br />
+            <label className="field">
+              <span className="field-label">Printer IP</span>
               <input
                 value={settings.direct.host}
                 placeholder="e.g. 192.168.1.50"
                 onChange={(e) => update({ direct: { ...settings.direct, host: e.target.value } })}
               />
             </label>
-            <label>
-              Port
-              <br />
+            <label className="field">
+              <span className="field-label">Port</span>
               <input
                 type="number"
                 value={settings.direct.port}
@@ -133,9 +131,8 @@ export default function PrinterSettingsPage() {
       {settings.method === 'AGENT' && (
         <div className="panel">
           <h3>Windows agent</h3>
-          <label>
-            Windows printer name (exactly as shown by SumatraPDF -list-printers)
-            <br />
+          <label className="field">
+            <span className="field-label">Windows printer name (exactly as shown by SumatraPDF -list-printers)</span>
             <input
               value={settings.agent.printerName}
               style={{ width: 320 }}

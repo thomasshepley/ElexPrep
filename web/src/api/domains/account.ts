@@ -95,7 +95,11 @@ export const accountApi = {
       request<{ key: string; value: T }>(`/settings/${key}`, { method: 'PUT', body: JSON.stringify({ value }) }),
   },
   activity: {
-    list: (jobId?: string) => request<ActivityLogEntry[]>(`/activity${jobId ? `?jobId=${jobId}` : ''}`),
+    list: (opts: { jobId?: string; before?: string } = {}) => {
+      const params = new URLSearchParams(Object.entries(opts).filter((e): e is [string, string] => Boolean(e[1])));
+      const qs = params.toString();
+      return request<{ entries: ActivityLogEntry[]; nextCursor: string | null }>(`/activity${qs ? `?${qs}` : ''}`);
+    },
   },
   lockdown: {
     setDevelopment: (enabled: boolean) =>
