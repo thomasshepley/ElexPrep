@@ -13,7 +13,7 @@ import { uploadDir } from './routes/jobs';
 import fs from 'fs';
 import path from 'path';
 
-const ROLES = ['ADMIN', 'USER', 'SIGNAGE', 'CREW'];
+const ROLES = ['ADMIN', 'USER', 'SIGNAGE', 'CREW', 'WEBMASTER'];
 
 function fail(message: string): never {
   console.error(`Error: ${message}`);

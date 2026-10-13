@@ -31,6 +31,10 @@ import OneDriveSettingsPage from './pages/OneDriveSettingsPage'
 import CrewPortalSettingsPage from './pages/CrewPortalSettingsPage'
 import ActivityLogPage from './pages/ActivityLogPage'
 import OnboardingPage from './pages/OnboardingPage'
+import WebmasterPage from './pages/WebmasterPage'
+import { startActionTracking } from './bugReport/actionTracker'
+
+startActionTracking()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -52,6 +56,7 @@ createRoot(document.getElementById('root')!).render(
             <Route index element={<DashboardPage />} />
             <Route path="jobs" element={<JobsListPage />} />
             <Route path="jobs/:jobId" element={<JobDetailPage />} />
+            <Route path="webmaster" element={<WebmasterPage />} />
             <Route path="settings" element={<SettingsLayout />}>
               <Route index element={<Navigate to="fixture-types" replace />} />
               <Route path="fixture-types" element={<FixtureTypeRulesPage />} />

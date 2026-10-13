@@ -4,6 +4,7 @@ import { JobsIcon, SettingsIcon, SignOutIcon } from '../components/Icons';
 import ThemeToggle from '../components/ThemeToggle';
 import NotificationBell from '../components/NotificationBell';
 import VersionBadge from '../components/VersionBadge';
+import BugReportButton from '../components/BugReportButton';
 import Avatar from '../components/Avatar';
 import ForcedPasswordChange from '../components/ForcedPasswordChange';
 
@@ -60,6 +61,7 @@ export default function CrewLayout() {
               <span>Sign out</span>
             </button>
             <VersionBadge />
+            <BugReportButton />
           </div>
         </div>
       </aside>

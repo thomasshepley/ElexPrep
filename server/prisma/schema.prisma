@@ -765,6 +765,32 @@ model User {
   notifications Notification[]
   jobDiscussionMessages JobDiscussionMessage[]
   backupCodes  BackupCode[]
+  bugReports   BugReport[]
+}
+
+/// A self-submitted bug report - "Submit a bug" in the sidebar, under the version badge.
+/// reporter* fields are denormalized off req.user at submit time (not just a userId FK) so a
+/// report stays readable even if that account is later deleted. recentActionsJson is a
+/// client-captured rolling trail of the last ~15 clicks (element descriptors only - never
+/// input values) leading up to the submission, letting whoever reviews this reconstruct what
+/// the reporter was doing, not just what they typed in the notes box. Visible only on the
+/// WEBMASTER-only Webmaster page (see routes/bugReports.ts) - not even ADMIN can read these.
+model BugReport {
+  id                String   @id @default(cuid())
+  userId            String?
+  user              User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  reporterName      String
+  reporterRole      String
+  pageUrl           String
+  pageTitle         String?
+  userAgent         String?
+  viewportWidth     Int?
+  viewportHeight    Int?
+  recentActionsJson String?
+  notes             String?
+  createdAt         DateTime @default(now())
+
+  @@index([userId])
 }
 
 /// One-time recovery codes for when a 2FA-enabled user loses their authenticator — bcrypt-

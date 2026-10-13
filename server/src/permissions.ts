@@ -96,7 +96,7 @@ export async function saveUserPermissionOverride(userId: string, patch: Partial<
  * is always nothing, USER is the role baseline with that specific account's override (if any)
  * merged on top. */
 export async function resolvePermissionsForUser(userId: string, role: Role): Promise<RolePermissions> {
-  if (role === 'ADMIN') {
+  if (role === 'ADMIN' || role === 'WEBMASTER') {
     return Object.fromEntries(PERMISSION_KEYS.map((k) => [k, true])) as RolePermissions;
   }
   if (role === 'SIGNAGE') {
@@ -118,7 +118,7 @@ export async function authedUserWithPermissions(user: AuthedUser) {
 export function requirePermission(key: PermissionKey) {
   return async (req: Request, res: Response, next: NextFunction) => {
     if (!req.user) return res.status(401).json({ error: 'Not signed in' });
-    if (req.user.role === 'ADMIN') return next();
+    if (req.user.role === 'ADMIN' || req.user.role === 'WEBMASTER') return next();
     if (req.user.role !== 'USER') return res.status(403).json({ error: 'Insufficient permissions' });
     const perms = await resolvePermissionsForUser(req.user.id, req.user.role);
     if (!perms[key]) return res.status(403).json({ error: 'Insufficient permissions' });

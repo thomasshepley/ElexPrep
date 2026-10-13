@@ -41,6 +41,7 @@ import { jobCrewAssignmentsRouter } from './routes/jobCrewAssignments';
 import { labelTemplatesRouter } from './routes/labelTemplates';
 import { jobScheduleRouter } from './routes/jobSchedule';
 import { jobDaysRouter } from './routes/jobDays';
+import { bugReportsRouter } from './routes/bugReports';
 import { jobDocumentsRouter } from './routes/jobDocuments';
 import { jobContactsRouter } from './routes/jobContacts';
 import { jobDiscussionRouter } from './routes/jobDiscussion';
@@ -84,6 +85,7 @@ app.get('/api/health', (_req, res) => res.json({ ok: true }));
 app.get('/api/version', (_req, res) => res.json(getVersionInfo()));
 
 app.use('/api/auth', authRouter);
+app.use('/api/bug-reports', bugReportsRouter);
 app.use('/api/2fa', twoFactorRouter);
 app.use('/api/users', usersRouter);
 app.use('/api/settings', settingsRouter);

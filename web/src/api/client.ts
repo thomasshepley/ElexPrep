@@ -188,7 +188,7 @@ export interface ActivityLogEntry {
   jobName?: string | null;
 }
 
-export type Role = 'ADMIN' | 'USER' | 'SIGNAGE' | 'CREW';
+export type Role = 'ADMIN' | 'USER' | 'SIGNAGE' | 'CREW' | 'WEBMASTER';
 
 export type PermissionKey =
   | 'deleteJobs'
@@ -332,6 +332,28 @@ export interface JobDay {
   id: string;
   date: string;
   crew: JobDayCrew[];
+}
+
+export interface BugReportAction {
+  time: string;
+  type: string;
+  description: string;
+}
+
+/// A self-submitted bug report - see server/src/routes/bugReports.ts. Only ever fetched by the
+/// WEBMASTER-only Webmaster page; the submit endpoint itself is open to any signed-in account.
+export interface BugReport {
+  id: string;
+  reporterName: string;
+  reporterRole: string;
+  pageUrl: string;
+  pageTitle: string | null;
+  userAgent: string | null;
+  viewportWidth: number | null;
+  viewportHeight: number | null;
+  recentActions: BugReportAction[];
+  notes: string | null;
+  createdAt: string;
 }
 
 export interface CrewMe {
@@ -820,6 +842,19 @@ export const api = {
       }),
     unassignCrew: (jobId: string, dayId: string, id: string) =>
       request<void>(`/jobs/${jobId}/days/${dayId}/crew/${id}`, { method: 'DELETE' }),
+  },
+  bugReports: {
+    submit: (data: {
+      pageUrl: string;
+      pageTitle?: string;
+      userAgent?: string;
+      viewportWidth?: number;
+      viewportHeight?: number;
+      recentActions?: { time: string; type: string; description: string }[];
+      notes?: string;
+    }) => request<{ ok: boolean }>('/bug-reports', { method: 'POST', body: JSON.stringify(data) }),
+    list: () => request<BugReport[]>('/bug-reports'),
+    remove: (id: string) => request<void>(`/bug-reports/${id}`, { method: 'DELETE' }),
   },
   jobDiscussion: {
     list: (jobId: string) => request<DiscussionThreadData>(`/jobs/${jobId}/discussion`),

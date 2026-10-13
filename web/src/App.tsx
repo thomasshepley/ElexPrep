@@ -4,6 +4,7 @@ import { DashboardIcon, JobsIcon, SettingsIcon, SignageIcon, SignOutIcon } from 
 import ThemeToggle from './components/ThemeToggle'
 import NotificationBell from './components/NotificationBell'
 import VersionBadge from './components/VersionBadge'
+import BugReportButton from './components/BugReportButton'
 import Avatar from './components/Avatar'
 import ForcedPasswordChange from './components/ForcedPasswordChange'
 import './App.css'
@@ -47,6 +48,12 @@ function App() {
               <SignageIcon />
               <span>Signage</span>
             </NavLink>
+            {user.role === 'WEBMASTER' && (
+              <NavLink to="/webmaster" aria-label="Webmaster">
+                <SettingsIcon />
+                <span>Webmaster</span>
+              </NavLink>
+            )}
           </nav>
           <div className="sidebar-user">
             <div className="sidebar-user-row">
@@ -62,6 +69,7 @@ function App() {
               <span>Sign out</span>
             </button>
             <VersionBadge />
+            <BugReportButton />
           </div>
         </div>
       </aside>

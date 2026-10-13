@@ -96,7 +96,7 @@ authRouter.post('/login', loginLimiter, async (req, res) => {
     return res.status(401).json({ error: 'Incorrect username or password' });
   }
 
-  if (user.role !== 'ADMIN' && (await isMaintenanceModeEnabled())) {
+  if (user.role !== 'ADMIN' && user.role !== 'WEBMASTER' && (await isMaintenanceModeEnabled())) {
     return res.status(503).json({ error: 'The site is locked down for maintenance - try again shortly' });
   }
 
@@ -141,7 +141,7 @@ authRouter.post('/login/verify-2fa', totpVerifyLimiter, async (req, res) => {
     return res.status(401).json({ error: 'Incorrect code' });
   }
 
-  if (user.role !== 'ADMIN' && (await isMaintenanceModeEnabled())) {
+  if (user.role !== 'ADMIN' && user.role !== 'WEBMASTER' && (await isMaintenanceModeEnabled())) {
     return res.status(503).json({ error: 'The site is locked down for maintenance - try again shortly' });
   }
 

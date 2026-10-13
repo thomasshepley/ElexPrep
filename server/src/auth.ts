@@ -4,7 +4,13 @@ import { NextFunction, Request, Response } from 'express';
 import { prisma } from './db';
 import { isMaintenanceModeEnabled } from './maintenanceMode';
 
-export type Role = 'ADMIN' | 'USER' | 'SIGNAGE' | 'CREW';
+/// WEBMASTER sits above ADMIN - it passes every requireRole/requirePermission check regardless
+/// of which roles are listed (see requireRole/permissions.ts below), on top of its own
+/// exclusive access to the bug-report Webmaster page. Deliberately not offered anywhere in the
+/// web UI's role pickers (routes/users.ts's create/update allowlists never include it) - the
+/// only way to grant it is the server-side admin CLI (server/src/cli.ts), a channel an ADMIN
+/// account has no access to.
+export type Role = 'ADMIN' | 'USER' | 'SIGNAGE' | 'CREW' | 'WEBMASTER';
 
 export interface AuthedUser {
   id: string;
@@ -98,6 +104,7 @@ const CREW_ALLOWLIST = [
   /^\/api\/crew\/me\/jobs$/,
   /^\/api\/crew\/me\/jobs\/[^/]+(\/.*)?$/,
   /^\/api\/notifications(\/.*)?$/,
+  /^\/api\/bug-reports$/,
 ];
 
 /**
@@ -140,10 +147,10 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
   if (req.path === '/api/onboarding' && req.method === 'POST') return next();
   if (/^\/api\/onboarding\/invite\/[^/]+(\/complete)?$/.test(req.path)) return next();
   if (!req.user) return res.status(401).json({ error: 'Not signed in' });
-  // Emergency full-stop (see maintenanceMode.ts) - everyone except ADMIN is locked out of
-  // every API call, including one from a session that was already live when lockdown was
-  // switched on, not just new logins (those are stopped separately in routes/auth.ts).
-  if (req.user.role !== 'ADMIN' && (await isMaintenanceModeEnabled())) {
+  // Emergency full-stop (see maintenanceMode.ts) - everyone except ADMIN/WEBMASTER is locked
+  // out of every API call, including one from a session that was already live when lockdown
+  // was switched on, not just new logins (those are stopped separately in routes/auth.ts).
+  if (req.user.role !== 'ADMIN' && req.user.role !== 'WEBMASTER' && (await isMaintenanceModeEnabled())) {
     return res.status(503).json({ error: 'The site is locked down for maintenance - try again shortly' });
   }
   if (req.user.role === 'SIGNAGE' && req.method !== 'GET') {
@@ -159,7 +166,9 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
 
 export function requireRole(...roles: Role[]) {
   return (req: Request, res: Response, next: NextFunction) => {
-    if (!req.user || !roles.includes(req.user.role)) {
+    if (!req.user) return res.status(403).json({ error: 'Insufficient permissions' });
+    if (req.user.role === 'WEBMASTER') return next();
+    if (!roles.includes(req.user.role)) {
       return res.status(403).json({ error: 'Insufficient permissions' });
     }
     next();

@@ -4,6 +4,10 @@ Newest entries first. Each push/merge gets exactly one entry - see
 `scripts/bump-version.mjs` for how the version number itself advances. A `+` marks a
 feature addition, a `-` marks a bug fix.
 
+## v1.3.1 - 2026-10-13
+
++ Added a "Submit a bug" button to report issues directly from the app
+
 ## v1.3.0 - 2026-10-13
 
 + Color-code schedule entries, drag crew onto specific tasks, and default new entries to the selected day
