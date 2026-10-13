@@ -529,6 +529,8 @@ export interface JobScheduleItem {
   startsAt: string;
   endsAt: string | null;
   notes: string | null;
+  /** Where on site ("Loading bay"). */
+  location: string | null;
   color: string | null;
   crew: JobDayCrew[];
 }

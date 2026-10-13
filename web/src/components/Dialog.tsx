@@ -23,6 +23,8 @@ interface PromptOptions {
   required?: boolean;
   inputType?: 'text' | 'password' | 'number';
   minLength?: number;
+  /** Ask for the value twice (e.g. a new password) and only allow submit when they match. */
+  confirmEntry?: boolean;
 }
 
 interface AlertOptions {
@@ -79,6 +81,7 @@ function DialogView({ request, onDone }: { request: Request; onDone: () => void 
   const confirmRef = useRef<HTMLButtonElement>(null);
   const previouslyFocused = useRef<Element | null>(document.activeElement);
   const [value, setValue] = useState(request.kind === 'prompt' ? request.options.defaultValue ?? '' : '');
+  const [repeat, setRepeat] = useState('');
 
   const cancel = useCallback(() => {
     if (request.kind === 'confirm') request.resolve(false);
@@ -109,7 +112,9 @@ function DialogView({ request, onDone }: { request: Request; onDone: () => void 
   const { options } = request;
   const prompt = request.kind === 'prompt' ? request.options : null;
   const confirm = request.kind === 'confirm' ? request.options : null;
+  const mismatch = Boolean(prompt?.confirmEntry && repeat !== value);
   const blocked =
+    mismatch ||
     (prompt?.required && !value.trim()) ||
     (prompt?.minLength !== undefined && value.length < prompt.minLength) ||
     (confirm?.typeToConfirm !== undefined && value !== confirm.typeToConfirm);
@@ -156,6 +161,19 @@ function DialogView({ request, onDone }: { request: Request; onDone: () => void 
               />
             )}
             {prompt.minLength !== undefined && <p className="muted dialog-hint">At least {prompt.minLength} characters.</p>}
+          </div>
+        )}
+        {prompt?.confirmEntry && (
+          <div className="field">
+            <label htmlFor={`${titleId}-repeat`}>Confirm {prompt.label.toLowerCase()}</label>
+            <input
+              id={`${titleId}-repeat`}
+              type={prompt.inputType ?? 'text'}
+              value={repeat}
+              autoComplete={prompt.inputType === 'password' ? 'new-password' : 'off'}
+              onChange={(e) => setRepeat(e.target.value)}
+            />
+            {repeat && mismatch && <p className="error dialog-hint">These don&apos;t match yet.</p>}
           </div>
         )}
         {confirm?.typeToConfirm !== undefined && (

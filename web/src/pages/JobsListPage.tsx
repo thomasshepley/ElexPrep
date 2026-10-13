@@ -66,6 +66,11 @@ function OnboardingOptionsForm({
   const [name, setName] = useState(opportunity?.subject ?? '');
   const [description, setDescription] = useState('');
   const [address, setAddress] = useState('');
+  const [settledAddress, setSettledAddress] = useState(address);
+  useEffect(() => {
+    const t = setTimeout(() => setSettledAddress(address.trim()), 700);
+    return () => clearTimeout(t);
+  }, [address]);
   const [startsAt, setStartsAt] = useState(toDatetimeLocal(opportunity?.startsAt ?? null));
   const [endsAt, setEndsAt] = useState(toDatetimeLocal(opportunity?.endsAt ?? null));
 
@@ -127,7 +132,8 @@ function OnboardingOptionsForm({
               placeholder="Street, city, postcode"
             />
           </div>
-          {address && <LocationLinks address={address} showMap={false} />}
+          {/* Map pin once typing pauses, so the embed isn't reloaded on every keystroke. */}
+          {settledAddress && <LocationLinks address={settledAddress} />}
 
           <h4>Why</h4>
           <p className="muted" style={{ marginTop: 0 }}>

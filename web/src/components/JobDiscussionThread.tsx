@@ -445,6 +445,7 @@ function GroupEditor({
         {visibility === 'MEMBERS' && (
           <div className="field">
             <label>Members</label>
+            <div className="stack-sm">
             {crew === null && <span className="muted">Loading crew…</span>}
             {crew?.length === 0 && <span className="muted">No crew on this job yet - add them on the Crew tab first.</span>}
             {crew?.map((a) => (
@@ -453,6 +454,7 @@ function GroupEditor({
                 {a.displayName} <span className="muted">{a.role}</span>
               </label>
             ))}
+            </div>
           </div>
         )}
         {error && <p className="error">{error}</p>}

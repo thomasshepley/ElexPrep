@@ -2789,3 +2789,34 @@ button.discussion-group-tab.active {
 button.discussion-group-add {
   border-style: dashed;
 }
+
+/* Timeline blocks that open a details popup, and the crew member's own slots (purple). */
+.day-timeline-item.is-openable {
+  cursor: pointer;
+}
+
+.day-timeline-item.is-openable:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.day-timeline-item.is-mine {
+  background: rgba(142, 36, 170, 0.22);
+  border-left-color: #a64dd1;
+}
+
+.day-timeline-legend {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: var(--text-xs);
+  margin: var(--space-2) 0 0;
+}
+
+.day-timeline-mine-swatch {
+  width: 0.8rem;
+  height: 0.8rem;
+  border-radius: 3px;
+  background: rgba(142, 36, 170, 0.5);
+  border-left: 3px solid #a64dd1;
+}

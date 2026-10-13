@@ -4,6 +4,11 @@ Newest entries first. Each push/merge gets exactly one entry - see
 `scripts/bump-version.mjs` for how the version number itself advances. A `+` marks a
 feature addition, a `-` marks a bug fix.
 
+## v1.4.0 - 2026-10-13
+
+- Table rows on the Crew and Location Colours pages line up again, and colour pickers show their colour
++ Chat groups in job discussions, schedule entries open into a popup with where, who and notes, your own slots are highlighted on your schedule, location dropdowns on cases and labels, and new admin features for the Crew tab and Crew settings
+
 ## v1.3.9 - 2026-10-13
 
 + Added Copy all and Download .md buttons for bug reports on the Webmaster page

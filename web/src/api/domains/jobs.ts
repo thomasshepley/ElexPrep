@@ -5,12 +5,12 @@ import type { CrewFeatures } from '@elexprep/shared';
 export const jobsApi = {
   jobSchedule: {
     list: (jobId: string) => request<JobScheduleItem[]>(`/jobs/${jobId}/schedule`),
-    create: (jobId: string, data: { title: string; startsAt: string; endsAt?: string; notes?: string; color?: string }) =>
+    create: (jobId: string, data: { title: string; startsAt: string; endsAt?: string; notes?: string; color?: string; location?: string }) =>
       request<JobScheduleItem>(`/jobs/${jobId}/schedule`, { method: 'POST', body: JSON.stringify(data) }),
     update: (
       jobId: string,
       id: string,
-      data: Partial<{ title: string; startsAt: string; endsAt: string | null; notes: string; color: string | null }>
+      data: Partial<{ title: string; startsAt: string; endsAt: string | null; notes: string; color: string | null; location: string | null }>
     ) => request<JobScheduleItem>(`/jobs/${jobId}/schedule/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     remove: (jobId: string, id: string) => request<void>(`/jobs/${jobId}/schedule/${id}`, { method: 'DELETE' }),
     assignCrew: (jobId: string, itemId: string, jobCrewAssignmentId: string, dayDate: string) =>

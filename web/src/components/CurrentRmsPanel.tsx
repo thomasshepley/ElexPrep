@@ -31,7 +31,25 @@ export default function CurrentRmsPanel({ jobId }: { jobId: string }) {
   // Current RMS's "Service" line items are typically labour/setup, not physical kit to prep -
   // defaulting to Rentals-only keeps the pick list focused on what crew actually need to pull.
   const [showAllTypes, setShowAllTypes] = useState(false);
-  const [hiddenIds, setHiddenIds] = useState<Set<number>>(new Set());
+  // Hidden rows are remembered per job in this browser, so they stay hidden after a reload.
+  const hiddenKey = `pickListHidden:${jobId}`;
+  const [hiddenIds, setHiddenIdsState] = useState<Set<number>>(() => {
+    try {
+      return new Set(JSON.parse(localStorage.getItem(hiddenKey) ?? '[]') as number[]);
+    } catch {
+      return new Set();
+    }
+  });
+  const setHiddenIds = (update: Set<number> | ((prev: Set<number>) => Set<number>)) =>
+    setHiddenIdsState((prev) => {
+      const next = typeof update === 'function' ? update(prev) : update;
+      try {
+        localStorage.setItem(hiddenKey, JSON.stringify([...next]));
+      } catch {
+        // Private mode or blocked storage: hiding still works for this visit.
+      }
+      return next;
+    });
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('');
 

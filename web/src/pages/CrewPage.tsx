@@ -74,7 +74,7 @@ export default function CrewPage() {
   };
 
   const resetPassword = async (c: CrewMember) => {
-    const pw = await dialog.prompt({ title: `Reset ${c.username}'s password`, message: 'They will be signed out everywhere and need the new password to sign back in.', label: 'New password', inputType: 'password', minLength: 8, confirmLabel: 'Set password' });
+    const pw = await dialog.prompt({ title: `Reset ${c.username}'s password`, message: 'They will be signed out everywhere and need the new password to sign back in.', label: 'New password', inputType: 'password', minLength: 8, confirmEntry: true, confirmLabel: 'Set password' });
     if (!pw) return;
     await run(() => api.crew.update(c.id, { password: pw }), { success: 'Password updated' });
   };

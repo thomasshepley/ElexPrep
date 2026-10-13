@@ -15,6 +15,7 @@ export interface TimelineItem {
   startsAt: string;
   endsAt?: string | null;
   notes?: string | null;
+  location?: string | null;
   color?: string | null;
   crew?: TimelineItemCrew[];
 }
@@ -110,6 +111,29 @@ interface ItemBlockProps {
   style: React.CSSProperties;
   canManageCrew?: boolean;
   onUnassignCrew?: (itemId: string, crewRowId: string) => void;
+  onOpen?: (itemId: string) => void;
+  /** The viewer's own entry (crew portal): drawn in purple so their slots stand out. */
+  isMine?: boolean;
+}
+
+/** Click / Enter / Space on a block opens its details, without stealing clicks on its own buttons. */
+function openProps(item: LaidOutItem, onOpen?: (id: string) => void) {
+  if (!onOpen) return {};
+  return {
+    role: 'button',
+    tabIndex: 0,
+    'aria-label': `${item.title}, ${formatTime(new Date(item.startsAt))} - open details`,
+    onClick: (e: React.MouseEvent) => {
+      if ((e.target as HTMLElement).closest('button')) return;
+      onOpen(item.id);
+    },
+    onKeyDown: (e: React.KeyboardEvent) => {
+      if ((e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget) {
+        e.preventDefault();
+        onOpen(item.id);
+      }
+    },
+  };
 }
 
 function ItemBody({ item, canManageCrew, onUnassignCrew }: Pick<ItemBlockProps, 'item' | 'canManageCrew' | 'onUnassignCrew'>) {
@@ -122,6 +146,7 @@ function ItemBody({ item, canManageCrew, onUnassignCrew }: Pick<ItemBlockProps, 
         {end && ` – ${formatTime(end)}`}
       </div>
       <div className="day-timeline-item-title">{item.title}</div>
+      {item.location && <div className="day-timeline-item-notes">{item.location}</div>}
       {item.notes && <div className="day-timeline-item-notes">{item.notes}</div>}
       {item.crew && item.crew.length > 0 && (
         <div className="day-timeline-item-crew">
@@ -151,9 +176,9 @@ function ItemBody({ item, canManageCrew, onUnassignCrew }: Pick<ItemBlockProps, 
 }
 
 /** A plain (non-drop-target) item block - used by the crew portal's read-only timeline. */
-function PlainItemBlock({ item, style, canManageCrew, onUnassignCrew }: ItemBlockProps) {
+function PlainItemBlock({ item, style, canManageCrew, onUnassignCrew, onOpen, isMine }: ItemBlockProps) {
   return (
-    <div className="day-timeline-item" style={style}>
+    <div className={`day-timeline-item${isMine ? ' is-mine' : ''}${onOpen ? ' is-openable' : ''}`} style={style} {...openProps(item, onOpen)}>
       <ItemBody item={item} canManageCrew={canManageCrew} onUnassignCrew={onUnassignCrew} />
     </div>
   );
@@ -161,10 +186,15 @@ function PlainItemBlock({ item, style, canManageCrew, onUnassignCrew }: ItemBloc
 
 /** A drop-target item block - used by the admin Schedule tab so crew can be dragged onto a
  * specific task, not just a whole day. */
-function DroppableItemBlock({ item, style, canManageCrew, onUnassignCrew }: ItemBlockProps) {
+function DroppableItemBlock({ item, style, canManageCrew, onUnassignCrew, onOpen }: ItemBlockProps) {
   const { setNodeRef, isOver } = useDroppable({ id: `task:${item.id}` });
   return (
-    <div ref={setNodeRef} className={`day-timeline-item${isOver ? ' day-timeline-item-drag-over' : ''}`} style={style}>
+    <div
+      ref={setNodeRef}
+      className={`day-timeline-item${isOver ? ' day-timeline-item-drag-over' : ''}${onOpen ? ' is-openable' : ''}`}
+      style={style}
+      {...openProps(item, onOpen)}
+    >
       <ItemBody item={item} canManageCrew={canManageCrew} onUnassignCrew={onUnassignCrew} />
     </div>
   );
@@ -180,11 +210,15 @@ export function SingleDayTimeline({
   dropTargets = false,
   canManageCrew = false,
   onUnassignCrew,
+  onOpen,
+  myCrewProfileId,
 }: {
   items: TimelineItem[];
   dropTargets?: boolean;
   canManageCrew?: boolean;
   onUnassignCrew?: (itemId: string, crewRowId: string) => void;
+  onOpen?: (itemId: string) => void;
+  myCrewProfileId?: string | null;
 }) {
   const sorted = [...items].sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
   const timed: TimedItem[] = sorted.map((item) => {
@@ -224,12 +258,16 @@ export function SingleDayTimeline({
               item={item}
               canManageCrew={canManageCrew}
               onUnassignCrew={onUnassignCrew}
+              onOpen={onOpen}
+              isMine={Boolean(myCrewProfileId && item.crew?.some((c) => c.crewProfileId === myCrewProfileId))}
               style={{
                 top,
                 minHeight: durationMin * PX_PER_MIN,
                 left: `${item.col * widthPct}%`,
                 width: `calc(${widthPct}% - 6px)`,
-                ...(wash ? { background: wash, borderLeftColor: item.color! } : {}),
+                ...(wash && !(myCrewProfileId && item.crew?.some((c) => c.crewProfileId === myCrewProfileId))
+                  ? { background: wash, borderLeftColor: item.color! }
+                  : {}),
               }}
             />
           );
@@ -247,7 +285,15 @@ export function SingleDayTimeline({
  * component used to) is what stops a multi-day job's entries from appearing to overlap just
  * because e.g. "Load in" on day 1 and "Show" on day 2 both start at 09:00.
  */
-export default function DayTimeline({ items }: { items: TimelineItem[] }) {
+export default function DayTimeline({
+  items,
+  onOpen,
+  myCrewProfileId,
+}: {
+  items: TimelineItem[];
+  onOpen?: (itemId: string) => void;
+  myCrewProfileId?: string | null;
+}) {
   const days = useMemo(() => {
     const map = new Map<string, TimelineItem[]>();
     for (const item of items) {
@@ -282,7 +328,8 @@ export default function DayTimeline({ items }: { items: TimelineItem[] }) {
           ))}
         </div>
       )}
-      {activeKey && <SingleDayTimeline items={activeItems} />}
+      {activeKey && <SingleDayTimeline items={activeItems} onOpen={onOpen} myCrewProfileId={myCrewProfileId} />}
+      {myCrewProfileId && <p className="muted day-timeline-legend"><span className="day-timeline-mine-swatch" /> Your slots</p>}
     </div>
   );
 }

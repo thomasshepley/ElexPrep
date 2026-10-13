@@ -10,6 +10,7 @@ import { useToast } from './Toast';
 import { formatDayHeading, formatTime } from '../utils/format';
 import DateTimeInput from './DateTimeInput';
 import Modal from './Modal';
+import ScheduleEntryModal, { SCHEDULE_COLOR_PRESETS } from './ScheduleEntryModal';
 import { useDialog } from './Dialog';
 import { PlusIcon } from './Icons';
 
@@ -21,7 +22,6 @@ const TIME_STEP_SECONDS = 15 * 60;
 // A handful of sensible preset colors for schedule entries, rather than a full color-wheel
 // picker - quick to pick from, matching the small-fixed-palette convention already used for
 // crew swatches (see shared/src/crewColors.ts).
-const SCHEDULE_COLOR_PRESETS = ['#E53935', '#8E24AA', '#3949AB', '#1E88E5', '#00897B', '#43A047', '#F9A825', '#EF6C00'];
 
 function toDatetimeLocal(d: Date): string {
   const pad = (n: number) => String(n).padStart(2, '0');
@@ -57,6 +57,7 @@ export default function JobSchedulePanel({ jobId }: { jobId: string }) {
   // changes - only the still-untouched default should track those automatically.
   const [endsAtTouched, setEndsAtTouched] = useState(false);
   const [notes, setNotes] = useState('');
+  const [location, setLocation] = useState('');
   const [color, setColor] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [activeRosterAssignmentId, setActiveRosterAssignmentId] = useState<string | null>(null);
@@ -137,10 +138,12 @@ export default function JobSchedulePanel({ jobId }: { jobId: string }) {
         startsAt: new Date(startsAt).toISOString(),
         endsAt: endsAt ? new Date(endsAt).toISOString() : undefined,
         notes: notes || undefined,
+        location: location || undefined,
         color: color || undefined,
       });
       setTitle('');
       setNotes('');
+      setLocation('');
       setColor(null);
       const next = nineAmOn(selectedDate);
       setStartsAt(next);
@@ -154,8 +157,8 @@ export default function JobSchedulePanel({ jobId }: { jobId: string }) {
     }
   };
 
-  const remove = async (item: JobScheduleItem) => {
-    if (!(await dialog.confirm({ title: `Remove "${item.title}"?`, confirmLabel: 'Remove', danger: true }))) return;
+  const remove = async (item: JobScheduleItem): Promise<boolean> => {
+    if (!(await dialog.confirm({ title: `Remove "${item.title}"?`, confirmLabel: 'Remove', danger: true }))) return false;
     try {
       await api.jobSchedule.remove(jobId, item.id);
       showToast('Schedule entry removed', 'info');
@@ -163,6 +166,7 @@ export default function JobSchedulePanel({ jobId }: { jobId: string }) {
       showToast((err as Error).message, 'error');
     }
     refresh();
+    return true;
   };
 
   // The keyboard/tap alternative to dragging a crew chip onto a block.
@@ -272,6 +276,10 @@ export default function JobSchedulePanel({ jobId }: { jobId: string }) {
                 <label htmlFor="sched-ends">Ends (optional)</label>
                 <DateTimeInput id="sched-ends" stepMinutes={TIME_STEP_SECONDS / 60} value={endsAt} onChange={handleEndsChange} defaultTime="18:00" />
               </div>
+              <div className="field" style={{ width: '12rem' }}>
+                <label htmlFor="sched-location">Where</label>
+                <input id="sched-location" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Loading bay" />
+              </div>
               <div className="field" style={{ width: '16rem' }}>
                 <label htmlFor="sched-notes">Notes</label>
                 <input id="sched-notes" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Via loading bay" />
@@ -320,6 +328,7 @@ export default function JobSchedulePanel({ jobId }: { jobId: string }) {
                   dropTargets
                   canManageCrew={canManageCrew}
                   onUnassignCrew={unassignTaskCrew}
+                  onOpen={setAssigningItemId}
                 />
                 {/* Doubles as the colour legend, and gives every block keyboard/tap actions. */}
                 <ul className="plain-list schedule-entries">
@@ -331,16 +340,17 @@ export default function JobSchedulePanel({ jobId }: { jobId: string }) {
                         {i.endsAt ? `–${formatTime(i.endsAt)}` : ''}
                       </span>
                       <span className="schedule-entry-title">
-                        <strong>{i.title}</strong>
+                        <button type="button" className="link-button queue-row-preview" onClick={() => setAssigningItemId(i.id)}>
+                          <strong>{i.title}</strong>
+                        </button>
+                        {i.location && <span className="muted"> · {i.location}</span>}
                         {i.notes && <span className="muted"> · {i.notes}</span>}
                         {i.crew.length > 0 && <span className="muted"> · {i.crew.map((c) => c.displayName).join(', ')}</span>}
                       </span>
                       <span className="row" style={{ gap: '0.4rem' }}>
-                        {canManageCrew && roster.length > 0 && (
-                          <button type="button" className="secondary" onClick={() => setAssigningItemId(i.id)}>
-                            Assign crew…
-                          </button>
-                        )}
+                        <button type="button" className="secondary" onClick={() => setAssigningItemId(i.id)}>
+                          {canManageCrew ? 'Details & crew…' : 'Details'}
+                        </button>
                         <button type="button" className="secondary" onClick={() => remove(i)}>
                           Remove
                         </button>
@@ -358,25 +368,23 @@ export default function JobSchedulePanel({ jobId }: { jobId: string }) {
         </div>
       </div>
       {assigningItem && (
-        <Modal title={`Crew on "${assigningItem.title}"`} onClose={() => setAssigningItemId(null)}>
-          <p className="muted" style={{ marginTop: 0 }}>Ticking someone also puts them on this day.</p>
-          <ul className="plain-list">
-            {roster.map((a) => (
-              <li key={a.id}>
-                <label className="row" style={{ gap: '0.5rem' }}>
-                  <input
-                    type="checkbox"
-                    checked={assigningItem.crew.some((c) => c.jobCrewAssignmentId === a.id)}
-                    onChange={() => toggleTaskCrew(assigningItem, a)}
-                  />
-                  <span className="crew-swatch-dot" style={{ background: resolveCrewColor(a.crewProfileId, a.color) }} />
-                  {a.displayName}
-                  {a.role && <span className="muted">{a.role}</span>}
-                </label>
-              </li>
-            ))}
-          </ul>
-        </Modal>
+        <ScheduleEntryModal
+          key={assigningItem.id}
+          item={assigningItem}
+          roster={roster}
+          editable={canManageDays}
+          canManageCrew={canManageCrew}
+          onClose={() => setAssigningItemId(null)}
+          onToggleCrew={(a) => toggleTaskCrew(assigningItem, a)}
+          onSave={async (patch) => {
+            await api.jobSchedule.update(jobId, assigningItem.id, patch);
+            setAssigningItemId(null);
+            refresh();
+            refreshDays();
+            showToast('Schedule entry saved');
+          }}
+          onDelete={canManageDays ? () => remove(assigningItem).then((done) => done && setAssigningItemId(null)) : undefined}
+        />
       )}
       <DragOverlay>
         {activeAssignment && (

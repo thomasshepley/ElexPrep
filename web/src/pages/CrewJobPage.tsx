@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { api, type CrewJobDetail, type JobScheduleItem, type JobDay, type KitListItem, type JobDocument, type JobContact, type Plot, type OneDriveShare } from '../api/client';
 import Chevron from '../components/Chevron';
 import DayTimeline from '../components/DayTimeline';
+import ScheduleEntryModal from '../components/ScheduleEntryModal';
 import DayBlocksReadOnly from '../components/DayBlocksReadOnly';
 import { WhoIcon, WhatIcon, WhenIcon, WhereIcon, WhyIcon, DiscussionIcon } from '../components/Icons';
 import LabelTypeForm, { AD_HOC_TYPES, type AdHocType } from '../components/LabelTypeForm';
@@ -117,6 +118,11 @@ export default function CrewJobPage() {
   const [detail, setDetail] = useState<CrewJobDetail | null>(null);
   usePageTitle(detail?.what.jobName);
   const [schedule, setSchedule] = useState<JobScheduleItem[]>([]);
+  const [myProfileId, setMyProfileId] = useState<string | null>(null);
+  const [openEntryId, setOpenEntryId] = useState<string | null>(null);
+  useEffect(() => {
+    api.crewPortal.me().then((me) => setMyProfileId(me.id)).catch(() => {});
+  }, []);
   const [days, setDays] = useState<JobDay[]>([]);
   const [kitList, setKitList] = useState<KitListItem[]>([]);
   const [documents, setDocuments] = useState<JobDocument[]>([]);
@@ -207,7 +213,11 @@ export default function CrewJobPage() {
             </WhySubsection>
 
             <WhySubsection title="Day schedule" defaultOpen>
-              {schedule.length > 0 ? <DayTimeline items={schedule} /> : <p className="muted">No schedule has been set for this job yet.</p>}
+              {schedule.length > 0 ? (
+                <DayTimeline items={schedule} onOpen={setOpenEntryId} myCrewProfileId={myProfileId} />
+              ) : (
+                <p className="muted">No schedule has been set for this job yet.</p>
+              )}
             </WhySubsection>
 
             <WhySubsection title="CAD">
@@ -293,6 +303,10 @@ export default function CrewJobPage() {
           </WhySubsection>
         </StaticCard>
       </div>
+
+      {openEntryId && schedule.some((i) => i.id === openEntryId) && (
+        <ScheduleEntryModal item={schedule.find((i) => i.id === openEntryId)!} editable={false} onClose={() => setOpenEntryId(null)} />
+      )}
 
       <div style={{ marginTop: '0.9rem' }}>
         <InfoCard id="discussion" icon={<DiscussionIcon />} label="Discussion" summary="Message the crew and prep staff on this job">

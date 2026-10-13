@@ -81,7 +81,7 @@ export default function UsersPage() {
   };
 
   const resetPassword = async (u: AuthedUser) => {
-    const pw = await dialog.prompt({ title: `Reset ${u.username}'s password`, message: 'They will be signed out everywhere and need the new password to sign back in.', label: 'New password', inputType: 'password', minLength: 8, confirmLabel: 'Set password' });
+    const pw = await dialog.prompt({ title: `Reset ${u.username}'s password`, message: 'They will be signed out everywhere and need the new password to sign back in.', label: 'New password', inputType: 'password', minLength: 8, confirmEntry: true, confirmLabel: 'Set password' });
     if (!pw) return;
     await run(() => api.users.update(u.id, { password: pw }), { success: 'Password updated' });
   };
@@ -101,7 +101,7 @@ export default function UsersPage() {
     <div>
       <h1>Users</h1>
       <p className="muted">
-        ADMIN can manage users and see the activity log. USER can run prep. SIGNAGE is a
+        ADMIN can manage users and every setting. USER can run prep. SIGNAGE is a
         view-only login for prep-bay TV screens. Freelance crew accounts are managed separately
         on the <Link to="/settings/crew">Crew</Link> page.
       </p>

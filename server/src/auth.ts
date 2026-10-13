@@ -196,7 +196,7 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
   }
   if (req.user.role === 'CREW') {
     const allowed = CREW_ALLOWLIST.some((re) => re.test(req.path));
-    if (!allowed) return res.status(403).json({ error: 'The crew portal is not available yet' });
+    if (!allowed) return res.status(403).json({ error: "That isn't available from a crew account" });
   }
   next();
 }

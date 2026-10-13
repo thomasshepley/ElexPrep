@@ -226,6 +226,8 @@ model JobScheduleItem {
   startsAt  DateTime
   endsAt    DateTime?
   notes     String?
+  /// Where on site this happens ("Loading bay", "Stage left") - shown in the entry's popup.
+  location  String?
   /// Admin-picked hex color for this entry's block on the day timeline (e.g. to visually group
   /// "Load in" vs "Show" vs "Get out" at a glance) - null means the timeline's default accent
   /// color, same look as before this field existed.

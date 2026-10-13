@@ -32,6 +32,7 @@ type ScheduleItemRow = {
   startsAt: Date;
   endsAt: Date | null;
   notes: string | null;
+  location: string | null;
   color: string | null;
   crewAssignments: {
     id: string;
@@ -52,6 +53,7 @@ export function toScheduleItemDto(item: ScheduleItemRow) {
     startsAt: item.startsAt.toISOString(),
     endsAt: item.endsAt ? item.endsAt.toISOString() : null,
     notes: item.notes,
+    location: item.location,
     color: item.color,
     crew: item.crewAssignments.map((ca) => ({
       id: ca.id,
@@ -89,7 +91,7 @@ jobScheduleRouter.get('/:jobId/schedule', async (req, res) => {
 });
 
 jobScheduleRouter.post('/:jobId/schedule', requireRole('ADMIN'), async (req, res) => {
-  const { title, startsAt, endsAt, notes, color } = req.body ?? {};
+  const { title, startsAt, endsAt, notes, color, location } = req.body ?? {};
   if (!title || typeof title !== 'string') return res.status(400).json({ error: 'title is required' });
   if (!startsAt) return res.status(400).json({ error: 'startsAt is required' });
   const item = await prisma.jobScheduleItem.create({
@@ -100,6 +102,7 @@ jobScheduleRouter.post('/:jobId/schedule', requireRole('ADMIN'), async (req, res
       endsAt: endsAt ? new Date(endsAt) : null,
       notes: notes || null,
       color: color || null,
+      location: typeof location === 'string' && location.trim() ? location.trim().slice(0, 120) : null,
     },
     include: scheduleItemInclude,
   });
@@ -110,7 +113,8 @@ jobScheduleRouter.post('/:jobId/schedule', requireRole('ADMIN'), async (req, res
 jobScheduleRouter.put('/:jobId/schedule/:id', requireRole('ADMIN'), async (req, res) => {
   const existing = await prisma.jobScheduleItem.findUnique({ where: { id: req.params.id } });
   if (!existing || existing.jobId !== req.params.jobId) return res.status(404).json({ error: 'Schedule item not found' });
-  const { title, startsAt, endsAt, notes, color } = req.body ?? {};
+  const { title, startsAt, endsAt, notes, color, location } = req.body ?? {};
+  if (location !== undefined && location !== null && (typeof location !== 'string' || location.length > 120)) return res.status(400).json({ error: 'location must be text (120 characters max)' });
   const item = await prisma.jobScheduleItem.update({
     where: { id: existing.id },
     data: {
@@ -119,6 +123,7 @@ jobScheduleRouter.put('/:jobId/schedule/:id', requireRole('ADMIN'), async (req, 
       ...(endsAt !== undefined ? { endsAt: endsAt ? new Date(endsAt) : null } : {}),
       ...(notes !== undefined ? { notes: notes || null } : {}),
       ...(color !== undefined ? { color: color || null } : {}),
+      ...(location !== undefined ? { location: location || null } : {}),
     },
     include: scheduleItemInclude,
   });
