@@ -42,7 +42,7 @@ export default function ForcedPasswordChange() {
     <div className="auth-page">
       <div className="auth-card">
         <div className="auth-brand">
-          <span className="auth-brand-mark" />
+          <img className="auth-brand-mark" src="/elex-mark.png" alt="" />
           <h1>ELEX Portal</h1>
           <p>An admin has required a new password for {user?.username} before continuing.</p>
         </div>

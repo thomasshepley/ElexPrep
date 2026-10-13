@@ -20,11 +20,16 @@
   --content: #e4e4e7;
   --content-muted: #9a9aa2;
 
-  /* Accent (brand blue) - --accent for text/links/icons on a dark surface (5.6:1), --accent-fill
-     for solid button backgrounds with white text (4.7:1 with #fff). */
-  --accent: #4f8cff;
-  --accent-fill: #2f6fe0;
-  --accent-wash: rgba(79, 140, 255, 0.14);
+  /* ELEX secondary brand colour - the dark slate paired with the teal. */
+  --brand-secondary: #222a35;
+
+  /* Accent: ELEX brand teal (#02b0bf, as on elex.lighting). --accent for text/links/icons on a
+     dark surface (6.7:1); --accent-fill is the brand teal itself for solid backgrounds, with
+     --on-accent in the secondary brand slate on it (5.4:1) - white would only reach 2.7:1. */
+  --accent: #02b0bf;
+  --accent-fill: #02b0bf;
+  --on-accent: var(--brand-secondary);
+  --accent-wash: rgba(2, 176, 191, 0.14);
 
   /* "PM" tag (project manager) - purple names and chip, see components/UserName.tsx. */
   --pm: #b98cff;
@@ -89,9 +94,12 @@
   --border-strong: #c2c5cc;
   --content: #1b1c20;
   --content-muted: #5b5d66;
-  --accent: #2f6fe0;
-  --accent-fill: #2f6fe0;
-  --accent-wash: rgba(47, 111, 224, 0.08);
+  /* Brand teal is too light for text on white, so links use a deeper teal (5.4:1); fills keep
+     the brand teal with dark text, same as dark mode. */
+  --accent: #00767f;
+  --accent-fill: #02b0bf;
+  --on-accent: var(--brand-secondary);
+  --accent-wash: rgba(2, 176, 191, 0.1);
   --pm: #7a3fd1;
   --pm-wash: rgba(122, 63, 209, 0.1);
   --danger: #cc3b3b;
@@ -160,7 +168,7 @@ button {
   font: inherit;
   font-weight: 600;
   background: var(--accent-fill);
-  color: #fff;
+  color: var(--on-accent);
   border: none;
   border-radius: var(--radius-sm);
   padding: var(--space-2) var(--space-4);
@@ -199,6 +207,7 @@ button.secondary:hover:not(:disabled) {
 
 button.danger {
   background: var(--danger-fill);
+  color: #fff;
 }
 
 button:disabled {
@@ -823,7 +832,7 @@ tbody tr:hover {
 
 .chip-accent {
   background: var(--accent-fill);
-  color: #fff;
+  color: var(--on-accent);
   border-color: transparent;
 }
 
@@ -946,9 +955,10 @@ tbody tr:hover {
   --border-strong: rgba(255, 255, 255, 0.22);
   --content: #f3f3f5;
   --content-muted: #9a9aa5;
-  --accent: #7badff;
-  --accent-fill: #2f6fe0;
-  --accent-wash: rgba(123, 173, 255, 0.16);
+  --accent: #02b0bf;
+  --accent-fill: #02b0bf;
+  --on-accent: var(--brand-secondary);
+  --accent-wash: rgba(2, 176, 191, 0.16);
   color-scheme: dark;
 
   min-height: 100vh;
@@ -956,8 +966,8 @@ tbody tr:hover {
   place-items: center;
   padding: 1.5rem;
   background: var(--surface);
-  background-image: radial-gradient(ellipse 820px 520px at 50% 14%, rgba(79, 140, 255, 0.24), transparent 65%),
-    radial-gradient(ellipse 600px 460px at 88% 90%, rgba(123, 173, 255, 0.08), transparent 70%);
+  background-image: radial-gradient(ellipse 820px 520px at 50% 14%, rgba(2, 176, 191, 0.2), transparent 65%),
+    radial-gradient(ellipse 600px 460px at 88% 90%, rgba(2, 176, 191, 0.07), transparent 70%);
   color: var(--content);
 }
 
@@ -989,11 +999,9 @@ tbody tr:hover {
 }
 
 .auth-brand-mark {
-  width: 3rem;
-  height: 3rem;
-  border-radius: var(--radius-md);
-  background: linear-gradient(150deg, var(--accent) 0%, var(--accent-fill) 100%);
-  box-shadow: 0 10px 24px rgba(47, 111, 224, 0.4);
+  width: 3.5rem;
+  height: 3.5rem;
+  display: block;
 }
 
 .auth-brand h1 {
@@ -1023,6 +1031,7 @@ tbody tr:hover {
 /* Dashboard toolbar - a search field (with a leading icon) plus a primary action, in one row. */
 .toolbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.75rem;
   margin-bottom: 1.5rem;
@@ -1030,8 +1039,15 @@ tbody tr:hover {
 
 .search-field {
   position: relative;
-  flex: 1;
+  flex: 1 1 14rem;
   max-width: 360px;
+}
+
+@media (max-width: 760px) {
+  .search-field {
+    flex-basis: 100%;
+    max-width: none;
+  }
 }
 
 .search-field svg {
@@ -1097,25 +1113,11 @@ tbody tr:hover {
   flex-wrap: wrap;
 }
 
-.job-card-delete {
-  opacity: 0.7;
-  position: relative;
-  z-index: 1;
-}
 
-.job-card-delete:hover {
-  opacity: 1;
-}
 
 /* Makes the whole card clickable (a "stretched link") without nesting a <button> inside an
    <a>, which is invalid HTML and makes click targets ambiguous. The card itself stays a plain
    div; this pseudo-element-like overlay carries the real navigation. */
-.job-card-stretched-link {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  border-radius: inherit;
-}
 
 .empty-state {
   padding: 3rem 1.5rem;
@@ -1193,7 +1195,7 @@ tbody tr:hover {
   height: 1.4rem;
   border-radius: 50%;
   background: var(--accent-fill);
-  color: #fff;
+  color: var(--on-accent);
 }
 
 .month-calendar-day-number {
@@ -2095,4 +2097,288 @@ td input[type='number']::-webkit-inner-spin-button {
   width: 100%;
   height: 100%;
   object-fit: contain;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: 0 var(--space-4);
+  max-width: 52rem;
+}
+
+.form-grid-full {
+  grid-column: 1 / -1;
+}
+
+.form-grid .field input,
+.form-grid .field textarea {
+  width: 100%;
+}
+
+.logo-slots {
+  display: flex;
+  gap: var(--space-5);
+  flex-wrap: wrap;
+}
+
+.logo-slot-name {
+  margin: 0 0 0.3rem;
+  text-transform: capitalize;
+}
+
+.logo-slot-preview {
+  max-height: 60px;
+  display: block;
+  margin-bottom: 0.4rem;
+}
+
+.onedrive-logo-suggestion {
+  margin-bottom: var(--space-4);
+}
+
+.danger-zone {
+  border-color: var(--danger-fill);
+}
+
+.job-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 0.9rem;
+  color: var(--content-muted);
+  font-size: var(--text-sm);
+  margin: 0.35rem 0 0.6rem;
+}
+
+.job-card-meta .job-card-venue {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin: 0;
+}
+
+.prep-progress {
+  display: flex;
+  gap: 0.25rem;
+  margin-bottom: 0.6rem;
+}
+
+.prep-progress-step {
+  flex: 1;
+  font-size: var(--text-xs);
+  text-align: center;
+  padding: 0.15rem 0;
+  border-radius: 999px;
+  background: var(--surface-sunken);
+  color: var(--content-muted);
+}
+
+.prep-progress-step.is-done {
+  background: var(--accent-wash);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.segmented {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.segmented button {
+  background: transparent;
+  color: var(--content-muted);
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 0.4rem 0.8rem;
+}
+
+.segmented button + button {
+  border-left: 1px solid var(--border);
+}
+
+.segmented button.active {
+  background: var(--accent-wash);
+  color: var(--content);
+}
+
+.segmented button:hover:not(:disabled) {
+  transform: none;
+  box-shadow: none;
+}
+
+.secondary-nav-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.secondary-nav-group + .secondary-nav-group {
+  margin-top: var(--space-3);
+}
+
+.secondary-nav-heading {
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--content-muted);
+  padding: 0 0.75rem 0.2rem;
+}
+
+@media (max-width: 760px) {
+  .secondary-nav-group {
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .secondary-nav-group + .secondary-nav-group {
+    margin-top: 0;
+    padding-left: var(--space-2);
+    border-left: 1px solid var(--border);
+  }
+
+  .secondary-nav-heading {
+    display: none;
+  }
+}
+
+/* InlineEdit: a table value that reads as text and turns into an input on click. */
+.inline-edit {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+}
+
+button.inline-edit-value {
+  background: transparent;
+  color: var(--content);
+  font-weight: 400;
+  text-align: left;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  box-shadow: none;
+  padding: 0.3rem 0.45rem;
+  margin: -0.3rem -0.45rem;
+  min-height: 2rem;
+  max-width: calc(100% + 0.9rem);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: text;
+}
+
+button.inline-edit-value:hover:not(:disabled) {
+  transform: none;
+  filter: none;
+  box-shadow: none;
+  border-color: var(--border);
+  background: var(--surface-sunken);
+}
+
+button.inline-edit-value.is-error {
+  border-color: var(--danger);
+}
+
+.inline-edit-empty {
+  color: var(--content-muted);
+  opacity: 0.6;
+}
+
+.inline-edit-input {
+  margin: -0.3rem -0.45rem;
+  padding: 0.3rem 0.45rem;
+}
+
+/* Floats beside the value instead of in flow, so a save never reflows the row. */
+.inline-edit-status {
+  position: absolute;
+  left: 100%;
+  margin-left: 0.5rem;
+  white-space: nowrap;
+  font-size: var(--text-xs);
+  pointer-events: none;
+}
+
+.inline-edit-saved {
+  color: var(--success, var(--accent));
+  font-weight: 600;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* Job contacts: one card per person, read first, with edit behind a button. */
+.contact-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+
+.contact-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  min-width: 0;
+}
+
+.contact-card-editing {
+  grid-column: 1 / -1;
+  margin-top: var(--space-3);
+}
+
+.contact-cards .contact-card-editing {
+  margin-top: 0;
+}
+
+.contact-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.6rem;
+}
+
+.contact-card-head > :first-child {
+  flex: 1;
+}
+
+.contact-card-head > .row {
+  flex-wrap: nowrap;
+  flex-shrink: 0;
+}
+
+.contact-card-head button {
+  padding: 0.25rem 0.6rem;
+  font-size: var(--text-sm);
+}
+
+.contact-card-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.9rem;
+  font-size: var(--text-sm);
+}
+
+.contact-card-links a {
+  overflow-wrap: anywhere;
+}
+
+.contact-card-notes {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--content-muted);
 }

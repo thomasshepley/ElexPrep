@@ -11,6 +11,7 @@ import TwoFactorPanel from '../components/TwoFactorPanel';
 import PasswordInput from '../components/PasswordInput';
 import Avatar from '../components/Avatar';
 import FileInput from '../components/FileInput';
+import MobileAccountActions from '../components/MobileAccountActions';
 
 /**
  * Crew self-service: the first place a crew member can edit anything about their own account
@@ -126,6 +127,7 @@ export default function CrewAccountPage() {
   return (
     <div>
       <h1>My account</h1>
+      <MobileAccountActions />
       {message && <p className="muted">{message}</p>}
       {error && <p className="error">{error}</p>}
 

@@ -10,10 +10,10 @@ import {
 } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { isAdminRole } from '../auth/roles';
+import type { JobSummary } from '../api/client';
 import { SearchIcon, WhereIcon } from '../components/Icons';
 import LocationLinks from '../components/LocationLinks';
-import { useDialog } from '../components/Dialog';
-import { formatDate } from '../utils/format';
+import { formatDate, formatDateRange } from '../utils/format';
 import DateTimeInput from '../components/DateTimeInput';
 
 function toDatetimeLocal(iso: string | null): string {
@@ -354,15 +354,29 @@ function OnboardOpportunitiesPanel({ existingOppIds, onOnboarded }: { existingOp
   );
 }
 
+type WhenFilter = 'upcoming' | 'past' | 'all';
+type VisibilityFilter = 'all' | 'public' | 'private';
+
+function prepStage(s: JobSummary | undefined): { label: string; step: number } {
+  if (!s) return { label: '', step: 0 };
+  if (s.labelsPrinted > 0 && s.labelsQueued === 0) return { label: 'Labels printed', step: 4 };
+  if (s.labelsQueued > 0 || s.labelsPrinted > 0) return { label: 'Labels queued', step: 3 };
+  if (s.cases > 0) return { label: 'Cases built', step: 2 };
+  if (s.fixtures > 0) return { label: 'Patch imported', step: 1 };
+  return { label: 'No patch yet', step: 0 };
+}
+
+const PREP_STEPS = ['Patch', 'Cases', 'Labels', 'Printed'];
+
 export default function JobsListPage() {
-  const dialog = useDialog();
   const { user } = useAuth();
   const isAdmin = isAdminRole(user?.role);
-  const canDelete = isAdmin || Boolean(user?.permissions?.deleteJobs);
   const canOnboard = isAdmin || Boolean(user?.permissions?.onboardJobs);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [tab, setTab] = useState<'portal' | 'onboard'>('portal');
   const [search, setSearch] = useState('');
+  const [when, setWhen] = useState<WhenFilter>('upcoming');
+  const [visibility, setVisibility] = useState<VisibilityFilter>('all');
   const [error, setError] = useState<string | null>(null);
 
   const refresh = () => api.jobs.list().then(setJobs).catch((e) => setError(e.message));
@@ -371,21 +385,30 @@ export default function JobsListPage() {
     refresh();
   }, []);
 
-  const removeJob = async (job: Job, e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (!(await dialog.confirm({ title: `Delete "${job.name}"?`, message: 'This removes its patch, cases, labels, plots and print history too.', confirmLabel: 'Delete job', danger: true, typeToConfirm: job.name }))) {
-      return;
-    }
-    await api.jobs.remove(job.id);
-    refresh();
-  };
-
+  // Upcoming (or undated) jobs soonest first, then past jobs most-recent first - the order you'd
+  // actually work through them, rather than when each was onboarded.
   const filtered = useMemo(() => {
-    if (!search) return jobs;
-    const q = search.toLowerCase();
-    return jobs.filter((j) => j.name.toLowerCase().includes(q) || (j.venue ?? '').toLowerCase().includes(q));
-  }, [jobs, search]);
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    const isPast = (j: Job) => {
+      const end = j.summary?.endsAt ?? j.summary?.startsAt;
+      return end ? new Date(end) < startOfToday : false;
+    };
+    const q = search.trim().toLowerCase();
+    return jobs
+      .filter((j) => !q || j.name.toLowerCase().includes(q) || (j.venue ?? '').toLowerCase().includes(q))
+      .filter((j) => (when === 'all' ? true : when === 'past' ? isPast(j) : !isPast(j)))
+      .filter((j) => (visibility === 'all' ? true : visibility === 'public' ? j.isPublic : !j.isPublic))
+      .sort((a, b) => {
+        const as = a.summary?.startsAt ? new Date(a.summary.startsAt).getTime() : null;
+        const bs = b.summary?.startsAt ? new Date(b.summary.startsAt).getTime() : null;
+        if (when === 'past') return (bs ?? 0) - (as ?? 0);
+        if (as !== null && bs !== null) return as - bs;
+        if (as !== null) return -1;
+        if (bs !== null) return 1;
+        return a.name.localeCompare(b.name);
+      });
+  }, [jobs, search, when, visibility]);
 
   const existingOppIds = useMemo(
     () => new Set(jobs.filter((j) => j.currentRmsOpportunityId).map((j) => j.currentRmsOpportunityId!)),
@@ -420,8 +443,22 @@ export default function JobsListPage() {
             <div className="toolbar">
               <div className="search-field">
                 <SearchIcon />
-                <input placeholder="Search jobs by name or venue" value={search} onChange={(e) => setSearch(e.target.value)} />
+                <input aria-label="Search jobs" placeholder="Search jobs by name or venue" value={search} onChange={(e) => setSearch(e.target.value)} />
               </div>
+              <div className="segmented" role="group" aria-label="Show jobs">
+                {(['upcoming', 'past', 'all'] as const).map((w) => (
+                  <button key={w} type="button" className={when === w ? 'active' : ''} aria-pressed={when === w} onClick={() => setWhen(w)}>
+                    {w === 'upcoming' ? 'Upcoming' : w === 'past' ? 'Past' : 'All'}
+                  </button>
+                ))}
+              </div>
+              {isAdmin && (
+                <select aria-label="Visibility" value={visibility} onChange={(e) => setVisibility(e.target.value as VisibilityFilter)}>
+                  <option value="all">Public and private</option>
+                  <option value="public">Public only</option>
+                  <option value="private">Private only</option>
+                </select>
+              )}
             </div>
           )}
 
@@ -447,34 +484,45 @@ export default function JobsListPage() {
           )}
           {jobs.length > 0 && filtered.length === 0 && (
             <div className="empty-state">
-              <p style={{ margin: 0 }}>No jobs match "{search}".</p>
+              <p style={{ margin: 0 }}>{search ? `No jobs match "${search}".` : when === 'upcoming' ? 'No upcoming jobs - check Past or All.' : 'No jobs here.'}</p>
             </div>
           )}
 
           {filtered.length > 0 && (
             <div className="job-grid">
-              {filtered.map((job) => (
-                <div key={job.id} className="job-card" style={{ position: 'relative' }}>
-                  <Link to={`/jobs/${job.id}`} className="job-card-stretched-link" aria-label={job.name} />
-                  <div className="job-card-top">
-                    <h3>{job.name}</h3>
-                    {canDelete && (
-                      <button className="secondary job-card-delete" onClick={(e) => removeJob(job, e)}>
-                        Delete
-                      </button>
-                    )}
-                  </div>
-                  {job.venue && (
-                    <div className="job-card-venue">
-                      <WhereIcon /> {job.venue}
+              {filtered.map((job) => {
+                const stage = prepStage(job.summary);
+                const dates = job.summary?.startsAt ? formatDateRange(job.summary.startsAt, job.summary.endsAt) : 'No date set';
+                return (
+                  <Link key={job.id} to={`/jobs/${job.id}`} className="job-card">
+                    <div className="job-card-top">
+                      <h3>{job.name}</h3>
                     </div>
-                  )}
-                  <div className="job-card-tags">
-                    {isAdmin && <span className={`chip ${job.isPublic ? 'chip-success' : 'chip-neutral'}`}>{job.isPublic ? 'Public' : 'Private'}</span>}
-                    {job.rmsAlertAt && <span className="chip chip-warning">RMS changed</span>}
-                  </div>
-                </div>
-              ))}
+                    <div className="job-card-meta">
+                      <span>{dates}</span>
+                      {job.venue && (
+                        <span className="job-card-venue">
+                          <WhereIcon /> {job.venue}
+                        </span>
+                      )}
+                      {job.summary && <span>{job.summary.crewCount === 1 ? '1 crew' : `${job.summary.crewCount} crew`}</span>}
+                    </div>
+                    {job.summary && (
+                      <div className="prep-progress" aria-label={`Prep: ${stage.label}`}>
+                        {PREP_STEPS.map((step, i) => (
+                          <span key={step} className={`prep-progress-step${i < stage.step ? ' is-done' : ''}`}>
+                            {step}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    <div className="job-card-tags">
+                      {isAdmin && <span className={`chip ${job.isPublic ? 'chip-success' : 'chip-neutral'}`}>{job.isPublic ? 'Public' : 'Private'}</span>}
+                      {job.rmsAlertAt && <span className="chip chip-warning">RMS changed</span>}
+                    </div>
+                  </Link>
+                );
+              })}
             </div>
           )}
         </>

@@ -5,7 +5,7 @@ import { prisma, logActivity } from '../db';
 import { MIN_PASSWORD_LENGTH, hashPassword, requireRole } from '../auth';
 import { requirePermission } from '../permissions';
 import { DOCUMENT_FIELDS, assertSafeDocuments, saveDocuments, streamDecryptedDocument } from '../crewDocumentsStorage';
-import { encryptBankDetails, decryptBankDetails, parseBankDetails } from '../bankDetails';
+import { decryptBankDetails } from '../bankDetails';
 import { notifyCrewApplicationSubmitted } from '../notifications';
 
 /**
@@ -86,19 +86,13 @@ crewApplicationsRouter.post(
   publicSubmitLimiter,
   upload.fields(DOCUMENT_FIELDS.map((d) => ({ name: d.field, maxCount: 1 }))),
   async (req, res) => {
-    const { fullName, email, phone, skills, certifications, dayRate, rightToWork, notes, gender, address, bankDetails } = req.body ?? {};
+    // Deliberately the basics only: an anonymous applicant isn't asked for bank details, home
+    // address, gender or rate - those are added from the crew account once approved.
+    const { fullName, email, phone, skills, certifications, rightToWork, notes } = req.body ?? {};
     if (!fullName || typeof fullName !== 'string') return res.status(400).json({ error: 'fullName is required' });
     if (!email || typeof email !== 'string') return res.status(400).json({ error: 'email is required' });
     if (fullName.length > 200 || email.length > 320) return res.status(400).json({ error: 'Name or email is too long' });
     assertSafeDocuments(req.files as Record<string, Express.Multer.File[]> | undefined);
-
-    let bankEncrypted: { ciphertext: string; iv: string; authTag: string } | null = null;
-    try {
-      const parsed = parseBankDetails(bankDetails);
-      if (parsed) bankEncrypted = encryptBankDetails(parsed);
-    } catch (err) {
-      return res.status(400).json({ error: (err as Error).message });
-    }
 
     const application = await prisma.crewApplication.create({
       data: {
@@ -107,14 +101,8 @@ crewApplicationsRouter.post(
         phone: phone || null,
         skills: skills || null,
         certifications: certifications || null,
-        dayRate: dayRate || null,
         rightToWork: rightToWork || null,
         notes: notes || null,
-        gender: gender || null,
-        address: address || null,
-        bankDetailsCiphertext: bankEncrypted?.ciphertext ?? null,
-        bankDetailsIv: bankEncrypted?.iv ?? null,
-        bankDetailsAuthTag: bankEncrypted?.authTag ?? null,
       },
     });
     await saveDocuments({ applicationId: application.id }, req.files as Record<string, Express.Multer.File[]> | undefined);

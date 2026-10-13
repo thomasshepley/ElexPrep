@@ -88,7 +88,7 @@ export default function JobLocationColorsPanel({ jobId }: { jobId: string }) {
 
   return (
     <div>
-      <h4>Location colors (this job only)</h4>
+      <h3 className="mt-0">Location colours (this job only)</h3>
       <p className="muted">
         Overrides/adds to the global defaults in{' '}
         <a href="/settings/location-colors" target="_blank" rel="noreferrer">

@@ -3,6 +3,7 @@ import { api, type FixtureTypeRule } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { hasPermission } from '../auth/roles';
 import PermissionFieldset from '../components/PermissionFieldset';
+import InlineEdit from '../components/InlineEdit';
 
 const PREP_SETTINGS_NOTE = 'You can view these settings, but changing them needs the "Manage prep settings" permission.';
 
@@ -55,8 +56,8 @@ export default function FixtureTypeRulesPage() {
       <p className="muted">
         Defines how many units of each fixture type go in a case, e.g. AstraBlade in pairs
         (201 + 202, 203 + 204…), Reflecta in threes (401 - 403), Viper Profile one per case.
-        A fixture type with no rule here defaults to one unit per case. Every field below is
-        editable in place (click and type, saves on blur).
+        A fixture type with no rule here defaults to one unit per case. Click any value below to
+        edit it.
       </p>
       <div className="panel">
         <h3>Add rule</h3>
@@ -91,26 +92,28 @@ export default function FixtureTypeRulesPage() {
             {rules.map((r) => (
               <tr key={r.id}>
                 <td>
-                  <input defaultValue={r.name} onBlur={(e) => update(r, 'name', e.target.value)} />
+                  <InlineEdit label="Fixture type" value={r.name} onSave={(v) => update(r, 'name', v)} />
                 </td>
                 <td>
-                  <input
+                  <InlineEdit
                     type="number"
                     min={1}
-                    defaultValue={r.unitsPerCase}
-                    style={{ width: 70 }}
-                    onBlur={(e) => {
-                      const n = Math.floor(Number(e.target.value));
-                      if (!e.target.value.trim() || !Number.isFinite(n) || n < 1) e.target.value = String(r.unitsPerCase);
-                      else update(r, 'unitsPerCase', n);
+                    label="Units per case"
+                    value={r.unitsPerCase}
+                    width={40}
+                    onSave={(v) => {
+                      const n = Math.floor(Number(v));
+                      if (!v.trim() || !Number.isFinite(n) || n < 1) throw new Error('Units per case must be 1 or more');
+                      return update(r, 'unitsPerCase', n);
                     }}
                   />
                 </td>
                 <td>
-                  <input
+                  <InlineEdit
+                    label="Case label override"
                     placeholder="(uses fixture type)"
-                    defaultValue={r.caseLabelOverride ?? ''}
-                    onBlur={(e) => update(r, 'caseLabelOverride', e.target.value)}
+                    value={r.caseLabelOverride}
+                    onSave={(v) => update(r, 'caseLabelOverride', v)}
                   />
                 </td>
                 <td>

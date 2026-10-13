@@ -6,6 +6,7 @@ import FileInput from './FileInput';
 import { useToast } from './Toast';
 import { useDialog } from './Dialog';
 import { formatDateTime } from '../utils/format';
+import InlineEdit from './InlineEdit';
 
 /** Fixture types that actually take a separate pixel-map patch - only these get the Pix
  * Uni/Pix Addr columns in the fixtures table. Matched on letters and digits only, so
@@ -227,6 +228,7 @@ export default function PatchImportPanel({ jobId, groupId = null }: { jobId: str
     } catch (e) {
       showToast((e as Error).message, 'error');
       loadFixtures();
+      throw e;
     }
   };
 
@@ -410,7 +412,7 @@ export default function PatchImportPanel({ jobId, groupId = null }: { jobId: str
         {fixtures && stageFixtures.length === 0 && <p className="muted">No fixtures imported for this stage yet.</p>}
         {fixtures && stageFixtures.length > 0 && (
           <>
-            <p className="muted">Every field is editable in place (click and type, saves on blur).</p>
+            <p className="muted">Click any value to edit it - Enter or clicking away saves, Escape cancels.</p>
             <input
               placeholder="Search fixtures…"
               value={fixtureSearch}
@@ -475,54 +477,25 @@ export default function PatchImportPanel({ jobId, groupId = null }: { jobId: str
                         <input type="checkbox" checked={selected.has(f.id)} onChange={() => toggleSelected(f.id)} />
                       </td>
                       <td>
-                        <input
-                          type="number"
-                          defaultValue={f.address ?? ''}
-                          style={{ width: 60 }}
-                          onBlur={(e) => updateFixture(f, 'address', e.target.value)}
-                        />
+                        <InlineEdit type="number" label="Address" value={f.address} width={60} onSave={(v) => updateFixture(f, 'address', v)} />
                       </td>
                       <td>
-                        <input
-                          defaultValue={f.fixtureType}
-                          style={{ width: 150 }}
-                          onBlur={(e) => updateFixture(f, 'fixtureType', e.target.value)}
-                        />
+                        <InlineEdit label="Type" value={f.fixtureType} width={150} onSave={(v) => updateFixture(f, 'fixtureType', v)} />
                       </td>
                       <td>
-                        <input
-                          type="number"
-                          defaultValue={f.mainUniverse ?? ''}
-                          style={{ width: 55 }}
-                          onBlur={(e) => updateFixture(f, 'mainUniverse', e.target.value)}
-                        />
+                        <InlineEdit type="number" label="Main universe" value={f.mainUniverse} width={55} onSave={(v) => updateFixture(f, 'mainUniverse', v)} />
                       </td>
                       <td>
-                        <input
-                          type="number"
-                          defaultValue={f.mainAddress ?? ''}
-                          style={{ width: 55 }}
-                          onBlur={(e) => updateFixture(f, 'mainAddress', e.target.value)}
-                        />
+                        <InlineEdit type="number" label="Main address" value={f.mainAddress} width={55} onSave={(v) => updateFixture(f, 'mainAddress', v)} />
                       </td>
                       {showPixColumns &&
                         (supportsPixelMap(f.fixtureType) ? (
                           <>
                             <td>
-                              <input
-                                type="number"
-                                defaultValue={f.pixUniverse ?? ''}
-                                style={{ width: 55 }}
-                                onBlur={(e) => updateFixture(f, 'pixUniverse', e.target.value)}
-                              />
+                              <InlineEdit type="number" label="Pixel universe" value={f.pixUniverse} width={55} onSave={(v) => updateFixture(f, 'pixUniverse', v)} />
                             </td>
                             <td>
-                              <input
-                                type="number"
-                                defaultValue={f.pixAddress ?? ''}
-                                style={{ width: 55 }}
-                                onBlur={(e) => updateFixture(f, 'pixAddress', e.target.value)}
-                              />
+                              <InlineEdit type="number" label="Pixel address" value={f.pixAddress} width={55} onSave={(v) => updateFixture(f, 'pixAddress', v)} />
                             </td>
                           </>
                         ) : (
@@ -532,17 +505,14 @@ export default function PatchImportPanel({ jobId, groupId = null }: { jobId: str
                           </>
                         ))}
                       <td>
-                        <input
-                          defaultValue={f.mode ?? ''}
-                          style={{ width: 120 }}
-                          onBlur={(e) => updateFixture(f, 'mode', e.target.value)}
-                        />
+                        <InlineEdit label="Mode" value={f.mode} width={120} onSave={(v) => updateFixture(f, 'mode', v)} />
                       </td>
                       <td>
                         <LocationSelect
                           value={f.location ?? ''}
                           options={locationOptions}
-                          onChange={(value) => updateFixture(f, 'location', value)}
+                          // updateFixture already toasts a failure; the select snaps back on reload.
+                          onChange={(value) => updateFixture(f, 'location', value).catch(() => {})}
                           ariaLabel={`Location for fixture ${f.address ?? ''}`}
                         />
                       </td>

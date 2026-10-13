@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { api, type Job, type CrewFeatures, CREW_FEATURE_KEYS, CREW_FEATURE_LABELS } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { hasPermission, isAdminRole } from '../auth/roles';
@@ -18,6 +18,9 @@ import FileInput from '../components/FileInput';
 import { useToast } from '../components/Toast';
 import { usePageTitle } from '../pageTitle';
 import DateTimeInput from '../components/DateTimeInput';
+import { useDialog } from '../components/Dialog';
+import { useAsyncAction } from '../hooks/useAsyncAction';
+import { toDatetimeLocal } from '../utils/format';
 
 const TABS = ['Prep', 'Plots', 'Schedule', 'Documents', 'Contacts', 'Crew', 'Discussion', 'Current RMS', 'Job Settings'] as const;
 type Tab = (typeof TABS)[number];
@@ -84,27 +87,21 @@ export default function JobDetailPage() {
   );
 }
 
-/** Formats an ISO datetime string for a <input type="datetime-local"> value (local time, no
- * seconds/timezone) - undefined/null becomes '' so the field renders empty rather than crashing. */
-function toDatetimeLocal(iso: string | null): string {
-  if (!iso) return '';
-  const d = new Date(iso);
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-
 function JobSettingsPanel({ job, onUpdate }: { job: Job; onUpdate: (j: Job) => void }) {
   const { user } = useAuth();
+  const navigate = useNavigate();
+  const dialog = useDialog();
+  const { busy, run } = useAsyncAction();
   const isAdmin = isAdminRole(user?.role);
   const canPublish = isAdmin || Boolean(user?.permissions?.publishJobs);
   const canEditJob = hasPermission(user, 'editJobs');
+  const canDelete = hasPermission(user, 'deleteJobs');
   const [name, setName] = useState(job.name);
   const [venue, setVenue] = useState(job.venue ?? '');
   const [description, setDescription] = useState(job.description ?? '');
   const [address, setAddress] = useState(job.address ?? '');
   const [startsAt, setStartsAt] = useState(toDatetimeLocal(job.startsAt));
   const [endsAt, setEndsAt] = useState(toDatetimeLocal(job.endsAt));
-  const [logoBusy, setLogoBusy] = useState(false);
   const [oneDriveLogo, setOneDriveLogo] = useState<{ itemId: string; name: string } | null>(null);
 
   useEffect(() => {
@@ -112,181 +109,211 @@ function JobSettingsPanel({ job, onUpdate }: { job: Job; onUpdate: (j: Job) => v
     api.jobs.logoOneDriveCandidate(job.id).then(setOneDriveLogo).catch(() => setOneDriveLogo(null));
   }, [job.id, job.oneDriveFolderId]);
 
+  const dirty =
+    name !== job.name ||
+    venue !== (job.venue ?? '') ||
+    description !== (job.description ?? '') ||
+    address !== (job.address ?? '') ||
+    startsAt !== toDatetimeLocal(job.startsAt) ||
+    endsAt !== toDatetimeLocal(job.endsAt);
+
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
-    const updated = await api.jobs.update(job.id, {
-      name,
-      venue,
-      description: description || null,
-      address: address || null,
-      startsAt: startsAt ? new Date(startsAt).toISOString() : null,
-      endsAt: endsAt ? new Date(endsAt).toISOString() : null,
-    });
-    onUpdate(updated);
+    const updated = await run(
+      () =>
+        api.jobs.update(job.id, {
+          name,
+          venue,
+          description: description || null,
+          address: address || null,
+          startsAt: startsAt ? new Date(startsAt).toISOString() : null,
+          endsAt: endsAt ? new Date(endsAt).toISOString() : null,
+        }),
+      { success: 'Job details saved' }
+    );
+    if (updated) onUpdate(updated);
   };
 
   const togglePublic = async () => {
-    const updated = await api.jobs.update(job.id, { isPublic: !job.isPublic });
-    onUpdate(updated);
+    const updated = await run(() => api.jobs.update(job.id, { isPublic: !job.isPublic }), {
+      success: job.isPublic ? 'Job is now private' : 'Job is now public',
+    });
+    if (updated) onUpdate(updated);
   };
 
-  const uploadLogo = async (file: File, slot: 'left' | 'middle' | 'right') => {
-    setLogoBusy(true);
-    try {
-      const updated = await api.jobs.uploadLogo(job.id, file, slot);
-      onUpdate(updated);
-    } finally {
-      setLogoBusy(false);
-    }
+  const uploadLogo = async (file: File, slot: LogoSlot) => {
+    const updated = await run(() => api.jobs.uploadLogo(job.id, file, slot), { success: 'Logo updated' });
+    if (updated) onUpdate(updated);
   };
 
-  const removeLogo = async (slot: 'left' | 'middle' | 'right') => {
-    setLogoBusy(true);
-    try {
-      const updated = await api.jobs.removeLogo(job.id, slot);
-      onUpdate(updated);
-    } finally {
-      setLogoBusy(false);
-    }
+  const removeLogo = async (slot: LogoSlot) => {
+    const updated = await run(() => api.jobs.removeLogo(job.id, slot), { success: 'Logo removed' });
+    if (updated) onUpdate(updated);
   };
 
-  const applyOneDriveLogo = async (slot: 'left' | 'middle' | 'right') => {
-    setLogoBusy(true);
-    try {
-      const updated = await api.jobs.applyLogoOneDriveCandidate(job.id, slot);
+  const applyOneDriveLogo = async (slot: LogoSlot) => {
+    const updated = await run(() => api.jobs.applyLogoOneDriveCandidate(job.id, slot), { success: 'Logo imported from OneDrive' });
+    if (updated) {
       onUpdate(updated);
       setOneDriveLogo(null);
-    } finally {
-      setLogoBusy(false);
     }
+  };
+
+  const deleteJob = async () => {
+    const ok = await dialog.confirm({
+      title: `Delete "${job.name}"?`,
+      message: 'This removes its patch, cases, labels, plots, documents and print history. It cannot be undone.',
+      confirmLabel: 'Delete job',
+      danger: true,
+      typeToConfirm: job.name,
+    });
+    if (!ok) return;
+    const done = await run(() => api.jobs.remove(job.id).then(() => true), { success: `Deleted "${job.name}"` });
+    if (done) navigate('/jobs');
   };
 
   // The first still-empty slot, in the order most jobs would want it filled - used so the
   // OneDrive suggestion below has one obvious default action instead of asking which slot.
-  const emptyLogoSlot = !job.logoPath ? 'middle' : !job.logoPathLeft ? 'left' : !job.logoPathRight ? 'right' : null;
+  const emptyLogoSlot: LogoSlot | null = !job.logoPath ? 'middle' : !job.logoPathLeft ? 'left' : !job.logoPathRight ? 'right' : null;
 
   return (
-    <div className="panel">
-      <h3>Job settings</h3>
-      {!canEditJob && <p className="muted">You can view this job's details, but editing them needs the "Edit jobs" permission.</p>}
-      <form onSubmit={save}>
-       <fieldset disabled={!canEditJob} className="row" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '0.6rem', border: 0, padding: 0, margin: 0 }}>
-        <label>
-          Name
-          <br />
-          <input value={name} onChange={(e) => setName(e.target.value)} />
-        </label>
-        <label>
-          Venue
-          <br />
-          <input value={venue} onChange={(e) => setVenue(e.target.value)} />
-        </label>
-        <label style={{ width: '100%', maxWidth: '32rem' }}>
-          Description
-          <br />
-          <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} style={{ width: '100%' }} />
-        </label>
-        <label style={{ width: '100%', maxWidth: '32rem' }}>
-          Address
-          <br />
-          <input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Street, city, postcode" style={{ width: '100%' }} />
-        </label>
-        {address && (
-          <div style={{ width: '100%', maxWidth: '32rem' }}>
-            <LocationLinks address={address} />
-          </div>
-        )}
-        <div className="row" style={{ gap: '1rem' }}>
-          <label>
-            Starts
-            <br />
-            <DateTimeInput value={startsAt} onChange={setStartsAt} />
-          </label>
-          <label>
-            Ends
-            <br />
-            <DateTimeInput value={endsAt} onChange={setEndsAt} defaultTime="18:00" />
-          </label>
-        </div>
-        <p className="muted" style={{ margin: 0 }}>
-          These can extend earlier or later than the linked Current RMS opportunity's own dates -
-          e.g. to cover a prep day before the hire actually starts. Leave blank to fall back to
-          the opportunity's dates.
-        </p>
-        {canEditJob && <button type="submit">Save</button>}
-       </fieldset>
-      </form>
+    <div className="stack">
+      <section className="panel">
+        <h3 className="mt-0">Details</h3>
+        {!canEditJob && <p className="muted">You can view this job's details, but editing them needs the "Edit jobs" permission.</p>}
+        <form onSubmit={save}>
+          <fieldset disabled={!canEditJob || busy} className="plain-fieldset">
+            <div className="form-grid">
+              <div className="field">
+                <label htmlFor="job-name">Name</label>
+                <input id="job-name" value={name} onChange={(e) => setName(e.target.value)} required />
+              </div>
+              <div className="field">
+                <label htmlFor="job-venue">Venue</label>
+                <input id="job-venue" value={venue} onChange={(e) => setVenue(e.target.value)} />
+              </div>
+              <div className="field form-grid-full">
+                <label htmlFor="job-description">Description</label>
+                <textarea id="job-description" value={description} onChange={(e) => setDescription(e.target.value)} rows={3} />
+              </div>
+              <div className="field form-grid-full">
+                <label htmlFor="job-address">Address</label>
+                <input id="job-address" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Street, city, postcode" />
+              </div>
+              {address && (
+                <div className="form-grid-full">
+                  <LocationLinks address={address} />
+                </div>
+              )}
+              <div className="field">
+                <label htmlFor="job-starts">Starts</label>
+                <DateTimeInput id="job-starts" value={startsAt} onChange={setStartsAt} />
+              </div>
+              <div className="field">
+                <label htmlFor="job-ends">Ends</label>
+                <DateTimeInput id="job-ends" value={endsAt} onChange={setEndsAt} defaultTime="18:00" />
+              </div>
+            </div>
+            <p className="muted">
+              These can extend earlier or later than the linked Current RMS opportunity's dates - e.g. to cover a prep day
+              before the hire starts. Leave blank to use the opportunity's dates.
+            </p>
+            {canEditJob && (
+              <button type="submit" disabled={!dirty || busy}>
+                Save details
+              </button>
+            )}
+          </fieldset>
+        </form>
+      </section>
 
-      <div style={{ marginTop: '1.25rem' }}>
-        <h4>Visibility</h4>
+      <section className="panel">
+        <h3 className="mt-0">Visibility</h3>
         {canPublish ? (
           <>
             <label className="row" style={{ gap: '0.4rem' }}>
-              <input type="checkbox" checked={job.isPublic} onChange={togglePublic} />
-              Public - normal users can see this job
+              <input type="checkbox" checked={job.isPublic} onChange={togglePublic} disabled={busy} />
+              Public - every staff account can see this job
             </label>
-            <p className="muted">Admins always see every job regardless of this setting.</p>
+            <p className="muted mb-0">Admins always see every job regardless of this setting.</p>
           </>
         ) : (
-          <p className="muted">{job.isPublic ? 'This job is public.' : 'This job is private.'}</p>
+          <p className="muted mb-0">{job.isPublic ? 'This job is public.' : 'This job is private.'}</p>
         )}
-      </div>
+      </section>
 
-      <div style={{ marginTop: '1.25rem' }}>
-        <h4>Job logo</h4>
+      <section className="panel">
+        <h3 className="mt-0">Logos</h3>
         <p className="muted">
-          Used on PAL/generic labels and prep displays. Up to three logos print side by side
-          across the label's logo bar - most jobs just use the middle slot.
+          Used on PAL/generic labels and prep displays. Up to three logos print side by side across the label's logo bar - most
+          jobs just use the middle slot.
         </p>
         {canEditJob && oneDriveLogo && emptyLogoSlot && (
-          <div className="panel onedrive-logo-suggestion" style={{ marginBottom: '0.9rem' }}>
-            <p style={{ margin: 0 }}>
+          <div className="panel onedrive-logo-suggestion">
+            <p className="mt-0">
               Found a logo in this job's OneDrive folder: <strong>{oneDriveLogo.name}</strong>
             </p>
-            <button type="button" disabled={logoBusy} onClick={() => applyOneDriveLogo(emptyLogoSlot)} style={{ marginTop: '0.5rem' }}>
+            <button type="button" disabled={busy} onClick={() => applyOneDriveLogo(emptyLogoSlot)}>
               Use as {emptyLogoSlot} logo
             </button>
           </div>
         )}
-        <div className="row" style={{ gap: '1.5rem', flexWrap: 'wrap' }}>
+        <div className="logo-slots">
           {(['left', 'middle', 'right'] as const).map((slot) => {
             const path = slot === 'left' ? job.logoPathLeft : slot === 'right' ? job.logoPathRight : job.logoPath;
             return (
-              <div key={slot}>
-                <p className="muted" style={{ margin: '0 0 0.3rem', textTransform: 'capitalize' }}>
-                  {slot}
-                </p>
-                {path && (
-                  <div>
-                    <LogoSizeControl job={job} slot={slot} canEdit={canEditJob} onUpdate={onUpdate} />
-                    {canEditJob && (
-                      <button type="button" className="secondary" disabled={logoBusy} onClick={() => removeLogo(slot)} style={{ marginBottom: '0.3rem' }}>
+              <div key={slot} className="logo-slot">
+                <p className="muted logo-slot-name">{slot}</p>
+                {path ? (
+                  <LogoSizeControl job={job} slot={slot} canEdit={canEditJob} onUpdate={onUpdate} />
+                ) : (
+                  <p className="muted">None</p>
+                )}
+                {canEditJob && (
+                  <div className="row" style={{ gap: '0.4rem' }}>
+                    <FileInput
+                      accept="image/png,image/jpeg,image/gif,image/webp"
+                      disabled={busy}
+                      onFile={(file) => uploadLogo(file, slot)}
+                      label={path ? 'Replace' : 'Choose image'}
+                    />
+                    {path && (
+                      <button type="button" className="secondary" disabled={busy} onClick={() => removeLogo(slot)}>
                         Remove
                       </button>
                     )}
                   </div>
                 )}
-                {canEditJob ? (
-                  <FileInput accept="image/png,image/jpeg,image/gif,image/webp" disabled={logoBusy} onFile={(file) => uploadLogo(file, slot)} label={path ? 'Replace' : 'Choose image'} />
-                ) : (
-                  !path && <p className="muted" style={{ margin: 0 }}>None</p>
-                )}
               </div>
             );
           })}
         </div>
-      </div>
+      </section>
 
-      <div style={{ marginTop: '1.25rem' }}>
-        <JobCrewFeaturesPanel job={job} onUpdate={onUpdate} />
-      </div>
+      <JobCrewFeaturesPanel job={job} onUpdate={onUpdate} />
 
-      <div style={{ marginTop: '1.25rem' }}>
+      <section className="panel">
         <JobLocationColorsPanel jobId={job.id} />
-      </div>
+      </section>
+
+      {canDelete && (
+        <section className="panel danger-zone">
+          <h3 className="mt-0">Danger zone</h3>
+          <div className="row-between">
+            <p className="muted mb-0">
+              Delete this job and everything attached to it. You'll be asked to type the job's name to confirm.
+            </p>
+            <button type="button" className="danger" disabled={busy} onClick={deleteJob}>
+              Delete job
+            </button>
+          </div>
+        </section>
+      )}
     </div>
   );
 }
+
+type LogoSlot = 'left' | 'middle' | 'right';
 
 const LOGO_SCALE_FIELD = { left: 'logoScaleLeft', middle: 'logoScale', right: 'logoScaleRight' } as const;
 
@@ -374,30 +401,28 @@ function JobCrewFeaturesPanel({ job, onUpdate }: { job: Job; onUpdate: (j: Job) 
   const isAdmin = isAdminRole(user?.role);
   const canEdit = isAdmin || Boolean(user?.permissions?.onboardJobs) || Boolean(user?.permissions?.manageCrewAssignments);
   const [features, setFeatures] = useState<CrewFeatures | null>(null);
-  const [busy, setBusy] = useState(false);
+  const { busy, run } = useAsyncAction();
 
   useEffect(() => {
-    api.portalSettings.getCrewFeaturesDefault().then((defaults) => {
-      const override = job.crewFeaturesJson ? (JSON.parse(job.crewFeaturesJson) as Partial<CrewFeatures>) : {};
-      setFeatures({ ...defaults, ...override });
-    });
+    api.portalSettings
+      .getCrewFeaturesDefault()
+      .then((defaults) => {
+        const override = job.crewFeaturesJson ? (JSON.parse(job.crewFeaturesJson) as Partial<CrewFeatures>) : {};
+        setFeatures({ ...defaults, ...override });
+      })
+      .catch(() => setFeatures(null));
   }, [job.crewFeaturesJson]);
 
   if (!canEdit || !features) return null;
 
   const save = async () => {
-    setBusy(true);
-    try {
-      const updated = await api.jobs.update(job.id, { crewFeatures: features });
-      onUpdate(updated);
-    } finally {
-      setBusy(false);
-    }
+    const updated = await run(() => api.jobs.update(job.id, { crewFeatures: features }), { success: 'Crew portal features saved' });
+    if (updated) onUpdate(updated);
   };
 
   return (
-    <div>
-      <h4>Crew portal features</h4>
+    <section className="panel">
+      <h3 className="mt-0">Crew portal</h3>
       <p className="muted">Which sections of this job's page are visible to its crew.</p>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginBottom: '0.75rem' }}>
         {CREW_FEATURE_KEYS.map((key) => (
@@ -407,9 +432,9 @@ function JobCrewFeaturesPanel({ job, onUpdate }: { job: Job; onUpdate: (j: Job) 
           </label>
         ))}
       </div>
-      <button type="button" className="secondary" onClick={save} disabled={busy}>
-        Save
+      <button type="button" onClick={save} disabled={busy}>
+        Save crew portal features
       </button>
-    </div>
+    </section>
   );
 }

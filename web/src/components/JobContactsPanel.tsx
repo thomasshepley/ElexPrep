@@ -3,16 +3,14 @@ import { api, type JobContact } from '../api/client';
 import WhatsAppButton from './WhatsAppButton';
 import { useToast } from './Toast';
 import { useDialog } from './Dialog';
+import { PlusIcon } from './Icons';
 
 export default function JobContactsPanel({ jobId }: { jobId: string }) {
   const dialog = useDialog();
   const { showToast } = useToast();
   const [contacts, setContacts] = useState<JobContact[]>([]);
-  const [name, setName] = useState('');
-  const [role, setRole] = useState('');
-  const [phone, setPhone] = useState('');
-  const [email, setEmail] = useState('');
-  const [notes, setNotes] = useState('');
+  const [adding, setAdding] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const refresh = () => api.jobContacts.list(jobId).then(setContacts).catch((e) => setError(e.message));
@@ -22,32 +20,25 @@ export default function JobContactsPanel({ jobId }: { jobId: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [jobId]);
 
-  const create = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const create = async (d: ContactDraft) => {
     setError(null);
-    try {
-      await api.jobContacts.create(jobId, {
-        name,
-        role: role || undefined,
-        phone: phone || undefined,
-        email: email || undefined,
-        notes: notes || undefined,
-      });
-      setName('');
-      setRole('');
-      setPhone('');
-      setEmail('');
-      setNotes('');
-      refresh();
-      showToast(`Added ${name} to important contacts`);
-    } catch (err) {
-      setError((err as Error).message);
-    }
+    await api.jobContacts.create(jobId, {
+      name: d.name,
+      role: d.role || undefined,
+      phone: d.phone || undefined,
+      email: d.email || undefined,
+      notes: d.notes || undefined,
+    });
+    refresh();
+    showToast(`Added ${d.name} to important contacts`);
   };
 
-  const updateField = async (c: JobContact, field: 'name' | 'role' | 'phone' | 'email' | 'notes', value: string) => {
-    if (value === (c[field] ?? '')) return;
-    await api.jobContacts.update(jobId, c.id, { [field]: value });
+  const save = async (c: JobContact, draft: ContactDraft) => {
+    const changes = Object.fromEntries(
+      (Object.keys(draft) as (keyof ContactDraft)[]).filter((k) => draft[k] !== (c[k] ?? '')).map((k) => [k, draft[k]]),
+    );
+    if (Object.keys(changes).length > 0) await api.jobContacts.update(jobId, c.id, changes);
+    setEditingId(null);
     refresh();
   };
 
@@ -60,83 +51,141 @@ export default function JobContactsPanel({ jobId }: { jobId: string }) {
 
   return (
     <div className="panel">
-      <h3>Important contacts</h3>
+      <div className="row" style={{ justifyContent: 'space-between' }}>
+        <h3>Important contacts</h3>
+        {!adding && (
+          <button type="button" className="secondary" onClick={() => setAdding(true)}>
+            <PlusIcon /> Add contact
+          </button>
+        )}
+      </div>
       <p className="muted">Venue, client, or production contacts worth having on hand for this job.</p>
-      <form onSubmit={create}>
-        <div className="row" style={{ alignItems: 'flex-end', flexWrap: 'wrap', gap: '0.9rem' }}>
-          <div className="field" style={{ width: '12rem' }}>
-            <label htmlFor="contact-name">Name</label>
-            <input id="contact-name" value={name} onChange={(e) => setName(e.target.value)} required />
-          </div>
-          <div className="field" style={{ width: '11rem' }}>
-            <label htmlFor="contact-role">Role</label>
-            <input id="contact-role" value={role} onChange={(e) => setRole(e.target.value)} placeholder="Venue Manager" />
-          </div>
-          <div className="field" style={{ width: '10rem' }}>
-            <label htmlFor="contact-phone">Phone</label>
-            <input id="contact-phone" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="07700 900000" />
-          </div>
-          <div className="field" style={{ width: '12rem' }}>
-            <label htmlFor="contact-email">Email</label>
-            <input id="contact-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-          </div>
-          <div className="field" style={{ width: '14rem' }}>
-            <label htmlFor="contact-notes">Notes</label>
-            <input id="contact-notes" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Site access code, etc." />
-          </div>
-          <button type="submit">Add</button>
-        </div>
-      </form>
-      {error && <p className="error">{error}</p>}
 
       {contacts.length > 0 ? (
-        <div className="table-scroll">
-          <table style={{ marginTop: '0.75rem' }}>
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Role</th>
-                <th>Phone</th>
-                <th>Email</th>
-                <th>Notes</th>
-                <th></th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {contacts.map((c) => (
-                <tr key={c.id}>
-                  <td>
-                    <input defaultValue={c.name} style={{ width: '10rem' }} onBlur={(e) => updateField(c, 'name', e.target.value)} />
-                  </td>
-                  <td>
-                    <input defaultValue={c.role ?? ''} style={{ width: '9rem' }} onBlur={(e) => updateField(c, 'role', e.target.value)} />
-                  </td>
-                  <td>
-                    <input defaultValue={c.phone ?? ''} style={{ width: '8rem' }} onBlur={(e) => updateField(c, 'phone', e.target.value)} />
-                  </td>
-                  <td>
-                    <input defaultValue={c.email ?? ''} style={{ width: '10rem' }} onBlur={(e) => updateField(c, 'email', e.target.value)} />
-                  </td>
-                  <td>
-                    <input defaultValue={c.notes ?? ''} style={{ width: '11rem' }} onBlur={(e) => updateField(c, 'notes', e.target.value)} />
-                  </td>
-                  <td>
-                    <WhatsAppButton phone={c.phone} label="WhatsApp" compact />
-                  </td>
-                  <td>
-                    <button type="button" className="secondary" onClick={() => remove(c)}>
+        <div className="contact-cards">
+          {contacts.map((c) =>
+            editingId === c.id ? (
+              <ContactForm key={c.id} initial={c} submitLabel="Save" onSubmit={(d) => save(c, d)} onCancel={() => setEditingId(null)} />
+            ) : (
+              <div key={c.id} className="contact-card">
+                <div className="contact-card-head">
+                  <div style={{ minWidth: 0 }}>
+                    <strong>{c.name}</strong>
+                    {c.role && <div className="muted">{c.role}</div>}
+                  </div>
+                  <div className="row" style={{ gap: '0.4rem' }}>
+                    <button type="button" className="secondary" onClick={() => setEditingId(c.id)} aria-label={`Edit ${c.name}`}>
+                      Edit
+                    </button>
+                    <button type="button" className="secondary" onClick={() => remove(c)} aria-label={`Remove ${c.name}`}>
                       Remove
                     </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  </div>
+                </div>
+                <div className="contact-card-links">
+                  {c.phone && <a href={`tel:${c.phone.replace(/\s+/g, '')}`}>{c.phone}</a>}
+                  {c.email && <a href={`mailto:${c.email}`}>{c.email}</a>}
+                  {c.phone && <WhatsAppButton phone={c.phone} label="WhatsApp" compact />}
+                </div>
+                {c.notes && <p className="contact-card-notes">{c.notes}</p>}
+              </div>
+            ),
+          )}
         </div>
       ) : (
-        <p className="muted">No contacts added yet.</p>
+        !adding && <p className="muted">No contacts added yet.</p>
       )}
+
+      {adding && (
+        <ContactForm
+          submitLabel="Add contact"
+          onSubmit={async (d) => {
+            await create(d);
+            setAdding(false);
+          }}
+          onCancel={() => setAdding(false)}
+        />
+      )}
+      {error && <p className="error">{error}</p>}
     </div>
+  );
+}
+
+type ContactDraft = { name: string; role: string; phone: string; email: string; notes: string };
+
+function ContactForm({
+  initial,
+  submitLabel,
+  onSubmit,
+  onCancel,
+}: {
+  initial?: JobContact;
+  submitLabel: string;
+  onSubmit: (draft: ContactDraft) => Promise<void>;
+  onCancel: () => void;
+}) {
+  const [draft, setDraft] = useState<ContactDraft>({
+    name: initial?.name ?? '',
+    role: initial?.role ?? '',
+    phone: initial?.phone ?? '',
+    email: initial?.email ?? '',
+    notes: initial?.notes ?? '',
+  });
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const id = initial?.id ?? 'new';
+  const set = (k: keyof ContactDraft) => (e: React.ChangeEvent<HTMLInputElement>) => setDraft((d) => ({ ...d, [k]: e.target.value }));
+
+  return (
+    <form
+      className="contact-card contact-card-editing"
+      onSubmit={async (e) => {
+        e.preventDefault();
+        setBusy(true);
+        setError(null);
+        try {
+          await onSubmit(draft);
+        } catch (err) {
+          setError((err as Error).message);
+        } finally {
+          setBusy(false);
+        }
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') onCancel();
+      }}
+    >
+      <div className="form-grid">
+        <div className="field">
+          <label htmlFor={`contact-name-${id}`}>Name</label>
+          <input id={`contact-name-${id}`} value={draft.name} onChange={set('name')} required autoFocus />
+        </div>
+        <div className="field">
+          <label htmlFor={`contact-role-${id}`}>Role</label>
+          <input id={`contact-role-${id}`} value={draft.role} onChange={set('role')} placeholder="Venue Manager" />
+        </div>
+        <div className="field">
+          <label htmlFor={`contact-phone-${id}`}>Phone</label>
+          <input id={`contact-phone-${id}`} type="tel" value={draft.phone} onChange={set('phone')} placeholder="07700 900000" />
+        </div>
+        <div className="field">
+          <label htmlFor={`contact-email-${id}`}>Email</label>
+          <input id={`contact-email-${id}`} type="email" value={draft.email} onChange={set('email')} />
+        </div>
+        <div className="field form-grid-full">
+          <label htmlFor={`contact-notes-${id}`}>Notes</label>
+          <input id={`contact-notes-${id}`} value={draft.notes} onChange={set('notes')} placeholder="Site access code, etc." />
+        </div>
+      </div>
+      {error && <p className="error">{error}</p>}
+      <div className="row" style={{ gap: '0.5rem' }}>
+        <button type="submit" disabled={busy}>
+          {submitLabel}
+        </button>
+        <button type="button" className="secondary" onClick={onCancel}>
+          Cancel
+        </button>
+      </div>
+    </form>
   );
 }

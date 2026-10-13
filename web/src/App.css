@@ -44,10 +44,9 @@
 }
 
 .sidebar-brand-mark {
-  width: 1.8rem;
-  height: 1.8rem;
-  border-radius: 7px;
-  background: linear-gradient(150deg, var(--accent), var(--accent-fill));
+  width: 1.9rem;
+  height: 1.9rem;
+  display: block;
   flex-shrink: 0;
 }
 
@@ -160,45 +159,157 @@
   width: 100%;
 }
 
+/* Notifications, theme and sign out as one row of icon buttons rather than three full-width
+   buttons stacked down the sidebar. */
+.sidebar-actions {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.sidebar-actions > * {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.sidebar-actions .notification-bell > button {
+  flex: 1;
+}
+
+.sidebar-actions .notification-bell {
+  display: flex;
+}
+
+.sidebar-actions button {
+  padding: 0.55rem;
+}
+
+.sidebar-actions button > span:not(.notification-badge) {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.mobile-only {
+  display: none !important;
+}
+
+/* Phones: the sidebar becomes a labelled bottom tab bar (crew on site use this one-handed), and
+   the account controls move onto the account page (see MobileAccountActions). */
 @media (max-width: 760px) {
+  .shell {
+    display: block;
+  }
+
   .sidebar {
-    width: 76px;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: auto;
+    z-index: 900;
+    border-right: none;
+    border-top: 1px solid var(--border);
+    padding-bottom: env(safe-area-inset-bottom);
   }
 
   .sidebar-sticky {
-    padding: 1.25rem 0.5rem;
-    align-items: center;
+    position: static;
+    height: auto;
+    flex-direction: row;
+    padding: 0.3rem 0.25rem;
+    overflow: visible;
   }
 
-  .sidebar-brand-text,
-  .sidebar-nav a span,
-  .sidebar-username,
-  .sidebar-signout span,
-  .sidebar-theme-toggle span {
-    display: none;
+  .sidebar-brand,
+  .sidebar-user-row,
+  .sidebar-user .sidebar-version,
+  .sidebar-user .sidebar-bug-report,
+  .sidebar-actions > .sidebar-theme-toggle,
+  .sidebar-actions > .sidebar-signout {
+    display: none !important;
   }
 
-  .sidebar-brand {
-    justify-content: center;
-    padding: 0;
+  /* Flatten the nav and the actions so every tab, bell included, is an equal-width item of the
+     one bar. */
+  .sidebar-nav,
+  .sidebar-user,
+  .sidebar-actions {
+    display: contents;
+  }
+
+  .sidebar-actions .notification-bell {
+    flex: 1 1 0;
+    min-width: 0;
   }
 
   .sidebar-nav a {
-    justify-content: center;
-    padding: 0.65rem;
+    flex: 1 1 0;
+    flex-direction: column;
+    gap: 0.15rem;
+    padding: 0.35rem 0.1rem;
+    font-size: 0.68rem;
+    min-width: 0;
   }
 
-  .sidebar-user-row {
-    justify-content: center;
-    padding: 0;
+  .sidebar-nav a span {
+    display: block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
-  .sidebar-signout,
-  .sidebar-theme-toggle {
-    padding: 0.6rem;
+
+  /* The bell is the one sidebar action kept on the bar, styled as a tab like its neighbours. */
+  .sidebar-actions .notification-bell > button {
+    position: relative;
+    flex-direction: column;
+    gap: 0.15rem;
+    border: none;
+    background: transparent;
+    box-shadow: none;
+    padding: 0.35rem 0.25rem;
+    color: var(--content-muted);
+    font-size: 0.68rem;
+    font-weight: 500;
+  }
+
+  .sidebar-actions .notification-bell > button > span:not(.notification-badge) {
+    position: static;
+    width: auto;
+    height: auto;
+    clip: auto;
+  }
+
+  .sidebar-actions .notification-bell > button > span:not(.notification-badge)::before {
+    content: 'Alerts';
+    font-size: 0.68rem;
+  }
+
+  .sidebar-actions .notification-bell > button > span:not(.notification-badge) {
+    font-size: 0;
+  }
+
+  .mobile-only {
+    display: flex !important;
+  }
+
+  .mobile-account-actions {
+    flex-direction: column;
+    gap: 0.6rem;
   }
 
   .shell-main {
-    padding: 1.5rem 1rem;
+    padding: 1.5rem 1rem calc(5rem + env(safe-area-inset-bottom));
+  }
+
+  .notification-panel {
+    left: 0.5rem !important;
+    right: 0.5rem;
+    width: auto !important;
+    max-width: none !important;
   }
 }

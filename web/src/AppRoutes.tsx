@@ -58,6 +58,7 @@ export default function AppRoutes() {
             <Route path="jobs" element={<JobsListPage />} />
             <Route path="jobs/:jobId" element={<JobDetailPage />} />
             <Route path="webmaster" element={<WebmasterPage />} />
+            <Route path="preferences" element={<PreferencesPage />} />
             <Route path="settings" element={<SettingsLayout />}>
               <Route index element={<Navigate to="fixture-types" replace />} />
               <Route path="fixture-types" element={<FixtureTypeRulesPage />} />
@@ -72,7 +73,7 @@ export default function AppRoutes() {
               <Route path="onedrive" element={<OneDriveSettingsPage />} />
               <Route path="crew-portal" element={<CrewPortalSettingsPage />} />
               <Route path="activity" element={<ActivityLogPage />} />
-              <Route path="preferences" element={<PreferencesPage />} />
+              <Route path="preferences" element={<Navigate to="/preferences" replace />} />
               <Route path="*" element={<NotFoundPage home="/settings" />} />
             </Route>
             <Route path="*" element={<NotFoundPage />} />
