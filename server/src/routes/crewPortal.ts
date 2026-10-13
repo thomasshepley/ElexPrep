@@ -468,7 +468,7 @@ function toDiscussionMessageDto(m: {
   editedAt: Date | null;
   deletedAt: Date | null;
   deletedByName: string | null;
-  authorUser: { displayName: string; role: string };
+  authorUser: { displayName: string; role: string; isProjectManager: boolean };
 }) {
   return {
     id: m.id,
@@ -476,6 +476,7 @@ function toDiscussionMessageDto(m: {
     authorUserId: m.authorUserId,
     authorName: m.authorUser.displayName,
     authorRole: m.authorUser.role,
+    authorIsProjectManager: m.authorUser.isProjectManager,
     body: m.deletedAt ? '' : m.body,
     createdAt: m.createdAt,
     editedAt: m.editedAt,
@@ -484,7 +485,7 @@ function toDiscussionMessageDto(m: {
   };
 }
 
-const DISCUSSION_MESSAGE_INCLUDE = { authorUser: { select: { displayName: true, role: true } } } as const;
+const DISCUSSION_MESSAGE_INCLUDE = { authorUser: { select: { displayName: true, role: true, isProjectManager: true } } } as const;
 
 // Same thread staff see on the job's Discussion tab (routes/jobDiscussion.ts), scoped here to
 // a job the caller is actually assigned to. Crew have no moderateDiscussion permission, so

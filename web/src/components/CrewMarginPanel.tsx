@@ -151,8 +151,9 @@ function MarginDisplay({
       <p className="muted">
         Charge is what Current RMS says the client is billed for crew/labour, across this job's
         linked opportunity and any other opportunity sharing its Current RMS project (e.g. a
-        separate crewing quote). Cost is this job's crew assignments (day rate × days). Admin-only
-        - never shown to crew.
+        separate crewing quote). Cost is each crew member's day rate × the job days they're
+        assigned to on the Schedule tab (* = not on any day yet, so the Crew tab's Days figure is
+        used). Admin-only - never shown to crew.
       </p>
       {error && <p className="error">{error}</p>}
       {loading && !data && <p className="muted">Loading…</p>}
@@ -258,7 +259,10 @@ function MarginDisplay({
                           {b.name}
                           <div className="muted" style={{ fontSize: 'var(--text-xs)' }}>{b.role}</div>
                         </td>
-                        <td>{b.days}</td>
+                        <td title={b.daysFromSchedule ? 'Job days assigned on the Schedule tab' : 'Not on any scheduled day yet - using the Days figure from the Crew tab'}>
+                          {b.days}
+                          {!b.daysFromSchedule && <span className="muted"> *</span>}
+                        </td>
                         <td title={`Suggested rate (profile/global default): ${formatMoney(b.suggestedRate)}`}>
                           {b.zeroRated ? <span className="muted">Zero-rated</span> : formatMoney(b.dayRate)}
                         </td>

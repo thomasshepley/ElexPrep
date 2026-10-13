@@ -43,7 +43,7 @@ export const accountApi = {
     list: () => request<AuthedUser[]>('/users'),
     create: (data: { username: string; password: string; displayName?: string; role?: Role }) =>
       request<AuthedUser>('/users', { method: 'POST', body: JSON.stringify(data) }),
-    update: (id: string, data: Partial<{ displayName: string; role: Role; password: string }>) =>
+    update: (id: string, data: Partial<{ displayName: string; role: Role; password: string; isProjectManager: boolean }>) =>
       request<AuthedUser>(`/users/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     remove: (id: string) => request<void>(`/users/${id}`, { method: 'DELETE' }),
   },

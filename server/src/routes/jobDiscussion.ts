@@ -22,7 +22,7 @@ interface MessageRow {
   editedAt: Date | null;
   deletedAt: Date | null;
   deletedByName: string | null;
-  authorUser: { displayName: string; role: string };
+  authorUser: { displayName: string; role: string; isProjectManager: boolean };
 }
 
 function toMessageDto(m: MessageRow) {
@@ -32,6 +32,7 @@ function toMessageDto(m: MessageRow) {
     authorUserId: m.authorUserId,
     authorName: m.authorUser.displayName,
     authorRole: m.authorUser.role,
+    authorIsProjectManager: m.authorUser.isProjectManager,
     // A moderator-removed message never sends its original text to clients - only the
     // placeholder metadata (see JobDiscussionThread.tsx's rendering of deletedByName).
     body: m.deletedAt ? '' : m.body,
@@ -42,7 +43,7 @@ function toMessageDto(m: MessageRow) {
   };
 }
 
-const MESSAGE_INCLUDE = { authorUser: { select: { displayName: true, role: true } } } as const;
+const MESSAGE_INCLUDE = { authorUser: { select: { displayName: true, role: true, isProjectManager: true } } } as const;
 
 jobDiscussionRouter.get('/:jobId/discussion', async (req, res) => {
   const [job, messages] = await Promise.all([

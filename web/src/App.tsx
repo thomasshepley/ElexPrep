@@ -9,6 +9,7 @@ import Avatar from './components/Avatar'
 import ForcedPasswordChange from './components/ForcedPasswordChange'
 import LockdownBanner from './components/LockdownBanner'
 import './App.css'
+import UserName from './components/UserName';
 
 function App() {
   const { user, loading, logout } = useAuth()
@@ -62,7 +63,7 @@ function App() {
               <div className="sidebar-user-row">
                 <Avatar userId={user.id} displayName={user.displayName} hasAvatar={Boolean(user.avatarPath)} />
                 <NavLink to="/settings/preferences" className="sidebar-username" aria-label={`${user.displayName} - preferences`}>
-                  {user.displayName}
+                  <UserName name={user.displayName} role={user.role} isProjectManager={user.isProjectManager} showPmChip={false} />
                 </NavLink>
               </div>
               <NotificationBell />

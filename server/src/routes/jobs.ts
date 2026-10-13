@@ -26,6 +26,10 @@ const upload = multer({
 
 export const jobsRouter = Router();
 
+const LOGO_SCALE_FIELDS = { left: 'logoScaleLeft', middle: 'logoScale', right: 'logoScaleRight' } as const;
+const LOGO_SCALE_MIN = 20;
+const LOGO_SCALE_MAX = 200;
+
 /** ADMIN sees every job; USER/SIGNAGE only see jobs an admin has marked Public. */
 jobsRouter.get('/', async (req, res) => {
   const isAdmin = isAdminRole(req.user?.role);
@@ -48,8 +52,8 @@ jobsRouter.get('/:id', async (req, res) => {
 });
 
 jobsRouter.put('/:id', async (req, res) => {
-  const { name, venue, description, address, startsAt, endsAt, isPublic, crewFeatures } = req.body ?? {};
-  const editsDetails = [name, venue, description, address, startsAt, endsAt].some((v) => v !== undefined);
+  const { name, venue, description, address, startsAt, endsAt, isPublic, crewFeatures, logoScales } = req.body ?? {};
+  const editsDetails = [name, venue, description, address, startsAt, endsAt, logoScales].some((v) => v !== undefined);
   if (editsDetails && !isAdminRole(req.user?.role)) {
     const perms = req.user?.role === 'USER' ? await resolvePermissionsForUser(req.user.id, 'USER') : null;
     if (!perms?.editJobs) {
@@ -62,6 +66,18 @@ jobsRouter.put('/:id', async (req, res) => {
     }
   }
   if (typeof name === 'string' && !name.trim()) return res.status(400).json({ error: 'name cannot be empty' });
+  // Per-slot logo size on the label logo bar, percent of the slot - see Job.logoScale*.
+  const logoScaleData: Record<string, number> = {};
+  if (logoScales !== undefined) {
+    if (!logoScales || typeof logoScales !== 'object') return res.status(400).json({ error: 'logoScales must be an object' });
+    for (const [slot, value] of Object.entries(logoScales as Record<string, unknown>)) {
+      if (!(slot in LOGO_SCALE_FIELDS)) return res.status(400).json({ error: `Unknown logo slot "${slot}"` });
+      if (typeof value !== 'number' || !Number.isFinite(value) || value < LOGO_SCALE_MIN || value > LOGO_SCALE_MAX) {
+        return res.status(400).json({ error: `Logo size must be between ${LOGO_SCALE_MIN}% and ${LOGO_SCALE_MAX}%` });
+      }
+      logoScaleData[LOGO_SCALE_FIELDS[slot as keyof typeof LOGO_SCALE_FIELDS]] = Math.round(value);
+    }
+  }
   for (const [key, value] of Object.entries({ startsAt, endsAt })) {
     if (value && Number.isNaN(new Date(value).getTime())) return res.status(400).json({ error: `${key} is not a valid date` });
   }
@@ -93,6 +109,7 @@ jobsRouter.put('/:id', async (req, res) => {
       ...(endsAt !== undefined ? { endsAt: endsAt ? new Date(endsAt) : null } : {}),
       ...(isPublic !== undefined ? { isPublic } : {}),
       ...(crewFeaturesJson !== undefined ? { crewFeaturesJson } : {}),
+      ...logoScaleData,
     },
   });
   if (isPublic !== undefined) await logActivity('job.visibility', `isPublic=${isPublic}`, job.id, req.user?.id);

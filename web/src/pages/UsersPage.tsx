@@ -6,6 +6,7 @@ import PasswordInput from '../components/PasswordInput';
 import Avatar from '../components/Avatar';
 import { useDialog } from '../components/Dialog';
 import { useAsyncAction } from '../hooks/useAsyncAction';
+import UserName from '../components/UserName';
 
 const ROLES: Role[] = ['ADMIN', 'USER', 'SIGNAGE'];
 
@@ -66,6 +67,16 @@ export default function UsersPage() {
     } catch (err) {
       setError((err as Error).message);
       refresh();
+    }
+  };
+
+  const togglePm = async (u: AuthedUser, isProjectManager: boolean) => {
+    setError(null);
+    try {
+      await api.users.update(u.id, { isProjectManager });
+      refresh();
+    } catch (err) {
+      setError((err as Error).message);
     }
   };
 
@@ -145,6 +156,7 @@ export default function UsersPage() {
               <th>Username</th>
               <th>Display name</th>
               <th>Role</th>
+              <th title="Project manager - their name shows in purple across the site">PM tag</th>
               <th></th>
             </tr>
           </thead>
@@ -159,7 +171,9 @@ export default function UsersPage() {
                       {u.id === me?.id && <span className="muted"> (you)</span>}
                     </div>
                   </td>
-                  <td>{u.displayName}</td>
+                  <td>
+                    <UserName name={u.displayName} role={u.role} isProjectManager={u.isProjectManager} showPmChip={false} />
+                  </td>
                   <td>
                     <select
                       value={u.role}
@@ -174,6 +188,14 @@ export default function UsersPage() {
                         </option>
                       ))}
                     </select>
+                  </td>
+                  <td>
+                    <input
+                      type="checkbox"
+                      checked={Boolean(u.isProjectManager)}
+                      aria-label={`PM tag for ${u.username}`}
+                      onChange={(e) => togglePm(u, e.target.checked)}
+                    />
                   </td>
                   <td className="row">
                     {u.role === 'USER' && (
@@ -193,7 +215,7 @@ export default function UsersPage() {
                 </tr>
                 {expandedId === u.id && u.role === 'USER' && (
                   <tr>
-                    <td colSpan={4}>
+                    <td colSpan={5}>
                       <UserPermissionsPanel userId={u.id} />
                     </td>
                   </tr>

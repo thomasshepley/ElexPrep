@@ -95,6 +95,8 @@ export const jobsApi = {
           suggestedRate: number;
           zeroRated: boolean;
           days: number;
+          /** True when `days` is the count of job days assigned on the Schedule tab. */
+          daysFromSchedule: boolean;
           cost: number;
         }[];
         margin: number;
@@ -131,6 +133,7 @@ export const jobsApi = {
       id: string,
       data: Partial<Pick<Job, 'name' | 'venue' | 'description' | 'address' | 'startsAt' | 'endsAt' | 'isPublic'>> & {
         crewFeatures?: Partial<CrewFeatures> | null;
+        logoScales?: Partial<Record<'left' | 'middle' | 'right', number>>;
       }
     ) => request<Job>(`/jobs/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     remove: (id: string) => request<void>(`/jobs/${id}`, { method: 'DELETE' }),

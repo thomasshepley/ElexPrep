@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { prisma, logActivity } from '../db';
 import { requirePermission } from '../permissions';
 import { notifyCrewAssigned } from '../notifications';
+import { effectiveDayRate, effectiveDays, loadGlobalDefaultDayRate } from '../crewRates';
 
 /**
  * Job-scoped crew attribution: who's working this job, in what role, at what rate. Viewing is
@@ -28,10 +29,14 @@ interface AssignmentRow {
     color: string | null;
     active: boolean;
     user: { username: string; displayName: string };
+    rateLines: { label: string; amount: string }[];
   };
+  _count: { dayAssignments: number };
 }
 
-function toAssignmentDto(a: AssignmentRow) {
+function toAssignmentDto(a: AssignmentRow, globalDefaultRate: number) {
+  const rate = effectiveDayRate(a, a.crewProfile.dayRate, a.crewProfile.rateLines, globalDefaultRate);
+  const days = effectiveDays(a._count.dayAssignments, a.days);
   return {
     id: a.id,
     crewProfileId: a.crewProfileId,
@@ -45,11 +50,24 @@ function toAssignmentDto(a: AssignmentRow) {
     zeroRated: a.zeroRated,
     active: a.crewProfile.active,
     color: a.crewProfile.color,
+    /** What the margin calc actually uses - see crewRates.ts for the fallback order. */
+    effectiveDayRate: rate.rate,
+    dayRateSource: rate.source,
+    suggestedDayRate: rate.suggested.rate,
+    suggestedDayRateSource: rate.suggested.source,
+    scheduledDays: a._count.dayAssignments,
+    effectiveDays: days.days,
   };
 }
 
 const assignmentInclude = {
-  crewProfile: { include: { user: { select: { username: true, displayName: true } } } },
+  crewProfile: {
+    include: {
+      user: { select: { username: true, displayName: true } },
+      rateLines: { select: { label: true, amount: true } },
+    },
+  },
+  _count: { select: { dayAssignments: true } },
 } as const;
 
 jobCrewAssignmentsRouter.get('/:jobId/crew', async (req, res) => {
@@ -58,7 +76,8 @@ jobCrewAssignmentsRouter.get('/:jobId/crew', async (req, res) => {
     include: assignmentInclude,
     orderBy: { createdAt: 'asc' },
   });
-  res.json(assignments.map(toAssignmentDto));
+  const globalDefaultRate = await loadGlobalDefaultDayRate();
+  res.json(assignments.map((a) => toAssignmentDto(a, globalDefaultRate)));
 });
 
 jobCrewAssignmentsRouter.post('/:jobId/crew', requirePermission('manageCrewAssignments'), async (req, res) => {
@@ -84,7 +103,7 @@ jobCrewAssignmentsRouter.post('/:jobId/crew', requirePermission('manageCrewAssig
   await logActivity('crew_assignment.create', `${assignment.crewProfile.user.username} as ${role}`, jobId, req.user?.id);
   const job = await prisma.job.findUnique({ where: { id: jobId }, select: { name: true } });
   if (job) await notifyCrewAssigned(assignment.crewProfile.userId, jobId, job.name, role);
-  res.status(201).json(toAssignmentDto(assignment));
+  res.status(201).json(toAssignmentDto(assignment, await loadGlobalDefaultDayRate()));
 });
 
 jobCrewAssignmentsRouter.put('/:jobId/crew/:id', requirePermission('manageCrewAssignments'), async (req, res) => {
@@ -102,7 +121,7 @@ jobCrewAssignmentsRouter.put('/:jobId/crew/:id', requirePermission('manageCrewAs
     },
     include: assignmentInclude,
   });
-  res.json(toAssignmentDto(assignment));
+  res.json(toAssignmentDto(assignment, await loadGlobalDefaultDayRate()));
 });
 
 jobCrewAssignmentsRouter.delete('/:jobId/crew/:id', requirePermission('manageCrewAssignments'), async (req, res) => {

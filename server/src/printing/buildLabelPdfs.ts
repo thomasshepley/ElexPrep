@@ -89,7 +89,7 @@ async function loadJobLogos(doc: PDFDocument, jobId: string): Promise<LogoImages
     embed(job.logoPath),
     embed(job.logoPathRight),
   ]);
-  return { left, middle, right };
+  return { left, middle, right, scales: { left: job.logoScaleLeft, middle: job.logoScale, right: job.logoScaleRight } };
 }
 
 export async function renderLabelType(

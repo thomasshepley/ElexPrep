@@ -19,12 +19,14 @@ activityRouter.get('/', requireRole('WEBMASTER'), async (req, res) => {
     prisma.user.findMany({ where: { id: { in: userIds } } }),
     prisma.job.findMany({ where: { id: { in: jobIds } }, select: { id: true, name: true } }),
   ]);
-  const nameById = new Map(users.map((u) => [u.id, u.displayName]));
+  const userById = new Map(users.map((u) => [u.id, u]));
   const jobById = new Map(jobs.map((j) => [j.id, j.name]));
   res.json(
     entries.map((e) => ({
       ...e,
-      userName: e.userId ? nameById.get(e.userId) ?? '(deleted user)' : null,
+      userName: e.userId ? userById.get(e.userId)?.displayName ?? '(deleted user)' : null,
+      userRole: e.userId ? userById.get(e.userId)?.role ?? null : null,
+      userIsProjectManager: e.userId ? userById.get(e.userId)?.isProjectManager ?? false : false,
       jobName: e.jobId ? jobById.get(e.jobId) ?? '(deleted job)' : null,
     }))
   );

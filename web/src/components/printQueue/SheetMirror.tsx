@@ -47,6 +47,8 @@ export interface LogoUrls {
   left?: string;
   middle?: string;
   right?: string;
+  /** Per-slot size, percent of the slot (100 = fit) - mirrors the printed PDF. */
+  scales?: { left?: number; middle?: number; right?: number };
 }
 
 export interface SheetMirrorProps {
@@ -155,7 +157,9 @@ export default function SheetMirror({
         }
 
         if (el.type === 'image') {
-          const urls = [logoUrls?.left, logoUrls?.middle, logoUrls?.right].filter((u): u is string => Boolean(u));
+          const urls = (['left', 'middle', 'right'] as const)
+            .map((slot) => ({ url: logoUrls?.[slot], zoom: (logoUrls?.scales?.[slot] ?? 100) / 100 }))
+            .filter((u): u is { url: string; zoom: number } => Boolean(u.url));
           return (
             <div
               key={el.id}
@@ -164,8 +168,8 @@ export default function SheetMirror({
             >
               {urls.length > 0 ? (
                 urls.map((u, i) => (
-                  <div key={i} style={{ flex: 1, height: '100%', minWidth: 0 }}>
-                    <LogoImg src={u} placeholder={el.placeholder} />
+                  <div key={i} style={{ flex: 1, height: '100%', minWidth: 0, overflow: 'hidden' }}>
+                    <LogoImg src={u.url} placeholder={el.placeholder} zoom={u.zoom} />
                   </div>
                 ))
               ) : (
@@ -243,10 +247,17 @@ export default function SheetMirror({
   );
 }
 
-function LogoImg({ src, placeholder }: { src: string; placeholder: string }) {
+function LogoImg({ src, placeholder, zoom = 1 }: { src: string; placeholder: string; zoom?: number }) {
   const [failed, setFailed] = useState(false);
   if (failed) return <span style={{ color: '#999', fontSize: 11 }}>{placeholder}</span>;
-  return <img src={src} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} onError={() => setFailed(true)} />;
+  return (
+    <img
+      src={src}
+      alt=""
+      style={{ width: '100%', height: '100%', objectFit: 'contain', transform: zoom !== 1 ? `scale(${zoom})` : undefined }}
+      onError={() => setFailed(true)}
+    />
+  );
 }
 
 function ResizeHandle({ onPointerDown }: { onPointerDown: (e: React.PointerEvent) => void }) {

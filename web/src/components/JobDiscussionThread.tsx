@@ -3,6 +3,7 @@ import { api, type DiscussionMessage } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { useDialog } from './Dialog';
 import { formatDateTime } from '../utils/format';
+import UserName from './UserName';
 
 const POLL_MS = 15000;
 
@@ -156,7 +157,7 @@ export default function JobDiscussionThread({ jobId, scope }: { jobId: string; s
           return (
             <div key={m.id} className={`discussion-message${isOwn ? ' is-own' : ''}${isDeleted ? ' is-deleted' : ''}`}>
               <div className="discussion-message-meta">
-                <strong>{m.authorName}</strong>
+                <UserName as="strong" name={m.authorName} role={m.authorRole} isProjectManager={m.authorIsProjectManager} />
                 <span className="chip chip-role">{m.authorRole}</span>
                 <span className="muted">{formatDateTime(m.createdAt)}</span>
                 {m.editedAt && !isDeleted && <span className="muted discussion-message-edited">(edited)</span>}

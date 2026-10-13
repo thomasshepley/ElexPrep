@@ -7,6 +7,60 @@ import { useToast } from './Toast';
 import { useDialog } from './Dialog';
 import { formatDateTime } from '../utils/format';
 
+/** Fixture types that actually take a separate pixel-map patch - only these get the Pix
+ * Uni/Pix Addr columns in the fixtures table. Matched on letters and digits only, so
+ * "Prolights AstraBlade IP", "AstraBladeIP" and "PixelLine IP" all count. */
+const PIXEL_MAPPED_TYPE_KEYS = ['astrabladeip', 'pixellineip'];
+
+function supportsPixelMap(fixtureType: string | null | undefined): boolean {
+  const key = (fixtureType ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  return PIXEL_MAPPED_TYPE_KEYS.some((k) => key.includes(k));
+}
+
+const NEW_LOCATION = '__new_location__';
+
+/** Location picker for the fixtures table: every location this job already knows about
+ * (global + job location colours, plus whatever fixtures already use) with "New location…"
+ * for anything else. Controlled by the saved value, so cancelling the prompt snaps back. */
+function LocationSelect({
+  value,
+  options,
+  onChange,
+  ariaLabel,
+  placeholder = '-',
+  width = '9rem',
+}: {
+  value: string;
+  options: string[];
+  onChange: (value: string) => void;
+  ariaLabel: string;
+  placeholder?: string;
+  width?: string;
+}) {
+  const dialog = useDialog();
+  const all = value && !options.includes(value) ? [value, ...options] : options;
+  return (
+    <select
+      value={value}
+      aria-label={ariaLabel}
+      style={{ width }}
+      onChange={async (e) => {
+        if (e.target.value !== NEW_LOCATION) return onChange(e.target.value);
+        const typed = await dialog.prompt({ title: 'New location', label: 'Location', placeholder: 'e.g. Stage Left', confirmLabel: 'Use', required: true });
+        if (typed?.trim()) onChange(typed.trim());
+      }}
+    >
+      <option value="">{placeholder}</option>
+      {all.map((loc) => (
+        <option key={loc} value={loc}>
+          {loc}
+        </option>
+      ))}
+      <option value={NEW_LOCATION}>New location…</option>
+    </select>
+  );
+}
+
 function announceNewFixtureTypes(showToast: ReturnType<typeof useToast>['showToast'], types: string[]) {
   if (types.length === 0) return;
   const list = types.length <= 3 ? types.join(', ') : `${types.slice(0, 3).join(', ')} +${types.length - 3} more`;
@@ -39,6 +93,7 @@ export default function PatchImportPanel({ jobId, groupId = null }: { jobId: str
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkLocation, setBulkLocation] = useState('');
   const [fixtureSearch, setFixtureSearch] = useState('');
+  const [knownLocations, setKnownLocations] = useState<string[]>([]);
 
   const [candidate, setCandidate] = useState<PatchImportCandidate | null>(null);
   const [scanError, setScanError] = useState<string | null>(null);
@@ -46,6 +101,15 @@ export default function PatchImportPanel({ jobId, groupId = null }: { jobId: str
 
   const loadFixtures = () => api.patch.fixtures(jobId).then(setFixtures);
   const loadCandidate = () => api.patch.getOneDriveCandidate(jobId).then(setCandidate);
+
+  useEffect(() => {
+    // Location names already set up as colours (global and this job's own) seed the picker;
+    // a failed load just means a shorter list, not a broken table.
+    Promise.all([
+      api.locationColorRules.list().catch(() => []),
+      api.jobLocationColorRules.list(jobId).catch(() => []),
+    ]).then(([globalRules, jobRules]) => setKnownLocations([...globalRules, ...jobRules].map((r) => r.location)));
+  }, [jobId]);
 
   useEffect(() => {
     loadFixtures();
@@ -108,6 +172,12 @@ export default function PatchImportPanel({ jobId, groupId = null }: { jobId: str
   };
 
   const stageFixtures = (fixtures ?? []).filter((f) => (f.groupId ?? null) === groupId);
+
+  const locationOptions = [...new Set([...knownLocations, ...(fixtures ?? []).map((f) => f.location ?? '')])]
+    .filter(Boolean)
+    .sort((a, b) => a.localeCompare(b));
+  const showPixColumns = stageFixtures.some((f) => supportsPixelMap(f.fixtureType));
+  const columnCount = showPixColumns ? 10 : 8;
 
   const toggleSelectAll = () => {
     setSelected((s) => (s.size === stageFixtures.length ? new Set() : new Set(stageFixtures.map((f) => f.id))));
@@ -350,13 +420,17 @@ export default function PatchImportPanel({ jobId, groupId = null }: { jobId: str
             {selected.size > 0 && (
               <div className="row panel" style={{ background: 'rgba(255,255,255,0.04)', alignItems: 'center', gap: '0.6rem' }}>
                 <strong>{selected.size} selected</strong>
-                <input
-                  placeholder="Set location to…"
+                <LocationSelect
                   value={bulkLocation}
-                  onChange={(e) => setBulkLocation(e.target.value)}
-                  style={{ width: 160 }}
+                  options={locationOptions}
+                  onChange={setBulkLocation}
+                  ariaLabel="Location for the selected fixtures"
+                  placeholder="Set location to…"
+                  width="12rem"
                 />
-                <button onClick={bulkSetLocation}>Set location</button>
+                <button onClick={bulkSetLocation} disabled={!bulkLocation}>
+                  Set location
+                </button>
                 <button className="secondary" onClick={bulkDelete}>
                   Delete selected
                 </button>
@@ -380,8 +454,8 @@ export default function PatchImportPanel({ jobId, groupId = null }: { jobId: str
                     <th>Type</th>
                     <th>Main Uni</th>
                     <th>Main Addr</th>
-                    <th>Pix Uni</th>
-                    <th>Pix Addr</th>
+                    {showPixColumns && <th>Pix Uni</th>}
+                    {showPixColumns && <th>Pix Addr</th>}
                     <th>Mode</th>
                     <th>Location</th>
                     <th></th>
@@ -391,7 +465,7 @@ export default function PatchImportPanel({ jobId, groupId = null }: { jobId: str
                   {fixtureGroups.map((group) => (
                     <Fragment key={group.type}>
                       <tr>
-                        <td colSpan={10} style={{ fontWeight: 700, paddingTop: '0.75rem' }}>
+                        <td colSpan={columnCount} style={{ fontWeight: 700, paddingTop: '0.75rem' }}>
                           {group.type} <span className="muted" style={{ fontWeight: 400 }}>({group.items.length})</span>
                         </td>
                       </tr>
@@ -431,22 +505,32 @@ export default function PatchImportPanel({ jobId, groupId = null }: { jobId: str
                           onBlur={(e) => updateFixture(f, 'mainAddress', e.target.value)}
                         />
                       </td>
-                      <td>
-                        <input
-                          type="number"
-                          defaultValue={f.pixUniverse ?? ''}
-                          style={{ width: 55 }}
-                          onBlur={(e) => updateFixture(f, 'pixUniverse', e.target.value)}
-                        />
-                      </td>
-                      <td>
-                        <input
-                          type="number"
-                          defaultValue={f.pixAddress ?? ''}
-                          style={{ width: 55 }}
-                          onBlur={(e) => updateFixture(f, 'pixAddress', e.target.value)}
-                        />
-                      </td>
+                      {showPixColumns &&
+                        (supportsPixelMap(f.fixtureType) ? (
+                          <>
+                            <td>
+                              <input
+                                type="number"
+                                defaultValue={f.pixUniverse ?? ''}
+                                style={{ width: 55 }}
+                                onBlur={(e) => updateFixture(f, 'pixUniverse', e.target.value)}
+                              />
+                            </td>
+                            <td>
+                              <input
+                                type="number"
+                                defaultValue={f.pixAddress ?? ''}
+                                style={{ width: 55 }}
+                                onBlur={(e) => updateFixture(f, 'pixAddress', e.target.value)}
+                              />
+                            </td>
+                          </>
+                        ) : (
+                          <>
+                            <td className="muted">-</td>
+                            <td className="muted">-</td>
+                          </>
+                        ))}
                       <td>
                         <input
                           defaultValue={f.mode ?? ''}
@@ -455,10 +539,11 @@ export default function PatchImportPanel({ jobId, groupId = null }: { jobId: str
                         />
                       </td>
                       <td>
-                        <input
-                          defaultValue={f.location ?? ''}
-                          style={{ width: 120 }}
-                          onBlur={(e) => updateFixture(f, 'location', e.target.value)}
+                        <LocationSelect
+                          value={f.location ?? ''}
+                          options={locationOptions}
+                          onChange={(value) => updateFixture(f, 'location', value)}
+                          ariaLabel={`Location for fixture ${f.address ?? ''}`}
                         />
                       </td>
                       <td>
