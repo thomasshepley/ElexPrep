@@ -15,6 +15,7 @@ import { listJobShares, isItemSharedWithJob } from '../oneDrive/shares';
 import { streamOneDriveFile } from '../oneDrive/client';
 import { getOneDriveConfig } from '../oneDrive/config';
 import { autoPopulateDaysFromOpportunity, dayInclude, toDayDto } from './jobDays';
+import { scheduleItemInclude, toScheduleItemDto } from './jobSchedule';
 
 /**
  * Self-service data for a logged-in CREW account: their own profile, the jobs they're
@@ -284,9 +285,10 @@ crewPortalRouter.get('/me/jobs/:jobId/schedule', requireRole('CREW'), async (req
   if (!features.schedule) return res.json([]);
   const items = await prisma.jobScheduleItem.findMany({
     where: { jobId: req.params.jobId },
+    include: scheduleItemInclude,
     orderBy: { startsAt: 'asc' },
   });
-  res.json(items);
+  res.json(items.map(toScheduleItemDto));
 });
 
 // Read-only mirror of the admin day-blocks overview (routes/jobDays.ts) - same data, same

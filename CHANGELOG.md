@@ -4,6 +4,10 @@ Newest entries first. Each push/merge gets exactly one entry - see
 `scripts/bump-version.mjs` for how the version number itself advances. A `+` marks a
 feature addition, a `-` marks a bug fix.
 
+## v1.3.0 - 2026-10-13
+
++ Color-code schedule entries, drag crew onto specific tasks, and default new entries to the selected day
+
 ## v1.2.9 - 2026-10-13
 
 + Auto-add Current RMS opportunity days, fix rainbow preview, add a read-only crew week view

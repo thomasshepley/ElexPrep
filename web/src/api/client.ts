@@ -485,6 +485,8 @@ export interface JobScheduleItem {
   startsAt: string;
   endsAt: string | null;
   notes: string | null;
+  color: string | null;
+  crew: JobDayCrew[];
 }
 
 export interface JobDocument {
@@ -790,11 +792,21 @@ export const api = {
   },
   jobSchedule: {
     list: (jobId: string) => request<JobScheduleItem[]>(`/jobs/${jobId}/schedule`),
-    create: (jobId: string, data: { title: string; startsAt: string; endsAt?: string; notes?: string }) =>
+    create: (jobId: string, data: { title: string; startsAt: string; endsAt?: string; notes?: string; color?: string }) =>
       request<JobScheduleItem>(`/jobs/${jobId}/schedule`, { method: 'POST', body: JSON.stringify(data) }),
-    update: (jobId: string, id: string, data: Partial<{ title: string; startsAt: string; endsAt: string | null; notes: string }>) =>
-      request<JobScheduleItem>(`/jobs/${jobId}/schedule/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    update: (
+      jobId: string,
+      id: string,
+      data: Partial<{ title: string; startsAt: string; endsAt: string | null; notes: string; color: string | null }>
+    ) => request<JobScheduleItem>(`/jobs/${jobId}/schedule/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     remove: (jobId: string, id: string) => request<void>(`/jobs/${jobId}/schedule/${id}`, { method: 'DELETE' }),
+    assignCrew: (jobId: string, itemId: string, jobCrewAssignmentId: string, dayDate: string) =>
+      request<{ id: string }>(`/jobs/${jobId}/schedule/${itemId}/crew`, {
+        method: 'POST',
+        body: JSON.stringify({ jobCrewAssignmentId, dayDate }),
+      }),
+    unassignCrew: (jobId: string, itemId: string, id: string) =>
+      request<void>(`/jobs/${jobId}/schedule/${itemId}/crew/${id}`, { method: 'DELETE' }),
   },
   jobDays: {
     list: (jobId: string) => request<JobDay[]>(`/jobs/${jobId}/days`),

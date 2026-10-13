@@ -1276,6 +1276,26 @@ tbody tr:hover {
   color: var(--content-muted);
 }
 
+.day-timeline-item-drag-over {
+  outline: 2px dashed var(--accent);
+  outline-offset: 2px;
+}
+
+.day-timeline-item-crew {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-top: 0.35rem;
+}
+
+.schedule-color-swatch {
+  width: 1.4rem;
+  height: 1.4rem;
+  border-radius: 999px;
+  cursor: pointer;
+  padding: 0;
+}
+
 /* JobSchedulePanel's split layout - the day-blocks overview on the left, the selected day's
    hour-by-hour timeline on the right - collapses to a single column on narrow viewports,
    consistent with the app's mobile breakpoint elsewhere. */

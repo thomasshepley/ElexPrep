@@ -178,8 +178,14 @@ model JobScheduleItem {
   startsAt  DateTime
   endsAt    DateTime?
   notes     String?
+  /// Admin-picked hex color for this entry's block on the day timeline (e.g. to visually group
+  /// "Load in" vs "Show" vs "Get out" at a glance) - null means the timeline's default accent
+  /// color, same look as before this field existed.
+  color     String?
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
+
+  crewAssignments JobScheduleItemCrewAssignment[]
 
   @@index([jobId])
 }
@@ -221,6 +227,24 @@ model JobDayCrewAssignment {
 
   @@unique([jobDayId, jobCrewAssignmentId])
   @@index([jobDayId])
+  @@index([jobCrewAssignmentId])
+}
+
+/// Which of a job's already-attributed crew (JobCrewAssignment) are doing a specific hourly
+/// schedule entry ("task") - a finer-grain sibling of JobDayCrewAssignment. Dragging someone
+/// onto a task also assigns them to that task's whole day if they weren't already (see
+/// routes/jobSchedule.ts), so this is additive detail on top of the day assignment, never a
+/// substitute for it.
+model JobScheduleItemCrewAssignment {
+  id                  String            @id @default(cuid())
+  scheduleItemId      String
+  scheduleItem        JobScheduleItem   @relation(fields: [scheduleItemId], references: [id], onDelete: Cascade)
+  jobCrewAssignmentId String
+  jobCrewAssignment   JobCrewAssignment @relation(fields: [jobCrewAssignmentId], references: [id], onDelete: Cascade)
+  createdAt           DateTime          @default(now())
+
+  @@unique([scheduleItemId, jobCrewAssignmentId])
+  @@index([scheduleItemId])
   @@index([jobCrewAssignmentId])
 }
 
@@ -432,6 +456,7 @@ model JobCrewAssignment {
   updatedAt     DateTime    @updatedAt
 
   dayAssignments JobDayCrewAssignment[]
+  taskAssignments JobScheduleItemCrewAssignment[]
 
   @@unique([jobId, crewProfileId])
   @@index([jobId])

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { DndContext, DragOverlay, PointerSensor, useDraggable, useDroppable, useSensor, useSensors, type DragEndEvent, type DragStartEvent } from '@dnd-kit/core';
+import { useDraggable, useDroppable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import { resolveCrewColor } from '@elexprep/shared';
 import { api, type JobCrewAssignment } from '../api/client';
@@ -14,8 +14,9 @@ export interface DayBlockView {
 
 /** Local midnight (in this browser's own timezone) for the given YYYY-MM-DD key, as an ISO
  * string - this is what lets a day round-trip to the same calendar day for whoever added it,
- * regardless of what timezone the server itself runs in (see JobDay's schema comment). */
-function localMidnightIso(key: string): string {
+ * regardless of what timezone the server itself runs in (see JobDay's schema comment). Also
+ * used by JobSchedulePanel to resolve the day a dragged-onto schedule item falls on. */
+export function localMidnightIso(key: string): string {
   return new Date(`${key}T00:00:00`).toISOString();
 }
 
@@ -23,7 +24,7 @@ function formatDayLabel(key: string): string {
   return new Date(`${key}T00:00:00`).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
 }
 
-function CrewChip({ assignment }: { assignment: JobCrewAssignment }) {
+export function CrewChip({ assignment }: { assignment: JobCrewAssignment }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: `roster:${assignment.id}` });
   const color = resolveCrewColor(assignment.crewProfileId, assignment.color);
   return (
@@ -148,54 +149,75 @@ function AddDayForm({ onAdd }: { onAdd: (dateKey: string) => void }) {
  * yet - dragging crew onto one of those materializes it on the fly). Clicking a block (not
  * dragging it - blocks are drop targets only, never drag sources, so there's no click/drag
  * ambiguity to resolve) switches which day JobSchedulePanel's hour-by-hour view shows.
+ *
+ * No DndContext of its own - JobSchedulePanel provides one ambient context wrapping this
+ * component AND the hour-by-hour timeline, so a single drag from the roster strip here can
+ * land on either a day block or a specific schedule item ("task") in the other half of the
+ * split view.
  */
 export default function DayBlocksColumn({
-  jobId,
   blocks,
   roster,
   selectedDate,
   onSelectDate,
   canManageDays,
   canManageCrew,
-  onChanged,
+  onAddDay,
+  onRemoveDay,
+  onUnassignCrew,
 }: {
-  jobId: string;
   blocks: DayBlockView[];
   roster: JobCrewAssignment[];
   selectedDate: string | null;
   onSelectDate: (key: string) => void;
   canManageDays: boolean;
   canManageCrew: boolean;
-  onChanged: () => void;
+  onAddDay: (dateKey: string) => void;
+  onRemoveDay: (dayId: string) => void;
+  onUnassignCrew: (dayId: string, crewDayAssignmentId: string) => void;
 }) {
+  return (
+    <div className="day-blocks-column">
+      <div className="day-blocks-roster">
+        <h4>Crew on this job</h4>
+        {roster.length === 0 ? (
+          <p className="muted">No crew assigned to this job yet - add some on the Crew tab.</p>
+        ) : (
+          <>
+            <p className="muted day-blocks-roster-hint">Drag onto a day or a schedule entry to assign them to it.</p>
+            <div className="day-blocks-roster-chips">
+              {roster.map((a) => (
+                <CrewChip key={a.id} assignment={a} />
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+
+      <div className="day-blocks-list">
+        {blocks.length === 0 && <p className="muted">No days yet - add one below, or add a schedule entry.</p>}
+        {blocks.map((b) => (
+          <DayBlockCard
+            key={b.dateKey}
+            block={b}
+            active={b.dateKey === selectedDate}
+            canManageDays={canManageDays}
+            canManageCrew={canManageCrew}
+            onSelect={() => onSelectDate(b.dateKey)}
+            onRemoveDay={onRemoveDay}
+            onUnassignCrew={onUnassignCrew}
+          />
+        ))}
+        {canManageDays && <AddDayForm onAdd={onAddDay} />}
+      </div>
+    </div>
+  );
+}
+
+/** Thin wrapper so JobSchedulePanel's error-toast-on-failure handling stays identical to before
+ * this refactor (the day-level add/remove/unassign calls used to live inside this file). */
+export function useDayBlockActions(jobId: string, onChanged: () => void, onSelectDate: (key: string) => void) {
   const { showToast } = useToast();
-  const [activeRosterAssignmentId, setActiveRosterAssignmentId] = useState<string | null>(null);
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
-
-  const onDragStart = (e: DragStartEvent) => {
-    setActiveRosterAssignmentId(String(e.active.id).replace(/^roster:/, ''));
-  };
-
-  const onDragEnd = async (e: DragEndEvent) => {
-    setActiveRosterAssignmentId(null);
-    const { active, over } = e;
-    if (!over) return;
-    const assignmentId = String(active.id).replace(/^roster:/, '');
-    const targetDateKey = String(over.id).replace(/^day:/, '');
-    const block = blocks.find((b) => b.dateKey === targetDateKey);
-    if (!block) return;
-    try {
-      let dayId = block.day?.id;
-      if (!dayId) {
-        const created = await api.jobDays.create(jobId, localMidnightIso(targetDateKey));
-        dayId = created.id;
-      }
-      await api.jobDays.assignCrew(jobId, dayId, assignmentId);
-      onChanged();
-    } catch (err) {
-      showToast((err as Error).message, 'error');
-    }
-  };
 
   const addDay = async (key: string) => {
     try {
@@ -225,52 +247,5 @@ export default function DayBlocksColumn({
     }
   };
 
-  const activeAssignment = roster.find((a) => a.id === activeRosterAssignmentId);
-
-  return (
-    <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
-      <div className="day-blocks-column">
-        <div className="day-blocks-roster">
-          <h4>Crew on this job</h4>
-          {roster.length === 0 ? (
-            <p className="muted">No crew assigned to this job yet - add some on the Crew tab.</p>
-          ) : (
-            <>
-              <p className="muted day-blocks-roster-hint">Drag onto a day to assign them to it.</p>
-              <div className="day-blocks-roster-chips">
-                {roster.map((a) => (
-                  <CrewChip key={a.id} assignment={a} />
-                ))}
-              </div>
-            </>
-          )}
-        </div>
-
-        <div className="day-blocks-list">
-          {blocks.length === 0 && <p className="muted">No days yet - add one below, or add a schedule entry.</p>}
-          {blocks.map((b) => (
-            <DayBlockCard
-              key={b.dateKey}
-              block={b}
-              active={b.dateKey === selectedDate}
-              canManageDays={canManageDays}
-              canManageCrew={canManageCrew}
-              onSelect={() => onSelectDate(b.dateKey)}
-              onRemoveDay={removeDay}
-              onUnassignCrew={unassignCrew}
-            />
-          ))}
-          {canManageDays && <AddDayForm onAdd={addDay} />}
-        </div>
-      </div>
-      <DragOverlay>
-        {activeAssignment && (
-          <div className="day-block-crew-chip">
-            <span className="crew-swatch-dot" style={{ background: resolveCrewColor(activeAssignment.crewProfileId, activeAssignment.color) }} />
-            {activeAssignment.displayName}
-          </div>
-        )}
-      </DragOverlay>
-    </DndContext>
-  );
+  return { addDay, removeDay, unassignCrew };
 }
