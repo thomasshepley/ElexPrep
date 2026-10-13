@@ -4,6 +4,11 @@ Newest entries first. Each push/merge gets exactly one entry - see
 `scripts/bump-version.mjs` for how the version number itself advances. A `+` marks a
 feature addition, a `-` marks a bug fix.
 
+## v1.4.6 - 2026-10-13
+
+- On phones the site now feels like an app: a floating tab bar with Home, Jobs, Alerts and More that stays clear of curved screen corners, and no more sideways scrolling
++ New admin feature for job discussions
+
 ## v1.4.5 - 2026-10-13
 
 + Reply to a specific message and send images or GIFs in job discussions, named days with call and estimated wrap times, deadline-style schedule points (same start and end time), and your next call time on the crew home page

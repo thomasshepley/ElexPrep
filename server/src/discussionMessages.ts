@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import multer from 'multer';
-import { prisma } from './db';
+import { prisma, logActivity } from './db';
 import { uploadDir } from './routes/jobs';
 import { IMAGE_KINDS, acceptMemoryUpload, randomUploadName } from './uploadSafety';
 
@@ -118,4 +118,41 @@ export async function removeDiscussionImage(attachmentPath: string | null) {
 export function notificationText(text: string, hasImage: boolean): string {
   if (!hasImage) return text;
   return text ? `📷 ${text}` : '📷 Sent an image';
+}
+
+type LoggedMessage = {
+  id: string;
+  jobId: string;
+  authorUserId: string;
+  groupId: string | null;
+  body: string;
+  attachmentName: string | null;
+  replyToId?: string | null;
+};
+
+const quote = (text: string) => (text ? `"${text}"` : '(no text)');
+
+/**
+ * Message history for the activity log - the full text on every send, edit and delete, so a
+ * message someone later removes can still be read there. Shaped like
+ * `General · message <id> · "the text" · image door.png`, the id tying a message's send, edits and
+ * removal together.
+ */
+export async function logMessageActivity(
+  kind: 'create' | 'edit' | 'delete',
+  message: LoggedMessage,
+  userId: string,
+  extra: { previousBody?: string; removedBy?: 'author' | 'moderator' | 'group'; groupName?: string } = {}
+) {
+  const group = !extra.groupName && message.groupId ? await prisma.discussionGroup.findUnique({ where: { id: message.groupId }, select: { name: true } }) : null;
+  // The author's user id is turned into their name by the activity log (routes/activity.ts).
+  const parts = [extra.groupName ?? group?.name ?? 'General', `message ${message.id}`, `from ${message.authorUserId}`];
+  if (kind === 'create' && message.replyToId) parts.push(`reply to message ${message.replyToId}`);
+  if (kind === 'edit') parts.push(`was ${quote(extra.previousBody ?? '')}`, `now ${quote(message.body)}`);
+  else parts.push(quote(message.body));
+  if (message.attachmentName) parts.push(`image ${message.attachmentName}`);
+  if (kind === 'delete') {
+    parts.push(extra.removedBy === 'moderator' ? 'removed by a moderator' : extra.removedBy === 'group' ? 'deleted with its chat group' : 'deleted by its author');
+  }
+  await logActivity(`job_discussion.${kind}`, parts.join(' · '), message.jobId, userId);
 }

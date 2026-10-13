@@ -196,102 +196,263 @@
   display: none !important;
 }
 
-/* Phones: the sidebar becomes a labelled bottom tab bar (crew on site use this one-handed), and
-   the account controls move onto the account page (see MobileAccountActions). */
+/* The phone tab bar and More sheet (MobileTabBar.tsx) - only rendered on phones. */
+.mobile-tabbar {
+  position: fixed;
+  z-index: 900;
+  /* Inset from every edge, so the rounded corners of the screen never cut off a tab. */
+  left: max(12px, env(safe-area-inset-left));
+  right: max(12px, env(safe-area-inset-right));
+  bottom: max(10px, env(safe-area-inset-bottom));
+  display: grid;
+  grid-auto-columns: 1fr;
+  grid-auto-flow: column;
+  gap: 0.25rem;
+  padding: 0.35rem;
+  border-radius: 26px;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--surface-raised) 82%, transparent);
+  -webkit-backdrop-filter: blur(20px) saturate(1.6);
+  backdrop-filter: blur(20px) saturate(1.6);
+  box-shadow: var(--shadow-md);
+}
+
+.mobile-tabbar .notification-bell {
+  width: auto;
+  display: flex;
+}
+
+.mobile-tab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.15rem;
+  min-width: 0;
+  min-height: 52px;
+  padding: 0.3rem 0.2rem;
+  border: none;
+  border-radius: 20px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--content-muted);
+  font: inherit;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button.mobile-tab:hover:not(:disabled) {
+  transform: none;
+  box-shadow: none;
+  background: transparent;
+}
+
+.mobile-tab.active,
+button.mobile-tab.active:hover:not(:disabled) {
+  color: var(--accent);
+  background: var(--accent-wash);
+}
+
+.mobile-tab-icon {
+  position: relative;
+  display: inline-flex;
+}
+
+.mobile-tab-icon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.mobile-tab-label {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mobile-tab .notification-badge {
+  top: -0.35rem;
+  right: -0.6rem;
+}
+
+/* A bottom sheet: the More menu, and the Alerts list on phones. */
+.sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 950;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: flex-end;
+  animation: sheet-fade 160ms ease-out;
+}
+
+.sheet {
+  width: 100%;
+  max-height: 85vh;
+  overflow-y: auto;
+  padding: 0.5rem max(1rem, env(safe-area-inset-right)) calc(1rem + env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
+  background: var(--surface-raised);
+  border-top: 1px solid var(--border);
+  border-radius: 22px 22px 0 0;
+  box-shadow: var(--shadow-md);
+  animation: sheet-up 220ms cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+
+.sheet-grabber {
+  width: 38px;
+  height: 5px;
+  margin: 0.2rem auto 0.9rem;
+  border-radius: 999px;
+  background: var(--border-strong);
+}
+
+.sheet-profile {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 0.6rem 0.75rem;
+  margin-bottom: 0.75rem;
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+  color: var(--content);
+  text-decoration: none;
+}
+
+.sheet-profile > span {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.sheet-profile-sub {
+  font-size: var(--text-xs);
+}
+
+.sheet-list {
+  list-style: none;
+  margin: 0 0 0.75rem;
+  padding: 0;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--surface-sunken);
+}
+
+.sheet-list li + li {
+  border-top: 1px solid var(--border);
+}
+
+.sheet-row {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  min-height: 50px;
+  padding: 0 0.85rem;
+  color: var(--content);
+  text-decoration: none;
+  font-weight: 500;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.sheet-row:active {
+  background: var(--accent-wash);
+}
+
+.sheet-row.active {
+  color: var(--accent);
+}
+
+.sheet-row-icon {
+  display: inline-flex;
+  color: var(--accent);
+}
+
+.sheet-row-icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+.sheet-row-label {
+  flex: 1;
+}
+
+.sheet-row > svg:last-child {
+  color: var(--content-muted);
+}
+
+.sheet-footer {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.sheet-footer > * {
+  min-height: 46px;
+}
+
+.sheet-footer .sidebar-signout {
+  grid-column: 1 / -1;
+  color: var(--danger);
+}
+
+.sheet-footer .sidebar-version {
+  grid-column: 1 / -1;
+  min-height: 0;
+}
+
+@keyframes sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: none;
+  }
+}
+
+@keyframes sheet-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sheet,
+  .sheet-backdrop {
+    animation: none;
+  }
+}
+
+/* Phones: no sidebar (MobileTabBar replaces it), content kept clear of the floating bar and the
+   notch, and nothing wider than the screen. */
 @media (max-width: 760px) {
+  html,
+  body {
+    overflow-x: clip;
+    overscroll-behavior-x: none;
+  }
+
+  body {
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Below 16px, iOS zooms the whole page in when a field is tapped - that zoom is what makes a
+     phone page slide sideways. */
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+
   .shell {
     display: block;
   }
 
   .sidebar {
-    position: fixed;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    width: auto;
-    z-index: 900;
-    border-right: none;
-    border-top: 1px solid var(--border);
-    padding-bottom: env(safe-area-inset-bottom);
-  }
-
-  .sidebar-sticky {
-    position: static;
-    height: auto;
-    flex-direction: row;
-    padding: 0.3rem 0.25rem;
-    overflow: visible;
-  }
-
-  .sidebar-brand,
-  .sidebar-user-row,
-  .sidebar-user .sidebar-version,
-  .sidebar-user .sidebar-bug-report,
-  .sidebar-actions > .sidebar-theme-toggle,
-  .sidebar-actions > .sidebar-signout {
-    display: none !important;
-  }
-
-  /* Flatten the nav and the actions so every tab, bell included, is an equal-width item of the
-     one bar. */
-  .sidebar-nav,
-  .sidebar-user,
-  .sidebar-actions {
-    display: contents;
-  }
-
-  .sidebar-actions .notification-bell {
-    flex: 1 1 0;
-    min-width: 0;
-  }
-
-  .sidebar-nav a {
-    flex: 1 1 0;
-    flex-direction: column;
-    gap: 0.15rem;
-    padding: 0.35rem 0;
-    font-size: 0.64rem;
-    letter-spacing: -0.01em;
-    min-width: 0;
-  }
-
-  .sidebar-nav a span {
-    display: block;
-    max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-
-  /* The bell is the one sidebar action kept on the bar, styled as a tab like its neighbours. */
-  .sidebar-actions .notification-bell > button {
-    position: relative;
-    flex-direction: column;
-    gap: 0.15rem;
-    border: none;
-    background: transparent;
-    box-shadow: none;
-    padding: 0.35rem 0.25rem;
-    color: var(--content-muted);
-    font-size: 0.68rem;
-    font-weight: 500;
-  }
-
-  .sidebar-actions .notification-bell > button > span:not(.notification-badge) {
-    position: static;
-    width: auto;
-    height: auto;
-    clip: auto;
-  }
-
-  .sidebar-actions .notification-bell > button > span:not(.notification-badge)::before {
-    content: 'Alerts';
-    font-size: 0.68rem;
-  }
-
-  .sidebar-actions .notification-bell > button > span:not(.notification-badge) {
-    font-size: 0;
+    display: none;
   }
 
   .mobile-only {
@@ -304,13 +465,18 @@
   }
 
   .shell-main {
-    padding: 1.5rem 1rem calc(5rem + env(safe-area-inset-bottom));
+    padding: max(1.25rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right)) calc(96px + env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
+    overflow-x: clip;
   }
 
-  .notification-panel {
-    left: 0.5rem !important;
-    right: 0.5rem;
-    width: auto !important;
-    max-width: none !important;
+  .notification-panel.is-sheet {
+    position: fixed;
+    left: max(12px, env(safe-area-inset-left));
+    right: max(12px, env(safe-area-inset-right));
+    bottom: calc(max(10px, env(safe-area-inset-bottom)) + 76px);
+    width: auto;
+    max-height: 65vh;
+    border-radius: 20px;
+    z-index: 960;
   }
 }

@@ -12,6 +12,7 @@ import {
   discussionUploadsDir,
   notificationText,
   parseMessageInput,
+  logMessageActivity,
   removeDiscussionImage,
   storeDiscussionImage,
   toMessageDto,
@@ -65,7 +66,7 @@ jobDiscussionRouter.post('/:jobId/discussion', requireRole('ADMIN', 'USER'), dis
     data: { jobId: req.params.jobId, authorUserId: req.user!.id, body: input.text, groupId: group.id, replyToId: input.replyToId, ...image },
     include: MESSAGE_INCLUDE,
   });
-  await logActivity('job_discussion.create', req.params.jobId, req.params.jobId, req.user!.id);
+  await logMessageActivity('create', message, req.user!.id);
   await notifyDiscussionMessage(req.params.jobId, job.name, req.user!.id, req.user!.displayName, notificationText(message.body, Boolean(image)), group.id);
   res.status(201).json(toMessageDto(message));
 });
@@ -135,9 +136,11 @@ jobDiscussionRouter.delete('/:jobId/discussion/groups/:groupId', requireRole('AD
   const group = await prisma.discussionGroup.findFirst({ where: { id: req.params.groupId, jobId: req.params.jobId } });
   if (!group) return res.status(404).json({ error: 'Group not found' });
   if (group.isDefault) return res.status(400).json({ error: "General can't be deleted - rename it instead" });
-  const images = await prisma.jobDiscussionMessage.findMany({ where: { groupId: group.id, attachmentPath: { not: null } }, select: { attachmentPath: true } });
+  const doomed = await prisma.jobDiscussionMessage.findMany({ where: { groupId: group.id, deletedAt: null }, orderBy: { createdAt: 'asc' } });
   await prisma.discussionGroup.delete({ where: { id: group.id } });
-  await Promise.all(images.map((m) => removeDiscussionImage(m.attachmentPath)));
+  await Promise.all(doomed.map((m) => removeDiscussionImage(m.attachmentPath)));
+  // Keep each removed message readable in the activity log.
+  for (const m of doomed) await logMessageActivity('delete', m, req.user!.id, { removedBy: 'group', groupName: group.name });
   await logActivity('job_discussion.group_delete', group.name, req.params.jobId, req.user!.id);
   res.status(204).end();
 });
@@ -163,18 +166,19 @@ jobDiscussionRouter.put('/:jobId/discussion/:messageId', requireRole('ADMIN', 'U
     data: { body, editedAt: new Date() },
     include: MESSAGE_INCLUDE,
   });
-  await logActivity('job_discussion.edit', req.params.jobId, req.params.jobId, req.user!.id);
+  await logMessageActivity('edit', updated, req.user!.id, { previousBody: message.body });
   res.json(toMessageDto(updated));
 });
 
-// Deleting your own message is a hard delete (nothing worth auditing). Deleting someone
+// Deleting your own message is a hard delete (its text stays in the activity log). Deleting someone
 // else's message needs the (delegatable) moderateDiscussion permission - ADMIN always has
 // it, a USER account only if granted - and soft-deletes it instead, leaving a "removed by"
 // placeholder in the thread as the audit trail.
 jobDiscussionRouter.delete('/:jobId/discussion/:messageId', requireRole('ADMIN', 'USER'), async (req, res) => {
   const message = await prisma.jobDiscussionMessage.findUnique({ where: { id: req.params.messageId } });
   if (!message || message.jobId !== req.params.jobId || message.deletedAt) return res.status(404).json({ error: 'Message not found' });
-  if (message.authorUserId === req.user!.id) {
+  const removedBy = message.authorUserId === req.user!.id ? 'author' : 'moderator';
+  if (removedBy === 'author') {
     await prisma.jobDiscussionMessage.delete({ where: { id: message.id } });
     await removeDiscussionImage(message.attachmentPath);
   } else {
@@ -186,7 +190,7 @@ jobDiscussionRouter.delete('/:jobId/discussion/:messageId', requireRole('ADMIN',
     });
     await removeDiscussionImage(message.attachmentPath);
   }
-  await logActivity('job_discussion.delete', req.params.jobId, req.params.jobId, req.user!.id);
+  await logMessageActivity('delete', message, req.user!.id, { removedBy });
   res.status(204).end();
 });
 

@@ -87,6 +87,24 @@ export function BellIcon() {
   );
 }
 
+export function MoreIcon() {
+  return (
+    <svg {...common}>
+      <circle cx="3.3" cy="8" r="1.25" fill="currentColor" />
+      <circle cx="8" cy="8" r="1.25" fill="currentColor" />
+      <circle cx="12.7" cy="8" r="1.25" fill="currentColor" />
+    </svg>
+  );
+}
+
+export function ChevronRightIcon() {
+  return (
+    <svg {...common}>
+      <path d="m6 3.5 4.5 4.5L6 12.5" {...stroke} />
+    </svg>
+  );
+}
+
 export function WhyIcon() {
   return (
     <svg {...common}>

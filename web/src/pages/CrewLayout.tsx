@@ -9,6 +9,8 @@ import Avatar from '../components/Avatar';
 import ForcedPasswordChange from '../components/ForcedPasswordChange';
 import LockdownBanner from '../components/LockdownBanner';
 import UserName from '../components/UserName';
+import MobileTabBar from '../components/MobileTabBar';
+import { useIsPhone } from '../hooks/useIsPhone';
 
 /**
  * Shell for the whole crew portal (/crew/*) - a sibling to the admin/prep App shell and the
@@ -25,6 +27,7 @@ import UserName from '../components/UserName';
  */
 export default function CrewLayout() {
   const { user, loading, logout } = useAuth();
+  const phone = useIsPhone();
 
   if (loading) return null;
   if (!user) return <Navigate to="/login" replace />;
@@ -35,6 +38,12 @@ export default function CrewLayout() {
     <>
       <LockdownBanner />
       <div className="shell">
+        {phone ? (
+          <MobileTabBar
+            tabs={[{ to: '/crew', end: true, label: 'Schedule', icon: <JobsIcon /> }]}
+            after={[{ to: '/crew/account', label: 'Account', icon: <SettingsIcon /> }]}
+          />
+        ) : (
         <aside className="sidebar">
           <div className="sidebar-sticky">
             <div className="sidebar-brand">
@@ -71,6 +80,7 @@ export default function CrewLayout() {
             </div>
           </div>
         </aside>
+        )}
         <main className="shell-main">
           <div className="shell-main-inner">
             <Outlet />

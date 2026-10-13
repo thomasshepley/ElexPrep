@@ -26,6 +26,7 @@ import {
   discussionUploadsDir,
   notificationText,
   parseMessageInput,
+  logMessageActivity,
   removeDiscussionImage,
   storeDiscussionImage,
   toMessageDto,
@@ -624,7 +625,7 @@ crewPortalRouter.post('/me/jobs/:jobId/discussion', crewView, discussionImageUpl
     data: { jobId: req.params.jobId, authorUserId: req.user!.id, body: input.text, groupId: group.id, replyToId: input.replyToId, ...image },
     include: MESSAGE_INCLUDE,
   });
-  await logActivity('job_discussion.create', req.params.jobId, req.params.jobId, req.user!.id);
+  await logMessageActivity('create', message, req.user!.id);
   await notifyDiscussionMessage(req.params.jobId, found.assignment.job.name, req.user!.id, req.user!.displayName, notificationText(message.body, Boolean(image)), group.id);
   res.status(201).json(toMessageDto(message));
 });
@@ -658,7 +659,7 @@ crewPortalRouter.put('/me/jobs/:jobId/discussion/:messageId', crewView, async (r
     data: { body: input.text, editedAt: new Date() },
     include: MESSAGE_INCLUDE,
   });
-  await logActivity('job_discussion.edit', req.params.jobId, req.params.jobId, req.user!.id);
+  await logMessageActivity('edit', updated, req.user!.id, { previousBody: message.body });
   res.json(toMessageDto(updated));
 });
 
@@ -670,7 +671,7 @@ crewPortalRouter.delete('/me/jobs/:jobId/discussion/:messageId', crewView, async
   if (message.authorUserId !== req.user!.id) return res.status(403).json({ error: 'You can only delete your own messages' });
   await prisma.jobDiscussionMessage.delete({ where: { id: message.id } });
   await removeDiscussionImage(message.attachmentPath);
-  await logActivity('job_discussion.delete', req.params.jobId, req.params.jobId, req.user!.id);
+  await logMessageActivity('delete', message, req.user!.id, { removedBy: 'author' });
   res.status(204).end();
 });
 

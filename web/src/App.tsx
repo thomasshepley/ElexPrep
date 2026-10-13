@@ -10,10 +10,13 @@ import ForcedPasswordChange from './components/ForcedPasswordChange'
 import LockdownBanner from './components/LockdownBanner'
 import './App.css'
 import UserName from './components/UserName';
+import MobileTabBar from './components/MobileTabBar'
+import { useIsPhone } from './hooks/useIsPhone'
 
 function App() {
   const { user, loading, logout } = useAuth()
   const location = useLocation()
+  const phone = useIsPhone()
 
   if (loading) return null
   if (!user) return <Navigate to="/login" replace />
@@ -29,6 +32,41 @@ function App() {
     <>
       <LockdownBanner />
       <div className="shell">
+        {phone ? (
+          <MobileTabBar
+            tabs={[
+              { to: '/', end: true, label: 'Home', icon: <DashboardIcon /> },
+              { to: '/jobs', label: 'Jobs', icon: <JobsIcon /> },
+            ]}
+            more={{
+              header: (
+                <NavLink to="/preferences" className="sheet-profile">
+                  <Avatar userId={user.id} displayName={user.displayName} hasAvatar={Boolean(user.avatarPath)} size={44} />
+                  <span>
+                    <UserName as="strong" name={user.displayName} role={user.role} isProjectManager={user.isProjectManager} showPmChip={false} />
+                    <span className="muted sheet-profile-sub">Profile, notifications and security</span>
+                  </span>
+                </NavLink>
+              ),
+              links: [
+                { to: '/settings', label: 'Settings', icon: <SettingsIcon /> },
+                { to: '/signage', label: 'Signage', icon: <SignageIcon /> },
+                ...(user.role === 'WEBMASTER' ? [{ to: '/webmaster', label: 'Webmaster', icon: <SettingsIcon /> }] : []),
+              ],
+              footer: (
+                <div className="sheet-footer">
+                  <ThemeToggle />
+                  <BugReportButton />
+                  <button className="secondary sidebar-signout" onClick={logout}>
+                    <SignOutIcon />
+                    <span>Sign out</span>
+                  </button>
+                  <VersionBadge />
+                </div>
+              ),
+            }}
+          />
+        ) : (
         <aside className="sidebar">
           <div className="sidebar-sticky">
             <div className="sidebar-brand">
@@ -58,11 +96,6 @@ function App() {
                   <span>Webmaster</span>
                 </NavLink>
               )}
-              {/* Phone bottom bar only: preferences, theme and sign out live behind this tab there. */}
-              <NavLink to="/preferences" className="mobile-only" aria-label="My account and settings">
-                <Avatar userId={user.id} displayName={user.displayName} hasAvatar={Boolean(user.avatarPath)} size={22} />
-                <span>Me</span>
-              </NavLink>
             </nav>
             <div className="sidebar-user">
               <div className="sidebar-user-row">
@@ -84,6 +117,7 @@ function App() {
             </div>
           </div>
         </aside>
+        )}
         <main className="shell-main">
           <div className="shell-main-inner">
             <Outlet />
