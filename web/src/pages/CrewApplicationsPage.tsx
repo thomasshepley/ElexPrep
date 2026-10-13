@@ -5,6 +5,7 @@ import { isAdminRole } from '../auth/roles';
 import BankDetailsReveal from '../components/BankDetailsReveal';
 import WhatsAppButton from '../components/WhatsAppButton';
 import PasswordInput from '../components/PasswordInput';
+import { useDialog } from '../components/Dialog';
 
 const STATUS_FILTERS = ['PENDING', 'APPROVED', 'REJECTED', 'ALL'] as const;
 type StatusFilter = (typeof STATUS_FILTERS)[number];
@@ -16,6 +17,7 @@ function statusChipClass(status: string) {
 }
 
 export default function CrewApplicationsPage() {
+  const dialog = useDialog();
   const { user } = useAuth();
   const isAdmin = isAdminRole(user?.role);
   const [filter, setFilter] = useState<StatusFilter>('PENDING');
@@ -50,8 +52,9 @@ export default function CrewApplicationsPage() {
   };
 
   const reject = async (id: string) => {
-    const note = prompt('Rejection note (optional):') ?? '';
-    await api.crewApplications.reject(id, note || undefined);
+    const note = await dialog.prompt({ title: 'Reject this application?', label: 'Note (optional)', multiline: true, confirmLabel: 'Reject' });
+    if (note === null) return;
+    await api.crewApplications.reject(id, note.trim() || undefined);
     setExpandedId(null);
     setDetail(null);
     refresh();
@@ -71,8 +74,9 @@ export default function CrewApplicationsPage() {
   const toggleSelectAll = () => setSelected((prev) => (prev.size === pendingIds.length ? new Set() : new Set(pendingIds)));
 
   const bulkReject = async () => {
-    const note = prompt(`Rejection note for ${selected.size} applications (optional):`) ?? '';
-    await Promise.all([...selected].map((id) => api.crewApplications.reject(id, note || undefined)));
+    const note = await dialog.prompt({ title: `Reject ${selected.size} applications?`, label: 'Note (optional)', multiline: true, confirmLabel: 'Reject' });
+    if (note === null) return;
+    await Promise.all([...selected].map((id) => api.crewApplications.reject(id, note.trim() || undefined)));
     setSelected(new Set());
     setExpandedId(null);
     setDetail(null);
@@ -209,7 +213,19 @@ export default function CrewApplicationsPage() {
               )}
 
               {a.status === 'PENDING' && (
-                <ApproveForm applicationId={a.id} fullName={a.fullName} onDone={refresh} onReject={() => reject(a.id)} />
+                <ApproveForm
+                  applicationId={a.id}
+                  fullName={a.fullName}
+                  onDone={() => {
+                    setSelected((prev) => {
+                      const next = new Set(prev);
+                      next.delete(a.id);
+                      return next;
+                    });
+                    refresh();
+                  }}
+                  onReject={() => reject(a.id)}
+                />
               )}
 
               {a.status === 'REJECTED' && a.rejectionNote && (

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, type ActivityLogEntry } from '../api/client';
+import { formatDateTime } from '../utils/format';
 
 const ACRONYMS: Record<string, string> = {
   rms: 'RMS',
@@ -84,7 +85,7 @@ export default function ActivityLogPage() {
           <tbody>
             {filtered.map((e) => (
               <tr key={e.id}>
-                <td className="muted">{new Date(e.createdAt).toLocaleString()}</td>
+                <td className="muted">{formatDateTime(e.createdAt)}</td>
                 <td>{e.userName ?? <span className="muted">system</span>}</td>
                 <td>
                   {e.jobId && e.jobName ? (

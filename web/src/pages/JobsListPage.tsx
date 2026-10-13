@@ -12,6 +12,9 @@ import { useAuth } from '../auth/AuthContext';
 import { isAdminRole } from '../auth/roles';
 import { SearchIcon, WhereIcon } from '../components/Icons';
 import LocationLinks from '../components/LocationLinks';
+import { useDialog } from '../components/Dialog';
+import { formatDate } from '../utils/format';
+import DateTimeInput from '../components/DateTimeInput';
 
 function toDatetimeLocal(iso: string | null): string {
   if (!iso) return '';
@@ -101,11 +104,11 @@ function OnboardingOptionsForm({
           <div className="row" style={{ gap: '1rem' }}>
             <div className="field">
               <label htmlFor="onboard-starts">Starts</label>
-              <input id="onboard-starts" type="datetime-local" value={startsAt} onChange={(e) => setStartsAt(e.target.value)} />
+              <DateTimeInput id="onboard-starts" value={startsAt} onChange={setStartsAt} />
             </div>
             <div className="field">
               <label htmlFor="onboard-ends">Ends</label>
-              <input id="onboard-ends" type="datetime-local" value={endsAt} onChange={(e) => setEndsAt(e.target.value)} />
+              <DateTimeInput id="onboard-ends" value={endsAt} onChange={setEndsAt} defaultTime="18:00" />
             </div>
           </div>
           {!opportunity.startsAt && (
@@ -333,8 +336,8 @@ function OnboardOpportunitiesPanel({ existingOppIds, onOnboarded }: { existingOp
                     <OpportunityKindChip kind={o.kind} /> <span className="muted">{o.status}</span>
                   </td>
                   <td className="muted">
-                    {o.startsAt ? new Date(o.startsAt).toLocaleDateString() : ''}
-                    {o.endsAt ? ` – ${new Date(o.endsAt).toLocaleDateString()}` : ''}
+                    {o.startsAt ? formatDate(o.startsAt) : ''}
+                    {o.endsAt ? ` – ${formatDate(o.endsAt)}` : ''}
                   </td>
                   <td>
                     <button type="button" className="secondary" onClick={() => setPendingSingle(o)}>
@@ -352,6 +355,7 @@ function OnboardOpportunitiesPanel({ existingOppIds, onOnboarded }: { existingOp
 }
 
 export default function JobsListPage() {
+  const dialog = useDialog();
   const { user } = useAuth();
   const isAdmin = isAdminRole(user?.role);
   const canDelete = isAdmin || Boolean(user?.permissions?.deleteJobs);
@@ -370,7 +374,7 @@ export default function JobsListPage() {
   const removeJob = async (job: Job, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (!confirm(`Delete job "${job.name}"? This removes its patch, cases, labels, plots, and print history too.`)) {
+    if (!(await dialog.confirm({ title: `Delete "${job.name}"?`, message: 'This removes its patch, cases, labels, plots and print history too.', confirmLabel: 'Delete job', danger: true, typeToConfirm: job.name }))) {
       return;
     }
     await api.jobs.remove(job.id);

@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react';
 import { api, type JobContact } from '../api/client';
 import WhatsAppButton from './WhatsAppButton';
 import { useToast } from './Toast';
+import { useDialog } from './Dialog';
 
 export default function JobContactsPanel({ jobId }: { jobId: string }) {
+  const dialog = useDialog();
   const { showToast } = useToast();
   const [contacts, setContacts] = useState<JobContact[]>([]);
   const [name, setName] = useState('');
@@ -50,7 +52,7 @@ export default function JobContactsPanel({ jobId }: { jobId: string }) {
   };
 
   const remove = async (c: JobContact) => {
-    if (!confirm(`Remove ${c.name} from important contacts?`)) return;
+    if (!(await dialog.confirm({ title: `Remove ${c.name}?`, message: 'They come off this job\'s important contacts.', confirmLabel: 'Remove', danger: true }))) return;
     await api.jobContacts.remove(jobId, c.id);
     refresh();
     showToast('Contact removed', 'info');
@@ -120,7 +122,7 @@ export default function JobContactsPanel({ jobId }: { jobId: string }) {
                     <input defaultValue={c.notes ?? ''} style={{ width: '11rem' }} onBlur={(e) => updateField(c, 'notes', e.target.value)} />
                   </td>
                   <td>
-                    <WhatsAppButton phone={c.phone} label="WhatsApp" />
+                    <WhatsAppButton phone={c.phone} label="WhatsApp" compact />
                   </td>
                   <td>
                     <button type="button" className="secondary" onClick={() => remove(c)}>

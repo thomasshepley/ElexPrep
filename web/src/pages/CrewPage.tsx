@@ -9,6 +9,8 @@ import BankDetailsReveal from '../components/BankDetailsReveal';
 import WhatsAppButton from '../components/WhatsAppButton';
 import PasswordInput from '../components/PasswordInput';
 import Avatar from '../components/Avatar';
+import { useDialog } from '../components/Dialog';
+import { useAsyncAction } from '../hooks/useAsyncAction';
 
 const DOCUMENT_SLOTS = [
   { field: 'idDocument', label: 'Photo ID' },
@@ -16,6 +18,8 @@ const DOCUMENT_SLOTS = [
 ] as const;
 
 export default function CrewPage() {
+  const dialog = useDialog();
+  const { run } = useAsyncAction();
   const [crew, setCrew] = useState<CrewMember[]>([]);
   const [username, setUsername] = useState('');
   const [displayName, setDisplayName] = useState('');
@@ -65,10 +69,9 @@ export default function CrewPage() {
   };
 
   const resetPassword = async (c: CrewMember) => {
-    const pw = prompt(`New password for ${c.username}:`);
+    const pw = await dialog.prompt({ title: `Reset ${c.username}'s password`, message: 'They will be signed out everywhere and need the new password to sign back in.', label: 'New password', inputType: 'password', minLength: 8, confirmLabel: 'Set password' });
     if (!pw) return;
-    await api.crew.update(c.id, { password: pw });
-    alert('Password updated');
+    await run(() => api.crew.update(c.id, { password: pw }), { success: 'Password updated' });
   };
 
   const remove = async (c: CrewMember) => {
@@ -76,7 +79,7 @@ export default function CrewPage() {
       c.userRole === 'ADMIN'
         ? `Remove ${c.displayName} from the crew roster? Their admin login is unaffected.`
         : `Delete crew member ${c.displayName}? This removes their login and any job assignments.`;
-    if (!confirm(confirmMessage)) return;
+    if (!(await dialog.confirm({ title: c.userRole === 'ADMIN' ? 'Remove from the crew roster?' : `Delete ${c.displayName}?`, message: confirmMessage, confirmLabel: c.userRole === 'ADMIN' ? 'Remove' : 'Delete', danger: true }))) return;
     setError(null);
     try {
       await api.crew.remove(c.id);
@@ -175,7 +178,7 @@ export default function CrewPage() {
                   <td>
                     <div className="row" style={{ gap: '0.4rem' }}>
                       {c.phone ?? '-'}
-                      <WhatsAppButton phone={c.phone} label="WhatsApp" />
+                      <WhatsAppButton phone={c.phone} label="WhatsApp" compact />
                     </div>
                   </td>
                   <td>{c.skills ?? '-'}</td>
@@ -301,9 +304,9 @@ function ProfileEditPanel({ crew, onChanged }: { crew: CrewMember; onChanged: ()
 
         <div className="field">
           <label>Bank details</label>
-          <BankDetailsReveal hasBankDetails={crew.hasBankDetails} fetchDetails={() => api.crew.bankDetails(crew.id)} />
+          <BankDetailsReveal hasBankDetails={crew.hasBankDetails} fetchDetails={() => api.crew.bankDetails(crew.id)} version={crew} />
         </div>
-        <BankDetailsForm value={bankDetails} onChange={setBankDetails} />
+        <BankDetailsForm value={bankDetails} onChange={setBankDetails} title="Change bank details" />
         <p className="muted" style={{ marginTop: '-0.5rem' }}>
           Leave blank to keep what's already on file.
         </p>

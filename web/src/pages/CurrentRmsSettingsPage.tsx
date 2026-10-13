@@ -1,8 +1,13 @@
 import { useEffect, useState } from 'react';
 import { api, type CurrentRmsConfig, type CurrentRmsOpportunity } from '../api/client';
 import PasswordInput from '../components/PasswordInput';
+import { useDialog } from '../components/Dialog';
+import { useToast } from '../components/Toast';
+import { formatDate, formatDateTime } from '../utils/format';
 
 export default function CurrentRmsSettingsPage() {
+  const dialog = useDialog();
+  const { showToast } = useToast();
   const [config, setConfig] = useState<CurrentRmsConfig | null>(null);
   const [subdomain, setSubdomain] = useState('');
   const [apiKeyInput, setApiKeyInput] = useState('');
@@ -20,16 +25,22 @@ export default function CurrentRmsSettingsPage() {
   const [opportunities, setOpportunities] = useState<CurrentRmsOpportunity[]>([]);
   const [search, setSearch] = useState('');
 
+  const [loadError, setLoadError] = useState<string | null>(null);
+
   const loadConfig = () =>
-    api.currentRms.getConfig().then((c) => {
+    api.currentRms
+      .getConfig()
+      .then((c) => {
       setConfig(c);
       setSubdomain(c.subdomain);
       setPollMinutes(c.pollMinutes);
       setEnabled(c.enabled);
       setEditingApiKey(!c.hasApiKey);
-    });
+      })
+      .catch((e) => setLoadError((e as Error).message));
 
-  const loadOpportunities = (q?: string) => api.currentRms.listOpportunities(q).then(setOpportunities);
+  const loadOpportunities = (q?: string) =>
+    api.currentRms.listOpportunities(q).then(setOpportunities).catch((e) => setSaveError((e as Error).message));
 
   useEffect(() => {
     loadConfig();
@@ -59,7 +70,7 @@ export default function CurrentRmsSettingsPage() {
   };
 
   const removeApiKey = async () => {
-    if (!confirm('Remove the saved Current RMS API key? Syncing will stop working until a new key is saved.')) return;
+    if (!(await dialog.confirm({ title: 'Remove the Current RMS API key?', message: 'Syncing stops until a new key is saved.', confirmLabel: 'Remove key', danger: true }))) return;
     setBusy(true);
     setSaveError(null);
     setSaveMessage(null);
@@ -113,13 +124,13 @@ export default function CurrentRmsSettingsPage() {
   const importOpportunity = async (rmsId: number) => {
     try {
       const job = await api.currentRms.importOpportunity(rmsId);
-      alert(`Created job "${job.name}" - it's private until you mark it Public in Job Settings.`);
+      showToast(`Created "${job.name}" - it's private until you mark it Public in Job Settings.`, 'success');
     } catch (e) {
-      alert((e as Error).message);
+      showToast((e as Error).message, 'error');
     }
   };
 
-  if (!config) return null;
+  if (!config) return loadError ? <p className="error">Could not load Current RMS settings: {loadError}</p> : <p className="muted">Loading…</p>;
 
   return (
     <div>
@@ -239,7 +250,7 @@ export default function CurrentRmsSettingsPage() {
         >
           <strong>Last synced</strong>
           <span className={config.lastSyncError ? 'error' : 'muted'}>
-            {config.lastSyncedAt ? new Date(config.lastSyncedAt).toLocaleString() : 'Never synced yet'}
+            {config.lastSyncedAt ? formatDateTime(config.lastSyncedAt) : 'Never synced yet'}
           </span>
         </div>
         {config.lastSyncError && (
@@ -279,10 +290,10 @@ export default function CurrentRmsSettingsPage() {
                     <td>{o.memberName}</td>
                     <td>{o.status}</td>
                     <td className="muted">
-                      {o.startsAt ? new Date(o.startsAt).toLocaleDateString() : ''}
-                      {o.endsAt ? ` – ${new Date(o.endsAt).toLocaleDateString()}` : ''}
+                      {o.startsAt ? formatDate(o.startsAt) : ''}
+                      {o.endsAt ? ` – ${formatDate(o.endsAt)}` : ''}
                     </td>
-                    <td className="muted">{o.rmsUpdatedAt ? new Date(o.rmsUpdatedAt).toLocaleString() : ''}</td>
+                    <td className="muted">{o.rmsUpdatedAt ? formatDateTime(o.rmsUpdatedAt) : ''}</td>
                     <td>
                       <button className="secondary" onClick={() => importOpportunity(o.rmsId)}>
                         Import as job

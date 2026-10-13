@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useDroppable } from '@dnd-kit/core';
+import { formatDate, formatTime } from '../utils/format';
 
 export interface TimelineItemCrew {
   id: string;
@@ -20,14 +21,13 @@ export interface TimelineItem {
 
 const PX_PER_MIN = 1.1;
 const MIN_BLOCK_MIN = 30; // a point-in-time entry (no endsAt) still gets a visible block
+// The axis runs on into the small hours (to 06:00 next day) for shows that finish after midnight.
+const MAX_TIMELINE_MIN = 30 * 60;
 
 function minutesSinceMidnight(d: Date): number {
   return d.getHours() * 60 + d.getMinutes();
 }
 
-function formatTime(d: Date): string {
-  return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
-}
 
 /** A translucent wash of the item's own color, roughly matching --accent-wash's opacity, so a
  * colored item reads the same "tinted block, solid left border" look the default accent color
@@ -189,15 +189,16 @@ export function SingleDayTimeline({
   const sorted = [...items].sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
   const timed: TimedItem[] = sorted.map((item) => {
     const startMin = minutesSinceMidnight(new Date(item.startsAt));
-    const endMin = item.endsAt
-      ? Math.max(minutesSinceMidnight(new Date(item.endsAt)), startMin + MIN_BLOCK_MIN)
-      : startMin + MIN_BLOCK_MIN;
+    // Duration-based rather than end-of-day-based, so an entry running past midnight
+    // (22:00-01:00) keeps its real length instead of wrapping to a 30-minute stub.
+    const durationMin = item.endsAt ? (new Date(item.endsAt).getTime() - new Date(item.startsAt).getTime()) / 60000 : 0;
+    const endMin = Math.min(startMin + Math.max(durationMin, MIN_BLOCK_MIN), MAX_TIMELINE_MIN);
     return { ...item, startMin, endMin };
   });
   const laidOut = layoutColumns(timed);
 
   const dayStartHour = Math.max(0, Math.floor(Math.min(...timed.map((i) => i.startMin)) / 60) - 1);
-  const dayEndHour = Math.min(24, Math.ceil(Math.max(...timed.map((i) => i.endMin)) / 60) + 1);
+  const dayEndHour = Math.min(MAX_TIMELINE_MIN / 60, Math.ceil(Math.max(...timed.map((i) => i.endMin)) / 60) + 1);
   const hours = Array.from({ length: dayEndHour - dayStartHour + 1 }, (_, i) => dayStartHour + i);
   const totalHeight = (dayEndHour - dayStartHour) * 60 * PX_PER_MIN;
 
@@ -207,7 +208,7 @@ export function SingleDayTimeline({
     <div className="day-timeline" style={{ height: totalHeight }}>
       {hours.map((h) => (
         <div key={h} className="day-timeline-hour" style={{ top: (h - dayStartHour) * 60 * PX_PER_MIN }}>
-          <span className="day-timeline-hour-label">{String(h).padStart(2, '0')}:00</span>
+          <span className="day-timeline-hour-label">{String(h % 24).padStart(2, '0')}:00</span>
           <div className="day-timeline-hour-line" />
         </div>
       ))}
@@ -276,7 +277,7 @@ export default function DayTimeline({ items }: { items: TimelineItem[] }) {
               className={key === activeKey ? '' : 'secondary'}
               onClick={() => setSelected(key)}
             >
-              {new Date(`${key}T00:00:00`).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}
+              {formatDate(`${key}T00:00:00`)}
             </button>
           ))}
         </div>

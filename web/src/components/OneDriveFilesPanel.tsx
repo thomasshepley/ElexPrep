@@ -9,7 +9,7 @@ import { api, type JobOneDriveStatus, type OneDriveItem } from '../api/client';
  * until real Azure credentials are added in Settings -> OneDrive, `enabled` stays false and
  * this renders a clear "not connected yet" state rather than a broken file browser.
  */
-export default function OneDriveFilesPanel({ jobId, onChange }: { jobId: string; onChange?: () => void }) {
+export default function OneDriveFilesPanel({ jobId, onChange }: { jobId: string; onChange?: (status: JobOneDriveStatus) => void }) {
   const [status, setStatus] = useState<JobOneDriveStatus | null>(null);
   const [crumbs, setCrumbs] = useState<{ id: string | undefined; name: string }[]>([{ id: undefined, name: 'Project folder' }]);
   const [items, setItems] = useState<OneDriveItem[]>([]);
@@ -22,7 +22,7 @@ export default function OneDriveFilesPanel({ jobId, onChange }: { jobId: string;
       .get(jobId)
       .then((s) => {
         setStatus(s);
-        onChange?.();
+        onChange?.(s);
       })
       .catch((e) => setError(e.message));
 
@@ -43,7 +43,9 @@ export default function OneDriveFilesPanel({ jobId, onChange }: { jobId: string;
   };
 
   useEffect(() => {
-    if (status?.enabled && status.folderId) browse(undefined, 'Project folder');
+    // Opening the root resets the trail to just the root crumb (index 0) - appending here used to
+    // double it, so every shared path was stored as "Project folder/Project folder/...".
+    if (status?.enabled && status.folderId) browse(undefined, 'Project folder', 0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status?.enabled, status?.folderId]);
 
@@ -116,7 +118,7 @@ export default function OneDriveFilesPanel({ jobId, onChange }: { jobId: string;
     }
   };
 
-  if (!status) return null;
+  if (!status) return error ? <p className="error">Could not load OneDrive details: {error}</p> : <p className="muted">Loading…</p>;
 
   if (!status.enabled) {
     return (

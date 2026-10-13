@@ -4,8 +4,11 @@ import { toLocationColorMapEntry, type LocationColorMap } from '@elexprep/shared
 import { api, type Job, type PrintQueueItem, type AdHocLabel, type PrintJob, type PrintMethod } from '../api/client';
 import LabelTypeSection, { summarize } from './printQueue/LabelTypeSection';
 import PrintConfirmModal from './printQueue/PrintConfirmModal';
+import { useDialog } from './Dialog';
+import { labelTypeName } from '../utils/labelTypes';
 
 export default function PrintQueuePanel({ jobId, groupId = null }: { jobId: string; groupId?: string | null }) {
+  const dialog = useDialog();
   const [queue, setQueue] = useState<PrintQueueItem[]>([]);
   const [adHoc, setAdHoc] = useState<AdHocLabel[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -79,7 +82,7 @@ export default function PrintQueuePanel({ jobId, groupId = null }: { jobId: stri
     } catch (e) {
       const msg = (e as Error).message;
       if (msg.includes('safety cap') && !override) {
-        if (confirm(`${msg}\n\nPrint anyway?`)) return confirmSelected(true);
+        if (await dialog.confirm({ title: 'Print more copies than usual?', message: msg, confirmLabel: 'Print anyway' })) return confirmSelected(true);
         return false;
       }
       setError(msg);
@@ -218,7 +221,7 @@ export default function PrintQueuePanel({ jobId, groupId = null }: { jobId: stri
               <tbody>
                 {printJobs.map((pj) => (
                   <tr key={pj.id}>
-                    <td>{pj.labelType}</td>
+                    <td>{labelTypeName(pj.labelType)}</td>
                     <td>{trayMap[pj.labelType] ?? pj.tray}</td>
                     <td>{pj.pages}</td>
                     <td className="muted">{pj.method}</td>
@@ -271,7 +274,7 @@ export default function PrintQueuePanel({ jobId, groupId = null }: { jobId: stri
               <tbody>
                 {confirmedOrPrinted.map((item) => (
                   <tr key={item.id}>
-                    <td>{item.labelType}</td>
+                    <td>{labelTypeName(item.labelType)}</td>
                     <td>{summarize(item.labelType, item.content)}</td>
                     <td>{item.quantity}</td>
                     <td className="muted">{item.status}</td>

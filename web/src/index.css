@@ -1625,11 +1625,19 @@ tbody tr:hover {
 
 .discussion-compose {
   display: flex;
+  align-items: flex-end;
   gap: 0.6rem;
 }
 
-.discussion-compose input {
+.discussion-compose input,
+.discussion-compose textarea {
   flex: 1;
+  resize: none;
+  font: inherit;
+}
+
+.discussion-header {
+  margin-bottom: var(--space-3);
 }
 
 /* A collapsible form section (see CertificationPicker) - keeps optional, rarely-filled fields
@@ -1741,8 +1749,27 @@ tbody tr:hover {
    (see .chip's comment): it borrows WhatsApp's own brand color so the button reads at a glance
    as "this opens WhatsApp", same reasoning a payment button borrows its provider's mark. */
 .whatsapp-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  text-decoration: none;
+  border-radius: var(--radius-sm);
+  padding: 0.5rem 0.9rem;
+  font-weight: 600;
+  font-size: var(--text-sm);
   background: #25d366;
   color: #04280f;
+}
+
+.whatsapp-button-compact {
+  padding: 0.35rem;
+  background: transparent;
+  color: #25d366;
+  border: 1px solid var(--border);
+}
+
+.whatsapp-button-compact:hover {
+  background: rgba(37, 211, 102, 0.12);
 }
 
 .whatsapp-button:hover:not(:disabled) {
@@ -1914,4 +1941,116 @@ td input[type='number']::-webkit-outer-spin-button,
 td input[type='number']::-webkit-inner-spin-button {
   -webkit-appearance: none;
   margin: 0;
+}
+
+.dialog {
+  max-width: 28rem;
+}
+
+.dialog-message {
+  color: var(--content-muted);
+  margin-bottom: var(--space-4);
+  white-space: pre-line;
+}
+
+.dialog .field input,
+.dialog .field textarea {
+  width: 100%;
+}
+
+.dialog-hint {
+  font-size: var(--text-xs);
+  margin: 0.3rem 0 0;
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  margin-top: var(--space-5);
+}
+
+.load-error {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+/* Layout utilities, used in place of one-off inline styles. */
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.stack-sm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.row-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.row-end {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+.field-sm {
+  width: 8rem;
+  max-width: 100%;
+}
+
+.field-md {
+  width: 16rem;
+  max-width: 100%;
+}
+
+.field-lg {
+  width: 32rem;
+  max-width: 100%;
+}
+
+.mt-0 {
+  margin-top: 0;
+}
+
+.mb-0 {
+  margin-bottom: 0;
+}
+
+.section-gap {
+  margin-top: var(--space-5);
+}
+
+/* The map iframe paints white until Google's tiles arrive; a sunken background keeps it from
+   flashing a bright rectangle in dark mode. */
+.location-map {
+  border: 0;
+  border-radius: var(--radius-sm);
+  display: block;
+  background: var(--surface-sunken);
+}
+
+.datetime-input {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.datetime-input input[type='time'] {
+  width: 7rem;
+}
+
+.datetime-input-readout {
+  font-size: var(--text-xs);
 }

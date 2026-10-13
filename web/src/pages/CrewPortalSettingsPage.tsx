@@ -32,7 +32,7 @@ export default function CrewPortalSettingsPage() {
     }
   };
 
-  if (!features) return null;
+  if (!features) return error ? <p className="error">Could not load crew portal settings: {error}</p> : <p className="muted">Loading…</p>;
 
   return (
     <div>

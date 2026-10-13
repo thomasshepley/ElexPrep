@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api, type AdHocLabel, type CrewLabelRequest } from '../api/client';
 import LabelTypeForm, { TYPE_LABELS, type AdHocType } from './LabelTypeForm';
 import { WhoIcon } from './Icons';
+import { useDialog } from './Dialog';
 
 /**
  * One-off/ad hoc labels for a job, grouped into the same 3 sections crew think in when they
@@ -75,6 +76,7 @@ function summarizeContent(labelType: string, content: Record<string, unknown>): 
 }
 
 function RequestedLabelsPanel({ jobId, onChanged }: { jobId: string; onChanged: () => void }) {
+  const dialog = useDialog();
   const [requests, setRequests] = useState<CrewLabelRequest[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
@@ -93,8 +95,9 @@ function RequestedLabelsPanel({ jobId, onChanged }: { jobId: string; onChanged: 
   };
 
   const reject = async (id: string) => {
-    const note = prompt('Reason (optional):') ?? '';
-    await api.labelRequests.reject(jobId, id, note || undefined);
+    const note = await dialog.prompt({ title: 'Deny this label request?', label: 'Reason (optional)', multiline: true, confirmLabel: 'Deny request' });
+    if (note === null) return;
+    await api.labelRequests.reject(jobId, id, note.trim() || undefined);
     refresh();
   };
 
@@ -119,8 +122,9 @@ function RequestedLabelsPanel({ jobId, onChanged }: { jobId: string; onChanged: 
   };
 
   const bulkReject = async () => {
-    const note = prompt(`Reason for denying ${selected.size} requests (optional):`) ?? '';
-    await Promise.all([...selected].map((id) => api.labelRequests.reject(jobId, id, note || undefined)));
+    const note = await dialog.prompt({ title: `Deny ${selected.size} label requests?`, label: 'Reason (optional)', multiline: true, confirmLabel: 'Deny requests' });
+    if (note === null) return;
+    await Promise.all([...selected].map((id) => api.labelRequests.reject(jobId, id, note.trim() || undefined)));
     setSelected(new Set());
     refresh();
   };

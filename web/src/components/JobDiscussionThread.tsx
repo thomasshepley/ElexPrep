@@ -1,12 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { api, type DiscussionMessage } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
+import { useDialog } from './Dialog';
+import { formatDateTime } from '../utils/format';
 
 const POLL_MS = 15000;
 
-function formatTime(iso: string): string {
-  return new Date(iso).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
-}
 
 /**
  * A flat, chronological message thread for one job - shared by the admin job detail page's
@@ -16,6 +15,7 @@ function formatTime(iso: string): string {
  * since this app has no realtime transport yet.
  */
 export default function JobDiscussionThread({ jobId, scope }: { jobId: string; scope: 'staff' | 'crew' }) {
+  const dialog = useDialog();
   const { user } = useAuth();
   const [messages, setMessages] = useState<DiscussionMessage[] | null>(null);
   const [locked, setLocked] = useState(false);
@@ -37,10 +37,19 @@ export default function JobDiscussionThread({ jobId, scope }: { jobId: string; s
   // server-side checks, which this only mirrors for the UI affordance.
   const canModerate = scope === 'staff' && Boolean(user?.permissions?.moderateDiscussion);
 
+  // Whether the reader is at (or near) the bottom - new messages only pull the view down when
+  // they are, so someone scrolled up reading history isn't yanked away every poll.
+  const stickToBottom = useRef(true);
+  const onScroll = () => {
+    const el = listRef.current;
+    if (el) stickToBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 48;
+  };
+
   const refresh = () =>
     list(jobId)
       .then((data) => {
-        setMessages(data.messages);
+        // Keep the same array when nothing changed, so a quiet poll doesn't re-render the thread.
+        setMessages((prev) => (prev && JSON.stringify(prev) === JSON.stringify(data.messages) ? prev : data.messages));
         setLocked(data.locked);
       })
       .catch((e) => setError(e.message));
@@ -53,7 +62,7 @@ export default function JobDiscussionThread({ jobId, scope }: { jobId: string; s
   }, [jobId]);
 
   useEffect(() => {
-    if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight;
+    if (listRef.current && stickToBottom.current) listRef.current.scrollTop = listRef.current.scrollHeight;
   }, [messages]);
 
   const submit = async (e: React.FormEvent) => {
@@ -63,6 +72,7 @@ export default function JobDiscussionThread({ jobId, scope }: { jobId: string; s
     setError(null);
     try {
       const message = await send(jobId, draft.trim());
+      stickToBottom.current = true;
       setMessages((prev) => [...(prev ?? []), message]);
       setDraft('');
     } catch (err) {
@@ -95,7 +105,7 @@ export default function JobDiscussionThread({ jobId, scope }: { jobId: string; s
   };
 
   const deleteMessage = async (messageId: string) => {
-    if (!confirm('Delete this message?')) return;
+    if (!(await dialog.confirm({ title: 'Delete this message?', confirmLabel: 'Delete', danger: true }))) return;
     try {
       await remove(jobId, messageId);
       setMessages((prev) => prev?.filter((m) => m.id !== messageId) ?? null);
@@ -121,19 +131,20 @@ export default function JobDiscussionThread({ jobId, scope }: { jobId: string; s
 
   return (
     <div className="discussion-thread">
-      {canModerate && (
-        <div className="row discussion-lock-row" style={{ justifyContent: 'flex-end' }}>
+      <div className="row-between discussion-header">
+        <h3 className="mt-0 mb-0">Discussion</h3>
+        {canModerate && (
           <button type="button" className="secondary" disabled={lockBusy} onClick={toggleLock}>
             {locked ? 'Unlock discussion' : 'Lock discussion'}
           </button>
-        </div>
-      )}
+        )}
+      </div>
       {locked && (
         <p className="muted discussion-locked-note">
           {canModerate ? 'This discussion is locked - only moderators can post.' : 'This discussion is locked.'}
         </p>
       )}
-      <div className="discussion-messages" ref={listRef}>
+      <div className="discussion-messages" ref={listRef} onScroll={onScroll} role="log" aria-live="polite">
         {messages === null && <p className="muted">Loading…</p>}
         {messages !== null && messages.length === 0 && <p className="muted">No messages yet - say hello.</p>}
         {messages?.map((m) => {
@@ -147,7 +158,7 @@ export default function JobDiscussionThread({ jobId, scope }: { jobId: string; s
               <div className="discussion-message-meta">
                 <strong>{m.authorName}</strong>
                 <span className="chip chip-role">{m.authorRole}</span>
-                <span className="muted">{formatTime(m.createdAt)}</span>
+                <span className="muted">{formatDateTime(m.createdAt)}</span>
                 {m.editedAt && !isDeleted && <span className="muted discussion-message-edited">(edited)</span>}
                 {(canEdit || canDelete) && !isEditing && (
                   <span className="discussion-message-actions">
@@ -196,11 +207,18 @@ export default function JobDiscussionThread({ jobId, scope }: { jobId: string; s
       </div>
       {canCompose ? (
         <form className="discussion-compose" onSubmit={submit}>
-          <input
+          <textarea
             aria-label="Message"
-            placeholder="Write a message…"
+            placeholder="Write a message… (Enter to send, Shift+Enter for a new line)"
+            rows={Math.min(6, Math.max(1, draft.split('\n').length))}
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+                e.preventDefault();
+                e.currentTarget.form?.requestSubmit();
+              }
+            }}
             disabled={busy}
           />
           <button type="submit" disabled={busy || !draft.trim()}>

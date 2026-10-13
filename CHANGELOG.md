@@ -4,6 +4,10 @@ Newest entries first. Each push/merge gets exactly one entry - see
 `scripts/bump-version.mjs` for how the version number itself advances. A `+` marks a
 feature addition, a `-` marks a bug fix.
 
+## v1.3.5 - 2026-10-13
+
+- Replaced browser pop-ups with in-app dialogs, 24-hour UK dates throughout, and fixed a batch of form and loading bugs
+
 ## v1.3.4 - 2026-10-13
 
 - Fix job dates on the dashboard and crew schedule, phone layout, signage fallback and spare labels

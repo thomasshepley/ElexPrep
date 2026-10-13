@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { api, type CaseGroup } from '../api/client';
+import { useDialog } from './Dialog';
 
 export default function CasesPanel({ jobId, groupId = null }: { jobId: string; groupId?: string | null }) {
+  const dialog = useDialog();
   const [cases, setCases] = useState<CaseGroup[]>([]);
   const [busy, setBusy] = useState(false);
   const [newType, setNewType] = useState('');
@@ -22,9 +24,12 @@ export default function CasesPanel({ jobId, groupId = null }: { jobId: string; g
   const generate = async () => {
     if (
       stageCases.length > 0 &&
-      !confirm(
-        `This replaces all ${stageCases.length} case row(s) below with a fresh set built from the current patch and case rules - any manual edits or additions will be lost. Continue?`
-      )
+      !(await dialog.confirm({
+        title: 'Regenerate cases?',
+        message: `This replaces all ${stageCases.length} case row(s) with a fresh set built from the current patch and case rules - any manual edits or additions will be lost.`,
+        confirmLabel: 'Regenerate',
+        danger: true,
+      }))
     ) {
       return;
     }
@@ -45,7 +50,7 @@ export default function CasesPanel({ jobId, groupId = null }: { jobId: string; g
   };
 
   const remove = async (id: string) => {
-    if (!confirm('Delete this case row?')) return;
+    if (!(await dialog.confirm({ title: 'Delete this case?', confirmLabel: 'Delete', danger: true }))) return;
     await api.cases.remove(jobId, id);
     setSelected((s) => {
       const next = new Set(s);
@@ -76,7 +81,7 @@ export default function CasesPanel({ jobId, groupId = null }: { jobId: string; g
   };
 
   const bulkDelete = async () => {
-    if (!confirm(`Delete ${selected.size} selected case rows?`)) return;
+    if (!(await dialog.confirm({ title: `Delete ${selected.size} cases?`, confirmLabel: 'Delete', danger: true }))) return;
     await api.cases.bulkRemove(jobId, [...selected]);
     setSelected(new Set());
     refresh();

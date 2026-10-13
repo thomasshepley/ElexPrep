@@ -105,7 +105,7 @@ export default function TwoFactorPanel() {
     }
   };
 
-  if (!status) return null;
+  if (!status) return error ? <p className="error">Could not load two-factor settings: {error}</p> : <p className="muted">Loading…</p>;
 
   return (
     <div>

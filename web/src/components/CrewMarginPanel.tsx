@@ -2,10 +2,8 @@ import { useEffect, useState } from 'react';
 import { api } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { isAdminRole } from '../auth/roles';
+import { formatMoney } from '../utils/format';
 
-function formatMoney(n: number): string {
-  return `£${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
 
 /**
  * Admin-only crew profit/cost: what the client is charged for crew (from Current RMS, summed

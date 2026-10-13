@@ -7,6 +7,8 @@ import DayBlocksColumn, { localMidnightIso, useDayBlockActions, type DayBlockVie
 import { useAuth } from '../auth/AuthContext';
 import { isAdminRole } from '../auth/roles';
 import { useToast } from './Toast';
+import { formatDateTime, formatDayHeading, formatTime } from '../utils/format';
+import DateTimeInput from './DateTimeInput';
 
 // The native datetime-local spinner/scroll-wheel snaps to this step, so picking a time quickly
 // moves in 15-minute jumps - typing a value directly (e.g. 09:07) is still unrestricted, so an
@@ -236,26 +238,13 @@ export default function JobSchedulePanel({ jobId }: { jobId: string }) {
                 <label htmlFor="sched-title">Title</label>
                 <input id="sched-title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Load in / Prep" required />
               </div>
-              <div className="field" style={{ width: '13rem' }}>
+              <div className="field">
                 <label htmlFor="sched-starts">Starts</label>
-                <input
-                  id="sched-starts"
-                  type="datetime-local"
-                  step={TIME_STEP_SECONDS}
-                  value={startsAt}
-                  onChange={(e) => handleStartsChange(e.target.value)}
-                  required
-                />
+                <DateTimeInput id="sched-starts" stepMinutes={TIME_STEP_SECONDS / 60} value={startsAt} onChange={handleStartsChange} required />
               </div>
-              <div className="field" style={{ width: '13rem' }}>
+              <div className="field">
                 <label htmlFor="sched-ends">Ends (optional)</label>
-                <input
-                  id="sched-ends"
-                  type="datetime-local"
-                  step={TIME_STEP_SECONDS}
-                  value={endsAt}
-                  onChange={(e) => handleEndsChange(e.target.value)}
-                />
+                <DateTimeInput id="sched-ends" stepMinutes={TIME_STEP_SECONDS / 60} value={endsAt} onChange={handleEndsChange} defaultTime="18:00" />
               </div>
               <div className="field" style={{ width: '16rem' }}>
                 <label htmlFor="sched-notes">Notes</label>
@@ -293,7 +282,7 @@ export default function JobSchedulePanel({ jobId }: { jobId: string }) {
           {selectedDate && itemsForSelectedDate.length > 0 ? (
             <>
               <div className="panel">
-                <h3>{new Date(`${selectedDate}T00:00:00`).toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })}</h3>
+                <h3>{formatDayHeading(`${selectedDate}T00:00:00`)}</h3>
                 <SingleDayTimeline
                   items={itemsForSelectedDate}
                   dropTargets
@@ -316,8 +305,8 @@ export default function JobSchedulePanel({ jobId }: { jobId: string }) {
                     {itemsForSelectedDate.map((i) => (
                       <tr key={i.id}>
                         <td>{i.title}</td>
-                        <td>{new Date(i.startsAt).toLocaleString(undefined, { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</td>
-                        <td>{i.endsAt ? new Date(i.endsAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) : '-'}</td>
+                        <td>{formatDateTime(i.startsAt)}</td>
+                        <td>{i.endsAt ? formatTime(i.endsAt) : '-'}</td>
                         <td className="muted">{i.notes ?? '-'}</td>
                         <td>
                           <button className="secondary" onClick={() => remove(i.id)}>

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api, type OnboardingInvite } from '../api/client';
+import { useDialog } from '../components/Dialog';
 
 const STATUS_FILTERS = ['PENDING', 'APPROVED', 'REJECTED', 'COMPLETED', 'ALL'] as const;
 type StatusFilter = (typeof STATUS_FILTERS)[number];
@@ -12,6 +13,7 @@ function statusChipClass(status: string) {
 }
 
 export default function OnboardingPage() {
+  const dialog = useDialog();
   const [filter, setFilter] = useState<StatusFilter>('PENDING');
   const [invites, setInvites] = useState<OnboardingInvite[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -39,7 +41,7 @@ export default function OnboardingPage() {
   };
 
   const reject = async (id: string) => {
-    if (!confirm('Reject this onboarding request?')) return;
+    if (!(await dialog.confirm({ title: 'Reject this onboarding request?', confirmLabel: 'Reject', danger: true }))) return;
     await api.onboarding.reject(id);
     refresh();
   };
@@ -47,7 +49,13 @@ export default function OnboardingPage() {
   const copyLink = async (invite: OnboardingInvite) => {
     if (!invite.token) return;
     const link = `${window.location.origin}/onboard/complete/${invite.token}`;
-    await navigator.clipboard.writeText(link).catch(() => {});
+    try {
+      await navigator.clipboard.writeText(link);
+    } catch {
+      // Clipboard access can be refused (permissions, non-HTTPS) - show the link to copy by hand.
+      await dialog.prompt({ title: 'Copy this link', message: "Your browser didn't allow copying automatically.", label: 'Signup link', defaultValue: link, confirmLabel: 'Done' });
+      return;
+    }
     setCopiedId(invite.id);
     setTimeout(() => setCopiedId((id) => (id === invite.id ? null : id)), 2000);
   };

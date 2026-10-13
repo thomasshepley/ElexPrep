@@ -11,9 +11,11 @@ const EMPTY: BankDetails = { accountName: '', sortCode: '', accountNumber: '', b
 export default function BankDetailsForm({
   value,
   onChange,
+  title = 'Bank details',
 }: {
   value: BankDetails | null;
   onChange: (next: BankDetails | null) => void;
+  title?: string;
 }) {
   const idPrefix = useId();
   const current = value ?? EMPTY;
@@ -26,7 +28,7 @@ export default function BankDetailsForm({
 
   return (
     <div className="field">
-      <label>Bank details</label>
+      <label>{title}</label>
       <div className="bank-details-grid">
         <div className="field">
           <label htmlFor={`${idPrefix}-name`}>Account holder name</label>

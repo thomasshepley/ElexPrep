@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api, type CrewRateLine } from '../api/client';
+import { useDialog } from './Dialog';
 
 const GENERAL_LABEL = 'General day rate';
 
@@ -26,6 +27,7 @@ const SUGGESTED_ROLES = [
  * rate first, everything else is optional detail on top of it."
  */
 export default function RateCardEditor() {
+  const dialog = useDialog();
   const [lines, setLines] = useState<CrewRateLine[] | null>(null);
   const [generalAmount, setGeneralAmount] = useState('');
   const [customLabel, setCustomLabel] = useState('');
@@ -47,20 +49,27 @@ export default function RateCardEditor() {
     if (general) setGeneralAmount(general.amount);
   }, [general]);
 
+  // Clicking Save also blurs the input, which fires its own save - without this guard the two
+  // raced and created the general rate line twice.
+  const savingGeneral = useRef(false);
   const saveGeneral = async () => {
-    if (!generalAmount.trim()) return;
+    const amount = generalAmount.trim();
+    if (!amount || amount === (general?.amount ?? '') || savingGeneral.current) return;
+    savingGeneral.current = true;
     setError(null);
     try {
-      if (general) await api.crewPortal.rateLines.update(general.id, { amount: generalAmount });
-      else await api.crewPortal.rateLines.create({ label: GENERAL_LABEL, amount: generalAmount });
-      refresh();
+      if (general) await api.crewPortal.rateLines.update(general.id, { amount });
+      else await api.crewPortal.rateLines.create({ label: GENERAL_LABEL, amount });
+      await refresh();
     } catch (err) {
       setError((err as Error).message);
+    } finally {
+      savingGeneral.current = false;
     }
   };
 
   const addSuggested = async (label: string) => {
-    const amount = prompt(`Day rate for ${label}:`);
+    const amount = await dialog.prompt({ title: `Add a ${label} rate`, label: 'Day rate', placeholder: 'e.g. 250', confirmLabel: 'Add', required: true });
     if (!amount || !amount.trim()) return;
     setError(null);
     try {

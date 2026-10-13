@@ -4,6 +4,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { resolveCrewColor } from '@elexprep/shared';
 import { api, type JobCrewAssignment } from '../api/client';
 import { useToast } from './Toast';
+import { formatDate } from '../utils/format';
 
 export interface DayBlockView {
   dateKey: string;
@@ -21,7 +22,7 @@ export function localMidnightIso(key: string): string {
 }
 
 function formatDayLabel(key: string): string {
-  return new Date(`${key}T00:00:00`).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
+  return formatDate(`${key}T00:00:00`);
 }
 
 export function CrewChip({ assignment }: { assignment: JobCrewAssignment }) {

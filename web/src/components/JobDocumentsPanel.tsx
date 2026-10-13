@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, type JobDocument } from '../api/client';
 import FileInput from './FileInput';
+import { formatDate } from '../utils/format';
 
 export default function JobDocumentsPanel({ jobId }: { jobId: string }) {
   const [documents, setDocuments] = useState<JobDocument[]>([]);
@@ -57,7 +58,7 @@ export default function JobDocumentsPanel({ jobId }: { jobId: string }) {
                       {d.originalName}
                     </a>
                   </td>
-                  <td className="muted">{new Date(d.createdAt).toLocaleDateString()}</td>
+                  <td className="muted">{formatDate(d.createdAt)}</td>
                   <td>
                     <button className="secondary" onClick={() => remove(d.id)}>
                       Remove

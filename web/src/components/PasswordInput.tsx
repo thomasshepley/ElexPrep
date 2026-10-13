@@ -15,7 +15,6 @@ export default function PasswordInput(props: Omit<InputHTMLAttributes<HTMLInputE
         className="password-input-eye"
         aria-label={visible ? 'Hide password' : 'Show password'}
         aria-pressed={visible}
-        tabIndex={-1}
         onClick={() => setVisible((v) => !v)}
       >
         {visible ? <EyeOffIcon /> : <EyeIcon />}

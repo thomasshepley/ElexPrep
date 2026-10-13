@@ -1,8 +1,9 @@
 import { resolveCrewColor } from '@elexprep/shared';
 import type { JobDay } from '../api/client';
+import { formatDate } from '../utils/format';
 
 function formatDayLabel(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
+  return formatDate(iso);
 }
 
 /**

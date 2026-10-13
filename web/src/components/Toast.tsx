@@ -39,9 +39,9 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     <ToastContext.Provider value={{ showToast }}>
       {children}
       {createPortal(
-        <div className="toast-stack">
+        <div className="toast-stack" role="status" aria-live="polite">
           {toasts.map((t) => (
-            <div key={t.id} className={`toast toast-${t.variant}`} onClick={() => dismiss(t.id)}>
+            <div key={t.id} className={`toast toast-${t.variant}`} role={t.variant === 'error' ? 'alert' : undefined} onClick={() => dismiss(t.id)}>
               {t.message}
             </div>
           ))}

@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { api, type JobOneDriveStatus } from '../api/client';
+import { useState } from 'react';
+import { api, type JobOneDriveStatus, type Plot } from '../api/client';
 import CadPlotsViewer, { type CadPlotCandidate } from './CadPlotsViewer';
 import OneDriveFilesPanel from './OneDriveFilesPanel';
 import PlotsPanel from './PlotsPanel';
@@ -14,17 +14,10 @@ export default function JobPlotsTab({ jobId }: { jobId: string }) {
   const [oneDrive, setOneDrive] = useState<JobOneDriveStatus | null>(null);
   const [plotCandidates, setPlotCandidates] = useState<CadPlotCandidate[]>([]);
 
-  const loadOneDrive = () => api.jobOneDrive.get(jobId).then(setOneDrive).catch(() => setOneDrive(null));
-  const loadPlots = () =>
-    api.plots.list(jobId).then((plots) => {
-      setPlotCandidates(plots.map((p) => ({ key: `plot:${p.id}`, label: p.originalName, url: api.plots.fileUrl(jobId, p.id) })));
-    });
-
-  useEffect(() => {
-    loadOneDrive();
-    loadPlots();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [jobId]);
+  // The panels below own the fetching and report what they loaded, so each list is requested
+  // once per change rather than once by the panel and again here.
+  const onPlots = (plots: Plot[]) =>
+    setPlotCandidates(plots.map((p) => ({ key: `plot:${p.id}`, label: p.originalName, url: api.plots.fileUrl(jobId, p.id) })));
 
   const candidates: CadPlotCandidate[] = [
     ...(oneDrive?.cadPdf
@@ -44,8 +37,8 @@ export default function JobPlotsTab({ jobId }: { jobId: string }) {
         <h3>CAD</h3>
         <CadPlotsViewer candidates={candidates} />
       </div>
-      <OneDriveFilesPanel jobId={jobId} onChange={loadOneDrive} />
-      <PlotsPanel jobId={jobId} onChange={loadPlots} />
+      <OneDriveFilesPanel jobId={jobId} onChange={setOneDrive} />
+      <PlotsPanel jobId={jobId} onChange={onPlots} />
     </div>
   );
 }

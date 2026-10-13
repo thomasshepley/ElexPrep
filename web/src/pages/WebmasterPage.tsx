@@ -3,6 +3,7 @@ import { Navigate } from 'react-router-dom';
 import { api, type BugReport } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { useToast } from '../components/Toast';
+import { formatDateTime, formatTime } from '../utils/format';
 
 function SiteControlsPanel() {
   const { user, setUser } = useAuth();
@@ -72,7 +73,7 @@ function ReportRow({ report, onRemove }: { report: BugReport; onRemove: (id: str
         <div>
           <strong>{report.reporterName}</strong> <span className="chip chip-role">{report.reporterRole}</span>
           <p className="muted" style={{ margin: '0.3rem 0 0' }}>
-            {new Date(report.createdAt).toLocaleString()} · {report.pageUrl}
+            {formatDateTime(report.createdAt)} · {report.pageUrl}
           </p>
         </div>
         <div className="row" style={{ gap: '0.5rem' }}>
@@ -101,7 +102,7 @@ function ReportRow({ report, onRemove }: { report: BugReport; onRemove: (id: str
             <ul style={{ margin: 0 }}>
               {report.recentActions.map((a, i) => (
                 <li key={i} className="muted">
-                  {new Date(a.time).toLocaleTimeString()} - {a.type}: {a.description}
+                  {formatTime(a.time)} - {a.type}: {a.description}
                 </li>
               ))}
             </ul>

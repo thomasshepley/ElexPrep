@@ -3,17 +3,12 @@ import { Link } from 'react-router-dom';
 import { api, type CrewMyJob } from '../api/client';
 import { WhereIcon } from '../components/Icons';
 import MonthCalendar, { type CalendarEvent } from '../components/MonthCalendar';
+import { formatDateRange } from '../utils/format';
 
 const NO_DATE = 'No date set yet';
 
-function formatDateRange(startsAt: string | null, endsAt: string | null): string {
-  if (!startsAt) return NO_DATE;
-  const start = new Date(startsAt);
-  const startStr = start.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
-  if (!endsAt) return startStr;
-  const end = new Date(endsAt);
-  const endStr = end.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
-  return endStr === startStr ? startStr : `${startStr} – ${endStr}`;
+function formatDateRangeOrNone(startsAt: string | null, endsAt: string | null): string {
+  return startsAt ? formatDateRange(startsAt, endsAt) : NO_DATE;
 }
 
 /**
@@ -61,7 +56,7 @@ export default function CrewSchedulePage() {
             <h3>Your jobs</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
               {jobs.map((j) => {
-                const dateRange = formatDateRange(j.startsAt, j.endsAt);
+                const dateRange = formatDateRangeOrNone(j.startsAt, j.endsAt);
                 return (
                   <Link key={j.jobId} to={`/crew/jobs/${j.jobId}`} className="job-card">
                     <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>

@@ -61,12 +61,14 @@ export default function FixtureTypeRulesPage() {
       <div className="panel">
         <h3>Add rule</h3>
         <form className="row" onSubmit={create}>
-          <input placeholder="Fixture type (must match patch exactly)" value={name} onChange={(e) => setName(e.target.value)} required />
+          <input aria-label="Fixture type" placeholder="Fixture type (must match patch exactly)" value={name} onChange={(e) => setName(e.target.value)} required />
           <input
             type="number"
             min={1}
-            value={unitsPerCase}
-            onChange={(e) => setUnitsPerCase(Number(e.target.value))}
+            required
+            aria-label="Units per case"
+            value={unitsPerCase || ''}
+            onChange={(e) => setUnitsPerCase(e.target.value === '' ? 0 : Math.floor(Number(e.target.value)))}
             style={{ width: 80 }}
           />
           <span className="muted">units / case</span>
@@ -97,7 +99,11 @@ export default function FixtureTypeRulesPage() {
                     min={1}
                     defaultValue={r.unitsPerCase}
                     style={{ width: 70 }}
-                    onBlur={(e) => update(r, 'unitsPerCase', Number(e.target.value))}
+                    onBlur={(e) => {
+                      const n = Math.floor(Number(e.target.value));
+                      if (!e.target.value.trim() || !Number.isFinite(n) || n < 1) e.target.value = String(r.unitsPerCase);
+                      else update(r, 'unitsPerCase', n);
+                    }}
                   />
                 </td>
                 <td>

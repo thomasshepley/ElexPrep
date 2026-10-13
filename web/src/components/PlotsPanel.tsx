@@ -3,13 +3,18 @@ import { api, type Plot } from '../api/client';
 import FileInput from './FileInput';
 import { useAuth } from '../auth/AuthContext';
 import { hasPermission } from '../auth/roles';
+import { useDialog } from './Dialog';
+import { useAsyncAction } from '../hooks/useAsyncAction';
+import { formatDateTime } from '../utils/format';
 
 /**
  * Upload/manage uploaded CAD plot PDFs. Previewing lives in CadPlotsViewer, shown once above
  * this panel on the Plots tab (alongside the auto-detected OneDrive CAD PDF and any
  * CAD-flagged OneDrive shares) - this panel only needs to handle add/remove.
  */
-export default function PlotsPanel({ jobId, onChange }: { jobId: string; onChange?: () => void }) {
+export default function PlotsPanel({ jobId, onChange }: { jobId: string; onChange?: (plots: Plot[]) => void }) {
+  const dialog = useDialog();
+  const { run } = useAsyncAction();
   const { user } = useAuth();
   const canEdit = hasPermission(user, 'editJobs');
   const [plots, setPlots] = useState<Plot[]>([]);
@@ -18,7 +23,7 @@ export default function PlotsPanel({ jobId, onChange }: { jobId: string; onChang
 
   const refresh = () => api.plots.list(jobId).then((p) => {
     setPlots(p);
-    onChange?.();
+    onChange?.(p);
   });
 
   useEffect(() => {
@@ -40,8 +45,8 @@ export default function PlotsPanel({ jobId, onChange }: { jobId: string; onChang
   };
 
   const remove = async (plot: Plot) => {
-    if (!confirm(`Delete plot "${plot.originalName}"?`)) return;
-    await api.plots.remove(jobId, plot.id);
+    if (!(await dialog.confirm({ title: 'Delete this plot?', message: plot.originalName, confirmLabel: 'Delete', danger: true }))) return;
+    await run(() => api.plots.remove(jobId, plot.id), { success: 'Plot deleted' });
     refresh();
   };
 
@@ -64,7 +69,7 @@ export default function PlotsPanel({ jobId, onChange }: { jobId: string; onChang
               {plots.map((p) => (
                 <tr key={p.id}>
                   <td>{p.originalName}</td>
-                  <td className="muted">{new Date(p.createdAt).toLocaleString()}</td>
+                  <td className="muted">{formatDateTime(p.createdAt)}</td>
                   <td>
                     {canEdit && (
                       <button className="secondary" onClick={() => remove(p)}>

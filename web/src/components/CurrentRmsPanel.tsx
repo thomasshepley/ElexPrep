@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react';
 import { api, type CurrentRmsOpportunity, type CurrentRmsPickItem } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { isAdminRole } from '../auth/roles';
+import { useDialog } from './Dialog';
+import { useAsyncAction } from '../hooks/useAsyncAction';
+import { formatDate, formatDateTime } from '../utils/format';
 
 /** Current RMS sends quantity as a decimal string (e.g. "12.0"), same quirk as its money
  * fields - Number() strips the trailing .0 for a whole number while still showing real
@@ -12,6 +15,8 @@ function formatQuantity(q: unknown): string {
 }
 
 export default function CurrentRmsPanel({ jobId }: { jobId: string }) {
+  const dialog = useDialog();
+  const { run } = useAsyncAction();
   const { user } = useAuth();
   const isAdmin = isAdminRole(user?.role);
   const canLink = isAdmin || Boolean(user?.permissions?.linkCurrentRms);
@@ -41,12 +46,18 @@ export default function CurrentRmsPanel({ jobId }: { jobId: string }) {
   };
 
   const refresh = () =>
-    api.jobCurrentRms.get(jobId).then((res) => {
-      setLinked(res.linked);
-      setOpportunity(res.opportunity);
-      setRmsAlertAt(res.rmsAlertAt ?? null);
-      return res;
-    });
+    api.jobCurrentRms
+      .get(jobId)
+      .then((res) => {
+        setLinked(res.linked);
+        setOpportunity(res.opportunity);
+        setRmsAlertAt(res.rmsAlertAt ?? null);
+        return res;
+      })
+      .catch((e) => {
+        setError((e as Error).message);
+        return { linked: false } as { linked: boolean };
+      });
 
   useEffect(() => {
     setItems(null);
@@ -122,8 +133,8 @@ export default function CurrentRmsPanel({ jobId }: { jobId: string }) {
   );
 
   const unlink = async () => {
-    if (!confirm('Unlink this job from its Current RMS opportunity?')) return;
-    await api.jobCurrentRms.unlink(jobId);
+    if (!(await dialog.confirm({ title: 'Unlink from Current RMS?', message: 'The job stays in the portal; it just stops syncing with this opportunity.', confirmLabel: 'Unlink', danger: true }))) return;
+    if ((await run(() => api.jobCurrentRms.unlink(jobId).then(() => true))) !== true) return;
     setItems(null);
     refresh();
   };
@@ -133,14 +144,14 @@ export default function CurrentRmsPanel({ jobId }: { jobId: string }) {
     setRmsAlertAt(null);
   };
 
-  if (linked === null) return null;
+  if (linked === null) return error ? <p className="error">Could not load Current RMS details: {error}</p> : <p className="muted">Loading…</p>;
 
   return (
     <div>
       {rmsAlertAt && (
         <div className="panel" style={{ borderColor: '#c084fc' }}>
           <strong>This job's linked Current RMS opportunity has changed</strong>{' '}
-          <span className="muted">({new Date(rmsAlertAt).toLocaleString()})</span>
+          <span className="muted">({formatDateTime(rmsAlertAt)})</span>
           <div style={{ marginTop: '0.5rem' }}>
             <button className="secondary" onClick={acknowledge}>
               Acknowledge
@@ -203,14 +214,14 @@ export default function CurrentRmsPanel({ jobId }: { jobId: string }) {
                   <tr>
                     <td>Dates</td>
                     <td>
-                      {opportunity.startsAt ? new Date(opportunity.startsAt).toLocaleDateString() : '?'} –{' '}
-                      {opportunity.endsAt ? new Date(opportunity.endsAt).toLocaleDateString() : '?'}
+                      {opportunity.startsAt ? formatDate(opportunity.startsAt) : '?'} –{' '}
+                      {opportunity.endsAt ? formatDate(opportunity.endsAt) : '?'}
                     </td>
                   </tr>
                   <tr>
                     <td>RMS last updated</td>
                     <td className="muted">
-                      {opportunity.rmsUpdatedAt ? new Date(opportunity.rmsUpdatedAt).toLocaleString() : '-'}
+                      {opportunity.rmsUpdatedAt ? formatDateTime(opportunity.rmsUpdatedAt) : '-'}
                     </td>
                   </tr>
                 </tbody>

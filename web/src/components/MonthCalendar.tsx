@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Modal from './Modal';
 import CrewSwatch from './CrewSwatch';
+import { formatDayHeading, formatMonthYear } from '../utils/format';
 
 export interface CalendarEventCrew {
   id: string;
@@ -90,7 +91,7 @@ export default function MonthCalendar({ events, initialMonth }: { events: Calend
   return (
     <div className="panel month-calendar">
       <div className="row" style={{ justifyContent: 'space-between', marginBottom: '0.75rem' }}>
-        <strong>{cursor.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}</strong>
+        <strong>{formatMonthYear(cursor)}</strong>
         <div className="row" style={{ gap: '0.4rem' }}>
           <button className="secondary" onClick={() => setCursor(new Date(year, month - 1, 1))}>
             ‹
@@ -161,11 +162,7 @@ export default function MonthCalendar({ events, initialMonth }: { events: Calend
 
       {openDayKey && (
         <Modal
-          title={new Date(`${openDayKey}T00:00:00`).toLocaleDateString(undefined, {
-            weekday: 'long',
-            day: 'numeric',
-            month: 'long',
-          })}
+          title={formatDayHeading(`${openDayKey}T00:00:00`)}
           onClose={() => setOpenDayKey(null)}
         >
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>

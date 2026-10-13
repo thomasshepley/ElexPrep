@@ -2,22 +2,16 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, type DashboardOrder } from '../api/client';
 import MonthCalendar, { type CalendarEvent } from '../components/MonthCalendar';
+import { formatDateRange, formatMoney } from '../utils/format';
 
 const NO_DATE = 'No date set';
 
-function formatDateRange(startsAt: string | null, endsAt: string | null): string {
-  if (!startsAt) return NO_DATE;
-  const start = new Date(startsAt);
-  const startStr = start.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
-  if (!endsAt) return startStr;
-  const end = new Date(endsAt);
-  const endStr = end.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
-  return endStr === startStr ? startStr : `${startStr} – ${endStr}`;
+function formatDateRangeOrNone(startsAt: string | null, endsAt: string | null): string {
+  return startsAt ? formatDateRange(startsAt, endsAt) : NO_DATE;
 }
 
 function formatValue(value: number | null): string {
-  if (value === null) return '-';
-  return `£${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return value === null ? '-' : formatMoney(value);
 }
 
 export default function DashboardPage() {
@@ -87,7 +81,7 @@ export default function DashboardPage() {
                     <td>{o.venue ?? '-'}</td>
                     <td>
                       <span className={o.startsAt ? 'chip chip-accent' : 'chip chip-neutral'}>
-                        {formatDateRange(o.startsAt, o.endsAt)}
+                        {formatDateRangeOrNone(o.startsAt, o.endsAt)}
                       </span>
                     </td>
                     <td className="muted">{o.status ?? '-'}</td>

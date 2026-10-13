@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { api, type FixtureGroup, type RmsHeadingGroup } from '../api/client';
 import Modal from './Modal';
 import { useToast } from './Toast';
+import { useDialog } from './Dialog';
+import { useAsyncAction } from '../hooks/useAsyncAction';
 
 /**
  * CRUD + Current RMS cross-reference for a job's "stages" (FixtureGroup rows) - opened from
@@ -22,6 +24,8 @@ export default function StagesManager({
   onClose: () => void;
 }) {
   const { showToast } = useToast();
+  const dialog = useDialog();
+  const { run } = useAsyncAction();
   const [newName, setNewName] = useState('');
   const [renaming, setRenaming] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
@@ -63,8 +67,8 @@ export default function StagesManager({
   };
 
   const remove = async (group: FixtureGroup) => {
-    if (!confirm(`Delete stage "${group.name}"? Its fixtures/cases/labels become ungrouped, not deleted.`)) return;
-    await api.fixtureGroups.remove(jobId, group.id);
+    if (!(await dialog.confirm({ title: `Delete stage "${group.name}"?`, message: 'Its fixtures, cases and labels become ungrouped - nothing else is deleted.', confirmLabel: 'Delete stage', danger: true }))) return;
+    if ((await run(() => api.fixtureGroups.remove(jobId, group.id).then(() => true))) !== true) return;
     onChanged();
   };
 

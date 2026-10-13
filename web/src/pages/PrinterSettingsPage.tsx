@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, type PrinterSettings, type PrintMethod, type TrayKey } from '../api/client';
+import { useDialog } from '../components/Dialog';
+import { labelTypeName } from '../utils/labelTypes';
 
 const METHODS: { value: PrintMethod; label: string; help: string }[] = [
   {
@@ -23,16 +25,19 @@ const TRAY_KEYS: TrayKey[] = ['TRAY1', 'TRAY2', 'BYPASS'];
 const LABEL_TYPES = ['PAL', 'FIXTURE', 'TRUSS_SPIKE_POSITION', 'TRUSS_SPIKE_TIP', 'TRUSS_SPIKE_SACN', 'CABLE', 'RACK'];
 
 export default function PrinterSettingsPage() {
+  const dialog = useDialog();
   const [settings, setSettings] = useState<PrinterSettings | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  const [loadError, setLoadError] = useState<string | null>(null);
+
   useEffect(() => {
-    api.printerSettings.get().then(setSettings);
+    api.printerSettings.get().then(setSettings).catch((e) => setLoadError((e as Error).message));
   }, []);
 
-  if (!settings) return null;
+  if (!settings) return loadError ? <p className="error">Could not load printer settings: {loadError}</p> : <p className="muted">Loading…</p>;
 
   const update = (patch: Partial<PrinterSettings>) => setSettings({ ...settings, ...patch });
 
@@ -66,7 +71,7 @@ export default function PrinterSettingsPage() {
   };
 
   const regenerateToken = async () => {
-    if (!confirm('Generate a new agent token? The current token stops working immediately.')) return;
+    if (!(await dialog.confirm({ title: 'Generate a new agent token?', message: 'The current token stops working immediately - the print agent needs the new one before it can print again.', confirmLabel: 'Generate token', danger: true }))) return;
     const updated = await api.printerSettings.regenerateToken();
     setSettings(updated);
     setMessage('New token generated - update agent-config.json on the print machine.');
@@ -203,7 +208,7 @@ export default function PrinterSettingsPage() {
             <tbody>
               {LABEL_TYPES.map((t) => (
                 <tr key={t}>
-                  <td>{t}</td>
+                  <td>{labelTypeName(t)}</td>
                   <td>
                     <select
                       value={settings.typeToTray[t] ?? 'BYPASS'}

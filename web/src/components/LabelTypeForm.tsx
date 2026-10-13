@@ -16,7 +16,8 @@ export const TYPE_LABELS: Record<AdHocType, string> = {
 export function buildLabelContent(labelType: AdHocType, fields: Record<string, string>, isDmx: boolean): Record<string, unknown> {
   switch (labelType) {
     case 'TRUSS_SPIKE_POSITION':
-      return { address: Number(fields.address), location: fields.location };
+      // An empty field stays empty rather than becoming address 0 (Number('') === 0).
+      return { address: fields.address?.trim() ? Number(fields.address) : null, location: fields.location };
     case 'TRUSS_SPIKE_TIP':
       return { text: fields.text || 'DO NOT TIP', location: fields.location };
     case 'TRUSS_SPIKE_SACN':
@@ -46,7 +47,9 @@ export default function LabelTypeForm({
   submitLabel?: string;
 }) {
   const [labelType, setLabelType] = useState<AdHocType>(types[0]);
-  const [quantity, setQuantity] = useState(1);
+  // Kept as typed so the field can be cleared and retyped; parsed when submitting.
+  const [quantityText, setQuantityText] = useState('1');
+  const quantity = Math.max(1, Math.floor(Number(quantityText)) || 1);
   const [fields, setFields] = useState<Record<string, string>>({});
   const [isDmx, setIsDmx] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -72,7 +75,7 @@ export default function LabelTypeForm({
     try {
       await onSubmit(labelType, content, quantity);
       setFields({});
-      setQuantity(1);
+      setQuantityText('1');
       setIsDmx(false);
     } catch (err) {
       setError((err as Error).message);
@@ -141,7 +144,7 @@ export default function LabelTypeForm({
 
         <div className="field" style={{ width: 70 }}>
           <label htmlFor={`${idPrefix}-quantity`}>Quantity</label>
-          <input id={`${idPrefix}-quantity`} type="number" min={1} value={quantity} onChange={(e) => setQuantity(Number(e.target.value))} />
+          <input id={`${idPrefix}-quantity`} type="number" min={1} value={quantityText} onChange={(e) => setQuantityText(e.target.value)} onBlur={() => setQuantityText(String(quantity))} />
         </div>
         <button type="submit">{submitLabel}</button>
       </form>

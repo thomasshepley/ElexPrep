@@ -5,6 +5,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { DEFAULT_LABEL_TEMPLATES, mergeTemplate, type LabelElementDef, type LabelType, type LabelTypeTemplate, type LocationColorMap } from '@elexprep/shared';
 import { api, type AdHocLabel, type PrintQueueItem } from '../../api/client';
 import SheetMirror, { type LogoUrls } from './SheetMirror';
+import { labelTypeName } from '../../utils/labelTypes';
 
 export function summarize(labelType: string, content: Record<string, unknown>): string {
   switch (labelType) {
@@ -73,11 +74,16 @@ export default function LabelTypeSection({
   const [previewIndex, setPreviewIndex] = useState(0);
   const [editingRow, setEditingRow] = useState<string | null>(null);
 
+  const [templateError, setTemplateError] = useState<string | null>(null);
   useEffect(() => {
-    api.labelTemplates.get(jobId, labelType).then((r) => {
-      setTemplate(r.template);
-      setIsCustomized(r.isCustomized);
-    });
+    setTemplateError(null);
+    api.labelTemplates
+      .get(jobId, labelType)
+      .then((r) => {
+        setTemplate(r.template);
+        setIsCustomized(r.isCustomized);
+      })
+      .catch((e) => setTemplateError((e as Error).message));
   }, [jobId, labelType]);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
@@ -168,7 +174,8 @@ export default function LabelTypeSection({
     setDraft((d) => ({ ...d, [id]: { ...d[id], ...patch } }));
   };
 
-  if (!template || rows.length === 0) return null;
+  if (rows.length === 0) return null;
+  if (!template) return templateError ? <p className="error">Could not load the {labelTypeName(labelType)} template: {templateError}</p> : null;
 
   const clampedPreviewIndex = Math.min(previewIndex, rows.length - 1);
   const previewItem = rows[clampedPreviewIndex].content;
@@ -179,7 +186,7 @@ export default function LabelTypeSection({
     <div className="panel">
       <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
-          <h3>{labelType}</h3>
+          <h3>{labelTypeName(labelType)}</h3>
           {isCustomized && <span className="chip chip-neutral">Custom layout</span>}
         </div>
         {!customizing ? (
@@ -356,7 +363,12 @@ function SortableRow({
             min={1}
             defaultValue={row.quantity}
             style={{ width: 60 }}
-            onBlur={(e) => onSetQty(Number(e.target.value))}
+            onBlur={(e) => {
+              const q = Math.floor(Number(e.target.value));
+              // A cleared or invalid field puts the old value back instead of saving 0.
+              if (!e.target.value.trim() || !Number.isFinite(q) || q < 1) e.target.value = String(row.quantity);
+              else if (q !== row.quantity) onSetQty(q);
+            }}
           />
         </td>
         <td>
@@ -397,7 +409,12 @@ function ContentEditor({ content, onSave }: { content: Record<string, unknown>; 
               <input
                 type={typeof value === 'number' ? 'number' : 'text'}
                 value={values[key] == null ? '' : String(values[key])}
-                onChange={(e) => setValues((v) => ({ ...v, [key]: typeof value === 'number' ? Number(e.target.value) : e.target.value }))}
+                onChange={(e) =>
+                  setValues((v) => ({
+                    ...v,
+                    [key]: typeof value === 'number' ? (e.target.value === '' ? null : Number(e.target.value)) : e.target.value,
+                  }))
+                }
               />
             )}
           </label>
@@ -425,7 +442,7 @@ function ElementInspector({ element, onChange }: { element: LabelElementDef; onC
               type="number"
               step={0.05}
               value={element[k]}
-              onChange={(e) => onChange({ [k]: Number(e.target.value) })}
+              onChange={(e) => e.target.value !== '' && Number.isFinite(e.target.valueAsNumber) && onChange({ [k]: e.target.valueAsNumber })}
             />
           </label>
         ))}
@@ -437,7 +454,7 @@ function ElementInspector({ element, onChange }: { element: LabelElementDef; onC
               step={1}
               min={4}
               value={element.size}
-              onChange={(e) => onChange({ size: Number(e.target.value) })}
+              onChange={(e) => e.target.value !== '' && e.target.valueAsNumber >= 1 && onChange({ size: e.target.valueAsNumber })}
             />
           </label>
         )}

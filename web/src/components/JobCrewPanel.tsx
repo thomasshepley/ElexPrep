@@ -3,6 +3,7 @@ import { api, type CrewMember, type JobCrewAssignment } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { isAdminRole } from '../auth/roles';
 import WhatsAppButton from './WhatsAppButton';
+import { useDialog } from './Dialog';
 
 /**
  * Who's working this job, in what role, at what rate. Viewing is open to anyone who can see
@@ -10,6 +11,7 @@ import WhatsAppButton from './WhatsAppButton';
  * (ADMIN always has it) - mirrors the publishJobs pattern already used in Job Settings.
  */
 export default function JobCrewPanel({ jobId }: { jobId: string }) {
+  const dialog = useDialog();
   const { user } = useAuth();
   const canManage = isAdminRole(user?.role) || Boolean(user?.permissions?.manageCrewAssignments);
 
@@ -55,8 +57,10 @@ export default function JobCrewPanel({ jobId }: { jobId: string }) {
     }
   };
 
+  // Saved on blur, not per keystroke - a PUT + refresh on every key raced and overwrote typing.
   const updateRole = async (a: JobCrewAssignment, value: string) => {
-    await api.jobCrewAssignments.update(jobId, a.id, { role: value });
+    if (!value) return refresh();
+    await api.jobCrewAssignments.update(jobId, a.id, { role: value }).catch((e) => setError((e as Error).message));
     refresh();
   };
 
@@ -71,7 +75,7 @@ export default function JobCrewPanel({ jobId }: { jobId: string }) {
   };
 
   const remove = async (a: JobCrewAssignment) => {
-    if (!confirm(`Remove ${a.displayName} from this job?`)) return;
+    if (!(await dialog.confirm({ title: `Remove ${a.displayName} from this job?`, message: 'Their day and task assignments on this job are removed too.', confirmLabel: 'Remove', danger: true }))) return;
     await api.jobCrewAssignments.remove(jobId, a.id);
     refresh();
   };
@@ -157,7 +161,14 @@ export default function JobCrewPanel({ jobId }: { jobId: string }) {
                   </td>
                   <td>
                     {canManage ? (
-                      <input value={a.role} onChange={(e) => updateRole(a, e.target.value)} style={{ width: '10rem' }} />
+                      <input
+                        key={`${a.id}-${a.role}`}
+                        defaultValue={a.role}
+                        aria-label={`Role for ${a.displayName}`}
+                        onBlur={(e) => e.target.value.trim() !== a.role && updateRole(a, e.target.value.trim())}
+                        onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+                        style={{ width: '10rem' }}
+                      />
                     ) : (
                       <span className="chip chip-role">{a.role}</span>
                     )}
@@ -183,7 +194,7 @@ export default function JobCrewPanel({ jobId }: { jobId: string }) {
                     )}
                   </td>
                   <td>
-                    <WhatsAppButton phone={a.phone} label="WhatsApp" />
+                    <WhatsAppButton phone={a.phone} label="WhatsApp" compact />
                   </td>
                   {canManage && (
                     <td>

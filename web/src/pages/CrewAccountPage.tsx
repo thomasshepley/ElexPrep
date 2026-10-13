@@ -183,9 +183,9 @@ export default function CrewAccountPage() {
 
           <div className="field">
             <label>Bank details</label>
-            <BankDetailsReveal hasBankDetails={me.hasBankDetails} fetchDetails={api.crewPortal.bankDetails} />
+            <BankDetailsReveal hasBankDetails={me.hasBankDetails} fetchDetails={api.crewPortal.bankDetails} version={me} />
           </div>
-          <BankDetailsForm value={bankDetails} onChange={setBankDetails} />
+          <BankDetailsForm value={bankDetails} onChange={setBankDetails} title="Change bank details" />
           <p className="muted" style={{ marginTop: '-0.5rem' }}>
             Leave blank to keep what's already on file.
           </p>

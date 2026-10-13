@@ -45,6 +45,14 @@ export function formatLongDate(value: DateInput): string {
   return `${parts.weekday} ${parts.day} ${parts.month} ${parts.year}`;
 }
 
+/** "Thursday 15 October" - a day heading, no year. */
+export function formatDayHeading(value: DateInput): string {
+  const d = toDate(value);
+  if (!d) return '';
+  const parts = Object.fromEntries(longDayParts.formatToParts(d).map((p) => [p.type, p.value]));
+  return `${parts.weekday} ${parts.day} ${parts.month}`;
+}
+
 /** "October 2026" */
 export function formatMonthYear(value: DateInput): string {
   const d = toDate(value);

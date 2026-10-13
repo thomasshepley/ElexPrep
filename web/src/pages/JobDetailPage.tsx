@@ -16,6 +16,7 @@ import CrewMarginPanel from '../components/CrewMarginPanel';
 import JobDiscussionThread from '../components/JobDiscussionThread';
 import FileInput from '../components/FileInput';
 import { usePageTitle } from '../pageTitle';
+import DateTimeInput from '../components/DateTimeInput';
 
 const TABS = ['Prep', 'Plots', 'Schedule', 'Documents', 'Contacts', 'Crew', 'Discussion', 'Current RMS', 'Job Settings'] as const;
 type Tab = (typeof TABS)[number];
@@ -198,12 +199,12 @@ function JobSettingsPanel({ job, onUpdate }: { job: Job; onUpdate: (j: Job) => v
           <label>
             Starts
             <br />
-            <input type="datetime-local" value={startsAt} onChange={(e) => setStartsAt(e.target.value)} />
+            <DateTimeInput value={startsAt} onChange={setStartsAt} />
           </label>
           <label>
             Ends
             <br />
-            <input type="datetime-local" value={endsAt} onChange={(e) => setEndsAt(e.target.value)} />
+            <DateTimeInput value={endsAt} onChange={setEndsAt} defaultTime="18:00" />
           </label>
         </div>
         <p className="muted" style={{ margin: 0 }}>

@@ -4,6 +4,8 @@
   var theme = 'dark';
   try {
     if (localStorage.getItem('elex-theme') === 'light') theme = 'light';
-  } catch (e) {}
+  } catch {
+    // Storage blocked - fall back to the default theme.
+  }
   document.documentElement.setAttribute('data-theme', theme);
 })();

@@ -144,6 +144,7 @@ export default function ApplyPage() {
                   <FileInput
                     accept="application/pdf,image/*"
                     label={files[field] ? 'Change file' : 'Upload'}
+                    persistName
                     onFile={(file) => setFiles((f) => ({ ...f, [field]: file }))}
                   />
                 </div>

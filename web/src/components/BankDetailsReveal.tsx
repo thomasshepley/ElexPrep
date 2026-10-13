@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { BankDetails } from '../api/client';
 
 /**
@@ -8,20 +8,48 @@ import type { BankDetails } from '../api/client';
  * (api.crew.bankDetails / api.crewApplications.bankDetails) and crew self-service
  * (api.crewPortal.bankDetails) call sites without knowing which it is.
  */
-export default function BankDetailsReveal({ hasBankDetails, fetchDetails }: { hasBankDetails: boolean; fetchDetails: () => Promise<BankDetails> }) {
+const AUTO_HIDE_MS = 60_000;
+
+export default function BankDetailsReveal({
+  hasBankDetails,
+  fetchDetails,
+  version,
+}: {
+  hasBankDetails: boolean;
+  fetchDetails: () => Promise<BankDetails>;
+  /** Changes whenever the stored details may have changed (e.g. after a save), so a revealed
+   * copy is hidden instead of showing stale numbers. */
+  version?: unknown;
+}) {
   const [details, setDetails] = useState<BankDetails | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    setDetails(null);
+  }, [hasBankDetails, version]);
+
+  // Re-hidden after a minute - these shouldn't sit on screen indefinitely.
+  useEffect(() => {
+    if (!details) return;
+    const t = setTimeout(() => setDetails(null), AUTO_HIDE_MS);
+    return () => clearTimeout(t);
+  }, [details]);
 
   if (!hasBankDetails) return <span className="muted">No bank details on file.</span>;
 
   if (details) {
     return (
-      <div className="muted" style={{ fontSize: 'var(--text-sm)' }}>
-        <strong>{details.accountName}</strong>
-        {details.bankName && ` · ${details.bankName}`}
-        <br />
-        Sort code {details.sortCode} · Account {details.accountNumber}
+      <div className="row" style={{ alignItems: 'flex-start', gap: '0.75rem' }}>
+        <div className="muted" style={{ fontSize: 'var(--text-sm)' }}>
+          <strong>{details.accountName}</strong>
+          {details.bankName && ` · ${details.bankName}`}
+          <br />
+          Sort code {details.sortCode} · Account {details.accountNumber}
+        </div>
+        <button type="button" className="secondary" onClick={() => setDetails(null)}>
+          Hide
+        </button>
       </div>
     );
   }

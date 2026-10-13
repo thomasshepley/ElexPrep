@@ -4,6 +4,7 @@ import { useToast } from '../components/Toast';
 import { useAuth } from '../auth/AuthContext';
 import { hasPermission } from '../auth/roles';
 import PermissionFieldset from '../components/PermissionFieldset';
+import CommitColorInput from '../components/CommitColorInput';
 
 const PREP_SETTINGS_NOTE = 'You can view these settings, but changing them needs the "Manage prep settings" permission.';
 
@@ -102,14 +103,14 @@ export default function LocationColorsPage() {
         <h3>Add rule</h3>
         <form className="row" onSubmit={create}>
           <input placeholder="Location (e.g. Downstage)" value={location} onChange={(e) => setLocation(e.target.value)} required />
-          {pattern !== 'RAINBOW' && <input type="color" value={color} onChange={(e) => setColor(e.target.value)} />}
+          {pattern !== 'RAINBOW' && <input type="color" value={color} aria-label="Colour" onChange={(e) => setColor(e.target.value)} />}
           <select value={pattern} onChange={(e) => setPattern(e.target.value as LocationColorPattern)}>
             <option value="SOLID">Solid</option>
             <option value="DIAGONAL_STRIPES">Diagonal stripes (hazard)</option>
             <option value="RAINBOW">Rainbow (not tied to one spot)</option>
           </select>
           {pattern === 'DIAGONAL_STRIPES' && (
-            <input type="color" value={secondaryColor} onChange={(e) => setSecondaryColor(e.target.value)} title="Second stripe color" />
+            <input type="color" value={secondaryColor} onChange={(e) => setSecondaryColor(e.target.value)} title="Second stripe colour" aria-label="Second stripe colour" />
           )}
           <button type="submit">Add</button>
         </form>
@@ -132,14 +133,9 @@ export default function LocationColorsPage() {
               <tr key={r.id}>
                 <td>{r.location}</td>
                 <td className="row" style={{ gap: '0.3rem' }}>
-                  {r.pattern !== 'RAINBOW' && <input type="color" value={r.color} onChange={(e) => updateColor(r, e.target.value)} />}
+                  {r.pattern !== 'RAINBOW' && <CommitColorInput value={r.color} ariaLabel={`${r.location} colour`} onCommit={(v) => updateColor(r, v)} />}
                   {r.pattern === 'DIAGONAL_STRIPES' && (
-                    <input
-                      type="color"
-                      value={r.secondaryColor ?? '#FFFFFF'}
-                      title="Second stripe color"
-                      onChange={(e) => updateSecondaryColor(r, e.target.value)}
-                    />
+                    <CommitColorInput value={r.secondaryColor ?? '#FFFFFF'} title={`${r.location} second stripe colour`} onCommit={(v) => updateSecondaryColor(r, v)} />
                   )}
                   {r.pattern === 'RAINBOW' && <span className="muted">(fixed colors)</span>}
                 </td>

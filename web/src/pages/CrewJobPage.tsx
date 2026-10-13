@@ -11,19 +11,13 @@ import CadPlotsViewer from '../components/CadPlotsViewer';
 import LocationLinks from '../components/LocationLinks';
 import WhatsAppButton from '../components/WhatsAppButton';
 import { usePageTitle } from '../pageTitle';
+import { formatDateTime } from '../utils/format';
 
 const NO_DATE = 'No date set yet';
 const NO_VENUE = 'No venue set yet';
 
-function formatDateTime(iso: string | null): string {
-  if (!iso) return NO_DATE;
-  return new Date(iso).toLocaleString(undefined, {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+function formatWhen(iso: string | null): string {
+  return iso ? formatDateTime(iso) : NO_DATE;
 }
 
 /**
@@ -185,9 +179,9 @@ export default function CrewJobPage() {
 
         <StaticCard icon={<WhenIcon />} label="When">
           <p style={{ margin: 0 }}>
-            Starts: {formatDateTime(detail.when.startsAt)}
+            Starts: {formatWhen(detail.when.startsAt)}
             <br />
-            Ends: {formatDateTime(detail.when.endsAt)}
+            Ends: {formatWhen(detail.when.endsAt)}
           </p>
           {!detail.when.startsAt && <p className="muted">A day schedule will show here once one's set for this job.</p>}
         </StaticCard>

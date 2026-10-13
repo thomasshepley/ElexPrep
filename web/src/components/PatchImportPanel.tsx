@@ -4,6 +4,8 @@ import { PATCH_FIELD_LABELS, type PatchFieldKey } from '@elexprep/shared';
 import { api, type Fixture, type PatchImportCandidate, type PatchImportResult } from '../api/client';
 import FileInput from './FileInput';
 import { useToast } from './Toast';
+import { useDialog } from './Dialog';
+import { formatDateTime } from '../utils/format';
 
 function announceNewFixtureTypes(showToast: ReturnType<typeof useToast>['showToast'], types: string[]) {
   if (types.length === 0) return;
@@ -25,6 +27,7 @@ function summarizeImport(res: PatchImportResult): string {
 }
 
 export default function PatchImportPanel({ jobId, groupId = null }: { jobId: string; groupId?: string | null }) {
+  const dialog = useDialog();
   const { showToast } = useToast();
   const [rows, setRows] = useState<Record<string, string>[]>([]);
   const [savedMapping, setSavedMapping] = useState<Record<string, string> | null>(null);
@@ -81,11 +84,12 @@ export default function PatchImportPanel({ jobId, groupId = null }: { jobId: str
   };
 
   const rejectCandidate = async () => {
-    const note = prompt('Rejection note (optional):') ?? '';
+    const note = await dialog.prompt({ title: 'Reject this patch file?', label: 'Note (optional)', multiline: true, confirmLabel: 'Reject' });
+    if (note === null) return;
     setScanBusy(true);
     setScanError(null);
     try {
-      const res = await api.patch.rejectOneDriveCandidate(jobId, note || undefined);
+      const res = await api.patch.rejectOneDriveCandidate(jobId, note.trim() || undefined);
       setCandidate(res.candidate);
     } catch (e) {
       setScanError((e as Error).message);
@@ -137,7 +141,7 @@ export default function PatchImportPanel({ jobId, groupId = null }: { jobId: str
   };
 
   const bulkDelete = async () => {
-    if (!confirm(`Delete ${selected.size} selected fixtures?`)) return;
+    if (!(await dialog.confirm({ title: `Delete ${selected.size} fixtures?`, confirmLabel: 'Delete', danger: true }))) return;
     await api.patch.bulkRemoveFixtures(jobId, [...selected]);
     setSelected(new Set());
     loadFixtures();
@@ -151,13 +155,13 @@ export default function PatchImportPanel({ jobId, groupId = null }: { jobId: str
       await api.patch.updateFixture(jobId, f.id, { [field]: value } as Partial<Fixture>);
       loadFixtures();
     } catch (e) {
-      alert((e as Error).message);
+      showToast((e as Error).message, 'error');
       loadFixtures();
     }
   };
 
   const removeFixture = async (id: string) => {
-    if (!confirm('Delete this fixture?')) return;
+    if (!(await dialog.confirm({ title: 'Delete this fixture?', confirmLabel: 'Delete', danger: true }))) return;
     await api.patch.removeFixture(jobId, id);
     setSelected((s) => {
       const next = new Set(s);
@@ -225,7 +229,7 @@ export default function PatchImportPanel({ jobId, groupId = null }: { jobId: str
               <strong>{candidate.fileName}</strong>
               {candidate.extractedFrom === 'pdf' && <span className="chip chip-warning"> Extracted from CAD PDF</span>}
               <p className="muted" style={{ margin: 0 }}>
-                {candidate.rowCount} rows &middot; detected {new Date(candidate.detectedAt).toLocaleString()} &middot;{' '}
+                {candidate.rowCount} rows &middot; detected {formatDateTime(candidate.detectedAt)} &middot;{' '}
                 {candidate.oneDriveItemPath}
               </p>
               {candidate.extractedFrom === 'pdf' && (
@@ -245,7 +249,7 @@ export default function PatchImportPanel({ jobId, groupId = null }: { jobId: str
         )}
         {candidate && candidate.status === 'APPROVED' && (
           <p className="muted">
-            Last approved: {candidate.fileName} ({candidate.rowCount} rows), {new Date(candidate.reviewedAt ?? candidate.detectedAt).toLocaleString()}.
+            Last approved: {candidate.fileName} ({candidate.rowCount} rows), {formatDateTime(candidate.reviewedAt ?? candidate.detectedAt)}.
           </p>
         )}
         {candidate && candidate.status === 'REJECTED' && (

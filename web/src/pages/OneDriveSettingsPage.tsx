@@ -20,15 +20,20 @@ export default function OneDriveSettingsPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  const [loadError, setLoadError] = useState<string | null>(null);
+
   const load = () =>
-    api.oneDrive.getConfig().then((c) => {
+    api.oneDrive
+      .getConfig()
+      .then((c) => {
       setConfig(c);
       setTenantId(c.tenantId);
       setClientId(c.clientId);
       setDriveId(c.driveId);
       setRootFolderPath(c.rootFolderPath);
       setEnabled(c.enabled);
-    });
+      })
+      .catch((e) => setLoadError((e as Error).message));
 
   useEffect(() => {
     load();
@@ -72,7 +77,7 @@ export default function OneDriveSettingsPage() {
     }
   };
 
-  if (!config) return null;
+  if (!config) return loadError ? <p className="error">Could not load OneDrive settings: {loadError}</p> : <p className="muted">Loading…</p>;
 
   return (
     <div>

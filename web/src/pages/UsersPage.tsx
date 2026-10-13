@@ -4,10 +4,14 @@ import { api, type AuthedUser, type PermissionKey, type Role } from '../api/clie
 import { useAuth } from '../auth/AuthContext';
 import PasswordInput from '../components/PasswordInput';
 import Avatar from '../components/Avatar';
+import { useDialog } from '../components/Dialog';
+import { useAsyncAction } from '../hooks/useAsyncAction';
 
 const ROLES: Role[] = ['ADMIN', 'USER', 'SIGNAGE'];
 
 export default function UsersPage() {
+  const dialog = useDialog();
+  const { run } = useAsyncAction();
   const { user: me } = useAuth();
   const [users, setUsers] = useState<AuthedUser[]>([]);
   const [username, setUsername] = useState('');
@@ -66,14 +70,13 @@ export default function UsersPage() {
   };
 
   const resetPassword = async (u: AuthedUser) => {
-    const pw = prompt(`New password for ${u.username}:`);
+    const pw = await dialog.prompt({ title: `Reset ${u.username}'s password`, message: 'They will be signed out everywhere and need the new password to sign back in.', label: 'New password', inputType: 'password', minLength: 8, confirmLabel: 'Set password' });
     if (!pw) return;
-    await api.users.update(u.id, { password: pw });
-    alert('Password updated');
+    await run(() => api.users.update(u.id, { password: pw }), { success: 'Password updated' });
   };
 
   const remove = async (u: AuthedUser) => {
-    if (!confirm(`Delete user ${u.username}?`)) return;
+    if (!(await dialog.confirm({ title: `Delete ${u.username}?`, message: 'Their account is removed permanently.', confirmLabel: 'Delete user', danger: true }))) return;
     setError(null);
     try {
       await api.users.remove(u.id);
@@ -158,7 +161,13 @@ export default function UsersPage() {
                   </td>
                   <td>{u.displayName}</td>
                   <td>
-                    <select value={u.role} onChange={(e) => changeRole(u, e.target.value as Role)}>
+                    <select
+                      value={u.role}
+                      aria-label={`Role for ${u.username}`}
+                      disabled={u.id === me?.id}
+                      title={u.id === me?.id ? "You can't change your own role" : undefined}
+                      onChange={(e) => changeRole(u, e.target.value as Role)}
+                    >
                       {ROLES.map((r) => (
                         <option key={r} value={r}>
                           {r}

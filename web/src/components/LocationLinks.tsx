@@ -4,6 +4,8 @@
  * embedded preview uses Google's no-key map embed (maps.google.com/maps?...&output=embed);
  * the "Open in" links work regardless if that ever changes.
  */
+const W3W_PATTERN = /^\/{0,3}[a-z]+\.[a-z]+\.[a-z]+$/i;
+
 export default function LocationLinks({ address, showMap = true }: { address: string | null | undefined; showMap?: boolean }) {
   if (!address) return <p className="muted">No address set yet.</p>;
 
@@ -17,7 +19,7 @@ export default function LocationLinks({ address, showMap = true }: { address: st
           src={`https://maps.google.com/maps?q=${q}&z=15&output=embed`}
           width="100%"
           height="220"
-          style={{ border: 0, borderRadius: 6, display: 'block' }}
+          className="location-map"
           loading="lazy"
         />
       )}
@@ -31,9 +33,13 @@ export default function LocationLinks({ address, showMap = true }: { address: st
         <a href={`https://waze.com/ul?q=${q}&navigate=yes`} target="_blank" rel="noreferrer">
           Open in Waze
         </a>
-        <a href="https://what3words.com/" target="_blank" rel="noreferrer">
-          Look up on What3Words
-        </a>
+        {/* Only offered when the stored address is itself a what3words triple - a postal address
+            can't be turned into one without their API, and linking to their homepage helped no one. */}
+        {W3W_PATTERN.test(address.trim()) && (
+          <a href={`https://what3words.com/${address.trim().replace(/^\/+/, '')}`} target="_blank" rel="noreferrer">
+            Open in what3words
+          </a>
+        )}
       </div>
     </div>
   );

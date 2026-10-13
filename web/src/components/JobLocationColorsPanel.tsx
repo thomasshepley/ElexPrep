@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api, type LocationColorPattern, type LocationColorRule } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { hasPermission } from '../auth/roles';
+import CommitColorInput from './CommitColorInput';
 
 function contrastingText(hex: string): string {
   const clean = hex.replace('#', '');
@@ -104,13 +105,13 @@ export default function JobLocationColorsPanel({ jobId }: { jobId: string }) {
           onChange={(e) => setLocation(e.target.value)}
           required
         />
-        <input type="color" value={color} onChange={(e) => setColor(e.target.value)} />
+        <input type="color" value={color} aria-label="Colour" onChange={(e) => setColor(e.target.value)} />
         <select value={pattern} onChange={(e) => setPattern(e.target.value as LocationColorPattern)}>
           <option value="SOLID">Solid</option>
           <option value="DIAGONAL_STRIPES">Diagonal stripes (hazard)</option>
         </select>
         {pattern === 'DIAGONAL_STRIPES' && (
-          <input type="color" value={secondaryColor} onChange={(e) => setSecondaryColor(e.target.value)} title="Second stripe color" />
+          <input type="color" value={secondaryColor} onChange={(e) => setSecondaryColor(e.target.value)} title="Second stripe colour" aria-label="Second stripe colour" />
         )}
         <button type="submit">Add override</button>
       </form>
@@ -135,14 +136,9 @@ export default function JobLocationColorsPanel({ jobId }: { jobId: string }) {
                 <tr key={r.id}>
                   <td>{r.location}</td>
                   <td className="row" style={{ gap: '0.3rem' }}>
-                    <input type="color" value={r.color} onChange={(e) => updateColor(r, e.target.value)} />
+                    <CommitColorInput value={r.color} ariaLabel={`${r.location} colour`} onCommit={(v) => updateColor(r, v)} />
                     {r.pattern === 'DIAGONAL_STRIPES' && (
-                      <input
-                        type="color"
-                        value={r.secondaryColor ?? '#FFFFFF'}
-                        title="Second stripe color"
-                        onChange={(e) => updateSecondaryColor(r, e.target.value)}
-                      />
+                      <CommitColorInput value={r.secondaryColor ?? '#FFFFFF'} title={`${r.location} second stripe colour`} onCommit={(v) => updateSecondaryColor(r, v)} />
                     )}
                   </td>
                   <td>
