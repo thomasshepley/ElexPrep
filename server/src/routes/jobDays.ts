@@ -13,7 +13,7 @@ import { requirePermission } from '../permissions';
  */
 export const jobDaysRouter = Router();
 
-const dayInclude = {
+export const dayInclude = {
   crewAssignments: {
     include: {
       jobCrewAssignment: {
@@ -37,7 +37,7 @@ type DayRow = {
   }[];
 };
 
-function toDayDto(day: DayRow) {
+export function toDayDto(day: DayRow) {
   return {
     id: day.id,
     date: day.date.toISOString(),
@@ -52,7 +52,54 @@ function toDayDto(day: DayRow) {
   };
 }
 
+const MAX_AUTO_POPULATED_DAYS = 366;
+
+/**
+ * The first time anyone looks at a job's days with none added yet, fills them in from the
+ * job's own effective date range (its own startsAt/endsAt override, falling back to the linked
+ * Current RMS opportunity's dates - the same fallback already used for the "When" card, see
+ * routes/crewPortal.ts) - so a multi-day job shows its full run without the admin having to
+ * add every day one at a time. Only acts while the day list is completely empty, so it never
+ * undoes a deliberate removal of a day that's still there alongside others, and a sane cap
+ * guards against a garbage date range (e.g. a bad Current RMS sync) creating a year of rows.
+ */
+export async function autoPopulateDaysFromOpportunity(jobId: string) {
+  const existingCount = await prisma.jobDay.count({ where: { jobId } });
+  if (existingCount > 0) return;
+
+  const job = await prisma.job.findUnique({
+    where: { id: jobId },
+    select: { startsAt: true, endsAt: true, currentRmsOpportunityId: true },
+  });
+  if (!job) return;
+
+  const rmsId = job.currentRmsOpportunityId ? Number(job.currentRmsOpportunityId) : NaN;
+  const opp = Number.isFinite(rmsId) ? await prisma.currentRmsOpportunity.findUnique({ where: { rmsId } }) : null;
+  const start = job.startsAt ?? opp?.startsAt ?? null;
+  const end = job.endsAt ?? opp?.endsAt ?? null;
+  if (!start || !end) return;
+
+  const startKey = start.toISOString().slice(0, 10);
+  const endKey = end.toISOString().slice(0, 10);
+  if (startKey > endKey) return;
+
+  const dates: Date[] = [];
+  let cursor = new Date(`${startKey}T00:00:00.000Z`);
+  const last = new Date(`${endKey}T00:00:00.000Z`);
+  while (cursor <= last && dates.length <= MAX_AUTO_POPULATED_DAYS) {
+    dates.push(cursor);
+    cursor = new Date(cursor.getTime() + 24 * 60 * 60 * 1000);
+  }
+  if (dates.length === 0 || dates.length > MAX_AUTO_POPULATED_DAYS) return;
+
+  // No skipDuplicates - SQLite's connector doesn't support it in this Prisma version. Safe
+  // without it anyway: the existingCount === 0 guard above means this only ever runs against
+  // a genuinely empty day list.
+  await prisma.jobDay.createMany({ data: dates.map((date) => ({ jobId, date })) });
+}
+
 jobDaysRouter.get('/:jobId/days', async (req, res) => {
+  await autoPopulateDaysFromOpportunity(req.params.jobId);
   const days = await prisma.jobDay.findMany({
     where: { jobId: req.params.jobId },
     include: dayInclude,

@@ -758,6 +758,7 @@ export const api = {
     myJobs: () => request<CrewMyJob[]>('/crew/me/jobs'),
     jobDetail: (jobId: string) => request<CrewJobDetail>(`/crew/me/jobs/${jobId}`),
     schedule: (jobId: string) => request<JobScheduleItem[]>(`/crew/me/jobs/${jobId}/schedule`),
+    days: (jobId: string) => request<JobDay[]>(`/crew/me/jobs/${jobId}/days`),
     kitList: (jobId: string) => request<{ items: KitListItem[] }>(`/crew/me/jobs/${jobId}/kit-list`),
     documents: (jobId: string) => request<JobDocument[]>(`/crew/me/jobs/${jobId}/documents`),
     documentUrl: (jobId: string, docId: string) => `${BASE}/crew/me/jobs/${jobId}/documents/${docId}/file`,

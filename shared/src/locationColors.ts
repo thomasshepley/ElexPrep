@@ -31,6 +31,11 @@ export const DEFAULT_LOCATION_COLOR_RULES: {
   { location: 'Everywhere', color: '#1a1a1a', pattern: 'RAINBOW' },
 ];
 
+/** The 6 bands drawn left-to-right for the "Everywhere" RAINBOW pattern - shared by the PDF
+ * renderer (server/src/pdf/pdfBuilder.ts) and the print-queue's web preview (SheetMirror.tsx)
+ * so neither can drift from the other. */
+export const RAINBOW_BAND_COLORS = ['#D32F2F', '#F57C00', '#F5C400', '#1FA34C', '#1976D2', '#4B0082'];
+
 export interface ResolvedLocationColor {
   color: string;
   pattern: LocationColorPattern;

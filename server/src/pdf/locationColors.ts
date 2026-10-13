@@ -7,6 +7,7 @@ export {
   LocationColorPattern,
   ResolvedLocationColor,
   LocationColorMap,
+  RAINBOW_BAND_COLORS,
   resolveLocationColor,
   contrastingTextIsWhite,
   hexToRgbFractions,

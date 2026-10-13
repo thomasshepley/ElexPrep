@@ -14,6 +14,7 @@ import { findSharedCadPdf } from '../oneDrive/cad';
 import { listJobShares, isItemSharedWithJob } from '../oneDrive/shares';
 import { streamOneDriveFile } from '../oneDrive/client';
 import { getOneDriveConfig } from '../oneDrive/config';
+import { autoPopulateDaysFromOpportunity, dayInclude, toDayDto } from './jobDays';
 
 /**
  * Self-service data for a logged-in CREW account: their own profile, the jobs they're
@@ -286,6 +287,24 @@ crewPortalRouter.get('/me/jobs/:jobId/schedule', requireRole('CREW'), async (req
     orderBy: { startsAt: 'asc' },
   });
   res.json(items);
+});
+
+// Read-only mirror of the admin day-blocks overview (routes/jobDays.ts) - same data, same
+// per-job "schedule" visibility toggle as /schedule above, but no write endpoints: a crew
+// member can see which days exist and who else is working each one, never add/remove a day or
+// drag themselves (or anyone else) onto one.
+crewPortalRouter.get('/me/jobs/:jobId/days', requireRole('CREW'), async (req, res) => {
+  const found = await requireAssignedJob(req.user!.id, req.params.jobId);
+  if (!found) return res.status(404).json({ error: 'Job not found' });
+  const features = await resolveCrewFeatures(found.assignment.job);
+  if (!features.schedule) return res.json([]);
+  await autoPopulateDaysFromOpportunity(req.params.jobId);
+  const days = await prisma.jobDay.findMany({
+    where: { jobId: req.params.jobId },
+    include: dayInclude,
+    orderBy: { date: 'asc' },
+  });
+  res.json(days.map(toDayDto));
 });
 
 crewPortalRouter.get('/me/jobs/:jobId/documents', requireRole('CREW'), async (req, res) => {

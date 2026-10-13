@@ -12,7 +12,7 @@ import {
   rectangle,
 } from 'pdf-lib';
 import { CellGeometry, SheetGeometry } from '@elexprep/shared';
-import { hexToRgbFractions, ResolvedLocationColor } from './locationColors';
+import { hexToRgbFractions, RAINBOW_BAND_COLORS, ResolvedLocationColor } from './locationColors';
 
 export const PT_PER_IN = 72;
 export const inPt = (inches: number) => inches * PT_PER_IN;
@@ -156,8 +156,6 @@ export function drawLocationFill(page: PDFPage, rect: CellRectPt, resolved: Reso
   const { r, g, b } = hexToRgbFractions(resolved.color);
   page.drawRectangle({ x: rect.xPt, y: rect.yPt, width: rect.wPt, height: rect.hPt, color: rgb(r, g, b) });
 }
-
-const RAINBOW_BAND_COLORS = ['#D32F2F', '#F57C00', '#F5C400', '#1FA34C', '#1976D2', '#4B0082'];
 
 function drawRainbowFill(page: PDFPage, rect: CellRectPt) {
   const bandWidth = rect.wPt / RAINBOW_BAND_COLORS.length;

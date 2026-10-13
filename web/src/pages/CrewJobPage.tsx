@@ -1,8 +1,9 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { useParams } from 'react-router-dom';
-import { api, type CrewJobDetail, type JobScheduleItem, type KitListItem, type JobDocument, type JobContact, type Plot, type OneDriveShare } from '../api/client';
+import { api, type CrewJobDetail, type JobScheduleItem, type JobDay, type KitListItem, type JobDocument, type JobContact, type Plot, type OneDriveShare } from '../api/client';
 import Chevron from '../components/Chevron';
 import DayTimeline from '../components/DayTimeline';
+import DayBlocksReadOnly from '../components/DayBlocksReadOnly';
 import { WhoIcon, WhatIcon, WhenIcon, WhereIcon, WhyIcon, DiscussionIcon } from '../components/Icons';
 import LabelTypeForm, { AD_HOC_TYPES, type AdHocType } from '../components/LabelTypeForm';
 import JobDiscussionThread from '../components/JobDiscussionThread';
@@ -118,6 +119,7 @@ export default function CrewJobPage() {
   const { jobId } = useParams<{ jobId: string }>();
   const [detail, setDetail] = useState<CrewJobDetail | null>(null);
   const [schedule, setSchedule] = useState<JobScheduleItem[]>([]);
+  const [days, setDays] = useState<JobDay[]>([]);
   const [kitList, setKitList] = useState<KitListItem[]>([]);
   const [documents, setDocuments] = useState<JobDocument[]>([]);
   const [contacts, setContacts] = useState<JobContact[]>([]);
@@ -130,6 +132,7 @@ export default function CrewJobPage() {
     if (!jobId) return;
     api.crewPortal.jobDetail(jobId).then(setDetail).catch((e) => setError(e.message));
     api.crewPortal.schedule(jobId).then(setSchedule).catch(() => {});
+    api.crewPortal.days(jobId).then(setDays).catch(() => {});
     api.crewPortal.kitList(jobId).then((r) => setKitList(r.items)).catch(() => {});
     api.crewPortal.documents(jobId).then(setDocuments).catch(() => {});
     api.crewPortal.contacts(jobId).then(setContacts).catch(() => {});
@@ -196,6 +199,10 @@ export default function CrewJobPage() {
       <div style={{ marginTop: '0.9rem' }}>
         <StaticCard icon={<WhyIcon />} label="Why">
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))', gap: '1.5rem 2rem' }}>
+            <WhySubsection title="Week overview">
+              <DayBlocksReadOnly days={days} />
+            </WhySubsection>
+
             <WhySubsection title="Day schedule">
               {schedule.length > 0 ? <DayTimeline items={schedule} /> : <p className="muted">No schedule has been set for this job yet.</p>}
             </WhySubsection>

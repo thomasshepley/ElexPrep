@@ -1,6 +1,13 @@
 import { useRef, useState } from 'react';
 import type { LabelElementColor, LabelElementDef, LabelTypeTemplate, LocationColorMap } from '@elexprep/shared';
-import { DMX_CABLE_WIDTH_FACTOR, contrastingTextIsWhite, labelItemLocation, resolveLabelContent, resolveLocationColor } from '@elexprep/shared';
+import {
+  DMX_CABLE_WIDTH_FACTOR,
+  RAINBOW_BAND_COLORS,
+  contrastingTextIsWhite,
+  labelItemLocation,
+  resolveLabelContent,
+  resolveLocationColor,
+} from '@elexprep/shared';
 
 /**
  * CSS px per authored inch. The mirror approximates text layout with simple centered flexbox
@@ -11,7 +18,18 @@ import { DMX_CABLE_WIDTH_FACTOR, contrastingTextIsWhite, labelItemLocation, reso
 export const PX_PER_IN = 90;
 const PX_PER_PT = PX_PER_IN / 72;
 
+/** Hard-edged (no blending) color stops, matching drawRainbowFill's discrete left-to-right
+ * bands in pdfBuilder.ts rather than a smoothly blended gradient. */
+function rainbowBandsStyle(): React.CSSProperties {
+  const n = RAINBOW_BAND_COLORS.length;
+  const stops = RAINBOW_BAND_COLORS.flatMap((hex, i) => [`${hex} ${(i / n) * 100}%`, `${hex} ${((i + 1) / n) * 100}%`]);
+  return { backgroundImage: `linear-gradient(90deg, ${stops.join(', ')})` };
+}
+
 function fillStyle(resolved: ReturnType<typeof resolveLocationColor>): React.CSSProperties {
+  if (resolved.pattern === 'RAINBOW') {
+    return rainbowBandsStyle();
+  }
   if (resolved.pattern === 'DIAGONAL_STRIPES' && resolved.secondaryColor) {
     return {
       backgroundImage: `repeating-linear-gradient(45deg, ${resolved.color} 0 10px, ${resolved.secondaryColor} 10px 20px)`,
