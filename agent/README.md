@@ -61,6 +61,14 @@ watching the screen.
 - **The console window vanished** — `start.bat` pauses on exit specifically so a crash stays
   on screen; if it's still disappearing, run `node elexprep-print-agent.mjs` directly from a
   command prompt so the window doesn't close at all.
+- **Works via `start.bat` but fails once installed as the scheduled task (Windows Server
+  especially)** — `install-service.bat` registers the task to run as the `SYSTEM` account,
+  which doesn't always see a printer that was only installed under your own user profile.
+  Either install the printer as a shared/machine-wide printer (Settings → Printers & scanners
+  → Add printer, or share it from Print Management so every account can see it), or edit the
+  task to run as a real account that has the printer instead:
+  `schtasks /Change /TN "ElexPrep Print Agent" /RU "DOMAIN\serviceaccount" /RP`
+  (it will prompt for that account's password).
 
 ## Manual setup (without the .bat scripts)
 
