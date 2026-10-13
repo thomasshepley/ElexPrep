@@ -3,6 +3,10 @@
 Newest entries first. Each push/merge gets exactly one entry - see
 `scripts/bump-version.mjs` for how the version number itself advances.
 
+## v2.5.1 - 2026-10-13
+
+- Fixed CAD-PDF patch extraction, which was silently returning garbage for real exports
+
 ## v2.4.1 - 2026-10-12
 
 - Added stage tabs across patch import, cases, labels and the print queue
