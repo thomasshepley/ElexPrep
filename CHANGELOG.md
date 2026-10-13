@@ -4,6 +4,10 @@ Newest entries first. Each push/merge gets exactly one entry - see
 `scripts/bump-version.mjs` for how the version number itself advances. A `+` marks a
 feature addition, a `-` marks a bug fix.
 
+## v1.3.3 - 2026-10-13
+
+- Security hardening for file uploads, job access and sign-in
+
 ## v1.3.2 - 2026-10-13
 
 + Added site lockdown controls and expanded admin user management, fixed a job visibility bug for some accounts
