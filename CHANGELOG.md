@@ -4,6 +4,10 @@ Newest entries first. Each push/merge gets exactly one entry - see
 `scripts/bump-version.mjs` for how the version number itself advances. A `+` marks a
 feature addition, a `-` marks a bug fix.
 
+## v1.4.1 - 2026-10-13
+
+- Crew on a schedule entry is now a searchable list you click to add people, and checkboxes in forms no longer drop onto their own line
+
 ## v1.4.0 - 2026-10-13
 
 - Table rows on the Crew and Location Colours pages line up again, and colour pickers show their colour

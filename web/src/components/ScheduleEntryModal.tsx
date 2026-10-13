@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { resolveCrewColor } from '@elexprep/shared';
 import type { JobCrewAssignment, JobScheduleItem } from '../api/client';
 import Modal from './Modal';
+import CrewPicker from './CrewPicker';
 import DateTimeInput from './DateTimeInput';
 import { formatDayHeading, formatTime, toDatetimeLocal } from '../utils/format';
 
@@ -77,18 +78,15 @@ export default function ScheduleEntryModal({
       <label>Crew on this</label>
       <div className="stack-sm">
       {canManageCrew && roster && onToggleCrew ? (
-        roster.length === 0 ? (
-          <span className="muted">No crew on this job yet - add them on the Crew tab.</span>
-        ) : (
-          roster.map((a) => (
-            <label key={a.id} className="row" style={{ gap: '0.5rem' }}>
-              <input type="checkbox" checked={item.crew.some((c) => c.jobCrewAssignmentId === a.id)} onChange={() => onToggleCrew(a)} />
-              <span className="crew-swatch-dot" style={{ background: resolveCrewColor(a.crewProfileId, a.color) }} />
-              {a.displayName}
-              {a.role && <span className="muted">{a.role}</span>}
-            </label>
-          ))
-        )
+        <CrewPicker
+          label="Crew on this entry"
+          people={roster}
+          selectedIds={new Set(item.crew.map((c) => c.jobCrewAssignmentId))}
+          onToggle={(p) => {
+            const a = roster.find((r) => r.id === p.id);
+            if (a) onToggleCrew(a);
+          }}
+        />
       ) : item.crew.length === 0 ? (
         <span className="muted">No one assigned to this yet.</span>
       ) : (

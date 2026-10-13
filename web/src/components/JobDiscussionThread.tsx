@@ -3,6 +3,7 @@ import { api, type DiscussionGroup, type DiscussionGroupInput, type DiscussionMe
 import { useAuth } from '../auth/AuthContext';
 import { isAdminRole } from '../auth/roles';
 import Modal from './Modal';
+import CrewPicker from './CrewPicker';
 import { useDialog } from './Dialog';
 import { formatDateTime } from '../utils/format';
 import UserName from './UserName';
@@ -446,14 +447,11 @@ function GroupEditor({
           <div className="field">
             <label>Members</label>
             <div className="stack-sm">
-            {crew === null && <span className="muted">Loading crew…</span>}
-            {crew?.length === 0 && <span className="muted">No crew on this job yet - add them on the Crew tab first.</span>}
-            {crew?.map((a) => (
-              <label key={a.id} className="row" style={{ gap: '0.5rem' }}>
-                <input type="checkbox" checked={members.has(a.id)} onChange={() => toggleMember(a.id)} />
-                {a.displayName} <span className="muted">{a.role}</span>
-              </label>
-            ))}
+            {crew === null ? (
+              <span className="muted">Loading crew…</span>
+            ) : (
+              <CrewPicker label="Group members" people={crew} selectedIds={members} onToggle={(p) => toggleMember(p.id)} />
+            )}
             </div>
           </div>
         )}
