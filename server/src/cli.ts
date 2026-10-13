@@ -8,7 +8,12 @@
  */
 import { prisma } from './db';
 import { hashPassword } from './auth';
-import { setMaintenanceMode, isMaintenanceModeEnabled } from './maintenanceMode';
+import {
+  setDevelopmentLockdown,
+  isDevelopmentLockdownEnabled,
+  setFullLockdown,
+  isFullLockdownEnabled,
+} from './lockdownMode';
 import { uploadDir } from './routes/jobs';
 import fs from 'fs';
 import path from 'path';
@@ -25,14 +30,16 @@ function requireArgs(args: string[], count: number, usage: string) {
 }
 
 async function cmdStatus() {
-  const [userCount, jobCount, sessionCount, lockedDown] = await Promise.all([
+  const [userCount, jobCount, sessionCount, devLockdown, fullLockdown] = await Promise.all([
     prisma.user.count(),
     prisma.job.count(),
     prisma.session.count(),
-    isMaintenanceModeEnabled(),
+    isDevelopmentLockdownEnabled(),
+    isFullLockdownEnabled(),
   ]);
   const byRole = await prisma.user.groupBy({ by: ['role'], _count: true });
-  console.log(`Lockdown: ${lockedDown ? 'ON - only admins can sign in or use the API' : 'off'}`);
+  console.log(`Development lockdown: ${devLockdown ? 'ON - only admins/webmasters can sign in or use the API' : 'off'}`);
+  console.log(`Full lockdown: ${fullLockdown ? 'ON - only webmasters can sign in or use the API' : 'off'}`);
   console.log(`Users: ${userCount}`);
   for (const r of byRole) console.log(`  ${r.role}: ${r._count}`);
   console.log(`Jobs: ${jobCount}`);
@@ -121,14 +128,25 @@ async function cmdRevokeSessions(args: string[]) {
 }
 
 async function cmdLockdown() {
-  await setMaintenanceMode(true);
-  await prisma.session.deleteMany({ where: { user: { role: { not: 'ADMIN' } } } });
-  console.log('Lockdown enabled - only ADMIN accounts can sign in or use the API; non-admin sessions revoked.');
+  await setDevelopmentLockdown(true);
+  await prisma.session.deleteMany({ where: { user: { role: { notIn: ['ADMIN', 'WEBMASTER'] } } } });
+  console.log('Development lockdown enabled - only ADMIN/WEBMASTER accounts can sign in or use the API; other sessions revoked.');
 }
 
 async function cmdUnlock() {
-  await setMaintenanceMode(false);
-  console.log('Lockdown disabled - normal access restored.');
+  await setDevelopmentLockdown(false);
+  console.log('Development lockdown disabled - normal access restored.');
+}
+
+async function cmdFullLockdown() {
+  await setFullLockdown(true);
+  await prisma.session.deleteMany({ where: { user: { role: { not: 'WEBMASTER' } } } });
+  console.log('Full lockdown enabled - only WEBMASTER accounts can sign in or use the API (ADMIN included); every other session revoked.');
+}
+
+async function cmdFullUnlock() {
+  await setFullLockdown(false);
+  console.log('Full lockdown disabled - normal access restored.');
 }
 
 async function cmdResetAllData(args: string[]) {
@@ -163,8 +181,10 @@ function printUsage() {
   force-password-reset <user>               Require a new password on next sign-in
   set-role <user> <role>                    Change an account's role
   revoke-sessions <user|--all>              Sign an account (or everyone) out everywhere
-  lockdown                                   Lock the site to admins only (emergency stop)
-  unlock                                     Undo lockdown
+  lockdown                                   Development lockdown: admins only (emergency stop)
+  unlock                                     Undo development lockdown
+  full-lockdown                             Full lockdown: webmasters only, admins included
+  full-unlock                                Undo full lockdown
   reset-all-data --confirm-reset-everything  Wipe the database and uploads back to a fresh install
 `);
 }
@@ -192,6 +212,10 @@ async function main() {
       return cmdLockdown();
     case 'unlock':
       return cmdUnlock();
+    case 'full-lockdown':
+      return cmdFullLockdown();
+    case 'full-unlock':
+      return cmdFullUnlock();
     case 'reset-all-data':
       return cmdResetAllData(args);
     default:

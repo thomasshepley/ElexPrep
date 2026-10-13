@@ -47,6 +47,7 @@ import { jobContactsRouter } from './routes/jobContacts';
 import { jobDiscussionRouter } from './routes/jobDiscussion';
 import { dashboardRouter } from './routes/dashboard';
 import { notificationsRouter } from './routes/notifications';
+import { lockdownRouter } from './routes/lockdown';
 import { seedDefaultLocationColorsIfEmpty, seedNewDefaultLocationColorsIfMissing } from './pdf/locationColors';
 import { prisma } from './db';
 
@@ -126,6 +127,7 @@ app.use('/api/printer-settings', printerSettingsRouter);
 app.use('/api/agent', agentRouter);
 app.use('/api/activity', activityRouter);
 app.use('/api/permissions', permissionsRouter);
+app.use('/api/lockdown', lockdownRouter);
 
 // In production (Docker) the server also serves the built web app; in dev the Vite dev
 // server proxies /api here instead. WEB_DIST can point anywhere; default is web/dist.

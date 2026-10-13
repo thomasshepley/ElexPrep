@@ -4,6 +4,7 @@ import path from 'path';
 import fs from 'fs';
 import { prisma, logActivity } from '../db';
 import { requirePermission, resolvePermissionsForUser } from '../permissions';
+import { isAdminRole } from '../auth';
 import { normalizeCrewFeaturesPatch } from '../crewFeatures';
 import { findLogoCandidate } from '../oneDrive/logo';
 import { getOneDriveConfig } from '../oneDrive/config';
@@ -29,7 +30,7 @@ export const jobsRouter = Router();
 
 /** ADMIN sees every job; USER/SIGNAGE only see jobs an admin has marked Public. */
 jobsRouter.get('/', async (req, res) => {
-  const isAdmin = req.user?.role === 'ADMIN';
+  const isAdmin = isAdminRole(req.user?.role);
   const jobs = await prisma.job.findMany({
     where: isAdmin ? undefined : { isPublic: true },
     orderBy: { createdAt: 'desc' },
@@ -44,19 +45,19 @@ jobsRouter.get('/', async (req, res) => {
 jobsRouter.get('/:id', async (req, res) => {
   const job = await prisma.job.findUnique({ where: { id: req.params.id } });
   if (!job) return res.status(404).json({ error: 'not found' });
-  if (!job.isPublic && req.user?.role !== 'ADMIN') return res.status(404).json({ error: 'not found' });
+  if (!job.isPublic && !isAdminRole(req.user?.role)) return res.status(404).json({ error: 'not found' });
   res.json(job);
 });
 
 jobsRouter.put('/:id', async (req, res) => {
   const { name, venue, description, address, startsAt, endsAt, isPublic, crewFeatures } = req.body ?? {};
-  if (isPublic !== undefined && req.user?.role !== 'ADMIN') {
+  if (isPublic !== undefined && !isAdminRole(req.user?.role)) {
     const perms = req.user?.role === 'USER' ? await resolvePermissionsForUser(req.user.id, 'USER') : null;
     if (!perms?.publishJobs) {
       return res.status(403).json({ error: "Insufficient permissions to change a job's public visibility" });
     }
   }
-  if (crewFeatures !== undefined && req.user?.role !== 'ADMIN') {
+  if (crewFeatures !== undefined && !isAdminRole(req.user?.role)) {
     const perms = req.user?.role === 'USER' ? await resolvePermissionsForUser(req.user.id, 'USER') : null;
     if (!perms?.onboardJobs && !perms?.manageCrewAssignments) {
       return res.status(403).json({ error: "Insufficient permissions to change this job's crew portal features" });
@@ -157,7 +158,7 @@ jobsRouter.get('/:id/logo/:slot?', async (req, res) => {
   const job = await prisma.job.findUnique({ where: { id: req.params.id } });
   const logoPath = job?.[field];
   if (!logoPath) return res.status(404).end();
-  if (!job.isPublic && req.user?.role !== 'ADMIN') return res.status(404).end();
+  if (!job.isPublic && !isAdminRole(req.user?.role)) return res.status(404).end();
   res.sendFile(path.join(uploadDir, logoPath));
 });
 

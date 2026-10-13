@@ -2,7 +2,7 @@ import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import { NextFunction, Request, Response } from 'express';
 import { prisma } from './db';
-import { isMaintenanceModeEnabled } from './maintenanceMode';
+import { isDevelopmentLockdownEnabled, isFullLockdownEnabled } from './lockdownMode';
 
 /// WEBMASTER sits above ADMIN - it passes every requireRole/requirePermission check regardless
 /// of which roles are listed (see requireRole/permissions.ts below), on top of its own
@@ -11,6 +11,14 @@ import { isMaintenanceModeEnabled } from './maintenanceMode';
 /// only way to grant it is the server-side admin CLI (server/src/cli.ts), a channel an ADMIN
 /// account has no access to.
 export type Role = 'ADMIN' | 'USER' | 'SIGNAGE' | 'CREW' | 'WEBMASTER';
+
+/** Treats WEBMASTER as ADMIN-equivalent for any check that's really about "elevated staff
+ * access" (job visibility, settings pages, admin-only panels) rather than literally the ADMIN
+ * role value - use this instead of a raw `role === 'ADMIN'` comparison wherever WEBMASTER
+ * should see/do the same thing an ADMIN can. */
+export function isAdminRole(role: string | null | undefined): boolean {
+  return role === 'ADMIN' || role === 'WEBMASTER';
+}
 
 export interface AuthedUser {
   id: string;
@@ -147,11 +155,15 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
   if (req.path === '/api/onboarding' && req.method === 'POST') return next();
   if (/^\/api\/onboarding\/invite\/[^/]+(\/complete)?$/.test(req.path)) return next();
   if (!req.user) return res.status(401).json({ error: 'Not signed in' });
-  // Emergency full-stop (see maintenanceMode.ts) - everyone except ADMIN/WEBMASTER is locked
-  // out of every API call, including one from a session that was already live when lockdown
-  // was switched on, not just new logins (those are stopped separately in routes/auth.ts).
-  if (req.user.role !== 'ADMIN' && req.user.role !== 'WEBMASTER' && (await isMaintenanceModeEnabled())) {
-    return res.status(503).json({ error: 'The site is locked down for maintenance - try again shortly' });
+  // Two lockdown tiers (see lockdownMode.ts), checked against every API call including one
+  // from a session that was already live when lockdown was switched on, not just new logins
+  // (those are stopped separately in routes/auth.ts). Full lockdown is checked first since
+  // it's the stricter tier - if both happen to be on, its message is the more accurate one.
+  if (req.user.role !== 'WEBMASTER' && (await isFullLockdownEnabled())) {
+    return res.status(503).json({ error: 'The site is in lockdown mode - try again shortly' });
+  }
+  if (!isAdminRole(req.user.role) && (await isDevelopmentLockdownEnabled())) {
+    return res.status(503).json({ error: 'The site is locked down for development - try again shortly' });
   }
   if (req.user.role === 'SIGNAGE' && req.method !== 'GET') {
     const allowed = SIGNAGE_WRITE_ALLOWLIST.some((re) => re.test(req.path));

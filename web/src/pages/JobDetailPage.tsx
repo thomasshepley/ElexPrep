@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { api, type Job, type CrewFeatures, CREW_FEATURE_KEYS, CREW_FEATURE_LABELS } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
+import { isAdminRole } from '../auth/roles';
 import JobPrepTab from '../components/JobPrepTab';
 import JobPlotsTab from '../components/JobPlotsTab';
 import LocationLinks from '../components/LocationLinks';
@@ -79,7 +80,7 @@ function toDatetimeLocal(iso: string | null): string {
 
 function JobSettingsPanel({ job, onUpdate }: { job: Job; onUpdate: (j: Job) => void }) {
   const { user } = useAuth();
-  const isAdmin = user?.role === 'ADMIN';
+  const isAdmin = isAdminRole(user?.role);
   const canPublish = isAdmin || Boolean(user?.permissions?.publishJobs);
   const [name, setName] = useState(job.name);
   const [venue, setVenue] = useState(job.venue ?? '');
@@ -266,7 +267,7 @@ function JobSettingsPanel({ job, onUpdate }: { job: Job; onUpdate: (j: Job) => v
  * from whatever was set at onboarding (or the portal default, if never overridden). */
 function JobCrewFeaturesPanel({ job, onUpdate }: { job: Job; onUpdate: (j: Job) => void }) {
   const { user } = useAuth();
-  const isAdmin = user?.role === 'ADMIN';
+  const isAdmin = isAdminRole(user?.role);
   const canEdit = isAdmin || Boolean(user?.permissions?.onboardJobs) || Boolean(user?.permissions?.manageCrewAssignments);
   const [features, setFeatures] = useState<CrewFeatures | null>(null);
   const [busy, setBusy] = useState(false);

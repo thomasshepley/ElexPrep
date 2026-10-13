@@ -7,6 +7,7 @@ import VersionBadge from '../components/VersionBadge';
 import BugReportButton from '../components/BugReportButton';
 import Avatar from '../components/Avatar';
 import ForcedPasswordChange from '../components/ForcedPasswordChange';
+import LockdownBanner from '../components/LockdownBanner';
 
 /**
  * Shell for the whole crew portal (/crew/*) - a sibling to the admin/prep App shell and the
@@ -30,46 +31,49 @@ export default function CrewLayout() {
   if (user.mustChangePassword) return <ForcedPasswordChange />;
 
   return (
-    <div className="shell">
-      <aside className="sidebar">
-        <div className="sidebar-sticky">
-          <div className="sidebar-brand">
-            <span className="sidebar-brand-mark" />
-            <span className="sidebar-brand-text">ELEX Portal</span>
-          </div>
-          <nav className="sidebar-nav">
-            <NavLink to="/crew" end aria-label="Schedule">
-              <JobsIcon />
-              <span>Schedule</span>
-            </NavLink>
-            <NavLink to="/crew/account" aria-label="My account">
-              <SettingsIcon />
-              <span>My account</span>
-            </NavLink>
-          </nav>
-          <div className="sidebar-user">
-            <div className="sidebar-user-row">
-              <Avatar userId={user.id} displayName={user.displayName} hasAvatar={Boolean(user.avatarPath)} />
-              <NavLink to="/crew/account" className="sidebar-username" aria-label={`${user.displayName} - account`}>
-                {user.displayName}
-              </NavLink>
+    <>
+      <LockdownBanner />
+      <div className="shell">
+        <aside className="sidebar">
+          <div className="sidebar-sticky">
+            <div className="sidebar-brand">
+              <span className="sidebar-brand-mark" />
+              <span className="sidebar-brand-text">ELEX Portal</span>
             </div>
-            <NotificationBell />
-            <ThemeToggle />
-            <button className="secondary sidebar-signout" onClick={logout} aria-label="Sign out">
-              <SignOutIcon />
-              <span>Sign out</span>
-            </button>
-            <VersionBadge />
-            <BugReportButton />
+            <nav className="sidebar-nav">
+              <NavLink to="/crew" end aria-label="Schedule">
+                <JobsIcon />
+                <span>Schedule</span>
+              </NavLink>
+              <NavLink to="/crew/account" aria-label="My account">
+                <SettingsIcon />
+                <span>My account</span>
+              </NavLink>
+            </nav>
+            <div className="sidebar-user">
+              <div className="sidebar-user-row">
+                <Avatar userId={user.id} displayName={user.displayName} hasAvatar={Boolean(user.avatarPath)} />
+                <NavLink to="/crew/account" className="sidebar-username" aria-label={`${user.displayName} - account`}>
+                  {user.displayName}
+                </NavLink>
+              </div>
+              <NotificationBell />
+              <ThemeToggle />
+              <button className="secondary sidebar-signout" onClick={logout} aria-label="Sign out">
+                <SignOutIcon />
+                <span>Sign out</span>
+              </button>
+              <VersionBadge />
+              <BugReportButton />
+            </div>
           </div>
-        </div>
-      </aside>
-      <main className="shell-main">
-        <div className="shell-main-inner">
-          <Outlet />
-        </div>
-      </main>
-    </div>
+        </aside>
+        <main className="shell-main">
+          <div className="shell-main-inner">
+            <Outlet />
+          </div>
+        </main>
+      </div>
+    </>
   );
 }

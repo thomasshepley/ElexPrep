@@ -6,7 +6,7 @@ import PasswordInput from './PasswordInput';
 /**
  * Full-screen gate rendered instead of the normal app shell whenever the signed-in account
  * has mustChangePassword set (an admin forced it via the server-side CLI's
- * force-password-reset command - see server/src/maintenanceMode.ts-adjacent auth routes).
+ * force-password-reset command - see server/src/routes/auth.ts).
  * The account can still sign in with its current/temporary password - that's how it got this
  * far - but sees nothing else until it sets a new one. Reuses the same PUT /auth/me endpoint
  * self-service password changes already use; the server clears the flag the moment a new

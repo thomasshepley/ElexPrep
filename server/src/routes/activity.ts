@@ -1,10 +1,12 @@
 import { Router } from 'express';
 import { prisma } from '../db';
-import { requirePermission } from '../permissions';
+import { requireRole } from '../auth';
 
 export const activityRouter = Router();
 
-activityRouter.get('/', requirePermission('viewActivityLog'), async (req, res) => {
+// Webmaster-exclusive, not a delegatable permission - an ADMIN granting this to a USER would
+// otherwise be a way to indirectly regain it.
+activityRouter.get('/', requireRole('WEBMASTER'), async (req, res) => {
   const jobId = typeof req.query.jobId === 'string' ? req.query.jobId : undefined;
   const entries = await prisma.activityLogEntry.findMany({
     where: jobId ? { jobId } : undefined,

@@ -11,11 +11,12 @@ import {
   createSession,
   destroySession,
   hashPassword,
+  isAdminRole,
   toAuthedUser,
   verifyPassword,
 } from '../auth';
 import { authedUserWithPermissions } from '../permissions';
-import { isMaintenanceModeEnabled } from '../maintenanceMode';
+import { isDevelopmentLockdownEnabled, isFullLockdownEnabled } from '../lockdownMode';
 import { verifyTotpToken } from '../totp';
 import { decryptTotpSecret, consumeBackupCode } from '../twoFactor';
 import { createPendingLogin, checkPendingLogin, consumePendingLogin } from '../pendingTotpLogins';
@@ -96,8 +97,11 @@ authRouter.post('/login', loginLimiter, async (req, res) => {
     return res.status(401).json({ error: 'Incorrect username or password' });
   }
 
-  if (user.role !== 'ADMIN' && user.role !== 'WEBMASTER' && (await isMaintenanceModeEnabled())) {
-    return res.status(503).json({ error: 'The site is locked down for maintenance - try again shortly' });
+  if (user.role !== 'WEBMASTER' && (await isFullLockdownEnabled())) {
+    return res.status(503).json({ error: 'The site is in lockdown mode - try again shortly' });
+  }
+  if (!isAdminRole(user.role) && (await isDevelopmentLockdownEnabled())) {
+    return res.status(503).json({ error: 'The site is locked down for development - try again shortly' });
   }
 
   if (user.totpEnabled) {
@@ -141,8 +145,11 @@ authRouter.post('/login/verify-2fa', totpVerifyLimiter, async (req, res) => {
     return res.status(401).json({ error: 'Incorrect code' });
   }
 
-  if (user.role !== 'ADMIN' && user.role !== 'WEBMASTER' && (await isMaintenanceModeEnabled())) {
-    return res.status(503).json({ error: 'The site is locked down for maintenance - try again shortly' });
+  if (user.role !== 'WEBMASTER' && (await isFullLockdownEnabled())) {
+    return res.status(503).json({ error: 'The site is in lockdown mode - try again shortly' });
+  }
+  if (!isAdminRole(user.role) && (await isDevelopmentLockdownEnabled())) {
+    return res.status(503).json({ error: 'The site is locked down for development - try again shortly' });
   }
 
   consumePendingLogin(pendingToken);
@@ -180,9 +187,8 @@ authRouter.put('/me', async (req, res) => {
       return res.status(403).json({ error: 'Current password is incorrect' });
     }
     data.passwordHash = hashPassword(password);
-    // Satisfies an admin-forced reset (see maintenanceMode.ts-adjacent cli.ts's
-    // force-password-reset) the moment they actually change it - no separate "I'm done"
-    // step needed.
+    // Satisfies an admin-forced reset (see cli.ts's force-password-reset) the moment they
+    // actually change it - no separate "I'm done" step needed.
     data.mustChangePassword = false;
   }
 

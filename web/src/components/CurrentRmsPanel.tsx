@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, type CurrentRmsOpportunity, type CurrentRmsPickItem } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
+import { isAdminRole } from '../auth/roles';
 
 /** Current RMS sends quantity as a decimal string (e.g. "12.0"), same quirk as its money
  * fields - Number() strips the trailing .0 for a whole number while still showing real
@@ -12,7 +13,7 @@ function formatQuantity(q: unknown): string {
 
 export default function CurrentRmsPanel({ jobId }: { jobId: string }) {
   const { user } = useAuth();
-  const isAdmin = user?.role === 'ADMIN';
+  const isAdmin = isAdminRole(user?.role);
   const canLink = isAdmin || Boolean(user?.permissions?.linkCurrentRms);
   const [linked, setLinked] = useState<boolean | null>(null);
   const [opportunity, setOpportunity] = useState<CurrentRmsOpportunity | undefined>();

@@ -1731,3 +1731,26 @@ tbody tr:hover {
 .whatsapp-button:hover:not(:disabled) {
   filter: brightness(1.05);
 }
+
+/* Lockdown banners (see LockdownBanner.tsx) - deliberately fixed, saturated colors rather than
+   theme tokens: these are urgent site-wide alerts that must read the same in light and dark
+   mode, not blend into either. */
+.lockdown-banner {
+  width: 100%;
+  padding: 0.65rem 1rem;
+  text-align: center;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  font-size: 0.95rem;
+}
+
+.lockdown-banner-full {
+  background: #c81e1e;
+  color: #fff;
+}
+
+.lockdown-banner-dev {
+  background: #b45309;
+  color: #fff;
+}

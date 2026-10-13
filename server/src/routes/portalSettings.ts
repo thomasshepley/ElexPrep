@@ -1,5 +1,5 @@
 import { NextFunction, Request, Response, Router } from 'express';
-import { requireRole } from '../auth';
+import { isAdminRole, requireRole } from '../auth';
 import { resolvePermissionsForUser } from '../permissions';
 import { logActivity } from '../db';
 import { loadDefaultCrewFeatures, saveDefaultCrewFeatures, normalizeCrewFeaturesPatch } from '../crewFeatures';
@@ -10,7 +10,7 @@ import { loadDefaultCrewFeatures, saveDefaultCrewFeatures, normalizeCrewFeatures
  * ADMIN-only. */
 async function canReadDefaults(req: Request, res: Response, next: NextFunction) {
   if (!req.user) return res.status(401).json({ error: 'Not signed in' });
-  if (req.user.role === 'ADMIN') return next();
+  if (isAdminRole(req.user.role)) return next();
   if (req.user.role !== 'USER') return res.status(403).json({ error: 'Insufficient permissions' });
   const perms = await resolvePermissionsForUser(req.user.id, req.user.role);
   if (!perms.onboardJobs && !perms.manageCrewAssignments) return res.status(403).json({ error: 'Insufficient permissions' });

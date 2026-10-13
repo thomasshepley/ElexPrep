@@ -9,6 +9,7 @@ import {
   CREW_FEATURE_LABELS,
 } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
+import { isAdminRole } from '../auth/roles';
 import { SearchIcon, WhereIcon } from '../components/Icons';
 import LocationLinks from '../components/LocationLinks';
 
@@ -350,7 +351,7 @@ function OnboardOpportunitiesPanel({ existingOppIds, onOnboarded }: { existingOp
 
 export default function JobsListPage() {
   const { user } = useAuth();
-  const isAdmin = user?.role === 'ADMIN';
+  const isAdmin = isAdminRole(user?.role);
   const canDelete = isAdmin || Boolean(user?.permissions?.deleteJobs);
   const canOnboard = isAdmin || Boolean(user?.permissions?.onboardJobs);
   const [jobs, setJobs] = useState<Job[]>([]);

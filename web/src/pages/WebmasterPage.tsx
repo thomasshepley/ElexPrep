@@ -4,6 +4,66 @@ import { api, type BugReport } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { useToast } from '../components/Toast';
 
+function SiteControlsPanel() {
+  const { user, setUser } = useAuth();
+  const { showToast } = useToast();
+  const [busy, setBusy] = useState<'development' | 'full' | null>(null);
+
+  const toggle = async (tier: 'development' | 'full', enabled: boolean) => {
+    setBusy(tier);
+    try {
+      if (tier === 'development') await api.lockdown.setDevelopment(enabled);
+      else await api.lockdown.setFull(enabled);
+      const refreshed = await api.auth.me();
+      setUser(refreshed);
+      showToast(
+        `${tier === 'development' ? 'Development' : 'Full'} lockdown ${enabled ? 'enabled' : 'disabled'}.`,
+        'success'
+      );
+    } catch (err) {
+      showToast((err as Error).message, 'error');
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <div className="panel" style={{ marginBottom: '1.5rem' }}>
+      <h3 style={{ marginTop: 0 }}>Site controls</h3>
+      <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+        <div>
+          <strong>Development lockdown</strong>
+          <p className="muted" style={{ margin: 0 }}>
+            Blocks everyone except admins/webmasters from signing in or using the API - for planned maintenance.
+          </p>
+        </div>
+        <button
+          className={user?.developmentLockdown ? 'secondary' : 'primary'}
+          disabled={busy !== null}
+          onClick={() => toggle('development', !user?.developmentLockdown)}
+        >
+          {user?.developmentLockdown ? 'Disable' : 'Enable'}
+        </button>
+      </div>
+      <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <strong>Full lockdown</strong>
+          <p className="muted" style={{ margin: 0 }}>
+            Blocks everyone except webmasters, admins included - the strictest tier.
+          </p>
+        </div>
+        <button
+          className={user?.fullLockdown ? 'secondary' : 'primary'}
+          disabled={busy !== null}
+          onClick={() => toggle('full', !user?.fullLockdown)}
+        >
+          {user?.fullLockdown ? 'Disable' : 'Enable'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function ReportRow({ report, onRemove }: { report: BugReport; onRemove: (id: string) => void }) {
   const [expanded, setExpanded] = useState(false);
   return (
@@ -79,6 +139,7 @@ export default function WebmasterPage() {
   return (
     <div>
       <h1>Webmaster</h1>
+      <SiteControlsPanel />
       <p className="muted">Bug reports submitted from anywhere in the app.</p>
       {error && <p className="error">{error}</p>}
       {reports.length === 0 ? (

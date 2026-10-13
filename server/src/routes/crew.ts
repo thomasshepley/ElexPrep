@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import multer from 'multer';
 import { prisma, logActivity } from '../db';
-import { MIN_PASSWORD_LENGTH, hashPassword, requireRole } from '../auth';
+import { MIN_PASSWORD_LENGTH, hashPassword, isAdminRole, requireRole } from '../auth';
 import { DOCUMENT_FIELDS, deleteDocumentFile, saveDocuments, streamDecryptedDocument } from '../crewDocumentsStorage';
 import { encryptBankDetails, decryptBankDetails, parseBankDetails } from '../bankDetails';
 
@@ -268,7 +268,7 @@ crewRouter.get('/:id/bank-details', async (req, res) => {
 crewRouter.delete('/:id', async (req, res) => {
   const existing = await prisma.crewProfile.findUnique({ where: { id: req.params.id }, include: { user: true } });
   if (!existing) return res.status(404).json({ error: 'Crew member not found' });
-  if (existing.user.role === 'ADMIN') {
+  if (isAdminRole(existing.user.role)) {
     // This profile only exists to make an admin's own account assignable as crew - removing it
     // must leave their actual login (Users page) untouched, unlike the freelancer path below.
     await prisma.crewProfile.delete({ where: { id: existing.id } });

@@ -239,8 +239,10 @@ From then on, e.g. `admin status` from any directory.
 | `force-password-reset <user>` | The account can still sign in with its current password, but the web app blocks everything else until it sets a new one |
 | `set-role <user> <role>` | Changes an account's role |
 | `revoke-sessions <user>` or `revoke-sessions --all` | Signs an account - or everyone - out everywhere immediately |
-| `lockdown` | Emergency stop: only `ADMIN` accounts can sign in or use the API; every other account's sessions are revoked immediately. Use this if you suspect a compromise and want to freeze everything else while you investigate |
+| `lockdown` | Development lockdown: only `ADMIN` accounts can sign in or use the API; every other account's sessions are revoked immediately. Use this for planned maintenance or if you suspect a compromise and want to freeze everything else while you investigate |
 | `unlock` | Undoes `lockdown` |
+| `full-lockdown` | Full lockdown: the strictest tier - blocks every account from signing in or using the API, `ADMIN` included; every other account's sessions are revoked immediately. Reserved for the rare case where even admin accounts shouldn't be trusted |
+| `full-unlock` | Undoes `full-lockdown` |
 | `reset-all-data --confirm-reset-everything` | **Deletes every row in every table and every uploaded file.** Leaves the site exactly as if freshly installed - visiting it afterwards shows the first-run "create the admin account" screen. There is no undo short of restoring a backup (see Notes below) |
 
 `remove-user` and `reset-all-data` both refuse to run without their `--confirm`/

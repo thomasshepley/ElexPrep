@@ -1,6 +1,7 @@
 import { NextFunction, Request, Response } from 'express';
 import { prisma } from './db';
 import { AuthedUser, Role } from './auth';
+import { isDevelopmentLockdownEnabled, isFullLockdownEnabled } from './lockdownMode';
 
 /**
  * Granular capabilities an admin can delegate to the USER role, beyond its fixed baseline.
@@ -11,7 +12,6 @@ import { AuthedUser, Role } from './auth';
 export const PERMISSION_KEYS = [
   'deleteJobs',
   'publishJobs',
-  'viewActivityLog',
   'linkCurrentRms',
   'onboardJobs',
   'manageOneDrive',
@@ -26,7 +26,6 @@ export type RolePermissions = Record<PermissionKey, boolean>;
 export const PERMISSION_LABELS: Record<PermissionKey, string> = {
   deleteJobs: 'Delete jobs',
   publishJobs: "Publish/unpublish jobs (toggle a job's public visibility)",
-  viewActivityLog: 'View the activity log',
   linkCurrentRms: 'Link or unlink a job to a Current RMS opportunity',
   onboardJobs: 'Onboard a Current RMS Quote/Order into a portal job (the only way jobs are created)',
   manageOneDrive: "Link a job's OneDrive folder and choose which files/folders crew can see",
@@ -38,7 +37,6 @@ export const PERMISSION_LABELS: Record<PermissionKey, string> = {
 export const DEFAULT_PERMISSIONS: RolePermissions = {
   deleteJobs: false,
   publishJobs: false,
-  viewActivityLog: false,
   linkCurrentRms: false,
   onboardJobs: false,
   manageOneDrive: false,
@@ -107,8 +105,17 @@ export async function resolvePermissionsForUser(userId: string, role: Role): Pro
   return override ? { ...base, ...override } : base;
 }
 
+/** Single choke point used by /auth/me, /login, /login/verify-2fa, /setup and PUT /me - also
+ * surfaces both lockdown tiers here since /api/auth/me is the one route authMiddleware exempts
+ * from the lockdown gate, making it the only reliable way for an about-to-be-blocked account to
+ * learn it's in lockdown (for the web client's banner). */
 export async function authedUserWithPermissions(user: AuthedUser) {
-  return { ...user, permissions: await resolvePermissionsForUser(user.id, user.role) };
+  const [permissions, developmentLockdown, fullLockdown] = await Promise.all([
+    resolvePermissionsForUser(user.id, user.role),
+    isDevelopmentLockdownEnabled(),
+    isFullLockdownEnabled(),
+  ]);
+  return { ...user, permissions, developmentLockdown, fullLockdown };
 }
 
 /**

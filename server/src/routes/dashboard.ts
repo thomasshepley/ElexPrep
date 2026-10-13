@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { resolveCrewColor } from '@elexprep/shared';
 import { prisma } from '../db';
+import { isAdminRole } from '../auth';
 
 /**
  * Admin home: the jobs that are actual Current RMS orders (linked opportunities), with their
@@ -11,7 +12,7 @@ import { prisma } from '../db';
 export const dashboardRouter = Router();
 
 dashboardRouter.get('/', async (req, res) => {
-  const isAdmin = req.user?.role === 'ADMIN';
+  const isAdmin = isAdminRole(req.user?.role);
   const jobs = await prisma.job.findMany({
     where: {
       currentRmsOpportunityId: { not: null },

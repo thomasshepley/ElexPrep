@@ -5,6 +5,7 @@ import { api, type JobScheduleItem, type JobCrewAssignment, type JobDay } from '
 import { dateKey, SingleDayTimeline } from './DayTimeline';
 import DayBlocksColumn, { localMidnightIso, useDayBlockActions, type DayBlockView } from './DayBlocksColumn';
 import { useAuth } from '../auth/AuthContext';
+import { isAdminRole } from '../auth/roles';
 import { useToast } from './Toast';
 
 // The native datetime-local spinner/scroll-wheel snaps to this step, so picking a time quickly
@@ -54,8 +55,8 @@ export default function JobSchedulePanel({ jobId }: { jobId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [activeRosterAssignmentId, setActiveRosterAssignmentId] = useState<string | null>(null);
 
-  const canManageCrew = user?.role === 'ADMIN' || Boolean(user?.permissions?.manageCrewAssignments);
-  const canManageDays = user?.role === 'ADMIN';
+  const canManageCrew = isAdminRole(user?.role) || Boolean(user?.permissions?.manageCrewAssignments);
+  const canManageDays = isAdminRole(user?.role);
 
   const refresh = () => api.jobSchedule.list(jobId).then(setItems).catch((e) => setError(e.message));
   const refreshDays = () => api.jobDays.list(jobId).then(setJobDays).catch((e) => setError(e.message));

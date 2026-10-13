@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
+import { isAdminRole } from '../auth/roles';
 
 function formatMoney(n: number): string {
   return `£${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -19,7 +20,7 @@ export default function CrewMarginPanel({ jobId }: { jobId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  if (user?.role !== 'ADMIN') return null;
+  if (!isAdminRole(user?.role)) return null;
 
   const load = () => {
     setLoading(true);

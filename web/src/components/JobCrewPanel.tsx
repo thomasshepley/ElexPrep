@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, type CrewMember, type JobCrewAssignment } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
+import { isAdminRole } from '../auth/roles';
 import WhatsAppButton from './WhatsAppButton';
 
 /**
@@ -10,7 +11,7 @@ import WhatsAppButton from './WhatsAppButton';
  */
 export default function JobCrewPanel({ jobId }: { jobId: string }) {
   const { user } = useAuth();
-  const canManage = user?.role === 'ADMIN' || Boolean(user?.permissions?.manageCrewAssignments);
+  const canManage = isAdminRole(user?.role) || Boolean(user?.permissions?.manageCrewAssignments);
 
   const [assignments, setAssignments] = useState<JobCrewAssignment[]>([]);
   const [roster, setRoster] = useState<CrewMember[]>([]);

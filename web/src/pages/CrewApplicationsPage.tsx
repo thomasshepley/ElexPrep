@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, type CrewApplicationDetail, type CrewApplicationSummary } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
+import { isAdminRole } from '../auth/roles';
 import BankDetailsReveal from '../components/BankDetailsReveal';
 import WhatsAppButton from '../components/WhatsAppButton';
 import PasswordInput from '../components/PasswordInput';
@@ -16,7 +17,7 @@ function statusChipClass(status: string) {
 
 export default function CrewApplicationsPage() {
   const { user } = useAuth();
-  const isAdmin = user?.role === 'ADMIN';
+  const isAdmin = isAdminRole(user?.role);
   const [filter, setFilter] = useState<StatusFilter>('PENDING');
   const [applications, setApplications] = useState<CrewApplicationSummary[]>([]);
   const [expandedId, setExpandedId] = useState<string | null>(null);

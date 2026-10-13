@@ -193,7 +193,6 @@ export type Role = 'ADMIN' | 'USER' | 'SIGNAGE' | 'CREW' | 'WEBMASTER';
 export type PermissionKey =
   | 'deleteJobs'
   | 'publishJobs'
-  | 'viewActivityLog'
   | 'linkCurrentRms'
   | 'onboardJobs'
   | 'manageOneDrive'
@@ -213,6 +212,11 @@ export interface AuthedUser {
   /// shell blocks everything except a "set a new password" form until this clears, which
   /// happens automatically the moment the password is actually changed.
   mustChangePassword: boolean;
+  /// Both lockdown tiers (see server/src/lockdownMode.ts), surfaced on every authedUserWithPermissions
+  /// response so even an about-to-be-blocked account can render the lockdown banner via /auth/me,
+  /// the one route the lockdown gate itself exempts.
+  developmentLockdown: boolean;
+  fullLockdown: boolean;
 }
 
 export interface CrewMember {
@@ -1181,6 +1185,11 @@ export const api = {
   },
   activity: {
     list: (jobId?: string) => request<ActivityLogEntry[]>(`/activity${jobId ? `?jobId=${jobId}` : ''}`),
+  },
+  lockdown: {
+    setDevelopment: (enabled: boolean) =>
+      request<void>('/lockdown/development', { method: 'POST', body: JSON.stringify({ enabled }) }),
+    setFull: (enabled: boolean) => request<void>('/lockdown/full', { method: 'POST', body: JSON.stringify({ enabled }) }),
   },
   currentRms: {
     getConfig: () => request<CurrentRmsConfig>('/current-rms/config'),

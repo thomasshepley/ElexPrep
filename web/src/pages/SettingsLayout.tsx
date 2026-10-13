@@ -1,5 +1,6 @@
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
+import { isAdminRole } from '../auth/roles';
 import type { PermissionKey } from '../api/client';
 
 interface SettingsSection {
@@ -8,6 +9,8 @@ interface SettingsSection {
   adminOnly?: boolean;
   /** Non-admin visibility additionally requires this permission (adminOnly must be false). */
   permission?: PermissionKey;
+  /** Exclusive to WEBMASTER - not even ADMIN sees this section. */
+  webmasterOnly?: boolean;
 }
 
 const SECTIONS: SettingsSection[] = [
@@ -22,15 +25,16 @@ const SECTIONS: SettingsSection[] = [
   { to: '/settings/crew', label: 'Crew', adminOnly: true },
   { to: '/settings/crew-applications', label: 'Applications', permission: 'manageCrewApplications' },
   { to: '/settings/onboarding', label: 'Onboarding', permission: 'manageCrewApplications' },
-  { to: '/settings/activity', label: 'Activity Log', permission: 'viewActivityLog' },
+  { to: '/settings/activity', label: 'Activity Log', webmasterOnly: true },
   { to: '/settings/preferences', label: 'My Preferences' },
 ];
 
 export default function SettingsLayout() {
   const { user } = useAuth();
   const { pathname } = useLocation();
-  const isAdmin = user?.role === 'ADMIN';
+  const isAdmin = isAdminRole(user?.role);
   const sections = SECTIONS.filter((s) => {
+    if (s.webmasterOnly) return user?.role === 'WEBMASTER';
     if (s.adminOnly) return isAdmin;
     if (s.permission) return isAdmin || Boolean(user?.permissions?.[s.permission]);
     return true;
