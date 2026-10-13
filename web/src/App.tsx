@@ -31,7 +31,7 @@ function App() {
         <aside className="sidebar">
           <div className="sidebar-sticky">
             <div className="sidebar-brand">
-              <span className="sidebar-brand-mark" />
+              <img className="sidebar-brand-mark" src="/elex-mark.png" alt="" />
               <span className="sidebar-brand-text">ELEX Portal</span>
             </div>
             <nav className="sidebar-nav">
@@ -57,20 +57,27 @@ function App() {
                   <span>Webmaster</span>
                 </NavLink>
               )}
+              {/* Phone bottom bar only: preferences, theme and sign out live behind this tab there. */}
+              <NavLink to="/preferences" className="mobile-only" aria-label="My account and settings">
+                <Avatar userId={user.id} displayName={user.displayName} hasAvatar={Boolean(user.avatarPath)} size={22} />
+                <span>Me</span>
+              </NavLink>
             </nav>
             <div className="sidebar-user">
               <div className="sidebar-user-row">
                 <Avatar userId={user.id} displayName={user.displayName} hasAvatar={Boolean(user.avatarPath)} />
-                <NavLink to="/settings/preferences" className="sidebar-username" aria-label={`${user.displayName} - preferences`}>
+                <NavLink to="/preferences" className="sidebar-username" aria-label={`${user.displayName} - preferences`}>
                   {user.displayName}
                 </NavLink>
               </div>
-              <NotificationBell />
-              <ThemeToggle />
-              <button className="secondary sidebar-signout" onClick={logout} aria-label="Sign out">
-                <SignOutIcon />
-                <span>Sign out</span>
-              </button>
+              <div className="sidebar-actions">
+                <NotificationBell />
+                <ThemeToggle />
+                <button className="secondary sidebar-signout" onClick={logout} aria-label="Sign out" title="Sign out">
+                  <SignOutIcon />
+                  <span>Sign out</span>
+                </button>
+              </div>
               <VersionBadge />
               <BugReportButton />
             </div>

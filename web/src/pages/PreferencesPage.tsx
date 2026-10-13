@@ -6,6 +6,7 @@ import TwoFactorPanel from '../components/TwoFactorPanel';
 import PasswordInput from '../components/PasswordInput';
 import Avatar from '../components/Avatar';
 import FileInput from '../components/FileInput';
+import MobileAccountActions from '../components/MobileAccountActions';
 
 export default function PreferencesPage() {
   const { user, setUser } = useAuth();
@@ -74,6 +75,7 @@ export default function PreferencesPage() {
   return (
     <div>
       <h1>My preferences</h1>
+      <MobileAccountActions />
       {message && <p className="muted">{message}</p>}
       {error && <p className="error">{error}</p>}
 

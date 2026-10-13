@@ -4,6 +4,10 @@ Newest entries first. Each push/merge gets exactly one entry - see
 `scripts/bump-version.mjs` for how the version number itself advances. A `+` marks a
 feature addition, a `-` marks a bug fix.
 
+## v1.3.6 - 2026-10-13
+
++ New ELEX brand colours and logo, a bottom tab bar on phones, jobs list with dates and prep progress, grouped settings, click-to-edit tables, contact cards and a reorganised job settings page
+
 ## v1.3.5 - 2026-10-13
 
 - Replaced browser pop-ups with in-app dialogs, 24-hour UK dates throughout, and fixed a batch of form and loading bugs

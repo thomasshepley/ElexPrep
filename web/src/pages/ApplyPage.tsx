@@ -1,9 +1,8 @@
 import { useState } from 'react';
-import { api, type BankDetails } from '../api/client';
+import { api } from '../api/client';
 import FileInput from '../components/FileInput';
 import SkillPicker from '../components/SkillPicker';
 import CertificationPicker from '../components/CertificationPicker';
-import BankDetailsForm from '../components/BankDetailsForm';
 
 const DOCUMENT_SLOTS = [
   { field: 'idDocument', label: 'Photo ID' },
@@ -18,11 +17,7 @@ export default function ApplyPage() {
   const [phone, setPhone] = useState('');
   const [skills, setSkills] = useState('');
   const [certifications, setCertifications] = useState('');
-  const [dayRate, setDayRate] = useState('');
   const [rightToWork, setRightToWork] = useState('');
-  const [gender, setGender] = useState('');
-  const [address, setAddress] = useState('');
-  const [bankDetails, setBankDetails] = useState<BankDetails | null>(null);
   const [notes, setNotes] = useState('');
   const [files, setFiles] = useState<Partial<Record<DocumentField, File>>>({});
   const [busy, setBusy] = useState(false);
@@ -40,11 +35,7 @@ export default function ApplyPage() {
       if (phone) form.append('phone', phone);
       if (skills) form.append('skills', skills);
       if (certifications) form.append('certifications', certifications);
-      if (dayRate) form.append('dayRate', dayRate);
       if (rightToWork) form.append('rightToWork', rightToWork);
-      if (gender) form.append('gender', gender);
-      if (address) form.append('address', address);
-      if (bankDetails) form.append('bankDetails', JSON.stringify(bankDetails));
       if (notes) form.append('notes', notes);
       for (const { field } of DOCUMENT_SLOTS) {
         const file = files[field];
@@ -64,7 +55,7 @@ export default function ApplyPage() {
       <div className="auth-page">
         <div className="auth-card">
           <div className="auth-brand">
-            <span className="auth-brand-mark" />
+            <img className="auth-brand-mark" src="/elex-mark.png" alt="" />
             <h1>Application received</h1>
             <p>Thanks, {fullName.split(' ')[0] || 'there'} - we'll be in touch once it's been reviewed.</p>
           </div>
@@ -77,9 +68,12 @@ export default function ApplyPage() {
     <div className="auth-page">
       <div className="auth-card auth-card-wide">
         <div className="auth-brand">
-          <span className="auth-brand-mark" />
+          <img className="auth-brand-mark" src="/elex-mark.png" alt="" />
           <h1>Join the ELEX crew</h1>
           <p>Apply for freelance work - we'll review your application and be in touch.</p>
+          <p className="muted" style={{ fontSize: 'var(--text-sm)', margin: 0 }}>
+            We only ask for the basics here. Your day rate, address and bank details are added once you're approved, from your own account.
+          </p>
         </div>
         <form onSubmit={submit}>
           <div className="row" style={{ flexWrap: 'wrap', gap: '1rem' }}>
@@ -95,21 +89,6 @@ export default function ApplyPage() {
               <label htmlFor="apply-phone">Phone</label>
               <input id="apply-phone" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="07700 900000" />
             </div>
-            <div className="field" style={{ flex: '1 1 10rem' }}>
-              <label htmlFor="apply-day-rate">Day rate</label>
-              <input id="apply-day-rate" value={dayRate} onChange={(e) => setDayRate(e.target.value)} placeholder="250" />
-            </div>
-          </div>
-
-          <div className="row" style={{ flexWrap: 'wrap', gap: '1rem' }}>
-            <div className="field" style={{ flex: '1 1 10rem' }}>
-              <label htmlFor="apply-gender">Gender (optional)</label>
-              <input id="apply-gender" value={gender} onChange={(e) => setGender(e.target.value)} />
-            </div>
-            <div className="field" style={{ flex: '1 1 14rem' }}>
-              <label htmlFor="apply-address">Address</label>
-              <input id="apply-address" value={address} onChange={(e) => setAddress(e.target.value)} />
-            </div>
           </div>
 
           <SkillPicker value={skills} onChange={setSkills} />
@@ -123,8 +102,6 @@ export default function ApplyPage() {
               placeholder="e.g. UK/EU citizen, has a valid visa"
             />
           </div>
-
-          <BankDetailsForm value={bankDetails} onChange={setBankDetails} />
 
           <CertificationPicker value={certifications} onChange={setCertifications} />
 

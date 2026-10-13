@@ -1,3 +1,13 @@
+export interface JobSummary {
+  startsAt: string | null;
+  endsAt: string | null;
+  crewCount: number;
+  fixtures: number;
+  cases: number;
+  labelsQueued: number;
+  labelsPrinted: number;
+}
+
 export interface Job {
   id: string;
   name: string;
@@ -18,6 +28,8 @@ export interface Job {
   crewFeaturesJson: string | null;
   discussionLocked: boolean;
   createdAt: string;
+  /** Only on the jobs list response. */
+  summary?: JobSummary;
 }
 
 export interface FixtureTypeRule {

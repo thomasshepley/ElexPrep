@@ -25,7 +25,7 @@ const ROUTE_TITLES: [pattern: string, title: string][] = [
   ['/settings/onedrive', 'OneDrive'],
   ['/settings/crew-portal', 'Crew Portal'],
   ['/settings/activity', 'Activity Log'],
-  ['/settings/preferences', 'My Preferences'],
+  ['/preferences', 'My Preferences'],
   ['/crew', 'My schedule'],
   ['/crew/jobs/:jobId', 'Job'],
   ['/crew/account', 'My account'],

@@ -3,6 +3,7 @@ import { api, type AdHocLabel, type CrewLabelRequest } from '../api/client';
 import LabelTypeForm, { TYPE_LABELS, type AdHocType } from './LabelTypeForm';
 import { WhoIcon } from './Icons';
 import { useDialog } from './Dialog';
+import InlineEdit from './InlineEdit';
 
 /**
  * One-off/ad hoc labels for a job, grouped into the same 3 sections crew think in when they
@@ -229,7 +230,7 @@ function LabelSection({
   };
 
   const updateQuantity = async (id: string, quantity: number) => {
-    if (!Number.isFinite(quantity) || quantity < 1) return;
+    if (!Number.isFinite(quantity) || quantity < 1) throw new Error('Quantity must be at least 1');
     await api.adHocLabels.update(jobId, id, { quantity });
     onChanged();
   };
@@ -242,12 +243,12 @@ function LabelSection({
   };
 
   const editableField = (item: AdHocLabel, key: string, placeholder: string, width: number, type: 'text' | 'number' = 'text') => (
-    <input
+    <InlineEdit
       type={type}
-      placeholder={placeholder}
-      defaultValue={String(item.content[key] ?? '')}
-      style={{ width }}
-      onBlur={(e) => updateContentField(item, key, e.target.value)}
+      label={placeholder}
+      value={item.content[key] == null ? '' : String(item.content[key])}
+      width={width}
+      onSave={(v) => updateContentField(item, key, v)}
     />
   );
 
@@ -320,7 +321,7 @@ function LabelSection({
       {sectionItems.length > 0 && (
         <>
           <p className="muted" style={{ marginTop: '1rem' }}>
-            Every field is editable in place (click and type, saves on blur).
+            Click any value to edit it - Enter or clicking away saves, Escape cancels.
           </p>
           <div className="table-scroll">
             <table>
@@ -345,13 +346,7 @@ function LabelSection({
                     </td>
                     <td>{renderEditableContent(i)}</td>
                     <td>
-                      <input
-                        type="number"
-                        min={1}
-                        defaultValue={i.quantity}
-                        style={{ width: 60 }}
-                        onBlur={(e) => updateQuantity(i.id, Number(e.target.value))}
-                      />
+                      <InlineEdit type="number" min={1} label="Quantity" value={i.quantity} width={40} onSave={(v) => updateQuantity(i.id, Number(v))} />
                     </td>
                     <td>
                       <button className="secondary" onClick={() => remove(i.id)}>

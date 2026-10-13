@@ -32,8 +32,38 @@ jobsRouter.get('/', async (req, res) => {
   const jobs = await prisma.job.findMany({
     where: isAdmin ? undefined : { isPublic: true },
     orderBy: { createdAt: 'desc' },
+    include: { _count: { select: { fixtures: true, caseGroups: true, crewAssignments: true } } },
   });
-  res.json(jobs);
+  const ids = jobs.map((j) => j.id);
+  const [queueCounts, opportunities] = await Promise.all([
+    prisma.printQueueItem.groupBy({ by: ['jobId', 'status'], where: { jobId: { in: ids } }, _count: true }),
+    prisma.currentRmsOpportunity.findMany({
+      where: { rmsId: { in: jobs.filter((j) => j.currentRmsOpportunityId).map((j) => Number(j.currentRmsOpportunityId)) } },
+      select: { rmsId: true, startsAt: true, endsAt: true },
+    }),
+  ]);
+  const oppById = new Map(opportunities.map((o) => [String(o.rmsId), o]));
+  // A light per-job summary for the jobs list cards: effective dates (the job's own, falling
+  // back to the opportunity's), crew count, and how far prep has got.
+  res.json(
+    jobs.map(({ _count, ...job }) => {
+      const opp = job.currentRmsOpportunityId ? oppById.get(job.currentRmsOpportunityId) : undefined;
+      const queue = queueCounts.filter((q) => q.jobId === job.id);
+      const count = (status: string) => queue.find((q) => q.status === status)?._count ?? 0;
+      return {
+        ...job,
+        summary: {
+          startsAt: job.startsAt ?? opp?.startsAt ?? null,
+          endsAt: job.endsAt ?? opp?.endsAt ?? null,
+          crewCount: _count.crewAssignments,
+          fixtures: _count.fixtures,
+          cases: _count.caseGroups,
+          labelsQueued: count('PENDING') + count('CONFIRMED'),
+          labelsPrinted: count('PRINTED'),
+        },
+      };
+    })
+  );
 });
 
 // Jobs can no longer be created directly - every job enters the portal by onboarding a

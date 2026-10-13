@@ -81,7 +81,7 @@ export default function OnboardCompletePage() {
       <div className="auth-page">
         <div className="auth-card">
           <div className="auth-brand">
-            <span className="auth-brand-mark" />
+            <img className="auth-brand-mark" src="/elex-mark.png" alt="" />
             <h1>Link not found</h1>
             <p className="muted">This onboarding link isn't valid - it may have expired, already been used, or never been approved.</p>
           </div>
@@ -95,7 +95,7 @@ export default function OnboardCompletePage() {
       <div className="auth-page">
         <div className="auth-card">
           <div className="auth-brand">
-            <span className="auth-brand-mark" />
+            <img className="auth-brand-mark" src="/elex-mark.png" alt="" />
             <h1>Already set up</h1>
             <p className="muted">
               This account's already been created - <a href="/login">sign in</a> instead.
@@ -110,7 +110,7 @@ export default function OnboardCompletePage() {
     <div className="auth-page">
       <div className="auth-card auth-card-wide">
         <div className="auth-brand">
-          <span className="auth-brand-mark" />
+          <img className="auth-brand-mark" src="/elex-mark.png" alt="" />
           <h1>Welcome, {invite.fullName.split(' ')[0]}</h1>
           <p>Set up your login and tell us a bit about yourself.</p>
         </div>

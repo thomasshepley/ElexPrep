@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, type CaseGroup } from '../api/client';
 import { useDialog } from './Dialog';
+import InlineEdit from './InlineEdit';
 
 export default function CasesPanel({ jobId, groupId = null }: { jobId: string; groupId?: string | null }) {
   const dialog = useDialog();
@@ -114,8 +115,8 @@ export default function CasesPanel({ jobId, groupId = null }: { jobId: string; g
         </button>
       </div>
       <p className="muted">
-        Groups fixtures into cases using the units-per-case rule for each fixture type. Every
-        field below is editable in place (click and type, saves on blur); use Regenerate after
+        Groups fixtures into cases using the units-per-case rule for each fixture type. Click any
+        value below to edit it; use Regenerate after
         importing a new patch or editing case rules - it replaces every row here, so add any
         one-off cases below afterwards rather than before.
       </p>
@@ -164,19 +165,13 @@ export default function CasesPanel({ jobId, groupId = null }: { jobId: string; g
                       <input type="checkbox" checked={selected.has(c.id)} onChange={() => toggleSelected(c.id)} />
                     </td>
                     <td>
-                      <input
-                        defaultValue={c.fixtureType}
-                        onBlur={(e) => updateField(c, 'fixtureType', e.target.value)}
-                      />
+                      <InlineEdit label="Fixture type" value={c.fixtureType} onSave={(v) => updateField(c, 'fixtureType', v)} />
                     </td>
                     <td>
-                      <input defaultValue={c.label} onBlur={(e) => updateField(c, 'label', e.target.value)} />
+                      <InlineEdit label="Case label" value={c.label} onSave={(v) => updateField(c, 'label', v)} />
                     </td>
                     <td>
-                      <input
-                        defaultValue={c.location ?? ''}
-                        onBlur={(e) => updateField(c, 'location', e.target.value)}
-                      />
+                      <InlineEdit label="Location" value={c.location} onSave={(v) => updateField(c, 'location', v)} />
                     </td>
                     <td>
                       <button className="secondary" onClick={() => remove(c.id)}>

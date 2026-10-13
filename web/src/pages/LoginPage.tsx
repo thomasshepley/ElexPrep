@@ -75,7 +75,7 @@ export default function LoginPage() {
       <div className="auth-page">
         <div className="auth-card">
           <div className="auth-brand">
-            <span className="auth-brand-mark" />
+            <img className="auth-brand-mark" src="/elex-mark.png" alt="" />
             <h1>ELEX Portal</h1>
             <p>{useBackupCode ? 'Enter one of your backup codes.' : 'Enter the 6-digit code from your authenticator app.'}</p>
           </div>
@@ -119,7 +119,7 @@ export default function LoginPage() {
     <div className="auth-page">
       <div className="auth-card">
         <div className="auth-brand">
-          <span className="auth-brand-mark" />
+          <img className="auth-brand-mark" src="/elex-mark.png" alt="" />
           <h1>ELEX Portal</h1>
           <p>{needsSetup ? 'First run - create the admin account.' : 'Sign in to continue.'}</p>
         </div>

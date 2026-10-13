@@ -37,7 +37,7 @@ export default function CrewLayout() {
         <aside className="sidebar">
           <div className="sidebar-sticky">
             <div className="sidebar-brand">
-              <span className="sidebar-brand-mark" />
+              <img className="sidebar-brand-mark" src="/elex-mark.png" alt="" />
               <span className="sidebar-brand-text">ELEX Portal</span>
             </div>
             <nav className="sidebar-nav">
@@ -57,12 +57,14 @@ export default function CrewLayout() {
                   {user.displayName}
                 </NavLink>
               </div>
-              <NotificationBell />
-              <ThemeToggle />
-              <button className="secondary sidebar-signout" onClick={logout} aria-label="Sign out">
-                <SignOutIcon />
-                <span>Sign out</span>
-              </button>
+              <div className="sidebar-actions">
+                <NotificationBell />
+                <ThemeToggle />
+                <button className="secondary sidebar-signout" onClick={logout} aria-label="Sign out" title="Sign out">
+                  <SignOutIcon />
+                  <span>Sign out</span>
+                </button>
+              </div>
               <VersionBadge />
               <BugReportButton />
             </div>
