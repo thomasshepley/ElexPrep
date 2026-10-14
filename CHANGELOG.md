@@ -4,6 +4,10 @@ Newest entries first. Each push/merge gets exactly one entry - see
 `scripts/bump-version.mjs` for how the version number itself advances. A `+` marks a
 feature addition, a `-` marks a bug fix.
 
+## v1.7.0 - 2026-10-14
+
++ Behind-the-scenes improvements to how the site is updated
+
 ## v1.6.9 - 2026-10-14
 
 + More groundwork for a new prep planning feature

@@ -48,6 +48,7 @@ import { jobDiscussionRouter } from './routes/jobDiscussion';
 import { dashboardRouter } from './routes/dashboard';
 import { notificationsRouter } from './routes/notifications';
 import { lockdownRouter } from './routes/lockdown';
+import { siteUpdateRouter } from './routes/siteUpdate';
 import { prepRouter } from './routes/prep';
 import { cableRouter, jobCableRouter } from './routes/cable';
 import { riggingRouter, jobRiggingRouter } from './routes/rigging';
@@ -162,6 +163,7 @@ app.use('/api/agent', agentRouter);
 app.use('/api/activity', activityRouter);
 app.use('/api/permissions', permissionsRouter);
 app.use('/api/lockdown', lockdownRouter);
+app.use('/api/site-update', siteUpdateRouter);
 // Prep bays check job access themselves (crew see the jobs they are on, a bay screen its own
 // job), so they sit outside /api/jobs/:jobId's public-job rule.
 app.use('/api/prep', prepRouter);

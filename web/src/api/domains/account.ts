@@ -101,9 +101,38 @@ export const accountApi = {
       return request<{ entries: ActivityLogEntry[]; nextCursor: string | null }>(`/activity${qs ? `?${qs}` : ''}`);
     },
   },
+  siteUpdate: {
+    status: () => request<SiteUpdateStatus>('/site-update'),
+    check: () => request<SiteUpdateStatus>('/site-update/check', { method: 'POST' }),
+    update: (data: { maintenance: boolean; password: string; code?: string }) =>
+      request<SiteUpdateStatus>('/site-update/update', { method: 'POST', body: JSON.stringify(data) }),
+  },
   lockdown: {
     setDevelopment: (enabled: boolean) =>
       request<void>('/lockdown/development', { method: 'POST', body: JSON.stringify({ enabled }) }),
     setFull: (enabled: boolean) => request<void>('/lockdown/full', { method: 'POST', body: JSON.stringify({ enabled }) }),
   },
 };
+
+/** What the server's update agent last reported (see server/src/routes/siteUpdate.ts). */
+export interface SiteUpdateStatus {
+  installed: boolean;
+  agentSeenAt: string | null;
+  currentVersion: string;
+  state: 'idle' | 'checking' | 'updating' | 'done' | 'failed';
+  /** It said it was running, but long ago: the agent stopped mid-way. */
+  stale: boolean;
+  busy: boolean;
+  stateAt: string | null;
+  info: Partial<
+    Record<
+      'action' | 'result' | 'maintenance' | 'branch' | 'upstream' | 'behind' | 'ahead' | 'dirty' | 'currentVersion' | 'incomingVersion' | 'head' | 'fromVersion' | 'toVersion' | 'startedAt' | 'finishedAt' | 'by',
+      string
+    >
+  >;
+  pendingSince: string | null;
+  log: string;
+  incoming: { sha: string; subject: string }[];
+  incomingChangelog: { version: string; date: string; notes: string[]; sections: { title: string; notes: string[] }[] }[];
+  history: { at: string; maintenance: boolean; result: string; from: string; to: string; by: string | null }[];
+}

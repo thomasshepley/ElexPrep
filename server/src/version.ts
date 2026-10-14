@@ -28,7 +28,7 @@ function readSafe(filePath: string): string | null {
   }
 }
 
-function parseChangelog(markdown: string): ChangelogEntry[] {
+export function parseChangelog(markdown: string): ChangelogEntry[] {
   const entries: ChangelogEntry[] = [];
   const headingRe = /^## v(\S+) - (\d{4}-\d{2}-\d{2})\s*$/gm;
   const matches = [...markdown.matchAll(headingRe)];

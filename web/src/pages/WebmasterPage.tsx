@@ -7,6 +7,7 @@ import { useToast } from '../components/Toast';
 import { formatDateTime, formatTime } from '../utils/format';
 import { bugReportsToMarkdown, downloadMarkdown } from '../bugReport/exportMarkdown';
 import ActivityLogPage from './ActivityLogPage';
+import SiteUpdatePanel from '../components/SiteUpdatePanel';
 
 function SiteControlsPanel() {
   const { user, setUser } = useAuth();
@@ -172,7 +173,12 @@ export default function WebmasterPage() {
           </button>
         ))}
       </div>
-      {tab === 'controls' && <SiteControlsPanel />}
+      {tab === 'controls' && (
+        <>
+          <SiteUpdatePanel />
+          <SiteControlsPanel />
+        </>
+      )}
       {tab === 'activity' && <ActivityLogPage />}
       {tab === 'bugs' && (
       <>

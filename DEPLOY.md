@@ -211,6 +211,39 @@ put the maintenance page up for the switch-over:
 If the new version doesn't come up within three minutes, the script stops, prints the app's
 recent logs, and (with `--maintenance`) leaves the maintenance page up until you fix it.
 
+### Updating from the Webmaster page
+
+The webmaster can also check for and run updates from **Webmaster > Site controls > Site
+updates**, without SSH. The app runs in a container and is deliberately never given the
+Docker socket (that would hand anyone who broke into the app the whole server), so a small
+agent on the server does the work instead:
+
+1. the page writes a one-word request (`check`, `update` or `update-maintenance`) into
+   `data/ops/`, which the container shares with the server;
+2. a systemd path unit notices it and runs `scripts/update-agent.sh` as you, which refuses
+   anything else and runs `git fetch` (for a check) or `updatesite` (for an update);
+3. the agent writes its progress and log back into `data/ops/`, and the page shows them live.
+
+Set it up once, as the user that normally runs `updatesite` (it needs to be in the `docker`
+group and able to `git pull`):
+
+```bash
+./scripts/install-update-agent.sh
+```
+
+Then press **Check for updates** on the Webmaster page. It shows what's waiting on GitHub,
+including the changelog for each new version. **Update** asks for your password again (and
+your authenticator code if 2FA is on). Tick **Show the maintenance page** for a big update;
+everyone, you included, sees the maintenance page during the swap, and the Webmaster page
+comes back with the result when the site does. If an update fails with the maintenance page
+on, the agent turns it off again, since there'd be no way back in from the web; the site
+stays on the old version and the log says why.
+
+The page refuses to update when the server has commits of its own or files changed by hand,
+since a pull couldn't fast-forward; sort those out over SSH. To check on the agent:
+`systemctl status elexprep-update.path`, and `journalctl -u elexprep-update.service` for its
+runs. To take it out again: `./scripts/install-update-agent.sh --remove`.
+
 ### Maintenance mode
 
 For anything else that needs the site quiet (restoring a backup, server work), switch the
