@@ -47,6 +47,8 @@ export interface JobRigging {
   trusses: { id: string; positionName: string; fromPlot: boolean; profileId: string | null; fixtures: { id: string; label: string; type: string; weightKg: number | null; x: number; placed: boolean }[]; cableKgPerM: number; dropKg: number }[];
   assumptions: string[];
   plotName: string | null;
+  /** Why no rigging points came in from a plot, when none did. */
+  plotNote: string | null;
   venue: string | null;
   venueSetApplied: boolean;
   overrides: RigOverrides;

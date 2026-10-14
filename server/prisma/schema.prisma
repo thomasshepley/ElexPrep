@@ -1263,6 +1263,9 @@ model PlotExtraction {
   job         Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
   sourceName  String
   sourceHash  String
+  /// Which plot this was read from and which version of it (UPLOAD:<id>, or ONEDRIVE:<itemId>
+  /// plus its modified time), so a plot that hasn't changed is never downloaded again.
+  sourceKey   String?
   /// PDF_TEXT | EXPORT
   method      String
   resultJson  String
@@ -1270,6 +1273,7 @@ model PlotExtraction {
   confirmedAt DateTime?
 
   @@unique([jobId, sourceHash])
+  @@index([jobId, sourceKey])
 }
 
 /// A truss type for the rigging calculator: its own weight and the maker's allowable load table.

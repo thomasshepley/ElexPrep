@@ -20,23 +20,32 @@ import { requirePermission } from '../permissions';
 import { getCurrentRmsConfig } from '../currentRms/config';
 import { fetchPickListSnapshot } from '../currentRms/sync';
 import { plotsDir } from './plots';
-import { hashBytes, readPlotGeometry, type PlotGeometry } from '../cable/plotRead';
+import { PLOT_READER_VERSION, hashBytes, readPlotGeometry, type PlotGeometry } from '../cable/plotRead';
 import { getOneDriveConfig } from '../oneDrive/config';
 import { findSharedCadPdf } from '../oneDrive/cad';
 import { streamOneDriveFile } from '../oneDrive/client';
 
+export interface CadPlot {
+  source: 'UPLOAD' | 'ONEDRIVE';
+  ref: string;
+  name: string;
+  note?: string;
+  /** When OneDrive says the file last changed, so a new version is read again. */
+  modifiedAt?: string | null;
+}
+
 /** Every CAD plot on the job, wherever it lives: uploaded on the Plots tab, the CAD PDF found in
  * the job's OneDrive folder, or a OneDrive file marked as a CAD plot. Same list the Plots tab's
  * CAD view shows. */
-async function jobCadPlots(jobId: string): Promise<{ source: 'UPLOAD' | 'ONEDRIVE'; ref: string; name: string; note?: string }[]> {
+export async function jobCadPlots(jobId: string): Promise<CadPlot[]> {
   const job = await prisma.job.findUnique({ where: { id: jobId }, select: { oneDriveFolderId: true } });
   const [uploads, cadPdf, shares] = await Promise.all([
     prisma.plot.findMany({ where: { jobId }, select: { id: true, originalName: true }, orderBy: { createdAt: 'desc' } }),
     job ? findSharedCadPdf(job).catch(() => null) : Promise.resolve(null),
     prisma.oneDriveShare.findMany({ where: { jobId, isCadPlot: true, isFolder: false }, orderBy: { sharedAt: 'desc' } }),
   ]);
-  const out: { source: 'UPLOAD' | 'ONEDRIVE'; ref: string; name: string; note?: string }[] = [];
-  if (cadPdf) out.push({ source: 'ONEDRIVE', ref: cadPdf.itemId, name: cadPdf.name, note: 'OneDrive CAD folder' });
+  const out: CadPlot[] = [];
+  if (cadPdf) out.push({ source: 'ONEDRIVE', ref: cadPdf.itemId, name: cadPdf.name, note: 'OneDrive CAD folder', modifiedAt: cadPdf.modifiedAt?.toISOString() ?? null });
   for (const s of shares) if (s.itemId !== cadPdf?.itemId) out.push({ source: 'ONEDRIVE', ref: s.itemId, name: s.itemName, note: 'OneDrive' });
   for (const u of uploads) out.push({ source: 'UPLOAD', ref: u.id, name: u.originalName, note: 'Uploaded' });
   return out;
@@ -298,12 +307,14 @@ async function kitCables(jobId: string): Promise<{ linked: boolean; lines: { nam
 
 jobCableRouter.get('/:jobId/cable', async (req, res) => {
   const jobId = req.params.jobId;
+  // The plot first, so the positions below already carry its truss sizes and motors.
+  await ensurePlotRead(jobId, req.user!.id);
   const [built, plan, plots, kit, extraction] = await Promise.all([
     buildInputs(jobId),
     prisma.cablePlan.findUnique({ where: { jobId } }),
     jobCadPlots(jobId),
     kitCables(jobId),
-    prisma.plotExtraction.findFirst({ where: { jobId }, orderBy: { createdAt: 'desc' } }),
+    currentPlotExtraction(jobId),
   ]);
   res.json({
     inputs: {
@@ -421,8 +432,143 @@ jobCableRouter.get('/:jobId/cable/export.csv', async (req, res) => {
   res.send(rows.map((r) => r.map(csvCell).join(',')).join('\n'));
 });
 
-/** Reads truss geometry from one of the job's CAD plots (uploaded or on OneDrive) and fills in
- * positions that match. */
+class PlotFetchError extends Error {}
+
+async function plotBytes(jobId: string, plot: CadPlot): Promise<Uint8Array> {
+  try {
+    if (plot.source === 'UPLOAD') {
+      const row = await prisma.plot.findFirst({ where: { id: plot.ref, jobId } });
+      if (!row) throw new Error('that plot is no longer on the job');
+      return new Uint8Array(await fs.promises.readFile(path.join(plotsDir, row.fileName)));
+    }
+    return await readOneDriveBytes(plot.ref);
+  } catch (err) {
+    throw new PlotFetchError((err as Error).message);
+  }
+}
+
+/** One plot, and one version of it, is only ever downloaded and read once. */
+const plotKey = (p: CadPlot) => `${p.source}:${p.ref}${p.modifiedAt ? `@${p.modifiedAt}` : ''}:v${PLOT_READER_VERSION}`;
+
+const geometryOf = (e: { resultJson: string }): PlotGeometry | null => {
+  try {
+    return JSON.parse(e.resultJson) as PlotGeometry;
+  } catch {
+    return null;
+  }
+};
+const hasPoints = (e: { resultJson: string }) => (geometryOf(e)?.points.length ?? 0) > 0;
+
+/** Reads one CAD plot, from the cache when this version has been read before. A PDF that can't
+ * be read is remembered as having no points (when `rememberFailure`) so it isn't fetched again. */
+async function readCadPlot(jobId: string, plot: CadPlot, rememberFailure: boolean) {
+  const key = plotKey(plot);
+  const cached = await prisma.plotExtraction.findFirst({ where: { jobId, sourceKey: key }, orderBy: { createdAt: 'desc' } });
+  if (cached) return cached;
+  const data = await plotBytes(jobId, plot);
+  const hash = hashBytes(data);
+  const same = await prisma.plotExtraction.findUnique({ where: { jobId_sourceHash: { jobId, sourceHash: hash } } });
+  if (same) return prisma.plotExtraction.update({ where: { id: same.id }, data: { sourceKey: key, sourceName: plot.name } });
+  let geometry: PlotGeometry;
+  try {
+    geometry = await readPlotGeometry(data);
+  } catch (err) {
+    if (!rememberFailure) throw err;
+    geometry = { points: [], trusses: [], lxPanelFound: false, notes: [`Could not read this PDF: ${(err as Error).message}`] };
+  }
+  return prisma.plotExtraction.create({ data: { jobId, sourceName: plot.name, sourceHash: hash, sourceKey: key, method: 'PDF_TEXT', resultJson: JSON.stringify(geometry) } });
+}
+
+/**
+ * The plot's trusses onto the job's positions: length, where the loom comes up and how many
+ * motors. A truss on the plot that the patch doesn't use yet becomes a position of its own, so
+ * its motors are still counted. Done by hand (`force`) it overwrites what was typed in; done
+ * automatically it only fills in what nobody has set.
+ */
+async function applyPlotToPositions(jobId: string, geometry: PlotGeometry, force: boolean) {
+  const { positions } = await syncPositions(jobId);
+  const applied: string[] = [];
+  for (const t of geometry.trusses) {
+    const key = t.position.toLowerCase();
+    // A stage prefix ("Main: DS") still matches the plot's "DS".
+    const match = positions.find((p) => p.name.toLowerCase() === key || p.name.toLowerCase().endsWith(`: ${key}`));
+    const motors = geometry.points.filter((p) => !p.cablePick && p.position.toLowerCase() === key).length;
+    if (!match) {
+      await prisma.jobPosition.create({ data: { jobId, name: t.position, kind: 'TRUSS', lengthM: t.lengthM, pickOffsetM: t.pickOffsetM, motors, source: 'PLOT' } });
+      applied.push(t.position);
+      continue;
+    }
+    const keep = !force && match.source === 'MANUAL';
+    await prisma.jobPosition.update({
+      where: { id: match.id },
+      data: {
+        kind: 'TRUSS',
+        ...(keep ? {} : { lengthM: t.lengthM, pickOffsetM: t.pickOffsetM, source: 'PLOT' }),
+        ...(force || match.motors === 0 ? { motors } : {}),
+      },
+    });
+    applied.push(match.name);
+  }
+  return applied;
+}
+
+const autoReads = new Map<string, Promise<{ plots: number; errors: string[] }>>();
+
+/**
+ * Makes sure the job's CAD plot has been read, without anyone pressing a button: the first plot
+ * (OneDrive CAD folder first, then other OneDrive plots, then uploads) with a Rigging Points
+ * table. Each version of a plot is fetched once, then served from the cache.
+ */
+export function ensurePlotRead(jobId: string, userId?: string) {
+  let run = autoReads.get(jobId);
+  if (!run) {
+    run = autoReadPlot(jobId, userId).finally(() => autoReads.delete(jobId));
+    autoReads.set(jobId, run);
+  }
+  return run;
+}
+
+async function autoReadPlot(jobId: string, userId?: string) {
+  const plots = await jobCadPlots(jobId).catch(() => [] as CadPlot[]);
+  const errors: string[] = [];
+  for (const plot of plots) {
+    try {
+      const extraction = await readCadPlot(jobId, plot, true);
+      const geometry = geometryOf(extraction);
+      if (!geometry?.points.length) continue;
+      if (!extraction.confirmedAt) {
+        const applied = await applyPlotToPositions(jobId, geometry, false);
+        await prisma.plotExtraction.update({ where: { id: extraction.id }, data: { confirmedAt: new Date() } });
+        await logActivity('cable.plot_read', `${plot.name} (read automatically): ${applied.length ? applied.join(', ') : 'no trusses'}`, jobId, userId);
+      }
+      break;
+    } catch (err) {
+      errors.push(`${plot.name}: ${(err as Error).message}`);
+    }
+  }
+  return { plots: plots.length, errors };
+}
+
+/** The plot reading to use: the most recently applied one that found rigging points, by the
+ * current reader where there is one. */
+export async function currentPlotExtraction(jobId: string) {
+  const all = await prisma.plotExtraction.findMany({ where: { jobId }, orderBy: { createdAt: 'desc' }, take: 30 });
+  const current = all.filter((e) => e.sourceHash.endsWith(`:v${PLOT_READER_VERSION}`));
+  const pool = [current.filter(hasPoints), all.filter(hasPoints), current, all].find((l) => l.length) ?? [];
+  return [...pool].sort((a, b) => +(b.confirmedAt ?? b.createdAt) - +(a.confirmedAt ?? a.createdAt))[0] ?? null;
+}
+
+/** Why the rig has no points from a plot, in words for the page. */
+export async function plotStatusNote(jobId: string, auto: { plots: number; errors: string[] }) {
+  if (auto.plots === 0) return 'This job has no CAD plot yet. Upload one on the Plots tab or put it in the job\'s OneDrive CAD folder, and its rigging points come in by themselves.';
+  if (auto.errors.length) return `The CAD plot could not be fetched: ${auto.errors.join('; ')}`;
+  const latest = await currentPlotExtraction(jobId);
+  const why = latest ? geometryOf(latest)?.notes[0] : null;
+  return `None of the job's CAD plots has a Rigging Points table that could be read.${why ? ` ${why}` : ''}`;
+}
+
+/** Reads one of the job's CAD plots (uploaded or on OneDrive) on request, and fills in the
+ * positions that match, overwriting what was typed in. */
 jobCableRouter.post('/:jobId/cable/read-plot', async (req, res) => {
   const jobId = req.params.jobId;
   const source = req.body?.source === 'ONEDRIVE' ? 'ONEDRIVE' : 'UPLOAD';
@@ -430,43 +576,15 @@ jobCableRouter.post('/:jobId/cable/read-plot', async (req, res) => {
   // Only a plot this job actually has, never an arbitrary OneDrive item.
   const plot = (await jobCadPlots(jobId)).find((p) => p.source === source && p.ref === ref);
   if (!plot) return res.status(404).json({ error: 'not found' });
-  let data: Uint8Array;
+  let extraction;
   try {
-    if (source === 'UPLOAD') {
-      const row = await prisma.plot.findFirst({ where: { id: ref, jobId } });
-      if (!row) return res.status(404).json({ error: 'not found' });
-      data = new Uint8Array(await fs.promises.readFile(path.join(plotsDir, row.fileName)));
-    } else {
-      data = await readOneDriveBytes(ref);
-    }
+    extraction = await readCadPlot(jobId, plot, false);
   } catch (err) {
-    return res.status(502).json({ error: `Could not fetch that plot: ${(err as Error).message}` });
+    if (err instanceof PlotFetchError) return res.status(502).json({ error: `Could not fetch that plot: ${err.message}` });
+    return res.status(422).json({ error: `Could not read that PDF: ${(err as Error).message}` });
   }
-  const hash = hashBytes(data);
-  let extraction = await prisma.plotExtraction.findUnique({ where: { jobId_sourceHash: { jobId, sourceHash: hash } } });
-  if (!extraction) {
-    let geometry: PlotGeometry;
-    try {
-      geometry = await readPlotGeometry(data);
-    } catch (err) {
-      return res.status(422).json({ error: `Could not read that PDF: ${(err as Error).message}` });
-    }
-    extraction = await prisma.plotExtraction.create({ data: { jobId, sourceName: plot.name, sourceHash: hash, method: 'PDF_TEXT', resultJson: JSON.stringify(geometry) } });
-  }
-  const geometry = JSON.parse(extraction.resultJson) as PlotGeometry;
-  const { positions } = await syncPositions(jobId);
-  const applied: string[] = [];
-  for (const t of geometry.trusses) {
-    const key = t.position.toLowerCase();
-    // A stage prefix ("Main: DS") still matches the plot's "DS".
-    const match = positions.find((p) => p.name.toLowerCase() === key || p.name.toLowerCase().endsWith(`: ${key}`));
-    if (!match) continue;
-    await prisma.jobPosition.update({
-      where: { id: match.id },
-      data: { lengthM: t.lengthM, pickOffsetM: t.pickOffsetM, kind: 'TRUSS', source: 'PLOT' },
-    });
-    applied.push(match.name);
-  }
+  const geometry = geometryOf(extraction)!;
+  const applied = await applyPlotToPositions(jobId, geometry, true);
   await prisma.plotExtraction.update({ where: { id: extraction.id }, data: { confirmedAt: new Date() } });
   await logActivity('cable.plot_read', `${plot.name}: ${applied.length ? applied.join(', ') : 'no matching positions'}`, jobId, req.user!.id);
   res.json({ geometry, applied });

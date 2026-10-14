@@ -96,23 +96,16 @@ export default function CableTab({ jobId }: { jobId: string }) {
           <li className={data.plot ? 'is-ok' : data.inputs.plots.length ? 'is-partial' : 'is-missing'}>
             <strong>Plot:</strong>{' '}
             {data.inputs.plots.length === 0 && 'no CAD plot on the job yet (upload one on the Plots tab, or put it in the job\'s OneDrive CAD folder). Truss sizes can be typed in below.'}
-            {data.inputs.plots.map((p) => (
-              <button
-                key={`${p.source}:${p.ref}`}
-                type="button"
-                className="secondary cable-inline-button"
-                disabled={busy !== null}
-                onClick={() => run('plot', () => api.cable.readPlot(jobId, p.source, p.ref), 'Read the plot')}
-              >
-                {busy === 'plot' ? 'Reading…' : `Read truss sizes from ${p.name}`}
-                {p.note && <span className="muted"> ({p.note})</span>}
-              </button>
-            ))}
             {data.plot && (
-              <div className="muted">
-                Last read {data.plot.sourceName} on {formatDateTime(data.plot.createdAt)}:{' '}
+              <div>
+                Read by itself from {data.plot.sourceName}:{' '}
                 {data.plot.geometry.trusses.length
-                  ? data.plot.geometry.trusses.map((t) => `${t.position} ${t.lengthM} m${t.pickOffsetM != null ? `, pick ${t.pickOffsetM} m off the end` : ''}`).join('; ')
+                  ? data.plot.geometry.trusses
+                      .map((t) => {
+                        const motors = t.points.length;
+                        return `${t.position} ${t.lengthM} m, ${motors} motor${motors === 1 ? '' : 's'}${t.pickOffsetM != null ? `, pick ${t.pickOffsetM} m off the end` : ''}`;
+                      })
+                      .join('; ')
                   : 'no trusses found'}
                 .
                 <ul className="cable-notes">
@@ -120,6 +113,23 @@ export default function CableTab({ jobId }: { jobId: string }) {
                     <li key={n}>{n}</li>
                   ))}
                 </ul>
+              </div>
+            )}
+            {data.inputs.plots.length > 0 && (
+              <div className="cable-plot-actions">
+                <span className="muted">{data.plot ? 'Read again, replacing sizes typed in below:' : 'Read from:'}</span>
+                {data.inputs.plots.map((p) => (
+                  <button
+                    key={`${p.source}:${p.ref}`}
+                    type="button"
+                    className="secondary cable-inline-button"
+                    disabled={busy !== null}
+                    onClick={() => run('plot', () => api.cable.readPlot(jobId, p.source, p.ref), 'Read the plot')}
+                  >
+                    {busy === 'plot' ? 'Reading…' : p.name}
+                    {p.note && <span className="muted"> ({p.note})</span>}
+                  </button>
+                ))}
               </div>
             )}
           </li>

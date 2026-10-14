@@ -60,7 +60,8 @@ export default function RiggingTab({ jobId, jobName }: { jobId: string; jobName:
   const [error, setError] = useState<string | null>(null);
   const [rig, setRig] = useState<Rig | null>(null);
   const [overrides, setOverrides] = useState<RigOverrides>({});
-  const [view, setViewState] = useState<View>(() => readView() ?? (phone ? 'cards' : 'plan'));
+  // Phones always open on the point cards; bigger screens open on the view used last.
+  const [view, setViewState] = useState<View>(() => (phone ? 'cards' : readView() ?? 'plan'));
   const [selectedPoint, setSelectedPoint] = useState<string | null>(null);
   const [selectedTruss, setSelectedTruss] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -83,8 +84,17 @@ export default function RiggingTab({ jobId, jobName }: { jobId: string; jobName:
       .catch((e) => setError((e as Error).message));
   }, [jobId, apply]);
 
+  // Turning into a phone-sized window (or back) switches to that size's default.
+  const wasPhone = useRef(phone);
+  useEffect(() => {
+    if (wasPhone.current === phone) return;
+    wasPhone.current = phone;
+    setViewState(phone ? 'cards' : readView() ?? 'plan');
+  }, [phone]);
+
   const setView = (v: View) => {
     setViewState(v);
+    if (phone) return;
     try {
       localStorage.setItem(VIEW_KEY, v);
     } catch {
@@ -202,6 +212,12 @@ export default function RiggingTab({ jobId, jobName }: { jobId: string; jobName:
         <strong>Beta, admins only.</strong> {data.disclaimer}
       </p>
 
+      {data.plotNote && (rig.points.length > 0 || rig.trusses.length > 0) && (
+        <p className="rig-plot-note" role="status">
+          {data.plotNote}
+        </p>
+      )}
+
       <div className="rig-toolbar">
         <div className="tabs tabs-sub rig-views" role="tablist" aria-label="View">
           {(['plan', 'elevation', 'cards'] as View[]).map((v) => (
@@ -260,10 +276,7 @@ export default function RiggingTab({ jobId, jobName }: { jobId: string; jobName:
 
       {rig.points.length === 0 && rig.trusses.length === 0 ? (
         <section className="panel">
-          <p>
-            Nothing to work out yet. Read the job's CAD plot on the Cable (beta) tab to bring in its rigging points and trusses, or import a patch with a Position
-            column so the trusses appear here.
-          </p>
+          <p>Nothing to work out yet. {data.plotNote ?? 'Import a patch with a Position column so the trusses appear here.'}</p>
         </section>
       ) : (
         <div className={`rig-layout${view === 'plan' ? '' : ' is-wide'}`}>

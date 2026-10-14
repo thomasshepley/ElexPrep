@@ -15,7 +15,7 @@ import {
   type TrussProfileLike,
 } from '@elexprep/shared';
 import { prisma } from '../db';
-import { fixtureProfiles, getCableRules, syncPositions } from '../routes/cable';
+import { currentPlotExtraction, fixtureProfiles, getCableRules, syncPositions } from '../routes/cable';
 import type { PlotGeometry } from '../cable/plotRead';
 
 /** Company-wide rigging settings (Settings > Rigging). */
@@ -282,7 +282,7 @@ export async function buildRig(jobId: string): Promise<BuiltRig> {
     fixtureProfiles(),
     getCableRules(),
     prisma.riggingPlan.findUnique({ where: { jobId } }),
-    prisma.plotExtraction.findFirst({ where: { jobId }, orderBy: { createdAt: 'desc' } }),
+    currentPlotExtraction(jobId),
     prisma.job.findUnique({ where: { id: jobId }, select: { venue: true } }),
     syncPositions(jobId),
   ]);
@@ -336,7 +336,7 @@ export async function buildRig(jobId: string): Promise<BuiltRig> {
       point.directLoads = [];
       return point;
     });
-  if (!geometry) assumptions.push('No plot has been read yet: read the CAD plot on the Cable (beta) tab to bring in its rigging points, or add points by hand.');
+  if (!geometry?.points.length) assumptions.push('No rigging points from a CAD plot yet: add points by hand, or add the plot to the job and they come in by themselves.');
   if (points.some((p) => p.kind === 'hoist' && !p.capacityKg)) assumptions.push('Some points have no capacity: enter the venue figure for each one.');
   if (venueApplied) assumptions.push(`Capacities saved for ${job?.venue} were used where this plot has none of its own or they were not changed here.`);
   if (points.some((p) => p.kind === 'hoist' && p.hoist && p.hoist.id === defaultHoist?.id)) assumptions.push(`Hoists default to the ${defaultHoist?.name}; change any point that uses something else.`);
@@ -368,10 +368,11 @@ export async function buildRig(jobId: string): Promise<BuiltRig> {
   let stacked = 0;
   for (const pos of positions) {
     const list = byPos.get(pos.name) ?? [];
-    if (pos.kind !== 'TRUSS' || list.length === 0) continue;
     const o = overrides.trusses?.[pos.name] ?? {};
     const key = pos.name.toLowerCase();
     const plotTruss = geometry?.trusses.find((t) => t.position.toLowerCase() === key || key.endsWith(`: ${t.position.toLowerCase()}`)) ?? null;
+    // A truss on the plot counts as one whatever the position was set to.
+    if (list.length === 0 || (pos.kind !== 'TRUSS' && !plotTruss)) continue;
     let lengthM = o.lengthM ?? plotTruss?.lengthM ?? pos.lengthM ?? null;
     if (!lengthM) {
       lengthM = Math.max(2, Math.ceil(list.length * 0.6));
@@ -441,6 +442,19 @@ export async function buildRig(jobId: string): Promise<BuiltRig> {
     trusses.push({ id: pos.name, name: pos.name, lengthM, originX, y, profile, hoists: hoistsOnTruss, loads });
     infos.push({ id: pos.name, positionName: pos.name, fromPlot: Boolean(plotTruss), profileId: profile?.id ?? null, fixtures: fixtureInfos, cableKgPerM, dropKg });
   }
+  // A point with nothing worked out for it (its truss isn't in the patch, or it's a pick with no
+  // cable plan) carries the load printed on the plot, so a rig read from the PDF alone still adds up.
+  const onTruss = new Set(trusses.flatMap((t) => t.hoists.map((h) => h.pointId)));
+  const plotLoad = new Map((geometry?.points ?? []).map((p) => [`plot:${p.name}`, p.loadKg]));
+  const fromPlot: string[] = [];
+  for (const p of points) {
+    if (onTruss.has(p.id) || p.directLoads!.length) continue;
+    const l = plotLoad.get(p.id);
+    if (!l || l <= 0) continue;
+    p.directLoads!.push({ kg: l, label: 'Load shown on the plot', source: 'other' });
+    fromPlot.push(p.name);
+  }
+  if (fromPlot.length) assumptions.push(`${fromPlot.join(', ')}: not on a truss from the patch, so the applied load printed on the plot is used.`);
   if (unknownWeights.size) assumptions.push(`No weight in the fixture database for ${[...unknownWeights].join(', ')}: counted as clamp only. Add the weight in Settings, Fixture database.`);
   assumptions.push('Cable weight comes from the Cable (beta) working for each truss: Socas and data along the truss, plus the vertical drop at the cable pick.');
 

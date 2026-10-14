@@ -4341,6 +4341,13 @@ div.bay-center {
 .cable-inline-button {
   margin: 0.2rem 0.4rem 0.2rem 0;
 }
+.cable-plot-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 0.4rem;
+  margin-top: 0.35rem;
+}
 .cable-notes {
   margin: 0.3rem 0 0;
 }
@@ -4568,6 +4575,13 @@ div.bay-center {
   background: color-mix(in srgb, var(--warning) 14%, transparent);
   border: 1px solid color-mix(in srgb, var(--warning) 40%, transparent);
   margin: 0 0 1rem;
+}
+.rig-plot-note {
+  margin: 0 0 1rem;
+  padding: 0.6rem 0.9rem;
+  border-radius: var(--radius-md);
+  border: 1px dashed var(--border-strong);
+  color: var(--content-muted);
 }
 .rig-toolbar {
   display: flex;

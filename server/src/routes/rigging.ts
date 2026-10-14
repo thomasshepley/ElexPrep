@@ -12,6 +12,7 @@ import {
   trussProfiles,
   type RiggingSettings,
 } from '../rigging/build';
+import { currentPlotExtraction, ensurePlotRead, plotStatusNote } from './cable';
 
 /**
  * Rigging loads calculator (beta, admin only). Company settings, truss profiles and hoists under
@@ -115,11 +116,12 @@ async function names(ids: (string | null | undefined)[]) {
   return new Map(users.map((u) => [u.id, u.displayName]));
 }
 
-async function jobRigging(jobId: string) {
+async function jobRigging(jobId: string, plotNote: string | null = null) {
   const [built, plan, profiles, hoists] = await Promise.all([buildRig(jobId), prisma.riggingPlan.findUnique({ where: { jobId } }), trussProfiles(), hoistModels()]);
   const n = await names([plan?.calculatedById]);
   return {
     ...built,
+    plotNote,
     disclaimer: RIGGING_DISCLAIMER,
     trussProfiles: profiles.map((p) => ({ id: p.id, name: p.name })),
     hoistModels: hoists.map((h) => ({ id: h.id, name: h.name, ratedKg: h.ratedKg, hoistClass: h.hoistClass })),
@@ -133,7 +135,12 @@ async function jobRigging(jobId: string) {
 }
 
 jobRiggingRouter.get('/:jobId/rigging', async (req, res) => {
-  res.json(await jobRigging(req.params.jobId));
+  const jobId = req.params.jobId;
+  // The job's CAD plot is read on opening, so its rigging points are simply there.
+  const auto = await ensurePlotRead(jobId, req.user!.id);
+  const extraction = await currentPlotExtraction(jobId);
+  const hasPoints = extraction ? (JSON.parse(extraction.resultJson) as { points: unknown[] }).points.length > 0 : false;
+  res.json(await jobRigging(jobId, hasPoints ? null : await plotStatusNote(jobId, auto)));
 });
 
 /** Saves the hand changes (and method); any check on the old rig no longer stands. */

@@ -4,6 +4,19 @@ Newest entries first. Each push/merge gets exactly one entry - see
 `scripts/bump-version.mjs` for how the version number itself advances. A `+` marks a
 feature addition, a `-` marks a bug fix.
 
+## v1.6.6 - 2026-10-14
+
+### Rigging (beta)
+
++ (Beta) Points not on a truss from the patch use the load printed on the plot
+- (Beta) The Rigging tab reads the job's CAD plot by itself, so its motor points come straight in without reading it on the Cable tab first
+- (Beta) Phones always open the Rigging tab on the point cards, even after another view was picked
+
+### Cable calculator (beta)
+
++ (Beta) A truss on the plot that isn't in the patch yet still gets a position, so its motors are counted
+- (Beta) The cable calculator reads the CAD plot by itself and fills in each truss's size and motor count
+
 ## v1.6.5 - 2026-10-14
 
 + The Cable and Rigging tabs sit directly under Prep on each job, since they're part of prep
