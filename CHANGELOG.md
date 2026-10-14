@@ -4,6 +4,11 @@ Newest entries first. Each push/merge gets exactly one entry - see
 `scripts/bump-version.mjs` for how the version number itself advances. A `+` marks a
 feature addition, a `-` marks a bug fix.
 
+## v1.5.0 - 2026-10-14
+
+- Fixed Project Manager Picker
+- Loading placeholders shimmer more visibly
+
 ## v1.4.9 - 2026-10-14
 
 + Every page shows a placeholder shaped like its content while it loads
@@ -21,7 +26,8 @@ feature addition, a `-` marks a bug fix.
 
 + Phones held sideways and tablets get the app-style tab bar
 - Chat messages with long words no longer spill off small phones
-- The Schedule tab and filter tabs fit narrower screens
+- The Schedule tab fits narrower screens
+- Filter tabs fit narrower screens
 
 ## v1.4.6 - 2026-10-13
 
@@ -37,20 +43,26 @@ feature addition, a `-` marks a bug fix.
 + Named days with call and estimated wrap times
 + Deadline-style schedule points for entries with the same start and end time
 + Your next call time on the crew home page
-+ New admin features for the job page, Schedule tab and Print Queue
++ New admin feature for the job page
++ New admin feature for the Schedule tab
++ New admin feature for the Print Queue
 
 ## v1.4.4 - 2026-10-13
 
-+ Patch import now lets you choose the patch file from OneDrive in a popup, including one you've imported before
++ Choose the patch file from OneDrive in a popup
++ A patch file you've imported before can be imported again
 
 ## v1.4.3 - 2026-10-13
 
-+ New admin features for the Crew margin and for Users and crew settings
++ New admin feature for the Crew margin
++ New admin feature for Users and crew settings
 - Signage screens can sign out again
 
 ## v1.4.2 - 2026-10-13
 
-- Patch auto-import now finds patch PDFs anywhere in the job's OneDrive folder (and on the Plots tab), picks the one with the most patch rows, and says which files it checked
++ Patch auto-import says which files it checked
+- Patch auto-import finds patch PDFs anywhere in the job's OneDrive folder and on the Plots tab
+- Patch auto-import picks the PDF with the most patch rows
 
 ## v1.4.1 - 2026-10-13
 
@@ -59,13 +71,14 @@ feature addition, a `-` marks a bug fix.
 
 ## v1.4.0 - 2026-10-13
 
-- Table rows on the Crew and Location Colours pages line up again
-- Colour pickers show their colour
 + Chat groups in job discussions
 + Schedule entries open into a popup with where, who and notes
 + Your own slots are highlighted on your schedule
 + Location dropdowns on cases and labels
-+ New admin features for the Crew tab and Crew settings
++ New admin feature for the Crew tab
++ New admin feature for Crew settings
+- Table rows on the Crew and Location Colours pages line up again
+- Colour pickers show their colour
 
 ## v1.3.9 - 2026-10-13
 
@@ -83,8 +96,10 @@ feature addition, a `-` marks a bug fix.
 ## v1.3.7 - 2026-10-13
 
 + Dashboard this-week strip
-+ Crew next call and calendar export
-+ Clearer print queue and schedule
++ Next call on the crew home page
++ Calendar export for crew
++ Clearer print queue
++ Clearer schedule
 + Tidier crew settings
 
 ## v1.3.6 - 2026-10-13
@@ -112,11 +127,15 @@ feature addition, a `-` marks a bug fix.
 
 ## v1.3.3 - 2026-10-13
 
-- Security hardening for file uploads, job access and sign-in
+- Safer file uploads
+- Tighter checks on who can open a job
+- Safer sign-in
 
 ## v1.3.2 - 2026-10-13
 
-+ Added site lockdown controls and expanded admin user management, fixed a job visibility bug for some accounts
++ New admin feature for site security
++ New admin feature for user management
+- Fixed some accounts seeing jobs they shouldn't, or not seeing ones they should
 
 ## v1.3.1 - 2026-10-13
 
@@ -130,7 +149,9 @@ feature addition, a `-` marks a bug fix.
 
 ## v1.2.9 - 2026-10-13
 
-+ Auto-add Current RMS opportunity days, fix rainbow preview, add a read-only crew week view
++ A job's days are filled in automatically from its Current RMS dates
++ Crew get a read-only week overview
+- Fixed the rainbow colour preview
 
 ## v1.2.8 - 2026-10-13
 
@@ -138,19 +159,19 @@ feature addition, a `-` marks a bug fix.
 
 ## v1.2.7 - 2026-10-13
 
-- Fixed web build errors from a nullable fixture address and label-size typing
+- Fixed a website build error
 
 ## v1.2.6 - 2026-10-13
 
-+ Added an admin CLI for VPS operations and forced password reset
++ New admin feature for running the server
 
 ## v1.2.5 - 2026-10-13
 
-+ Added a Caddy reverse proxy for automatic HTTPS on the AWS deployment
++ New admin feature for running the server securely over HTTPS
 
 ## v1.2.4 - 2026-10-13
 
-- Security hardening pass before going live: locked down CORS, encrypted API keys at rest, timing-safe agent auth
+- Security improvements before going live
 
 ## v1.2.3 - 2026-10-13
 
@@ -188,7 +209,8 @@ feature addition, a `-` marks a bug fix.
 
 ## v1.1.5 - 2026-10-12
 
-+ Added a confirmation screen before sending to the printer, with an inline preview and a typed CONFIRM gate
++ Confirmation screen with a preview before sending to the printer
++ Type CONFIRM before a print is sent
 
 ## v1.1.4 - 2026-10-12
 
@@ -217,7 +239,8 @@ feature addition, a `-` marks a bug fix.
 
 ## v1.0.8 - 2026-10-12
 
-+ Added a toast notification system and auto-creation of case rules for new fixture types on import
++ Pop-up toast notifications
++ Case rules are created automatically for new fixture types on import
 
 ## v1.0.7 - 2026-10-12
 
@@ -243,7 +266,8 @@ feature addition, a `-` marks a bug fix.
 
 ## v1.0.2 - 2026-10-12
 
-+ Widened the desktop layout and reworked the crew job page so Who, What, When and Where are always visible
++ Wider desktop layout
++ Who, What, When and Where are always visible on the crew job page
 
 ## v1.0.1 - 2026-10-12
 

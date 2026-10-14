@@ -426,11 +426,15 @@ type LogoSlot = 'left' | 'middle' | 'right';
 /** Who's running this job - shown under the job name and to its crew on their job page. */
 function ProjectManagerPanel({ job, canEdit, onUpdate }: { job: Job; canEdit: boolean; onUpdate: (j: Job) => void }) {
   const { busy, run } = useAsyncAction();
-  const [options, setOptions] = useState<JobProjectManager[]>([]);
+  const [options, setOptions] = useState<(JobProjectManager & { crewRole: string | null; isStaff: boolean })[]>([]);
 
   useEffect(() => {
-    api.jobs.projectManagerOptions().then(setOptions).catch(() => setOptions([]));
-  }, []);
+    api.jobs.projectManagerOptions(job.id).then(setOptions).catch(() => setOptions([]));
+  }, [job.id]);
+
+  const staff = options.filter((o) => o.isStaff);
+  const crew = options.filter((o) => !o.isStaff);
+  const label = (o: (typeof options)[number]) => (o.crewRole ? `${o.displayName} (${o.crewRole})` : o.displayName);
 
   const change = async (projectManagerUserId: string | null) => {
     const updated = await run(() => api.jobs.update(job.id, { projectManagerUserId }), {
@@ -442,16 +446,29 @@ function ProjectManagerPanel({ job, canEdit, onUpdate }: { job: Job; canEdit: bo
   return (
     <section className="panel">
       <h3 className="mt-0">Project manager</h3>
-      <p className="muted">Who's running this job. Shown under the job name and on the crew's job page.</p>
+      <p className="muted">Who's running this job - any staff member or anyone on its crew. Shown under the job name and on the crew's job page.</p>
       <div className="field" style={{ maxWidth: '18rem' }}>
         <label htmlFor="job-pm">Project manager</label>
         <select id="job-pm" value={job.projectManagerUserId ?? ''} disabled={!canEdit || busy} onChange={(e) => change(e.target.value || null)}>
           <option value="">Nobody yet</option>
-          {options.map((o) => (
-            <option key={o.id} value={o.id}>
-              {o.displayName}
-            </option>
-          ))}
+          {staff.length > 0 && (
+            <optgroup label="Staff">
+              {staff.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {label(o)}
+                </option>
+              ))}
+            </optgroup>
+          )}
+          {crew.length > 0 && (
+            <optgroup label="Crew on this job">
+              {crew.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {label(o)}
+                </option>
+              ))}
+            </optgroup>
+          )}
           {job.projectManager && !options.some((o) => o.id === job.projectManager!.id) && (
             <option value={job.projectManager.id}>{job.projectManager.displayName}</option>
           )}

@@ -30,11 +30,30 @@ const LOGO_SCALE_FIELDS = { left: 'logoScaleLeft', middle: 'logoScale', right: '
 const LOGO_SCALE_MIN = 20;
 const LOGO_SCALE_MAX = 200;
 
-/** Who can be a job's project manager - staff who run jobs, not signage screens or crew logins.
- * A webmaster can be one too, but only another webmaster sees them in the picker, matching how
- * those accounts are hidden from admins elsewhere (routes/users.ts). */
+/** Who can be a job's project manager: staff who run jobs (not signage screens), plus anyone
+ * on this job's crew. A webmaster can be one too, but only another webmaster sees them in the
+ * picker, matching how those accounts are hidden from admins elsewhere (routes/users.ts). */
 const PM_ROLES = ['ADMIN', 'USER'];
 const pmRolesFor = (requesterRole: string | undefined) => (requesterRole === 'WEBMASTER' ? [...PM_ROLES, 'WEBMASTER'] : PM_ROLES);
+
+async function projectManagerOptions(jobId: string, requesterRole: string | undefined) {
+  const [staff, crew] = await Promise.all([
+    prisma.user.findMany({ where: { role: { in: pmRolesFor(requesterRole) } }, select: PM_SELECT }),
+    prisma.jobCrewAssignment.findMany({
+      where: { jobId, crewProfile: { user: requesterRole === 'WEBMASTER' ? {} : { role: { not: 'WEBMASTER' } } } },
+      select: { role: true, crewProfile: { select: { user: { select: { ...PM_SELECT, role: true } } } } },
+    }),
+  ]);
+  const byId = new Map<string, { id: string; displayName: string; avatarPath: string | null; crewRole: string | null; isStaff: boolean }>();
+  for (const u of staff) byId.set(u.id, { ...u, crewRole: null, isStaff: true });
+  for (const a of crew) {
+    const u = a.crewProfile.user;
+    const existing = byId.get(u.id);
+    if (existing) existing.crewRole = a.role;
+    else byId.set(u.id, { id: u.id, displayName: u.displayName, avatarPath: u.avatarPath, crewRole: a.role, isStaff: false });
+  }
+  return [...byId.values()].sort((a, b) => a.displayName.localeCompare(b.displayName));
+}
 const PM_SELECT = { id: true, displayName: true, avatarPath: true } as const;
 
 /** ADMIN sees every job; USER/SIGNAGE only see jobs an admin has marked Public. */
@@ -80,21 +99,15 @@ jobsRouter.get('/', async (req, res) => {
   );
 });
 
-// Staff who can be picked as a job's project manager. Declared before /:id so it isn't
-// swallowed as a job id.
-jobsRouter.get('/project-manager-options', requireRole('ADMIN', 'USER'), async (req, res) => {
-  const users = await prisma.user.findMany({
-    where: { role: { in: pmRolesFor(req.user?.role) } },
-    select: PM_SELECT,
-    orderBy: { displayName: 'asc' },
-  });
-  res.json(users);
-});
-
 // Jobs can no longer be created directly - every job enters the portal by onboarding a
 // Current RMS Quote/Order (see routes/currentRms.ts's import/bulk-import endpoints), so the
 // job list and its data (crew features, OneDrive folder, etc.) always starts from a real
 // opportunity rather than a blank admin-typed name.
+// Everyone who can be picked as this job's project manager: staff, then this job's crew.
+jobsRouter.get('/:id/project-manager-options', requireRole('ADMIN', 'USER'), async (req, res) => {
+  res.json(await projectManagerOptions(req.params.id, req.user?.role));
+});
+
 jobsRouter.get('/:id', async (req, res) => {
   const job = await prisma.job.findUnique({ where: { id: req.params.id }, include: { projectManager: { select: PM_SELECT } } });
   if (!job) return res.status(404).json({ error: 'not found' });
@@ -134,8 +147,10 @@ jobsRouter.put('/:id', async (req, res) => {
   }
   if (projectManagerUserId !== undefined && projectManagerUserId !== null) {
     if (typeof projectManagerUserId !== 'string') return res.status(400).json({ error: 'projectManagerUserId must be a user id or null' });
-    const pm = await prisma.user.findUnique({ where: { id: projectManagerUserId }, select: { role: true } });
-    if (!pm || !pmRolesFor(req.user?.role).includes(pm.role)) return res.status(400).json({ error: 'The project manager must be an admin or prep account' });
+    const options = await projectManagerOptions(req.params.id, req.user?.role);
+    if (!options.some((o) => o.id === projectManagerUserId)) {
+      return res.status(400).json({ error: 'The project manager must be a staff account or someone on this job' });
+    }
   }
   if (isPublic !== undefined && typeof isPublic !== 'boolean') return res.status(400).json({ error: 'isPublic must be a boolean' });
   if (isPublic !== undefined && !isAdminRole(req.user?.role)) {

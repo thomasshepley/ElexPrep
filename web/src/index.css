@@ -3409,7 +3409,7 @@ html {
   background-image: linear-gradient(
     100deg,
     transparent 20%,
-    color-mix(in srgb, var(--content) 7%, transparent) 50%,
+    color-mix(in srgb, var(--content) 13%, transparent) 50%,
     transparent 80%
   );
   background-size: 200% 100%;

@@ -175,7 +175,9 @@ export const jobsApi = {
   jobs: {
     list: () => request<Job[]>('/jobs'),
     get: (id: string) => request<Job>(`/jobs/${id}`),
-    projectManagerOptions: () => request<JobProjectManager[]>('/jobs/project-manager-options'),
+    /** Staff plus everyone on this job's crew. */
+    projectManagerOptions: (jobId: string) =>
+      request<(JobProjectManager & { crewRole: string | null; isStaff: boolean })[]>(`/jobs/${jobId}/project-manager-options`),
     update: (
       id: string,
       data: Partial<Pick<Job, 'name' | 'venue' | 'description' | 'address' | 'startsAt' | 'endsAt' | 'isPublic' | 'projectManagerUserId'>> & {
