@@ -4,6 +4,11 @@ Newest entries first. Each push/merge gets exactly one entry - see
 `scripts/bump-version.mjs` for how the version number itself advances. A `+` marks a
 feature addition, a `-` marks a bug fix.
 
+## v1.6.3 - 2026-10-14
+
++ Updates to the site no longer take it offline, at most a short pause while the new version starts
++ A Down for maintenance page while the site is being worked on, which reloads by itself when it's back
+
 ## v1.6.2 - 2026-10-14
 
 + Calendar items that run over several days show as one bar across the days, so the full name can be read

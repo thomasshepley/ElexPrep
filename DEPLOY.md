@@ -106,13 +106,9 @@ Cloudflare's proxy/WAF anyway.)
    (OVH's own field names may differ slightly, e.g. "sub-domain"/"target".) This is the only
    change made in OVH's DNS — the root domain, `www`, and any mail (MX) records already there
    are untouched.
-2. **Confirm the Caddyfile** at the repo root points at the right domain — it already does by
-   default:
-   ```
-   portal.elex.lighting {
-   	reverse_proxy elexprep:4000
-   }
-   ```
+2. **Confirm the Caddy config** (`deploy/caddy/Caddyfile`) points at the right domain. It
+   already does by default: its site address is `portal.elex.lighting`. The same file also
+   holds the maintenance page setup (see **Updating to a new version**).
 3. **Wait for the record to propagate** — usually minutes, occasionally up to a few hours.
    Check with:
    ```bash
@@ -133,8 +129,8 @@ Cloudflare's proxy/WAF anyway.)
    docker compose up -d
    ```
 
-From here, `git pull && docker compose up -d --build` (see **Updating to a new version**
-below) keeps `portal.elex.lighting` current — DNS, the Elastic IP, and the certificate don't
+From here, `updatesite` (see **Updating to a new version** below) keeps
+`portal.elex.lighting` current — DNS, the Elastic IP, and the certificate don't
 need touching again (Caddy renews automatically).
 
 **If you actually want Cloudflare in front of this subdomain** (its proxy/CDN, WAF, or
@@ -188,23 +184,67 @@ When all of that passes, the release is steady everywhere except the physical pr
 ## Updating to a new version
 
 ```bash
-git pull
-docker compose up -d --build
+./scripts/updatesite.sh
 ```
 
-Database migrations run automatically on container start. The `data/` folder is untouched
-by rebuilds.
+This keeps the site up for nearly all of the update:
 
-**Optional: a one-word `updatesite` command.** `scripts/updatesite.sh` runs those same two
-commands from wherever the repo actually lives, so you don't have to remember the path.
-Make it runnable as a plain command once:
+1. it pulls the latest code;
+2. it builds the new version **while the current one keeps serving everyone** (the slow part);
+3. it swaps the app container over. That takes a few seconds, and Caddy holds each request
+   and retries it rather than failing it, so people see a short pause, not an error. If the
+   swap ever takes longer than 30 seconds, they get the **Down for maintenance** page, which
+   reloads by itself when the site is back;
+4. it waits until the new version answers, applies any change to the Caddy config, and
+   prints `Live on vX.Y.Z`.
+
+Database migrations run automatically when the new container starts. The `data/` folder is
+untouched by updates. Old images are cleaned up afterwards so the disk doesn't fill.
+
+For a big update you'd rather nobody used the site during (a large database migration, say),
+put the maintenance page up for the switch-over:
 
 ```bash
-chmod +x scripts/updatesite.sh
-sudo ln -s "$(pwd)/scripts/updatesite.sh" /usr/local/bin/updatesite
+./scripts/updatesite.sh --maintenance
 ```
 
-From then on, `updatesite` from any directory pulls and rebuilds.
+If the new version doesn't come up within three minutes, the script stops, prints the app's
+recent logs, and (with `--maintenance`) leaves the maintenance page up until you fix it.
+
+### Maintenance mode
+
+For anything else that needs the site quiet (restoring a backup, server work), switch the
+maintenance page on and off yourself:
+
+```bash
+./scripts/maintenance.sh on                  # everyone sees "Down for maintenance"
+./scripts/maintenance.sh on "Back by 10pm"   # with a note on the page
+./scripts/maintenance.sh status
+./scripts/maintenance.sh off
+```
+
+It takes effect straight away, with no restart. Caddy serves the page itself, so it works
+even while the app container is stopped or being rebuilt. Anyone with the site open is
+moved onto it the next time their page talks to the server, and the page checks every 10
+seconds and goes back to the site on its own once maintenance is off.
+
+While it's on you can still reach the app directly over the SSH tunnel to `127.0.0.1:4000`
+(see **Create the admin account**) to check a new version before reopening.
+
+**Optional: one-word `updatesite` and `maintenance` commands.** Make them runnable from
+any directory once:
+
+```bash
+chmod +x scripts/updatesite.sh scripts/maintenance.sh
+sudo ln -sf "$(pwd)/scripts/updatesite.sh" /usr/local/bin/updatesite
+sudo ln -sf "$(pwd)/scripts/maintenance.sh" /usr/local/bin/maintenance
+```
+
+**First update after this change:** the Caddy config moved from `./Caddyfile` to
+`deploy/caddy/`. The first `updatesite` that includes it notices Docker Compose's new
+settings and restarts Caddy once (a second or two). Nothing to do by hand, unless you had
+edited `./Caddyfile` yourself, in which case copy your change into
+`deploy/caddy/Caddyfile` first.
 
 ## Admin CLI
 

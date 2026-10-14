@@ -26,6 +26,10 @@ export async function request<T>(path: string, init?: RequestInit): Promise<T> {
   });
   if (!res.ok) {
     if (res.status === 401 && !path.startsWith('/auth/')) onUnauthorized?.();
+    // Caddy answers for the app while the site is in maintenance mode or restarting (see
+    // deploy/caddy/Caddyfile): reload so this tab shows the maintenance page, which comes back
+    // by itself when the site does.
+    if (res.status === 503 && res.headers.get('X-Maintenance') === '1') window.location.reload();
     const body = await res.json().catch(() => ({}));
     throw new ApiError(body.error ?? `Request failed: ${res.status}`, res.status);
   }

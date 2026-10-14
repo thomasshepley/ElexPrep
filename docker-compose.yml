@@ -3,6 +3,9 @@ services:
     build: .
     container_name: elexprep
     restart: unless-stopped
+    # Time to finish in-flight requests and close the database cleanly when swapped for a new
+    # version (scripts/updatesite.sh).
+    stop_grace_period: 15s
     ports:
       # Bound to the box's own loopback only - reachable over an SSH tunnel (see DEPLOY.md)
       # for initial admin setup and troubleshooting, never from the public internet. Caddy
@@ -30,8 +33,9 @@ services:
       - ./data:/data
 
   # Reverse proxy + automatic HTTPS (Let's Encrypt) for the public domain - the only service
-  # with ports actually open to the internet. See DEPLOY.md's "Go live at
-  # portal.elex.lighting" for pointing DNS at this box and editing ./Caddyfile.
+  # with ports actually open to the internet. Also serves the maintenance page, both when
+  # maintenance mode is on and while the app is restarting. See DEPLOY.md's "Go live at
+  # portal.elex.lighting" and "Updating to a new version".
   caddy:
     image: caddy:2-alpine
     container_name: elexprep-caddy
@@ -40,7 +44,10 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # Folders rather than single files: a git pull replaces files, and a single-file mount
+      # would keep showing the container the old one.
+      - ./deploy/caddy:/etc/caddy:ro
+      - ./deploy/maintenance:/srv/maintenance:ro
       - caddy_data:/data
       - caddy_config:/config
     depends_on:
