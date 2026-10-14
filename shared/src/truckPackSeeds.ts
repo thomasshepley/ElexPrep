@@ -206,6 +206,30 @@ export const SEED_VEHICLES: SeedVehicle[] = [
     notes: 'Typical rigid body; check the plated payload.',
   },
   {
+    name: '26 t rigid box truck (3 axles)',
+    lengthMm: 8800,
+    widthMm: 2450,
+    heightMm: 2600,
+    payloadKg: 14000,
+    doorWidthMm: 2400,
+    doorHeightMm: 2450,
+    licence: 'C (HGV)',
+    notes: 'The 3-axle rigid class (26 t gross). Typical box body; about 7.5 to 8 t unladen, so payload is roughly 13 to 16 t depending on the body. Check the plate.',
+    since: 3,
+  },
+  {
+    name: '32 t rigid box truck (4 axles)',
+    lengthMm: 9500,
+    widthMm: 2450,
+    heightMm: 2600,
+    payloadKg: 18500,
+    doorWidthMm: 2400,
+    doorHeightMm: 2450,
+    licence: 'C (HGV)',
+    notes: 'The heaviest UK rigid (4 or more axles, 32 t gross). Rigids are 12 m overall at most, so the body is about 9 to 10 m. Typical figures: check the plate and the body builder\'s spec.',
+    since: 3,
+  },
+  {
     name: '13.6 m box trailer (artic)',
     lengthMm: 13620,
     widthMm: 2460,
@@ -268,4 +292,4 @@ export const SEED_VEHICLES: SeedVehicle[] = [
 ];
 
 /** Bumped whenever vehicles are added to the seed list, so they reach databases seeded before. */
-export const TRUCK_SEED_VERSION = 2;
+export const TRUCK_SEED_VERSION = 3;
