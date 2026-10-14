@@ -3494,3 +3494,9 @@ html {
   height: 0.9em;
   vertical-align: -0.1em;
 }
+
+.discussion-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}

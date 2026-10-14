@@ -1,3 +1,4 @@
+import { SkeletonPanel } from './Skeleton';
 import { useEffect, useState } from 'react';
 import QRCode from 'qrcode';
 import { api } from '../api/client';
@@ -105,7 +106,7 @@ export default function TwoFactorPanel() {
     }
   };
 
-  if (!status) return error ? <p className="error">Could not load two-factor settings: {error}</p> : <p className="muted">Loading…</p>;
+  if (!status) return error ? <p className="error">Could not load two-factor settings: {error}</p> : <SkeletonPanel lines={3} />;
 
   return (
     <div>

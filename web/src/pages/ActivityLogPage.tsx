@@ -1,3 +1,4 @@
+import { SkeletonRegion, SkeletonRows } from '../components/Skeleton';
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, type ActivityLogEntry } from '../api/client';
@@ -140,7 +141,12 @@ export default function ActivityLogPage() {
         </table>
       </div>
       {!loading && filtered.length === 0 && <p className="muted">No matching activity.</p>}
-      {loading && <p className="muted">Loading…</p>}
+      {loading && entries.length === 0 && (
+        <SkeletonRegion>
+          <SkeletonRows rows={8} cols={5} />
+        </SkeletonRegion>
+      )}
+      {loading && entries.length > 0 && <p className="muted">Loading older activity…</p>}
       {nextCursor && !loading && (
         <button type="button" className="secondary" style={{ marginTop: 'var(--space-3)' }} onClick={() => load(nextCursor)}>
           Load older activity

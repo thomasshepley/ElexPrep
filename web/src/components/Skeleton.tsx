@@ -128,3 +128,21 @@ export function PageSkeleton({ panels = 2 }: { panels?: number }) {
     </SkeletonRegion>
   );
 }
+
+/** Placeholder <tr>s to drop into a real table's <tbody> while its rows load, so the header and
+ * column widths are already in place. */
+export function SkeletonTableRows({ rows = 5, cols }: { rows?: number; cols: number }) {
+  return (
+    <>
+      {Array.from({ length: rows }, (_, r) => (
+        <tr key={`skeleton-${r}`} className="skeleton-tr" aria-hidden="true">
+          {Array.from({ length: cols }, (_, c) => (
+            <td key={c}>
+              <Skeleton w={c === 0 ? '75%' : LINE_WIDTHS[(r + c) % LINE_WIDTHS.length]} h={13} />
+            </td>
+          ))}
+        </tr>
+      ))}
+    </>
+  );
+}

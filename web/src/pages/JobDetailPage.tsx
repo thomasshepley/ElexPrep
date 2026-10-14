@@ -143,12 +143,7 @@ export default function JobDetailPage() {
           {tab === 'Schedule' && <JobSchedulePanel jobId={jobId} />}
           {tab === 'Documents' && <JobDocumentsPanel jobId={jobId} />}
           {tab === 'Contacts' && <JobContactsPanel jobId={jobId} />}
-          {tab === 'Crew' && (
-            <>
-              <JobCrewPanel jobId={jobId} />
-              <CrewMarginPanel jobId={jobId} />
-            </>
-          )}
+          {tab === 'Crew' && <CrewTab jobId={jobId} />}
           {tab === 'Discussion' && (
             <div className="panel">
               <JobDiscussionThread jobId={jobId} scope="staff" />
@@ -159,6 +154,17 @@ export default function JobDetailPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+/** Crew list and crew margin - the margin waits for the list above it so it doesn't get pushed down. */
+function CrewTab({ jobId }: { jobId: string }) {
+  const [crewReady, setCrewReady] = useState(false);
+  return (
+    <>
+      <JobCrewPanel jobId={jobId} onReady={() => setCrewReady(true)} />
+      {crewReady && <CrewMarginPanel jobId={jobId} />}
+    </>
   );
 }
 

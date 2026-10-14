@@ -1,3 +1,4 @@
+import { Skeleton, SkeletonRegion, SkeletonText } from '../components/Skeleton';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, type CrewMyJob } from '../api/client';
@@ -45,7 +46,20 @@ export default function CrewSchedulePage() {
     <div>
       <h1>Your schedule</h1>
       {error && <p className="error">{error}</p>}
-      {jobs === null && !error && <p className="muted">Loading…</p>}
+      {jobs === null && !error && (
+        <SkeletonRegion>
+          <div className="panel next-call">
+            <Skeleton w="22%" h={12} style={{ marginBottom: 14 }} />
+            <Skeleton w="60%" h={26} style={{ marginBottom: 14 }} />
+            <Skeleton w="45%" h={16} style={{ marginBottom: 16 }} />
+            <SkeletonText lines={3} gap={9} />
+          </div>
+          <div className="panel" style={{ marginTop: '1rem' }}>
+            <Skeleton w="30%" h={20} style={{ marginBottom: 16 }} />
+            <Skeleton h={420} r={8} />
+          </div>
+        </SkeletonRegion>
+      )}
       {jobs !== null && jobs.length === 0 && <p className="muted">You're not assigned to any jobs yet.</p>}
 
       {jobs !== null && jobs.length > 0 && (

@@ -1,3 +1,4 @@
+import { SkeletonTableRows } from '../components/Skeleton';
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { api, type AuthedUser, type CrewMember, type Role } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
@@ -47,6 +48,7 @@ export default function PeoplePage() {
   const [filter, setFilter] = useState<Filter>('all');
   const [query, setQuery] = useState('');
   const [showBaseline, setShowBaseline] = useState(false);
+  const [loaded, setLoaded] = useState(false);
 
   const refresh = () =>
     Promise.all([api.users.list(), api.crew.list()])
@@ -54,7 +56,8 @@ export default function PeoplePage() {
         setUsers(u);
         setCrew(c);
       })
-      .catch((e) => setError(e.message));
+      .catch((e) => setError(e.message))
+      .finally(() => setLoaded(true));
 
   useEffect(() => {
     refresh();
@@ -163,6 +166,7 @@ export default function PeoplePage() {
               </tr>
             </thead>
             <tbody>
+              {!loaded && <SkeletonTableRows rows={6} cols={7} />}
               {shown.map((p) => {
                 const { user, crew: profile } = p;
                 const isMe = user.id === me?.id;
@@ -282,7 +286,7 @@ export default function PeoplePage() {
             </tbody>
           </table>
         </div>
-        {shown.length === 0 && <p className="muted">{q ? `No one matches "${query}".` : 'No one here yet.'}</p>}
+        {loaded && shown.length === 0 && <p className="muted">{q ? `No one matches "${query}".` : 'No one here yet.'}</p>}
       </div>
 
       <DefaultRatePanel />

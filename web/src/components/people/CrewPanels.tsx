@@ -1,3 +1,4 @@
+import { SkeletonRegion, SkeletonText } from '../Skeleton';
 /** Crew profile, rate card, documents and role-rate panels used on the Users & crew page. */
 import { useEffect, useState } from 'react';
 import { resolveCrewColor } from '@elexprep/shared';
@@ -128,7 +129,8 @@ export function ProfileEditPanel({ crew, onChanged }: { crew: CrewMember; onChan
 }
 
 export function RateCardPanel({ crewId }: { crewId: string }) {
-  const [lines, setLines] = useState<CrewRateLine[]>([]);
+  const [linesLoaded, setLines] = useState<CrewRateLine[] | null>(null);
+  const lines = linesLoaded ?? [];
   const [label, setLabel] = useState('');
   const [amount, setAmount] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -162,7 +164,11 @@ export function RateCardPanel({ crewId }: { crewId: string }) {
     <div style={{ padding: '0.75rem 0', borderBottom: '1px solid var(--border)' }}>
       <strong>Rate card</strong>
       {error && <p className="error">{error}</p>}
-      {lines.length === 0 ? (
+      {linesLoaded === null && !error ? (
+        <SkeletonRegion style={{ margin: '0.5rem 0' }}>
+          <SkeletonText lines={2} gap={8} />
+        </SkeletonRegion>
+      ) : lines.length === 0 ? (
         <p className="muted">No rate lines yet.</p>
       ) : (
         <ul style={{ margin: '0.5rem 0' }}>
@@ -192,7 +198,8 @@ export function RateCardPanel({ crewId }: { crewId: string }) {
 }
 
 export function CrewDocumentsPanel({ crewId }: { crewId: string }) {
-  const [documents, setDocuments] = useState<CrewDocumentSummary[]>([]);
+  const [documentsLoaded, setDocuments] = useState<CrewDocumentSummary[] | null>(null);
+  const documents = documentsLoaded ?? [];
   const [error, setError] = useState<string | null>(null);
 
   const refresh = () => api.crew.documents.list(crewId).then(setDocuments).catch((e) => setError(e.message));
@@ -222,7 +229,11 @@ export function CrewDocumentsPanel({ crewId }: { crewId: string }) {
     <div style={{ padding: '0.75rem 0' }}>
       <strong>Compliance documents</strong>
       {error && <p className="error">{error}</p>}
-      {documents.length === 0 ? (
+      {documentsLoaded === null && !error ? (
+        <SkeletonRegion style={{ margin: '0.5rem 0' }}>
+          <SkeletonText lines={2} gap={8} />
+        </SkeletonRegion>
+      ) : documents.length === 0 ? (
         <p className="muted">No documents on file.</p>
       ) : (
         <ul style={{ margin: '0.5rem 0' }}>

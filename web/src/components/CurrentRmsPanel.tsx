@@ -1,3 +1,4 @@
+import { SkeletonPanel, SkeletonRegion, SkeletonRows } from './Skeleton';
 import { useEffect, useState } from 'react';
 import { api, type CurrentRmsOpportunity, type CurrentRmsPickItem } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
@@ -162,7 +163,15 @@ export default function CurrentRmsPanel({ jobId }: { jobId: string }) {
     setRmsAlertAt(null);
   };
 
-  if (linked === null) return error ? <p className="error">Could not load Current RMS details: {error}</p> : <p className="muted">Loading…</p>;
+  if (linked === null)
+    return error ? (
+      <p className="error">Could not load Current RMS details: {error}</p>
+    ) : (
+      <>
+        <SkeletonPanel lines={3} />
+        <SkeletonPanel rows={6} cols={3} />
+      </>
+    );
 
   return (
     <div>
@@ -264,6 +273,11 @@ export default function CurrentRmsPanel({ jobId }: { jobId: string }) {
               ) : (
                 <p className="error">{pickListError}</p>
               ))}
+            {!items && !pickListError && (
+              <SkeletonRegion label="Loading the pick list…" style={{ marginTop: '0.75rem' }}>
+                <SkeletonRows rows={8} cols={3} />
+              </SkeletonRegion>
+            )}
             {items && items.length === 0 && <p className="muted">No items returned.</p>}
             {items && items.length > 0 && (
               <>

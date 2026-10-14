@@ -1,3 +1,4 @@
+import { SkeletonList, SkeletonRegion } from './Skeleton';
 import { useEffect, useState } from 'react';
 import { api, type FixtureGroup, type RmsHeadingGroup } from '../api/client';
 import Modal from './Modal';
@@ -186,7 +187,7 @@ export default function StagesManager({
       </form>
 
       <h4 style={{ marginTop: '1.25rem' }}>Create stages from Current RMS headings</h4>
-      {headingsBusy && <p className="muted">Loading…</p>}
+      {headingsBusy && <SkeletonRegion><SkeletonList items={3} /></SkeletonRegion>}
       {headingsError && <p className="error">{headingsError}</p>}
       {headings !== null && headings.length === 0 && !headingsError && (
         <p className="muted">No section headings found on this job's linked opportunity.</p>

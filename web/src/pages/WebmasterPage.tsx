@@ -1,3 +1,4 @@
+import { SkeletonList, SkeletonRegion } from '../components/Skeleton';
 import { useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { api, type BugReport } from '../api/client';
@@ -118,7 +119,8 @@ function ReportRow({ report, onRemove }: { report: BugReport; onRemove: (id: str
 export default function WebmasterPage() {
   const { user } = useAuth();
   const { showToast } = useToast();
-  const [reports, setReports] = useState<BugReport[]>([]);
+  const [reportsLoaded, setReports] = useState<BugReport[] | null>(null);
+  const reports = reportsLoaded ?? [];
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<'controls' | 'bugs' | 'activity'>('bugs');
 
@@ -188,7 +190,11 @@ export default function WebmasterPage() {
         </div>
       </div>
       {error && <p className="error">{error}</p>}
-      {reports.length === 0 ? (
+      {reportsLoaded === null && !error ? (
+        <SkeletonRegion>
+          <SkeletonList items={3} />
+        </SkeletonRegion>
+      ) : reports.length === 0 ? (
         <p className="muted">No bug reports yet.</p>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>

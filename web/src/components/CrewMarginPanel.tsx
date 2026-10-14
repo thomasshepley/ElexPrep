@@ -1,3 +1,4 @@
+import { Skeleton, SkeletonRegion, SkeletonRows } from './Skeleton';
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
@@ -23,7 +24,7 @@ export default function CrewMarginPanel({ jobId }: { jobId: string }) {
 function CrewMarginPanelInner({ jobId }: { jobId: string }) {
   const [data, setData] = useState<Awaited<ReturnType<typeof api.jobCrewMargin.get>> | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   const load = () => {
     setLoading(true);
@@ -216,7 +217,19 @@ function MarginDisplay({
         ) : (
           <p className="error">{error}</p>
         ))}
-      {loading && !data && <p className="muted">Loading…</p>}
+      {loading && !data && (
+        <SkeletonRegion>
+          <div className="row" style={{ gap: '1.5rem', marginTop: '0.5rem', marginBottom: '1rem' }}>
+            {[0, 1, 2, 3].map((i) => (
+              <span key={i} className="skeleton-stack" style={{ gap: 6, width: '7rem' }}>
+                <Skeleton w="70%" h={10} />
+                <Skeleton w="90%" h={22} />
+              </span>
+            ))}
+          </div>
+          <SkeletonRows rows={4} cols={5} />
+        </SkeletonRegion>
+      )}
       {data && (
         <>
           <div className="row" style={{ gap: '1.5rem', flexWrap: 'wrap', marginTop: '0.5rem' }}>

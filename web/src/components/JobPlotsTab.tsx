@@ -1,4 +1,4 @@
-import { Skeleton, SkeletonRegion } from './Skeleton';
+import { Skeleton, SkeletonPanel, SkeletonRegion } from './Skeleton';
 import { useState } from 'react';
 import { api, type JobOneDriveStatus, type Plot } from '../api/client';
 import CadPlotsViewer, { type CadPlotCandidate } from './CadPlotsViewer';
@@ -35,20 +35,29 @@ export default function JobPlotsTab({ jobId }: { jobId: string }) {
     })) ?? []),
   ];
 
+  const ready = plotsSettled && driveSettled;
+
+  // The panels below load the data, so they mount straight away but stay hidden until both
+  // have answered - then the whole tab appears at once rather than in shifting pieces.
   return (
     <div>
-      <div className="panel">
-        <h3>CAD</h3>
-        {plotsSettled && driveSettled ? (
+      {!ready && (
+        <SkeletonRegion label="Loading plots…">
+          <div className="panel">
+            <h3>CAD</h3>
+            <Skeleton h={320} r={6} />
+          </div>
+          <SkeletonPanel lines={2} list={2} />
+        </SkeletonRegion>
+      )}
+      <div hidden={!ready} className={ready ? 'load-fade' : undefined}>
+        <div className="panel">
+          <h3>CAD</h3>
           <CadPlotsViewer candidates={candidates} />
-        ) : (
-          <SkeletonRegion label="Loading plots…">
-            <Skeleton h="auto" r={6} style={{ aspectRatio: '1.414', maxHeight: '75vh' }} />
-          </SkeletonRegion>
-        )}
+        </div>
+        <OneDriveFilesPanel jobId={jobId} onChange={setOneDrive} onSettled={() => setDriveSettled(true)} />
+        <PlotsPanel jobId={jobId} onChange={onPlots} onSettled={() => setPlotsSettled(true)} />
       </div>
-      <OneDriveFilesPanel jobId={jobId} onChange={setOneDrive} onSettled={() => setDriveSettled(true)} />
-      <PlotsPanel jobId={jobId} onChange={onPlots} onSettled={() => setPlotsSettled(true)} />
     </div>
   );
 }

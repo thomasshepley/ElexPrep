@@ -153,9 +153,14 @@ function ThisWeekSkeleton() {
       <div className="week-strip">
         <section className="week-day">
           <Skeleton w="45%" h={12} style={{ marginBottom: 12 }} />
-          <Skeleton w="60%" h={16} style={{ marginBottom: 8 }} />
-          <Skeleton w="35%" h={12} style={{ marginBottom: 10 }} />
-          <SkeletonText lines={2} gap={8} />
+          <div className="week-entry">
+            <Skeleton w="60%" h={16} style={{ marginBottom: 8 }} />
+            <Skeleton w="35%" h={12} style={{ marginBottom: 12 }} />
+            <SkeletonText lines={3} gap={10} />
+            <div className="week-crew" style={{ marginTop: 12 }}>
+              <Skeleton w={140} h={22} r={999} />
+            </div>
+          </div>
         </section>
       </div>
     </SkeletonRegion>

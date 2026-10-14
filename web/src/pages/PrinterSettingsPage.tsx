@@ -1,3 +1,4 @@
+import { Skeleton, SkeletonPanel } from '../components/Skeleton';
 import { useEffect, useState } from 'react';
 import { api, type PrinterSettings, type PrintMethod, type TrayKey } from '../api/client';
 import { useDialog } from '../components/Dialog';
@@ -37,7 +38,13 @@ export default function PrinterSettingsPage() {
     api.printerSettings.get().then(setSettings).catch((e) => setLoadError((e as Error).message));
   }, []);
 
-  if (!settings) return loadError ? <p className="error">Could not load printer settings: {loadError}</p> : <p className="muted">Loading…</p>;
+  if (!settings) return loadError ? <p className="error">Could not load printer settings: {loadError}</p> : (
+      <div>
+        <h1>Printer settings</h1>
+        <Skeleton w="60%" h={14} style={{ marginBottom: 20 }} />
+        <SkeletonPanel lines={4} /><SkeletonPanel lines={3} />
+      </div>
+    );
 
   const update = (patch: Partial<PrinterSettings>) => setSettings({ ...settings, ...patch });
 

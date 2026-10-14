@@ -1,3 +1,4 @@
+import { SkeletonList, SkeletonRegion } from '../components/Skeleton';
 import { useEffect, useState } from 'react';
 import { api, type CrewApplicationDetail, type CrewApplicationSummary } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
@@ -21,7 +22,8 @@ export default function CrewApplicationsPage() {
   const { user } = useAuth();
   const isAdmin = isAdminRole(user?.role);
   const [filter, setFilter] = useState<StatusFilter>('PENDING');
-  const [applications, setApplications] = useState<CrewApplicationSummary[]>([]);
+  const [applicationsLoaded, setApplications] = useState<CrewApplicationSummary[] | null>(null);
+  const applications = applicationsLoaded ?? [];
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<CrewApplicationDetail | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -100,7 +102,8 @@ export default function CrewApplicationsPage() {
       </div>
 
       {error && <p className="error">{error}</p>}
-      {applications.length === 0 && <p className="muted">No applications here.</p>}
+      {applicationsLoaded === null && !error && <SkeletonRegion className="panel"><SkeletonList items={4} /></SkeletonRegion>}
+      {applicationsLoaded !== null && applications.length === 0 && <p className="muted">No applications here.</p>}
 
       {pendingIds.length > 0 && (
         <div className="row" style={{ marginBottom: '0.75rem', gap: '0.5rem' }}>

@@ -1,3 +1,4 @@
+import { Skeleton, SkeletonRegion } from './Skeleton';
 import { useEffect, useMemo, useState } from 'react';
 import { DndContext, DragOverlay, PointerSensor, useSensor, useSensors, type DragEndEvent, type DragStartEvent } from '@dnd-kit/core';
 import { resolveCrewColor } from '@elexprep/shared';
@@ -69,9 +70,12 @@ export default function JobSchedulePanel({ jobId }: { jobId: string }) {
   const canManageCrew = isAdminRole(user?.role) || Boolean(user?.permissions?.manageCrewAssignments);
   const canManageDays = isAdminRole(user?.role);
 
-  const refresh = () => api.jobSchedule.list(jobId).then(setItems).catch((e) => setError(e.message));
-  const refreshDays = () => api.jobDays.list(jobId).then(setJobDays).catch((e) => setError(e.message));
-  const refreshRoster = () => api.jobCrewAssignments.list(jobId).then(setRoster).catch(() => {});
+  // The split view's shape depends on all three lists, so hold a skeleton until each has loaded once.
+  const [loaded, setLoaded] = useState({ items: false, days: false, roster: false });
+  const mark = (key: keyof typeof loaded) => () => setLoaded((l) => (l[key] ? l : { ...l, [key]: true }));
+  const refresh = () => api.jobSchedule.list(jobId).then(setItems).catch((e) => setError(e.message)).finally(mark('items'));
+  const refreshDays = () => api.jobDays.list(jobId).then(setJobDays).catch((e) => setError(e.message)).finally(mark('days'));
+  const refreshRoster = () => api.jobCrewAssignments.list(jobId).then(setRoster).catch(() => {}).finally(mark('roster'));
 
   useEffect(() => {
     refresh();
@@ -257,9 +261,11 @@ export default function JobSchedulePanel({ jobId }: { jobId: string }) {
   const activeAssignment = roster.find((a) => a.id === activeRosterAssignmentId);
   const assigningItem = items.find((i) => i.id === assigningItemId) ?? null;
 
+  if (!loaded.items || !loaded.days || !loaded.roster) return <ScheduleSkeleton />;
+
   return (
     <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
-      <div className="schedule-split">
+      <div className="schedule-split load-fade">
         <DayBlocksColumn
           blocks={blocks}
           roster={roster}
@@ -505,5 +511,40 @@ function DayDetailsModal({
         </div>
       </form>
     </Modal>
+  );
+}
+
+/** The Schedule tab's split view (crew strip and day blocks beside the hour view) while it loads. */
+function ScheduleSkeleton() {
+  return (
+    <SkeletonRegion className="schedule-split">
+      <div className="day-blocks-column">
+        <div className="day-blocks-roster">
+          <h4>Crew on this job</h4>
+          <Skeleton w="80%" h={12} style={{ marginBottom: 10 }} />
+          <div className="row" style={{ gap: '0.4rem' }}>
+            <Skeleton w={110} h={26} r={999} />
+            <Skeleton w={90} h={26} r={999} />
+          </div>
+        </div>
+        <div className="day-blocks-list">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="day-block">
+              <Skeleton w="55%" h={16} style={{ marginBottom: 10 }} />
+              <Skeleton w="35%" h={11} />
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="schedule-hour-view">
+        <div className="panel">
+          <div className="row" style={{ justifyContent: 'space-between' }}>
+            <Skeleton w="45%" h={22} />
+            <Skeleton w={96} h={38} r={8} />
+          </div>
+          <Skeleton h={440} r={8} style={{ marginTop: 16 }} />
+        </div>
+      </div>
+    </SkeletonRegion>
   );
 }

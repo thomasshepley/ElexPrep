@@ -1,3 +1,4 @@
+import { SkeletonPanel } from './Skeleton';
 import { Fragment, useEffect, useState } from 'react';
 import { api, type CrewMember, type DayRateSource, type JobCrewAssignment, type RoleRate } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
@@ -22,7 +23,7 @@ const RATE_SOURCE_LABELS: Record<DayRateSource, string> = {
  * the job; adding/editing/removing needs the delegatable manageCrewAssignments permission
  * (ADMIN always has it) - mirrors the publishJobs pattern already used in Job Settings.
  */
-export default function JobCrewPanel({ jobId }: { jobId: string }) {
+export default function JobCrewPanel({ jobId, onReady }: { jobId: string; /** Called once the panel has loaded and shown its content. */ onReady?: () => void }) {
   const dialog = useDialog();
   const { user } = useAuth();
   const canManage = isAdminRole(user?.role) || Boolean(user?.permissions?.manageCrewAssignments);
@@ -40,15 +41,27 @@ export default function JobCrewPanel({ jobId }: { jobId: string }) {
   const [newRole, setNewRole] = useState('');
   const [newRoleRate, setNewRoleRate] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  // Held as a skeleton until the job's crew (and, for managers, the roster) have loaded once.
+  const [assignmentsReady, setAssignmentsReady] = useState(false);
+  const [rosterReady, setRosterReady] = useState(!canManage);
 
   const refresh = () => {
-    api.jobCrewAssignments.list(jobId).then(setAssignments).catch((e) => setError(e.message));
+    api.jobCrewAssignments
+      .list(jobId)
+      .then(setAssignments)
+      .catch((e) => setError(e.message))
+      .finally(() => setAssignmentsReady(true));
     api.jobRoleRates.list(jobId).then(setJobRoleRates).catch(() => {});
   };
 
   useEffect(() => {
     refresh();
-    if (canManage) api.crew.list().then(setRoster).catch(() => {});
+    if (canManage)
+      api.crew
+        .list()
+        .then(setRoster)
+        .catch(() => {})
+        .finally(() => setRosterReady(true));
     // Portal role rates are admin-only; without them the placeholders just show "-".
     if (isAdminRole(user?.role)) api.globalRoleRates.list().then(setGlobalRoleRates).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -169,6 +182,20 @@ export default function JobCrewPanel({ jobId }: { jobId: string }) {
     await api.jobCrewAssignments.remove(jobId, a.id);
     refresh();
   };
+
+  useEffect(() => {
+    if (assignmentsReady && rosterReady) onReady?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [assignmentsReady, rosterReady]);
+
+  if (!assignmentsReady || !rosterReady) {
+    return (
+      <>
+        <SkeletonPanel lines={1} rows={3} cols={6} />
+        <SkeletonPanel lines={2} rows={2} cols={3} />
+      </>
+    );
+  }
 
   return (
     <div className="panel">

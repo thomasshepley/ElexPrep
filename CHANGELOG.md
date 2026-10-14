@@ -4,6 +4,12 @@ Newest entries first. Each push/merge gets exactly one entry - see
 `scripts/bump-version.mjs` for how the version number itself advances. A `+` marks a
 feature addition, a `-` marks a bug fix.
 
+## v1.4.9 - 2026-10-14
+
++ Every page shows a placeholder shaped like its content while it loads
+- Pages no longer jump around or shift sideways as their content loads
+- Staff who are on a job's crew no longer see the admin view flash before the crew view
+
 ## v1.4.8 - 2026-10-14
 
 + Select fixtures and move them to another stage

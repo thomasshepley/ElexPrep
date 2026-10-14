@@ -1,3 +1,4 @@
+import { SkeletonList, SkeletonRegion } from '../components/Skeleton';
 import { useEffect, useState } from 'react';
 import type { PickListDiff } from '@elexprep/shared';
 import { api, type CaseGroup, type CurrentRmsPickItem, type Job } from '../api/client';
@@ -181,7 +182,9 @@ function SignageScreen() {
           {loadError ? (
             <p className="error">Could not load jobs: {loadError}</p>
           ) : !choosing ? (
-            <p className="muted">Loading…</p>
+            <SkeletonRegion>
+              <SkeletonList items={3} />
+            </SkeletonRegion>
           ) : (
             <>
               <p className="muted">Choose the job this screen should show. It will be remembered on this screen.</p>

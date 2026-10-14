@@ -1,3 +1,4 @@
+import { SkeletonTableRows } from '../components/Skeleton';
 import { useEffect, useState } from 'react';
 import { api, type FixtureTypeRule } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
@@ -10,7 +11,8 @@ const PREP_SETTINGS_NOTE = 'You can view these settings, but changing them needs
 export default function FixtureTypeRulesPage() {
   const { user } = useAuth();
   const canEdit = hasPermission(user, 'managePrepSettings');
-  const [rules, setRules] = useState<FixtureTypeRule[]>([]);
+  const [rulesLoaded, setRules] = useState<FixtureTypeRule[] | null>(null);
+  const rules = rulesLoaded ?? [];
   const [name, setName] = useState('');
   const [unitsPerCase, setUnitsPerCase] = useState(1);
   const [error, setError] = useState<string | null>(null);
@@ -89,6 +91,7 @@ export default function FixtureTypeRulesPage() {
             </tr>
           </thead>
           <tbody>
+            {rulesLoaded === null && <SkeletonTableRows rows={8} cols={5} />}
             {rules.map((r) => (
               <tr key={r.id}>
                 <td>

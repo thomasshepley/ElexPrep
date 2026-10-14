@@ -1,3 +1,4 @@
+import { SkeletonList, SkeletonRegion } from './Skeleton';
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api, type AppNotification } from '../api/client';
@@ -112,7 +113,11 @@ export default function NotificationBell({ variant = 'sidebar' }: { variant?: 's
               </button>
             )}
           </div>
-          {items === null && <p className="muted" style={{ padding: '0.75rem' }}>Loading…</p>}
+          {items === null && (
+            <SkeletonRegion style={{ padding: '0 0.8rem' }}>
+              <SkeletonList items={3} />
+            </SkeletonRegion>
+          )}
           {items !== null && items.length === 0 && <p className="muted" style={{ padding: '0.75rem' }}>No notifications yet.</p>}
           {items !== null &&
             items.map((n) => (

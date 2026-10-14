@@ -1,3 +1,4 @@
+import { SkeletonRegion, SkeletonRows } from './Skeleton';
 import { useEffect, useState } from 'react';
 import { api, type LocationColorPattern, type LocationColorRule } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
@@ -31,7 +32,8 @@ function swatchBackground(rule: Pick<LocationColorRule, 'color' | 'pattern' | 's
 export default function JobLocationColorsPanel({ jobId }: { jobId: string }) {
   const { user } = useAuth();
   const canEdit = hasPermission(user, 'editJobs');
-  const [rules, setRules] = useState<LocationColorRule[]>([]);
+  const [rulesLoaded, setRules] = useState<LocationColorRule[] | null>(null);
+  const rules = rulesLoaded ?? [];
   const [location, setLocation] = useState('');
   const [color, setColor] = useState('#1FA34C');
   const [pattern, setPattern] = useState<LocationColorPattern>('SOLID');
@@ -175,7 +177,8 @@ export default function JobLocationColorsPanel({ jobId }: { jobId: string }) {
         </div>
         </fieldset>
       )}
-      {rules.length === 0 && <p className="muted">No overrides yet for this job.</p>}
+      {rulesLoaded === null && !error && <SkeletonRegion><SkeletonRows rows={2} cols={4} /></SkeletonRegion>}
+      {rulesLoaded !== null && rules.length === 0 && <p className="muted">No overrides yet for this job.</p>}
     </div>
   );
 }

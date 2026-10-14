@@ -1,3 +1,4 @@
+import { Skeleton, SkeletonList, SkeletonRegion, SkeletonRows, SkeletonText } from '../components/Skeleton';
 import { useEffect, useState, type ReactNode } from 'react';
 import { useParams } from 'react-router-dom';
 import { api, type CrewJobDetail, type JobScheduleItem, type JobDay, type KitListItem, type JobDocument, type JobContact, type Plot, type OneDriveShare } from '../api/client';
@@ -115,6 +116,33 @@ function RequestLabelForm({ jobId }: { jobId: string }) {
   );
 }
 
+/** The crew job page's layout (title, the four cards, the Why section) while it loads. */
+function CrewJobSkeleton() {
+  return (
+    <SkeletonRegion>
+      <div className="row" style={{ justifyContent: 'space-between', flexWrap: 'wrap' }}>
+        <Skeleton w="50%" h={34} />
+        <Skeleton w={150} h={38} r={8} />
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '0.9rem', marginTop: '1.25rem' }}>
+        {['Who', 'What', 'When', 'Where'].map((label) => (
+          <div key={label} className="panel">
+            <h2 className="info-card-heading" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+              <Skeleton w={30} h={30} r={8} />
+              <span className="info-card-label">{label}</span>
+            </h2>
+            <SkeletonText lines={3} gap={9} />
+          </div>
+        ))}
+      </div>
+      <div className="panel" style={{ marginTop: '0.9rem' }}>
+        <Skeleton w="12%" h={20} style={{ marginBottom: 18 }} />
+        <Skeleton h={360} r={8} />
+      </div>
+    </SkeletonRegion>
+  );
+}
+
 export default function CrewJobPage() {
   const { jobId } = useParams<{ jobId: string }>();
   if (!jobId) return null;
@@ -129,16 +157,21 @@ export default function CrewJobPage() {
 export function CrewJobView({ jobId, toolbar, setTitle = true }: { jobId: string; toolbar?: ReactNode; setTitle?: boolean }) {
   const [detail, setDetail] = useState<CrewJobDetail | null>(null);
   usePageTitle(setTitle ? detail?.what.jobName : undefined);
-  const [schedule, setSchedule] = useState<JobScheduleItem[]>([]);
+  const [scheduleLoaded, setSchedule] = useState<JobScheduleItem[] | null>(null);
+  const schedule = scheduleLoaded ?? [];
   const [myProfileId, setMyProfileId] = useState<string | null>(null);
   const [openEntryId, setOpenEntryId] = useState<string | null>(null);
   useEffect(() => {
     api.crewPortal.me().then((me) => setMyProfileId(me.id)).catch(() => {});
   }, []);
-  const [days, setDays] = useState<JobDay[]>([]);
-  const [kitList, setKitList] = useState<KitListItem[]>([]);
-  const [documents, setDocuments] = useState<JobDocument[]>([]);
-  const [contacts, setContacts] = useState<JobContact[]>([]);
+  const [daysLoaded, setDays] = useState<JobDay[] | null>(null);
+  const days = daysLoaded ?? [];
+  const [kitListLoaded, setKitList] = useState<KitListItem[] | null>(null);
+  const kitList = kitListLoaded ?? [];
+  const [documentsLoaded, setDocuments] = useState<JobDocument[] | null>(null);
+  const documents = documentsLoaded ?? [];
+  const [contactsLoaded, setContacts] = useState<JobContact[] | null>(null);
+  const contacts = contactsLoaded ?? [];
   const [plots, setPlots] = useState<Plot[]>([]);
   const [cadPdf, setCadPdf] = useState<{ itemId: string; name: string } | null>(null);
   const [sharedFiles, setSharedFiles] = useState<OneDriveShare[]>([]);
@@ -147,11 +180,11 @@ export function CrewJobView({ jobId, toolbar, setTitle = true }: { jobId: string
   useEffect(() => {
     if (!jobId) return;
     api.crewPortal.jobDetail(jobId).then(setDetail).catch((e) => setError(e.message));
-    api.crewPortal.schedule(jobId).then(setSchedule).catch(() => {});
-    api.crewPortal.days(jobId).then(setDays).catch(() => {});
-    api.crewPortal.kitList(jobId).then((r) => setKitList(r.items)).catch(() => {});
-    api.crewPortal.documents(jobId).then(setDocuments).catch(() => {});
-    api.crewPortal.contacts(jobId).then(setContacts).catch(() => {});
+    api.crewPortal.schedule(jobId).then(setSchedule).catch(() => setSchedule([]));
+    api.crewPortal.days(jobId).then(setDays).catch(() => setDays([]));
+    api.crewPortal.kitList(jobId).then((r) => setKitList(r.items)).catch(() => setKitList([]));
+    api.crewPortal.documents(jobId).then(setDocuments).catch(() => setDocuments([]));
+    api.crewPortal.contacts(jobId).then(setContacts).catch(() => setContacts([]));
     api.crewPortal.plots(jobId).then(setPlots).catch(() => {});
     api.crewPortal
       .oneDrive(jobId)
@@ -163,7 +196,9 @@ export function CrewJobView({ jobId, toolbar, setTitle = true }: { jobId: string
   }, [jobId]);
 
   if (error) return <p className="error">{error}</p>;
-  if (!detail) return <p className="muted">Loading…</p>;
+  // Wait for everything that decides the page's layout (the cards, the day schedule, the
+  // contacts section) so sections don't appear and push each other around.
+  if (!detail || scheduleLoaded === null || daysLoaded === null || contactsLoaded === null) return <CrewJobSkeleton />;
 
   return (
     <div>
@@ -259,7 +294,8 @@ export function CrewJobView({ jobId, toolbar, setTitle = true }: { jobId: string
             </WhySubsection>
 
             <WhySubsection title="Kit list">
-              {kitList.length === 0 && <p className="muted">No kit list available for this job.</p>}
+              {kitListLoaded === null && <SkeletonRegion><SkeletonRows rows={6} cols={2} /></SkeletonRegion>}
+              {kitListLoaded !== null && kitList.length === 0 && <p className="muted">No kit list available for this job.</p>}
               {kitList.length > 0 && (
                 <div className="table-scroll">
                   <table>
@@ -283,7 +319,8 @@ export function CrewJobView({ jobId, toolbar, setTitle = true }: { jobId: string
             </WhySubsection>
 
             <WhySubsection title="Documents & files">
-              {documents.length === 0 && sharedFiles.filter((s) => !s.isCadPlot).length === 0 && (
+              {documentsLoaded === null && <SkeletonRegion><SkeletonList items={2} /></SkeletonRegion>}
+              {documentsLoaded !== null && documents.length === 0 && sharedFiles.filter((s) => !s.isCadPlot).length === 0 && (
                 <p className="muted">No documents or shared files yet.</p>
               )}
               {(documents.length > 0 || sharedFiles.some((s) => !s.isCadPlot)) && (

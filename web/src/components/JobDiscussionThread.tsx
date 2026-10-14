@@ -1,3 +1,4 @@
+import { Skeleton, SkeletonRegion } from './Skeleton';
 import { useEffect, useRef, useState } from 'react';
 import { api, type DiscussionGroup, type DiscussionGroupInput, type DiscussionMessage, type JobCrewAssignment } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
@@ -316,7 +317,13 @@ export default function JobDiscussionThread({ jobId, scope }: { jobId: string; s
         </p>
       )}
       <div className="discussion-messages" ref={listRef} onScroll={onScroll} role="log" aria-live="polite">
-        {messages === null && <p className="muted">Loading…</p>}
+        {messages === null && (
+          <SkeletonRegion label="Loading messages…" className="discussion-skeleton">
+            {['58%', '42%', '66%', '38%'].map((w, i) => (
+              <Skeleton key={i} w={w} h={i % 2 ? 54 : 70} r={10} style={{ alignSelf: i % 2 ? 'flex-end' : 'flex-start' }} />
+            ))}
+          </SkeletonRegion>
+        )}
         {messages !== null && messages.length === 0 && (
           <p className="muted">No messages in {currentGroup?.name ?? 'this group'} yet - say hello.</p>
         )}

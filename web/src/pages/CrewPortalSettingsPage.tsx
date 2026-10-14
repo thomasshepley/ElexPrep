@@ -1,3 +1,4 @@
+import { Skeleton, SkeletonPanel } from '../components/Skeleton';
 import { useEffect, useState } from 'react';
 import { api, type CrewFeatures, CREW_FEATURE_KEYS, CREW_FEATURE_LABELS } from '../api/client';
 
@@ -32,7 +33,13 @@ export default function CrewPortalSettingsPage() {
     }
   };
 
-  if (!features) return error ? <p className="error">Could not load crew portal settings: {error}</p> : <p className="muted">Loading…</p>;
+  if (!features) return error ? <p className="error">Could not load crew portal settings: {error}</p> : (
+      <div>
+        <h1>Crew Portal</h1>
+        <Skeleton w="60%" h={14} style={{ marginBottom: 20 }} />
+        <SkeletonPanel lines={6} />
+      </div>
+    );
 
   return (
     <div>

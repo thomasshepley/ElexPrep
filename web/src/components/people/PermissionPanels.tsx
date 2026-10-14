@@ -1,3 +1,4 @@
+import { SkeletonRegion, SkeletonRows } from '../Skeleton';
 import { useEffect, useState } from 'react';
 import { api, type PermissionKey } from '../../api/client';
 
@@ -63,7 +64,7 @@ export function UserPermissionsPanel({ userId }: { userId: string }) {
         here applies to this account only.
       </p>
       {error && <p className="error">{error}</p>}
-      {!permissions && <p className="muted">Loading…</p>}
+      {!permissions && <SkeletonRegion><SkeletonRows rows={6} cols={2} /></SkeletonRegion>}
       {permissions && (
         <div className="table-scroll">
           <table>
@@ -116,7 +117,7 @@ export function RoleBaselinePanel() {
 
   return (
     <div style={{ paddingTop: '0.5rem' }}>
-      {!permissions && <p className="muted">Loading…</p>}
+      {!permissions && <SkeletonRegion><SkeletonRows rows={6} cols={2} /></SkeletonRegion>}
       {permissions && (
         <div className="table-scroll">
           <table>

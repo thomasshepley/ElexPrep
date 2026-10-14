@@ -1,3 +1,4 @@
+import { SkeletonList, SkeletonRegion } from '../components/Skeleton';
 import { useEffect, useState } from 'react';
 import { api, type OnboardingInvite } from '../api/client';
 import { useDialog } from '../components/Dialog';
@@ -15,7 +16,8 @@ function statusChipClass(status: string) {
 export default function OnboardingPage() {
   const dialog = useDialog();
   const [filter, setFilter] = useState<StatusFilter>('PENDING');
-  const [invites, setInvites] = useState<OnboardingInvite[]>([]);
+  const [invitesLoaded, setInvites] = useState<OnboardingInvite[] | null>(null);
+  const invites = invitesLoaded ?? [];
   const [error, setError] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
@@ -78,7 +80,8 @@ export default function OnboardingPage() {
       </div>
 
       {error && <p className="error">{error}</p>}
-      {invites.length === 0 && <p className="muted">No requests here.</p>}
+      {invitesLoaded === null && !error && <SkeletonRegion className="panel"><SkeletonList items={3} /></SkeletonRegion>}
+      {invitesLoaded !== null && invites.length === 0 && <p className="muted">No requests here.</p>}
 
       {invites.map((i) => (
         <div key={i.id} className="panel">

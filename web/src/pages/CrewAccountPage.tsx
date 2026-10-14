@@ -1,3 +1,4 @@
+import { SkeletonPanel } from '../components/Skeleton';
 import { useEffect, useState } from 'react';
 import { api, type BankDetails, type CrewMe } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
@@ -122,7 +123,14 @@ export default function CrewAccountPage() {
     }
   };
 
-  if (!me) return <p className="muted">Loading…</p>;
+  if (!me)
+    return (
+      <div>
+        <h1>My account</h1>
+        <SkeletonPanel lines={5} />
+        <SkeletonPanel lines={3} />
+      </div>
+    );
 
   return (
     <div>

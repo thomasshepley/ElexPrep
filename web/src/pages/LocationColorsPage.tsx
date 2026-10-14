@@ -1,3 +1,4 @@
+import { SkeletonTableRows } from '../components/Skeleton';
 import { useEffect, useState } from 'react';
 import { api, type LocationColorPattern, type LocationColorRule } from '../api/client';
 import { useToast } from '../components/Toast';
@@ -34,7 +35,8 @@ export default function LocationColorsPage() {
   const { user } = useAuth();
   const canEdit = hasPermission(user, 'managePrepSettings');
   const { showToast } = useToast();
-  const [rules, setRules] = useState<LocationColorRule[]>([]);
+  const [rulesLoaded, setRules] = useState<LocationColorRule[] | null>(null);
+  const rules = rulesLoaded ?? [];
   const [location, setLocation] = useState('');
   const [color, setColor] = useState('#1FA34C');
   const [pattern, setPattern] = useState<LocationColorPattern>('SOLID');
@@ -129,6 +131,7 @@ export default function LocationColorsPage() {
             </tr>
           </thead>
           <tbody>
+            {rulesLoaded === null && <SkeletonTableRows rows={8} cols={6} />}
             {rules.map((r) => (
               <tr key={r.id}>
                 <td>{r.location}</td>

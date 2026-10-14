@@ -1,3 +1,4 @@
+import { Skeleton, SkeletonPanel } from '../components/Skeleton';
 import { useEffect, useState } from 'react';
 import { api, type CurrentRmsConfig, type CurrentRmsOpportunity } from '../api/client';
 import PasswordInput from '../components/PasswordInput';
@@ -130,7 +131,13 @@ export default function CurrentRmsSettingsPage() {
     }
   };
 
-  if (!config) return loadError ? <p className="error">Could not load Current RMS settings: {loadError}</p> : <p className="muted">Loading…</p>;
+  if (!config) return loadError ? <p className="error">Could not load Current RMS settings: {loadError}</p> : (
+      <div>
+        <h1>Current RMS</h1>
+        <Skeleton w="60%" h={14} style={{ marginBottom: 20 }} />
+        <SkeletonPanel lines={5} /><SkeletonPanel rows={4} cols={4} />
+      </div>
+    );
 
   return (
     <div>
