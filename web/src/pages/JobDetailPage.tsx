@@ -29,6 +29,7 @@ import { SkeletonPanel } from '../components/Skeleton';
 
 // Admin-only beta, loaded only when opened.
 const CableTab = lazy(() => import('../components/CableTab'));
+const RiggingTab = lazy(() => import('../components/rigging/RiggingTab'));
 
 type JobView = 'admin' | 'crew';
 
@@ -62,10 +63,11 @@ function ViewSwitch({ view, onChange }: { view: JobView; onChange: (v: JobView) 
   );
 }
 
-const TABS = ['Prep', 'Plots', 'Schedule', 'Documents', 'Contacts', 'Crew', 'Discussion', 'Current RMS', 'Cable (beta)', 'Job Settings'] as const;
+// Cable and Rigging are part of prep, so they sit straight under it.
+const TABS = ['Prep', 'Cable (beta)', 'Rigging (beta)', 'Plots', 'Schedule', 'Documents', 'Contacts', 'Crew', 'Discussion', 'Current RMS', 'Job Settings'] as const;
 type Tab = (typeof TABS)[number];
 /** Tabs only admins see. */
-const ADMIN_TABS: readonly Tab[] = ['Cable (beta)'];
+const ADMIN_TABS: readonly Tab[] = ['Cable (beta)', 'Rigging (beta)'];
 
 export default function JobDetailPage() {
   const { jobId } = useParams<{ jobId: string }>();
@@ -161,6 +163,11 @@ export default function JobDetailPage() {
           {tab === 'Cable (beta)' && isAdmin && (
             <Suspense fallback={<SkeletonPanel rows={5} cols={6} />}>
               <CableTab jobId={jobId} />
+            </Suspense>
+          )}
+          {tab === 'Rigging (beta)' && isAdmin && (
+            <Suspense fallback={<SkeletonPanel height={360} />}>
+              <RiggingTab jobId={jobId} jobName={job.name} />
             </Suspense>
           )}
           {tab === 'Job Settings' && job && <JobSettingsPanel job={job} onUpdate={setJob} />}

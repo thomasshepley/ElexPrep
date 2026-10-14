@@ -11,7 +11,7 @@
 //
 // Lines that belong to a named area go under that area's heading: put `section "<Name>"` before
 // them and every following pair lands under "### <Name>" until the next `section`. Known areas:
-// "Signage Mode" and "Cable calculator (beta)".
+// "Signage Mode", "Cable calculator (beta)" and "Rigging (beta)".
 //
 //   node scripts/bump-version.mjs feature "Faster search" section "Signage Mode" feature "Bays" fix "Clock drift"
 //

@@ -33,8 +33,8 @@ test('reads the rotated rigging points table and builds the trusses', () => {
   assert.deepEqual(
     trusses.map((t) => [t.position, t.lengthM, t.yM, t.pickOffsetM]),
     [
-      ['DS', 8, -3.6, 1.5],
-      ['US', 8, -6.6, 1.5],
+      ['DS', 9, -3.6, 1],
+      ['US', 9, -6.6, 1],
     ]
   );
 });
@@ -43,5 +43,5 @@ const botm = process.env.BOTM_PDF;
 test('reads the real BOTM plot when BOTM_PDF points at it', { skip: !botm || !fs.existsSync(botm ?? '') }, async () => {
   const geo = await readPlotGeometry(new Uint8Array(fs.readFileSync(path.resolve(botm!))));
   assert.equal(geo.lxPanelFound, true);
-  assert.deepEqual(geo.trusses.map((t) => [t.position, t.lengthM, t.pickOffsetM]), [['DS', 8, 1.5], ['US', 8, 1.5]]);
+  assert.deepEqual(geo.trusses.map((t) => [t.position, t.lengthM, t.pickOffsetM]), [['DS', 9, 1], ['US', 9, 1]]);
 });

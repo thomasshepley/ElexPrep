@@ -103,6 +103,7 @@ model Job {
   screenDevices           ScreenDevice[]
   positions               JobPosition[]
   cablePlan               CablePlan?
+  riggingPlan             RiggingPlan?
   plotExtractions         PlotExtraction[]
 }
 
@@ -1208,6 +1209,10 @@ model FixtureProfile {
   /// Other names a patch uses for it, comma separated.
   aliases        String?
   notes          String?
+  /// Bare weight for the rigging calculator, kg.
+  weightKg       Float?
+  /// Clamp and safety bond, kg; null uses the rigging settings default.
+  clampKg        Float?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 }
@@ -1265,4 +1270,63 @@ model PlotExtraction {
   confirmedAt DateTime?
 
   @@unique([jobId, sourceHash])
+}
+
+/// A truss type for the rigging calculator: its own weight and the maker's allowable load table.
+model TrussProfile {
+  id              String   @id @default(cuid())
+  name            String   @unique
+  maker           String?
+  kgPerM          Float
+  /// [{ spanM, udlKgPerM }]: allowable distributed payload on a single span, from the maker's table.
+  spanTableJson   String   @default("[]")
+  /// Longest cantilever as a share of the adjacent span.
+  cantileverRatio Float    @default(0.25)
+  source          String?
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+/// A chain hoist model: rated load, class and its own weight (body plus chain).
+model HoistModel {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  ratedKg     Float
+  /// D8 | D8+ | C1
+  hoistClass  String   @default("D8+")
+  bodyKg      Float
+  chainKgPerM Float
+  chainM      Float    @default(20)
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+/// A job's rig for the rigging calculator: what was changed on top of the plot and patch (fixture
+/// positions, hoists, capacities, profiles), and the record of who calculated and checked it.
+model RiggingPlan {
+  id             String    @id @default(cuid())
+  jobId          String    @unique
+  job            Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  overridesJson  String    @default("{}")
+  method         String    @default("envelope")
+  calculatedById String?
+  calculatedAt   DateTime?
+  checkedByName  String?
+  checkedAt      DateTime?
+  /// The rig and results as they were when checked, so the record can be reproduced.
+  snapshotJson   String?
+  updatedAt      DateTime  @updatedAt
+}
+
+/// Point capacities for a venue, saved so a repeat venue doesn't need them typed in again.
+model VenuePointSet {
+  id         String   @id @default(cuid())
+  /// The venue name, lowercased.
+  venueKey   String   @unique
+  venueName  String
+  /// [{ name, capacityKg }]
+  pointsJson String
+  updatedAt  DateTime @updatedAt
 }

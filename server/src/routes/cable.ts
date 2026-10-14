@@ -75,7 +75,19 @@ export async function getCableRules(): Promise<CableRules> {
   }
 }
 
-async function profiles() {
+let seedingFixtures: Promise<void> | null = null;
+
+export async function fixtureProfiles() {
+  // Once, even when several requests arrive together on a fresh database.
+  seedingFixtures ??= seedFixtureProfiles().catch((err) => {
+    seedingFixtures = null;
+    throw err;
+  });
+  await seedingFixtures;
+  return prisma.fixtureProfile.findMany({ orderBy: { displayName: 'asc' } });
+}
+
+async function seedFixtureProfiles() {
   if ((await prisma.fixtureProfile.count()) === 0) {
     await prisma.fixtureProfile.createMany({
       data: SEED_FIXTURE_PROFILES.map((p) => ({
@@ -91,13 +103,13 @@ async function profiles() {
         inrushA: p.inrushA ?? null,
         aliases: p.aliases ?? null,
         notes: p.notes ?? null,
+        weightKg: p.weightKg ?? null,
       })),
     });
   }
-  return prisma.fixtureProfile.findMany({ orderBy: { displayName: 'asc' } });
 }
 
-function toProfileLike(p: Awaited<ReturnType<typeof profiles>>[number]): FixtureProfileLike {
+function toProfileLike(p: Awaited<ReturnType<typeof fixtureProfiles>>[number]): FixtureProfileLike {
   return {
     typeKey: p.typeKey,
     displayName: p.displayName,
@@ -143,7 +155,9 @@ function profileData(body: Record<string, unknown>): { data?: Record<string, unk
   const amps = optNum(body.amps, 63);
   const maxPerLine = optNum(body.maxPerLine, 64);
   const inrushA = optNum(body.inrushA, 500);
-  if ([amps, maxPerLine, inrushA].some((n) => Number.isNaN(n))) return { error: 'Amps, per-line and inrush must be numbers' };
+  const weightKg = optNum(body.weightKg, 2000);
+  const clampKg = optNum(body.clampKg, 50);
+  if ([amps, maxPerLine, inrushA, weightKg, clampKg].some((n) => Number.isNaN(n))) return { error: 'Amps, per-line, inrush and weights must be numbers' };
   return {
     data: {
       displayName,
@@ -158,12 +172,14 @@ function profileData(body: Record<string, unknown>): { data?: Record<string, unk
       inrushA,
       aliases: typeof body.aliases === 'string' && body.aliases.trim() ? body.aliases.trim().slice(0, 300) : null,
       notes: typeof body.notes === 'string' && body.notes.trim() ? body.notes.trim().slice(0, 300) : null,
+      weightKg,
+      clampKg,
     },
   };
 }
 
 cableRouter.get('/profiles', requireRole('ADMIN'), async (_req, res) => {
-  res.json(await profiles());
+  res.json(await fixtureProfiles());
 });
 
 cableRouter.post('/profiles', requireRole('ADMIN'), requirePermission('managePrepSettings'), async (req, res) => {
@@ -203,7 +219,7 @@ function guessKind(name: string): PositionKind {
 
 /** Positions from the patch's Position column (prefixed with the stage on a multi-stage job),
  * creating any new ones; fixtures with no position are listed as unplaced. */
-async function syncPositions(jobId: string) {
+export async function syncPositions(jobId: string) {
   const fixtures = await prisma.fixture.findMany({ where: { jobId }, include: { group: { select: { name: true } } }, orderBy: { address: 'asc' } });
   const usesStages = fixtures.some((f) => f.groupId);
   const nameFor = (f: (typeof fixtures)[number]) => {
@@ -221,8 +237,8 @@ async function syncPositions(jobId: string) {
   return { fixtures, positions, nameFor, inPatch: new Set(names) };
 }
 
-async function buildInputs(jobId: string) {
-  const [{ fixtures, positions, nameFor, inPatch }, rules, profs] = await Promise.all([syncPositions(jobId), getCableRules(), profiles()]);
+export async function buildInputs(jobId: string) {
+  const [{ fixtures, positions, nameFor, inPatch }, rules, profs] = await Promise.all([syncPositions(jobId), getCableRules(), fixtureProfiles()]);
   const like = profs.map(toProfileLike);
   const profileCache = new Map<string, FixtureProfileLike | null>();
   const profileFor = (type: string) => {

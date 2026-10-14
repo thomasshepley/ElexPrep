@@ -17,6 +17,8 @@ export interface FixtureProfile {
   inrushA: number | null;
   aliases: string | null;
   notes: string | null;
+  weightKg: number | null;
+  clampKg: number | null;
 }
 
 export type FixtureProfileInput = Omit<FixtureProfile, 'id' | 'typeKey'>;

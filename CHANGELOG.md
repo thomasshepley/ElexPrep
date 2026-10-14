@@ -4,6 +4,30 @@ Newest entries first. Each push/merge gets exactly one entry - see
 `scripts/bump-version.mjs` for how the version number itself advances. A `+` marks a
 feature addition, a `-` marks a bug fix.
 
+## v1.6.5 - 2026-10-14
+
++ The Cable and Rigging tabs sit directly under Prep on each job, since they're part of prep
+
+### Rigging (beta)
+
++ (Beta) Only admins can see the rigging calculator for now
++ (Beta) A Rigging tab on each job that works out the load on every hoist and venue point from the CAD plot, the patch and the cable plan
++ (Beta) Every load is static with a 10% safety margin added, and includes the motor, its chain and a rigging allowance
++ (Beta) Each point shows OK, Warning, Over capacity, Unknown capacity or Uplift against what it may carry
++ (Beta) Trusses on three or more hoists use the larger of the tributary and continuous beam answers, or either one on its own
++ (Beta) Switch between a plan map, an elevation per truss and a card per point, with point cards by default on phones
++ (Beta) Drag fixtures along a truss in the elevation and watch the loads change
++ (Beta) Each point shows how its load is worked out, line by line
++ (Beta) Truss checks against the maker's span table, with cantilevers that are too long flagged
++ (Beta) Point capacities come from the plot, from capacities saved for the venue, or typed in
++ (Beta) Print sheet and point table CSV with the method, margin, Calculated by and Checked by lines
++ (Beta) Rigging settings for the margin, warning levels, cable weights, trusses and hoists, with CM and EXE motors from 250 kg to 1 t
+
+### Cable calculator (beta)
+
++ (Beta) The fixture database has its own settings page, with each fixture's weight for rigging
+- (Beta) The cable calculator reads 9 m trusses from the plot correctly instead of 8 m
+
 ## v1.6.4 - 2026-10-14
 
 - CAD plots are in one place on the Plots tab instead of split between CAD and Plot CAD PDFs

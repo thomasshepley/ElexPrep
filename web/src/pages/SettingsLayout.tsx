@@ -24,7 +24,9 @@ const GROUPS: { title: string; sections: SettingsSection[] }[] = [
       { to: '/settings/import-mapping', label: 'Import Mapping' },
       { to: '/settings/printer', label: 'Printer', adminOnly: true },
       { to: '/settings/prep-bays', label: 'Prep bays', permission: 'managePrepSettings' },
+      { to: '/settings/fixtures', label: 'Fixture database', adminOnly: true },
       { to: '/settings/cable-rules', label: 'Cable rules', adminOnly: true },
+      { to: '/settings/rigging', label: 'Rigging', adminOnly: true },
     ],
   },
   {

@@ -14,6 +14,8 @@ import { prepApi } from './domains/prep';
 import { integrationsApi } from './domains/integrations';
 import { baysApi } from './domains/bays';
 import { cableApi } from './domains/cable';
+import { riggingApi } from './domains/rigging';
+export * from './domains/rigging';
 export * from './domains/cable';
 export * from './domains/bays';
 
@@ -25,4 +27,5 @@ export const api = {
   ...integrationsApi,
   ...baysApi,
   ...cableApi,
+  ...riggingApi,
 };

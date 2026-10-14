@@ -48,7 +48,9 @@ export interface PlotGeometry {
 }
 
 /** How far a truss is taken to run past its outermost rigging points, each end. */
-export const TRUSS_OVERHANG_M = 0.5;
+// Measured on Elex's own WYSIWYG template (BOTM HQ3): 9 m trusses on outer points 7 m apart, with
+// fixtures hanging 0.5 m beyond the outer points, so 1 m each end.
+export const TRUSS_OVERHANG_M = 1;
 
 const HEADERS = ['name', 'x', 'y', 'capacity', 'load', 'position', 'notes'] as const;
 type Column = (typeof HEADERS)[number];
@@ -199,6 +201,10 @@ export async function readPlotGeometry(data: Uint8Array): Promise<PlotGeometry> 
   return { points, trusses: trussesFromPoints(points), lxPanelFound, notes };
 }
 
+/** Bumped whenever the reader changes what it reports, so plots read before are read again. */
+export const PLOT_READER_VERSION = 2;
+
+/** The cache key for a plot: its content plus the reader version. */
 export function hashBytes(data: Uint8Array) {
-  return crypto.createHash('sha256').update(data).digest('hex');
+  return `${crypto.createHash('sha256').update(data).digest('hex')}:v${PLOT_READER_VERSION}`;
 }

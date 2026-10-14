@@ -69,8 +69,8 @@ export default function CableTab({ jobId }: { jobId: string }) {
   return (
     <div className="cable-tab">
       <p className="cable-beta">
-        <strong>Beta.</strong> A prep aid that gets the pack most of the way there and shows its working. Check it before you pull. Rules and the fixture
-        database are in <Link to="/settings/cable-rules">Settings, Cable rules</Link>.
+        <strong>Beta.</strong> A prep aid that gets the pack most of the way there and shows its working. Check it before you pull. The rules are in{' '}
+        <Link to="/settings/cable-rules">Settings, Cable rules</Link> and each fixture's power and connectors are in <Link to="/settings/fixtures">the fixture database</Link>.
       </p>
 
       <section className="panel">
@@ -87,7 +87,7 @@ export default function CableTab({ jobId }: { jobId: string }) {
             <strong>Fixture database:</strong>{' '}
             {data.inputs.unknownTypes.length ? (
               <>
-                not listed yet: {data.inputs.unknownTypes.join(', ')}. <Link to="/settings/cable-rules">Add them</Link> for their power and connectors.
+                not listed yet: {data.inputs.unknownTypes.join(', ')}. <Link to="/settings/fixtures">Add them</Link> for their power and connectors.
               </>
             ) : (
               'every fixture type is known'
