@@ -5341,3 +5341,635 @@ div.bay-center {
     margin: 0 0 14pt;
   }
 }
+
+/* Truck pack (alpha) */
+:root {
+  --tp-rigging: #d9534f;
+  --tp-power: #d9a521;
+  --tp-cable: #3b82c4;
+  --tp-fixtures: #02a3b0;
+  --tp-control: #9b7ad6;
+  --tp-other: #8a8f9c;
+}
+.tp-cat-rigging {
+  --tp-c: var(--tp-rigging);
+}
+.tp-cat-power {
+  --tp-c: var(--tp-power);
+}
+.tp-cat-cable {
+  --tp-c: var(--tp-cable);
+}
+.tp-cat-fixtures {
+  --tp-c: var(--tp-fixtures);
+}
+.tp-cat-control {
+  --tp-c: var(--tp-control);
+}
+.tp-cat-other {
+  --tp-c: var(--tp-other);
+}
+.tp-banner {
+  padding: 0.6rem 0.9rem;
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--pm) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--pm) 40%, transparent);
+  margin: 0 0 1rem;
+}
+.tp-note {
+  margin: 0 0 1rem;
+  padding: 0.6rem 0.9rem;
+  border-radius: var(--radius-md);
+  border: 1px dashed var(--border-strong);
+  color: var(--content-muted);
+}
+.tp-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-4);
+}
+.tp-toolbar .tp-views {
+  margin: 0;
+}
+.tp-toolbar .row-actions {
+  margin-left: auto;
+}
+.tp-source {
+  min-width: 16rem;
+}
+.tp-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+.tp-summary > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--border);
+  min-width: 0;
+}
+.tp-summary > div.is-ok {
+  border-left-color: var(--success);
+}
+.tp-summary > div.is-warning {
+  border-left-color: var(--warning);
+}
+.tp-summary-n {
+  font-size: var(--text-lg);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.tp-vehicle-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
+  gap: var(--space-2);
+}
+.tp-vehicle {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.15rem;
+  text-align: left;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--content);
+  font-weight: 400;
+}
+.tp-vehicle:hover:not(:disabled) {
+  border-color: var(--border-strong);
+}
+.tp-vehicle.is-shown {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+.tp-vehicle.is-nofit {
+  opacity: 0.75;
+}
+.tp-vehicle-name {
+  font-weight: 600;
+}
+.tp-vehicle-size {
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+.tp-fit {
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+.tp-fit.is-ok {
+  color: var(--success);
+}
+.tp-fit.is-no {
+  color: var(--content-muted);
+}
+.tp-pack-tabs {
+  margin-top: var(--space-3);
+}
+/* Vehicles are long and thin, so the drawing gets the full width and the details sit below. */
+.tp-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+.tp-layout > .panel {
+  margin: 0;
+}
+.tp-main {
+  min-width: 0;
+}
+.tp-inspector {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+  gap: var(--space-4);
+  align-items: start;
+  min-width: 0;
+}
+.tp-inspector > .panel {
+  margin: 0;
+}
+
+/* Drawings */
+.tp-drawing {
+  overflow: hidden;
+}
+.tp-drawing > svg {
+  display: block;
+  max-width: 100%;
+}
+.tp-floor {
+  fill: var(--surface-sunken);
+  stroke: var(--border-strong);
+  stroke-width: 1.5;
+}
+.tp-wall {
+  fill: color-mix(in srgb, var(--surface-sunken) 60%, transparent);
+  stroke: var(--border);
+}
+.tp-outline {
+  fill: none;
+  stroke: var(--border-strong);
+  stroke-width: 1.5;
+  stroke-dasharray: 5 4;
+}
+.tp-cab {
+  fill: none;
+  stroke: var(--content-muted);
+  stroke-width: 1.5;
+}
+.tp-doors {
+  stroke: var(--content-muted);
+  stroke-width: 3;
+  stroke-dasharray: 6 4;
+}
+.tp-end-label,
+.tp-tick-label {
+  fill: var(--content-muted);
+  font-size: 11px;
+}
+.tp-end-label {
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.tp-tick {
+  stroke: var(--content-muted);
+}
+.tp-hatch-line {
+  stroke: var(--content-muted);
+  stroke-width: 1.5;
+}
+.tp-arch {
+  stroke: var(--border-strong);
+}
+.tp-roofline {
+  stroke: var(--content-muted);
+  stroke-dasharray: 4 4;
+}
+.tp-stack {
+  cursor: pointer;
+}
+.tp-stack rect {
+  fill: color-mix(in srgb, var(--tp-c) 72%, var(--surface));
+  stroke: color-mix(in srgb, var(--tp-c) 60%, black);
+  stroke-width: 1;
+}
+.tp-stack.is-current rect,
+.tp-box.is-current polygon {
+  stroke: var(--content);
+  stroke-width: 2.5;
+}
+.tp-stack.is-selected rect,
+.tp-box.is-selected polygon {
+  stroke: var(--accent);
+  stroke-width: 3;
+}
+.tp-stack:focus-visible {
+  outline: none;
+}
+.tp-stack:focus-visible rect {
+  stroke: var(--accent);
+  stroke-width: 3;
+}
+.tp-stack-num,
+.tp-side-num {
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  fill: #fff;
+  paint-order: stroke;
+  stroke: rgba(0, 0, 0, 0.45);
+  stroke-width: 2.5px;
+}
+.tp-side-num {
+  fill: var(--content);
+  stroke: none;
+}
+.tp-stack-high {
+  font-size: 9.5px;
+  font-weight: 700;
+  fill: #fff;
+  opacity: 0.9;
+}
+.tp-cog circle {
+  fill: none;
+  stroke: var(--content);
+  stroke-width: 2;
+}
+.tp-cog line {
+  stroke: var(--content);
+  stroke-width: 2;
+}
+.tp-box {
+  cursor: pointer;
+}
+.tp-box polygon {
+  stroke: color-mix(in srgb, var(--tp-c) 50%, black);
+  stroke-width: 0.75;
+  stroke-linejoin: round;
+}
+.tp-face-front {
+  fill: color-mix(in srgb, var(--tp-c) 78%, var(--surface));
+}
+.tp-face-top {
+  fill: color-mix(in srgb, var(--tp-c) 55%, white);
+}
+.tp-face-side {
+  fill: color-mix(in srgb, var(--tp-c) 70%, black);
+}
+
+/* Stepping through the load */
+.tp-stepper {
+  margin-top: var(--space-3);
+  border-top: 1px solid var(--border);
+  padding-top: var(--space-3);
+}
+.tp-stepper-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.tp-stepper-controls input[type='range'] {
+  flex: 1;
+  accent-color: var(--accent);
+}
+.tp-stepper-text {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-sm);
+  min-height: 2.6em;
+}
+.tp-step {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.9rem;
+  height: 1.9rem;
+  padding: 0 0.3rem;
+  border-radius: 999px;
+  background: var(--tp-c, var(--accent));
+  color: #fff;
+  font-weight: 700;
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  flex: none;
+}
+.tp-card {
+  border-left: 4px solid var(--tp-c);
+}
+.tp-card-head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+.tp-facts {
+  margin: var(--space-3) 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2) var(--space-3);
+  font-size: var(--text-sm);
+}
+.tp-facts dt {
+  color: var(--content-muted);
+  font-size: var(--text-xs);
+}
+.tp-facts dd {
+  margin: 0;
+  font-weight: 600;
+}
+.tp-stack-cases {
+  margin: 0;
+  padding-left: 1.4rem;
+  font-size: var(--text-sm);
+}
+.tp-weight h3,
+.tp-hint h3 {
+  margin-top: 0;
+}
+.tp-payload-bar {
+  height: 10px;
+  border-radius: 5px;
+  background: var(--surface-sunken);
+  overflow: hidden;
+}
+.tp-payload-bar span {
+  display: block;
+  height: 100%;
+  background: var(--success);
+}
+.tp-payload.is-near .tp-payload-bar span {
+  background: var(--warning);
+}
+.tp-payload.is-over .tp-payload-bar span {
+  background: var(--danger);
+}
+.tp-payload p {
+  margin: var(--space-2) 0;
+}
+.tp-flag {
+  margin: var(--space-2) 0 0;
+  padding: 0.4rem 0.6rem;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--warning) 14%, transparent);
+  color: var(--warning);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+.tp-legend {
+  list-style: none;
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 0.9rem;
+  font-size: var(--text-xs);
+  color: var(--content-muted);
+}
+.tp-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.tp-swatch {
+  display: inline-block;
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 3px;
+  background: var(--tp-c);
+  flex: none;
+}
+.tp-chip {
+  display: inline-flex;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: color-mix(in srgb, var(--tp-c) 75%, var(--content));
+  background: color-mix(in srgb, var(--tp-c) 16%, transparent);
+  white-space: nowrap;
+}
+
+/* Load order */
+.tp-steps > p {
+  margin-top: 0;
+}
+.tp-step-group + .tp-step-group {
+  margin-top: var(--space-4);
+}
+.tp-step-group h3 {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-2);
+}
+.tp-step-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
+  gap: var(--space-2);
+}
+.tp-step-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  text-align: left;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--tp-c);
+  background: var(--surface);
+  color: var(--content);
+  font-weight: 400;
+}
+.tp-step-card.is-selected {
+  box-shadow: 0 0 0 2px var(--accent);
+}
+.tp-step-body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.tp-step-body .muted {
+  font-size: var(--text-xs);
+}
+
+/* Tables and forms */
+.tp-manifest td {
+  vertical-align: middle;
+}
+.tp-reset {
+  margin-left: 0.4rem;
+  font-size: var(--text-xs);
+}
+.tp-unplaced {
+  border-left: 4px solid var(--warning);
+}
+.tp-unplaced ul,
+.tp-unknown ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.tp-unknown {
+  margin-top: var(--space-4);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
+}
+.tp-unknown h3 {
+  margin: 0;
+}
+.tp-unknown-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+}
+.tp-unknown-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.tp-ignored {
+  margin-top: var(--space-3);
+}
+.tp-ignored summary {
+  cursor: pointer;
+  color: var(--content-muted);
+}
+.tp-add-case {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
+}
+.tp-add-case .field:nth-child(3) {
+  flex: 1 1 12rem;
+}
+.tp-assumptions {
+  margin: 0;
+  padding-left: 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.tp-order {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-width: 26rem;
+  counter-reset: tp-order;
+}
+.tp-order li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  counter-increment: tp-order;
+}
+.tp-order li::before {
+  content: counter(tp-order) '.';
+  width: 1.4rem;
+  color: var(--content-muted);
+  font-variant-numeric: tabular-nums;
+}
+.tp-order-name {
+  flex: 1;
+}
+tr.is-muted td {
+  opacity: 0.6;
+}
+
+@media (max-width: 760px) {
+  .tp-toolbar .row-actions {
+    margin-left: 0;
+  }
+  .tp-source {
+    min-width: 0;
+    flex: 1 1 100%;
+  }
+  .tp-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-2);
+  }
+  .tp-summary > div {
+    padding: var(--space-2) var(--space-3);
+  }
+  .tp-vehicle-list,
+  .tp-step-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Print: only the truck pack sheet. */
+.tp-print {
+  display: none;
+}
+@media print {
+  body.print-truck > :not(.tp-print) {
+    display: none !important;
+  }
+  body.print-truck .tp-print {
+    display: block;
+    color: #000;
+    background: #fff;
+    font-size: 10pt;
+    --content: #000;
+    --content-muted: #444;
+    --surface: #fff;
+    --surface-raised: #fff;
+    --surface-sunken: #f0f0f0;
+    --border: #999;
+    --border-strong: #666;
+    --accent: #000;
+  }
+  body.print-truck .tp-print h1 {
+    font-size: 16pt;
+    margin: 0 0 6pt;
+  }
+  body.print-truck .tp-print h2 {
+    font-size: 12pt;
+    margin: 10pt 0 4pt;
+  }
+  body.print-truck .tp-print-vehicle {
+    break-inside: avoid-page;
+  }
+  body.print-truck .tp-print-steps {
+    columns: 2;
+    font-size: 9pt;
+  }
+  body.print-truck .tp-print table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 9pt;
+  }
+  body.print-truck .tp-print th,
+  body.print-truck .tp-print td {
+    border: 0.5pt solid #999;
+    padding: 2pt 4pt;
+    text-align: left;
+  }
+}

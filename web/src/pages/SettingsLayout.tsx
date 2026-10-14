@@ -27,6 +27,7 @@ const GROUPS: { title: string; sections: SettingsSection[] }[] = [
       { to: '/settings/fixtures', label: 'Fixture database', adminOnly: true },
       { to: '/settings/cable-rules', label: 'Cable rules', adminOnly: true },
       { to: '/settings/rigging', label: 'Rigging', adminOnly: true },
+      { to: '/settings/truck-pack', label: 'Truck pack', webmasterOnly: true },
     ],
   },
   {

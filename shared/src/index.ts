@@ -14,3 +14,5 @@ export * from './cablePlan';
 export * from './cableFixtures';
 export * from './rigging';
 export * from './riggingSeeds';
+export * from './truckPack';
+export * from './truckPackSeeds';

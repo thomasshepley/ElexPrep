@@ -23,6 +23,7 @@ const PrepBaysPage = lazy(() => import('./pages/PrepBaysPage'))
 const CableRulesPage = lazy(() => import('./pages/CableRulesPage'))
 const FixtureDatabasePage = lazy(() => import('./pages/FixtureDatabasePage'))
 const RiggingSettingsPage = lazy(() => import('./pages/RiggingSettingsPage'))
+const TruckPackSettingsPage = lazy(() => import('./pages/TruckPackSettingsPage'))
 const CrewJobPage = lazy(() => import('./pages/CrewJobPage'))
 const CrewAccountPage = lazy(() => import('./pages/CrewAccountPage'))
 const SettingsLayout = lazy(() => import('./pages/SettingsLayout'))
@@ -79,6 +80,7 @@ export default function AppRoutes() {
               <Route path="cable-rules" element={<CableRulesPage />} />
               <Route path="fixtures" element={<FixtureDatabasePage />} />
               <Route path="rigging" element={<RiggingSettingsPage />} />
+              <Route path="truck-pack" element={<TruckPackSettingsPage />} />
               <Route path="current-rms" element={<CurrentRmsSettingsPage />} />
               <Route path="onedrive" element={<OneDriveSettingsPage />} />
               <Route path="crew-portal" element={<CrewPortalSettingsPage />} />

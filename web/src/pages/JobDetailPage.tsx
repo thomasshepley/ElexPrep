@@ -23,13 +23,15 @@ import { useDialog } from '../components/Dialog';
 import { useAsyncAction } from '../hooks/useAsyncAction';
 import { toDatetimeLocal } from '../utils/format';
 import UserName from '../components/UserName';
-import type { JobProjectManager } from '../api/client';
+import type { JobProjectManager, Role } from '../api/client';
 import { CrewJobView } from './CrewJobPage';
 import { SkeletonPanel } from '../components/Skeleton';
 
 // Admin-only beta, loaded only when opened.
 const CableTab = lazy(() => import('../components/CableTab'));
 const RiggingTab = lazy(() => import('../components/rigging/RiggingTab'));
+// Webmaster-only alpha.
+const TruckPackTab = lazy(() => import('../components/truckPack/TruckPackTab'));
 
 type JobView = 'admin' | 'crew';
 
@@ -63,11 +65,14 @@ function ViewSwitch({ view, onChange }: { view: JobView; onChange: (v: JobView) 
   );
 }
 
-// Cable and Rigging are part of prep, so they sit straight under it.
-const TABS = ['Prep', 'Cable (beta)', 'Rigging (beta)', 'Plots', 'Schedule', 'Documents', 'Contacts', 'Crew', 'Discussion', 'Current RMS', 'Job Settings'] as const;
+// Cable, Rigging and Truck pack are part of prep, so they sit straight under it.
+const TABS = ['Prep', 'Cable (beta)', 'Rigging (beta)', 'Truck pack (alpha)', 'Plots', 'Schedule', 'Documents', 'Contacts', 'Crew', 'Discussion', 'Current RMS', 'Job Settings'] as const;
 type Tab = (typeof TABS)[number];
 /** Tabs only admins see. */
 const ADMIN_TABS: readonly Tab[] = ['Cable (beta)', 'Rigging (beta)'];
+/** Tabs only the webmaster sees. */
+const WEBMASTER_TABS: readonly Tab[] = ['Truck pack (alpha)'];
+const tabVisible = (t: Tab, role: Role | null | undefined) => (WEBMASTER_TABS.includes(t) ? role === 'WEBMASTER' : isAdminRole(role) || !ADMIN_TABS.includes(t));
 
 export default function JobDetailPage() {
   const { jobId } = useParams<{ jobId: string }>();
@@ -140,7 +145,7 @@ export default function JobDetailPage() {
 
       <div className="secondary-shell">
         <nav className="secondary-nav">
-          {TABS.filter((t) => isAdmin || !ADMIN_TABS.includes(t)).map((t) => (
+          {TABS.filter((t) => tabVisible(t, user?.role)).map((t) => (
             <button key={t} className={t === tab ? 'active' : ''} onClick={() => setTab(t)}>
               {t}
               {t === 'Current RMS' && job?.rmsAlertAt && ' •'}
@@ -170,6 +175,11 @@ export default function JobDetailPage() {
               <RiggingTab jobId={jobId} jobName={job.name} />
             </Suspense>
           )}
+          {tab === 'Truck pack (alpha)' && user?.role === 'WEBMASTER' && (
+            <Suspense fallback={<SkeletonPanel height={420} />}>
+              <TruckPackTab jobId={jobId} jobName={job.name} />
+            </Suspense>
+          )}
           {tab === 'Job Settings' && job && <JobSettingsPanel job={job} onUpdate={setJob} />}
         </div>
       </div>
@@ -191,14 +201,13 @@ function CrewTab({ jobId }: { jobId: string }) {
 /** The job page's frame (title, subtitle, tab column, a panel) while the job loads. */
 function JobPageSkeleton() {
   const { user } = useAuth();
-  const isAdmin = isAdminRole(user?.role);
   return (
     <SkeletonRegion>
       <Skeleton w="46%" h={34} style={{ marginBottom: 12 }} />
       <Skeleton w="24%" h={14} style={{ marginBottom: 24 }} />
       <div className="secondary-shell">
         <nav className="secondary-nav" aria-hidden="true">
-          {TABS.filter((t) => isAdmin || !ADMIN_TABS.includes(t)).map((t) => (
+          {TABS.filter((t) => tabVisible(t, user?.role)).map((t) => (
             <button key={t} type="button" tabIndex={-1} disabled>
               {t}
             </button>
