@@ -466,7 +466,21 @@ function OperatorSignIn({ bay, view, onSignedIn }: { bay: BayInfo; view: PrepVie
         ) : (
           <label className="bay-label">
             Two-factor code (or a backup code)
-            <input className="bay-input" value={code} onChange={(e) => setCode(e.target.value.trim())} inputMode="numeric" autoComplete="one-time-code" autoFocus required />
+            <input
+              className="bay-input"
+              name="one-time-code"
+              type="text"
+              value={code}
+              onChange={(e) => setCode(e.target.value.trim())}
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              maxLength={20}
+              autoFocus
+              required
+            />
           </label>
         )}
         {error && <p className="error">{error}</p>}

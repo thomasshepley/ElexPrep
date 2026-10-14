@@ -4,6 +4,10 @@ Newest entries first. Each push/merge gets exactly one entry - see
 `scripts/bump-version.mjs` for how the version number itself advances. A `+` marks a
 feature addition, a `-` marks a bug fix.
 
+## v1.7.1 - 2026-10-14
+
+- The two-factor sign-in step no longer gets a saved password filled in by your phone, and offers your authenticator code instead
+
 ## v1.7.0 - 2026-10-14
 
 + Behind-the-scenes improvements to how the site is updated

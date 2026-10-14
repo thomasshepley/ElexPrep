@@ -161,9 +161,15 @@ export default function TwoFactorPanel() {
                   <label htmlFor="totp-confirm-code">6-digit code</label>
                   <input
                     id="totp-confirm-code"
+                    name="one-time-code"
+                    type="text"
                     value={confirmCode}
                     onChange={(e) => setConfirmCode(e.target.value)}
                     inputMode="numeric"
+                    autoComplete="one-time-code"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    maxLength={8}
                     autoFocus
                     required
                   />

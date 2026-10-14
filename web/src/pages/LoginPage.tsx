@@ -90,13 +90,25 @@ export default function LoginPage() {
           <form onSubmit={submitTotp}>
             <div className="field">
               <label htmlFor="login-totp">{useBackupCode ? 'Backup code' : 'Authentication code'}</label>
+              {/* Marked as a one-time code so phones and password managers offer the code (from
+                  Messages, Passwords or an authenticator) and never a saved password. A backup
+                  code isn't something they hold, so nothing is offered for it. */}
               <input
                 id="login-totp"
+                key={useBackupCode ? 'backup' : 'code'}
+                name={useBackupCode ? 'backup-code' : 'one-time-code'}
+                type="text"
                 value={totpCode}
                 onChange={(e) => setTotpCode(e.target.value)}
                 autoFocus
                 required
+                autoComplete={useBackupCode ? 'off' : 'one-time-code'}
+                autoCapitalize={useBackupCode ? 'characters' : 'none'}
+                autoCorrect="off"
+                spellCheck={false}
                 inputMode={useBackupCode ? 'text' : 'numeric'}
+                pattern={useBackupCode ? undefined : '[0-9 ]*'}
+                maxLength={useBackupCode ? 20 : 8}
                 placeholder={useBackupCode ? 'XXXX-XXXX' : '123456'}
               />
             </div>

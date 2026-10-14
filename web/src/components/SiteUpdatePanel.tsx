@@ -256,7 +256,7 @@ export default function SiteUpdatePanel() {
               {needsCode && (
                 <label className="field">
                   <span className="field-label">Authenticator code</span>
-                  <input inputMode="numeric" autoComplete="one-time-code" value={code} onChange={(e) => setCode(e.target.value)} required maxLength={8} />
+                  <input name="one-time-code" type="text" inputMode="numeric" autoComplete="one-time-code" autoCorrect="off" spellCheck={false} value={code} onChange={(e) => setCode(e.target.value)} required maxLength={8} />
                 </label>
               )}
               <button type="submit" disabled={sending || s.busy || Boolean(s.pendingSince) || !password || blocked}>
