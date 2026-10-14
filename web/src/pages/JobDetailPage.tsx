@@ -1,5 +1,5 @@
 import { Skeleton, SkeletonRegion, SkeletonRows } from '../components/Skeleton';
-import { useEffect, useState } from 'react';
+import { Suspense, lazy, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api, type Job, type CrewFeatures, CREW_FEATURE_KEYS, CREW_FEATURE_LABELS } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
@@ -25,6 +25,10 @@ import { toDatetimeLocal } from '../utils/format';
 import UserName from '../components/UserName';
 import type { JobProjectManager } from '../api/client';
 import { CrewJobView } from './CrewJobPage';
+import { SkeletonPanel } from '../components/Skeleton';
+
+// Admin-only beta, loaded only when opened.
+const CableTab = lazy(() => import('../components/CableTab'));
 
 type JobView = 'admin' | 'crew';
 
@@ -58,8 +62,10 @@ function ViewSwitch({ view, onChange }: { view: JobView; onChange: (v: JobView) 
   );
 }
 
-const TABS = ['Prep', 'Plots', 'Schedule', 'Documents', 'Contacts', 'Crew', 'Discussion', 'Current RMS', 'Job Settings'] as const;
+const TABS = ['Prep', 'Plots', 'Schedule', 'Documents', 'Contacts', 'Crew', 'Discussion', 'Current RMS', 'Cable (beta)', 'Job Settings'] as const;
 type Tab = (typeof TABS)[number];
+/** Tabs only admins see. */
+const ADMIN_TABS: readonly Tab[] = ['Cable (beta)'];
 
 export default function JobDetailPage() {
   const { jobId } = useParams<{ jobId: string }>();
@@ -72,6 +78,8 @@ export default function JobDetailPage() {
   // and then flip to the crew view.
   const [onCrew, setOnCrew] = useState<boolean | null>(null);
   const [view, setView] = useState<JobView>('admin');
+  const { user } = useAuth();
+  const isAdmin = isAdminRole(user?.role);
   usePageTitle(job?.name);
 
   useEffect(() => {
@@ -130,7 +138,7 @@ export default function JobDetailPage() {
 
       <div className="secondary-shell">
         <nav className="secondary-nav">
-          {TABS.map((t) => (
+          {TABS.filter((t) => isAdmin || !ADMIN_TABS.includes(t)).map((t) => (
             <button key={t} className={t === tab ? 'active' : ''} onClick={() => setTab(t)}>
               {t}
               {t === 'Current RMS' && job?.rmsAlertAt && ' •'}
@@ -150,6 +158,11 @@ export default function JobDetailPage() {
             </div>
           )}
           {tab === 'Current RMS' && <CurrentRmsPanel jobId={jobId} />}
+          {tab === 'Cable (beta)' && isAdmin && (
+            <Suspense fallback={<SkeletonPanel rows={5} cols={6} />}>
+              <CableTab jobId={jobId} />
+            </Suspense>
+          )}
           {tab === 'Job Settings' && job && <JobSettingsPanel job={job} onUpdate={setJob} />}
         </div>
       </div>
@@ -170,13 +183,15 @@ function CrewTab({ jobId }: { jobId: string }) {
 
 /** The job page's frame (title, subtitle, tab column, a panel) while the job loads. */
 function JobPageSkeleton() {
+  const { user } = useAuth();
+  const isAdmin = isAdminRole(user?.role);
   return (
     <SkeletonRegion>
       <Skeleton w="46%" h={34} style={{ marginBottom: 12 }} />
       <Skeleton w="24%" h={14} style={{ marginBottom: 24 }} />
       <div className="secondary-shell">
         <nav className="secondary-nav" aria-hidden="true">
-          {TABS.map((t) => (
+          {TABS.filter((t) => isAdmin || !ADMIN_TABS.includes(t)).map((t) => (
             <button key={t} type="button" tabIndex={-1} disabled>
               {t}
             </button>

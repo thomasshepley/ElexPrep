@@ -101,6 +101,9 @@ model Job {
   crewMarginLineOverrides CrewMarginLineOverride[]
   prepSessions            PrepSession[]
   screenDevices           ScreenDevice[]
+  positions               JobPosition[]
+  cablePlan               CablePlan?
+  plotExtractions         PlotExtraction[]
 }
 
 /// A named subdivision of one job's prep - a "stage" at a multi-stage event, or any other
@@ -1183,4 +1186,83 @@ model BarcodeAlias {
   source          String   @default("RMS")
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+}
+
+/// The company fixture database for the cable calculator: power draw, connectors and data per
+/// fixture type, matched to patch fixture types by typeKey (lowercase letters and digits) or an
+/// alias. Seeded from the plan's reference table on first use; editable in Settings > Cable rules.
+model FixtureProfile {
+  id             String   @id @default(cuid())
+  typeKey        String   @unique
+  displayName    String
+  watts          Int
+  amps           Float?
+  /// CEE16 | TRUE1 | POWERCON | OTHER
+  powerConnector String
+  hasPowerThru   Boolean  @default(false)
+  /// DMX5 | DMX3 | ETHERCON
+  dataConnector  String   @default("DMX5")
+  hasDataThru    Boolean  @default(false)
+  maxPerLine     Int?
+  inrushA        Float?
+  /// Other names a patch uses for it, comma separated.
+  aliases        String?
+  notes          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+/// A hanging position on a job (a truss, the floor, FOH) with the geometry the cable calculator
+/// needs. Created from the patch's Position column; lengths come from the plot or are typed in.
+model JobPosition {
+  id          String   @id @default(cuid())
+  jobId       String
+  job         Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  name        String
+  /// TRUSS | FLOOR | FOH | OTHER
+  kind        String   @default("TRUSS")
+  lengthM     Float?
+  trimM       Float?
+  /// Horizontal run from the position's cable pick to dimmer city.
+  distanceM   Float?
+  /// Along the truss, from the cable pick to the truss's near end.
+  pickOffsetM Float?
+  /// Motors on this position (rigging).
+  motors      Int      @default(0)
+  /// PATCH | PLOT | EXPORT | MANUAL: where the geometry came from.
+  source      String   @default("PATCH")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([jobId, name])
+}
+
+/// The job's last cable plan and the admin's overrides on it, so re-running keeps the edits.
+model CablePlan {
+  id            String   @id @default(cuid())
+  jobId         String   @unique
+  job           Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  computedAt    DateTime @default(now())
+  inputHash     String
+  resultJson    String
+  /// { "<stock item key>": quantity } set by hand on the totals table.
+  overridesJson String   @default("{}")
+  updatedAt     DateTime @updatedAt
+}
+
+/// Geometry read from a plot PDF (or an export), cached by the file's hash so the same plot is
+/// only ever read once.
+model PlotExtraction {
+  id          String    @id @default(cuid())
+  jobId       String
+  job         Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  sourceName  String
+  sourceHash  String
+  /// PDF_TEXT | EXPORT
+  method      String
+  resultJson  String
+  createdAt   DateTime  @default(now())
+  confirmedAt DateTime?
+
+  @@unique([jobId, sourceHash])
 }

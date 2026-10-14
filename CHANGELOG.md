@@ -4,6 +4,13 @@ Newest entries first. Each push/merge gets exactly one entry - see
 `scripts/bump-version.mjs` for how the version number itself advances. A `+` marks a
 feature addition, a `-` marks a bug fix.
 
+## v1.5.2 - 2026-10-14
+
+### Cable calculator (beta)
+
++ New admin feature for the job page
++ New admin feature for Settings
+
 ## v1.5.1 - 2026-10-14
 
 ### Signage Mode

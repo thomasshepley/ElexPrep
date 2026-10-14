@@ -4272,3 +4272,164 @@ div.bay-center {
 .prep-bay-missing ul {
   margin: 0.3rem 0 0;
 }
+
+/* Cable (beta) tab and Cable rules */
+.cable-beta {
+  padding: 0.6rem 0.9rem;
+  border-radius: var(--radius-md);
+  background: var(--accent-wash);
+  margin: 0 0 1rem;
+}
+.cable-checklist {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+.cable-checklist > li {
+  padding-left: 1.6rem;
+  position: relative;
+}
+.cable-checklist > li::before {
+  position: absolute;
+  left: 0;
+  top: 0;
+  font-weight: 700;
+}
+.cable-checklist > li.is-ok::before {
+  content: '✓';
+  color: var(--success);
+}
+.cable-checklist > li.is-partial::before {
+  content: '!';
+  color: var(--warning);
+}
+.cable-checklist > li.is-missing::before {
+  content: '✕';
+  color: var(--danger);
+}
+.cable-inline-button {
+  margin: 0.2rem 0.4rem 0.2rem 0;
+}
+.cable-notes {
+  margin: 0.3rem 0 0;
+}
+.cable-num {
+  width: 6.5em;
+}
+.cable-positions select {
+  min-width: 6em;
+}
+.cable-stale {
+  padding: 0.6rem 0.9rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--warning);
+  background: color-mix(in srgb, var(--warning) 12%, transparent);
+}
+.cable-totals-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: 1.5rem;
+}
+@media (max-width: 900px) {
+  .cable-totals-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.cable-totals {
+  width: 100%;
+}
+.cable-totals .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.cable-totals tr.is-overridden td:first-child::after {
+  content: ' (changed)';
+  color: var(--content-muted);
+  font-size: var(--text-xs);
+}
+.cable-rigging {
+  margin-top: 1rem;
+  border-top: 3px solid var(--warning);
+}
+.cable-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 520px), 1fr));
+  gap: 1rem;
+}
+.cable-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.cable-card-head h2 {
+  margin: 0;
+}
+.cable-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.6rem 1rem;
+  margin: 0.8rem 0;
+}
+.cable-facts dt {
+  font-size: var(--text-xs);
+  color: var(--content-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.cable-facts dd {
+  margin: 0.1rem 0 0;
+  font-weight: 600;
+}
+.cable-why {
+  display: block;
+  font-weight: 400;
+  font-size: var(--text-xs);
+  color: var(--content-muted);
+}
+.cable-socas {
+  width: 100%;
+  font-size: var(--text-sm);
+}
+.cable-fixtures {
+  font-size: var(--text-xs);
+  color: var(--content-muted);
+}
+.cable-jumpers {
+  margin: 0.6rem 0 0;
+}
+.cable-rigging-box {
+  margin-top: 0.6rem;
+  padding: 0.5rem 0.7rem;
+  border-left: 4px solid var(--warning);
+  background: color-mix(in srgb, var(--warning) 10%, transparent);
+  border-radius: 4px;
+}
+.cable-flags {
+  margin: 0.6rem 0 0;
+  padding-left: 1.2rem;
+}
+.cable-flags li {
+  color: var(--warning);
+}
+.cable-flags li.is-assumed {
+  color: var(--content-muted);
+}
+.cable-kit {
+  margin: 0;
+  padding-left: 1.2rem;
+}
+.cable-rules-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1rem 2rem;
+  margin-bottom: 1rem;
+}
+.cable-filter {
+  max-width: 320px;
+  margin-bottom: 0.6rem;
+}

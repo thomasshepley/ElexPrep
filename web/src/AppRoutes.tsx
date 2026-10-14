@@ -20,6 +20,7 @@ const OnboardCompletePage = lazy(() => import('./pages/OnboardCompletePage'))
 const SignagePage = lazy(() => import('./pages/SignagePage'))
 const ScanPage = lazy(() => import('./pages/ScanPage'))
 const PrepBaysPage = lazy(() => import('./pages/PrepBaysPage'))
+const CableRulesPage = lazy(() => import('./pages/CableRulesPage'))
 const CrewJobPage = lazy(() => import('./pages/CrewJobPage'))
 const CrewAccountPage = lazy(() => import('./pages/CrewAccountPage'))
 const SettingsLayout = lazy(() => import('./pages/SettingsLayout'))
@@ -73,6 +74,7 @@ export default function AppRoutes() {
               <Route path="onboarding" element={<OnboardingPage />} />
               <Route path="printer" element={<PrinterSettingsPage />} />
               <Route path="prep-bays" element={<PrepBaysPage />} />
+              <Route path="cable-rules" element={<CableRulesPage />} />
               <Route path="current-rms" element={<CurrentRmsSettingsPage />} />
               <Route path="onedrive" element={<OneDriveSettingsPage />} />
               <Route path="crew-portal" element={<CrewPortalSettingsPage />} />

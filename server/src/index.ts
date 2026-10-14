@@ -49,6 +49,7 @@ import { dashboardRouter } from './routes/dashboard';
 import { notificationsRouter } from './routes/notifications';
 import { lockdownRouter } from './routes/lockdown';
 import { prepRouter } from './routes/prep';
+import { cableRouter, jobCableRouter } from './routes/cable';
 import { requireJobVisible } from './jobVisibility';
 import { RejectedUploadError } from './uploadSafety';
 import { seedDefaultLocationColorsIfEmpty, seedNewDefaultLocationColorsIfMissing } from './pdf/locationColors';
@@ -137,6 +138,7 @@ app.use('/api/jobs', jobDaysRouter);
 app.use('/api/jobs', jobDocumentsRouter);
 app.use('/api/jobs', jobContactsRouter);
 app.use('/api/jobs', jobDiscussionRouter);
+app.use('/api/jobs', jobCableRouter);
 app.use('/api/dashboard', dashboardRouter);
 app.use('/api/notifications', notificationsRouter);
 // crewPortalRouter (self-service, CREW-only) is mounted before the admin-only crewRouter at
@@ -159,6 +161,7 @@ app.use('/api/lockdown', lockdownRouter);
 // Prep bays check job access themselves (crew see the jobs they are on, a bay screen its own
 // job), so they sit outside /api/jobs/:jobId's public-job rule.
 app.use('/api/prep', prepRouter);
+app.use('/api/cable', cableRouter);
 
 // In production (Docker) the server also serves the built web app; in dev the Vite dev
 // server proxies /api here instead. WEB_DIST can point anywhere; default is web/dist.

@@ -10,3 +10,5 @@ export * from './crewCertifications';
 export * from './notificationCategories';
 export * from './crewFeatures';
 export * from './crewColors';
+export * from './cablePlan';
+export * from './cableFixtures';
