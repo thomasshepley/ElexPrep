@@ -594,6 +594,9 @@ export interface DashboardOrder {
 export interface DashboardDay {
   id: string;
   date: string;
+  name: string | null;
+  callTime: string | null;
+  wrapTime: string | null;
   jobId: string;
   jobName: string;
   venue: string | null;

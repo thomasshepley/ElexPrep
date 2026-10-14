@@ -149,7 +149,7 @@ export default function DashboardPage() {
 function ThisWeekSkeleton() {
   return (
     <SkeletonRegion className="panel">
-      <h3>This week</h3>
+      <h3>Coming up</h3>
       <div className="week-strip">
         <section className="week-day">
           <Skeleton w="45%" h={12} style={{ marginBottom: 12 }} />
@@ -167,7 +167,7 @@ function ThisWeekSkeleton() {
   );
 }
 
-/** The next seven days of job days: what's on, who's on it, and the day's timed entries. */
+/** The next 30 days of job days: what's on, the call and wrap times, who's on it, and the day's timed entries. */
 function ThisWeek({ days }: { days: DashboardData['thisWeek'] }) {
   const byDate = new Map<string, DashboardData['thisWeek']>();
   for (const d of days) {
@@ -181,9 +181,9 @@ function ThisWeek({ days }: { days: DashboardData['thisWeek'] }) {
 
   return (
     <div className="panel">
-      <h3>This week</h3>
+      <h3>Coming up</h3>
       {days.length === 0 ? (
-        <p className="muted">Nothing scheduled in the next seven days. Days added on a job's Schedule tab show up here.</p>
+        <p className="muted">Nothing scheduled in the next 30 days. Days added on a job's Schedule tab show up here.</p>
       ) : (
         <div className="week-strip">
           {[...byDate.entries()].map(([key, entries]) => (
@@ -196,7 +196,18 @@ function ThisWeek({ days }: { days: DashboardData['thisWeek'] }) {
                   <Link to={`/jobs/${d.jobId}`}>
                     <strong>{d.jobName}</strong>
                   </Link>
+                  {d.name && <span className="chip chip-neutral week-day-name">{d.name}</span>}
                   {d.venue && <div className="muted">{d.venue}</div>}
+                  {(d.callTime || d.wrapTime) && (
+                    <div className="week-call">
+                      {d.callTime && (
+                        <span>
+                          Call <strong>{d.callTime}</strong>
+                        </span>
+                      )}
+                      {d.wrapTime && <span className="muted">Wrap about {d.wrapTime}</span>}
+                    </div>
+                  )}
                   {items.length > 0 && (
                     <ul className="plain-list week-items">
                       {items.map((i) => (

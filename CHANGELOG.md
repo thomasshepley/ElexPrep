@@ -4,14 +4,19 @@ Newest entries first. Each push/merge gets exactly one entry - see
 `scripts/bump-version.mjs` for how the version number itself advances. A `+` marks a
 feature addition, a `-` marks a bug fix.
 
-## v1.5.2 - 2026-10-14
+## v1.6.2 - 2026-10-14
+
++ Calendar items that run over several days show as one bar across the days, so the full name can be read
++ The dashboard shows the next 30 days instead of 7, with each day's name, call time and estimated wrap
+
+## v1.6.1 - 2026-10-14
 
 ### Cable calculator (beta)
 
 + New admin feature for the job page
 + New admin feature for Settings
 
-## v1.5.1 - 2026-10-14
+## v1.6.0 - 2026-10-14
 
 ### Signage Mode
 

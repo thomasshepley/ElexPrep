@@ -9,6 +9,9 @@ import { isAdminRole } from '../auth';
  * Same visibility rule as jobsRouter's GET / - a different view of the same job list, not a
  * separate permission boundary.
  */
+/** How far ahead the dashboard's Coming up list looks. */
+const COMING_UP_DAYS = 30;
+
 export const dashboardRouter = Router();
 
 dashboardRouter.get('/', async (req, res) => {
@@ -53,11 +56,12 @@ dashboardRouter.get('/', async (req, res) => {
       return a.jobName.localeCompare(b.jobName);
     });
 
-  // "This week": every job day from today for seven days, with who's working it and that day's
-  // timed entries, so the home screen answers "what's on and who's on it" without opening jobs.
+  // "Coming up": every job day from today for the next 30 days, with its call and wrap times,
+  // who's working it and that day's timed entries, so the home screen answers "what's on, when
+  // and who's on it" without opening jobs.
   const weekStart = new Date();
   weekStart.setUTCHours(0, 0, 0, 0);
-  const weekEnd = new Date(weekStart.getTime() + 7 * 24 * 60 * 60 * 1000);
+  const weekEnd = new Date(weekStart.getTime() + COMING_UP_DAYS * 24 * 60 * 60 * 1000);
   const jobIds = jobs.map((j) => j.id);
   const jobById = new Map(jobs.map((j) => [j.id, j]));
   const [days, items, failedPrints] = await Promise.all([
@@ -86,6 +90,9 @@ dashboardRouter.get('/', async (req, res) => {
   const thisWeek = days.map((d) => ({
     id: d.id,
     date: d.date,
+    name: d.name,
+    callTime: d.callTime,
+    wrapTime: d.wrapTime,
     jobId: d.jobId,
     jobName: jobById.get(d.jobId)?.name ?? '',
     venue: jobById.get(d.jobId)?.venue ?? null,

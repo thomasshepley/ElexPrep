@@ -53,26 +53,104 @@ function buildGridDays(year: number, month: number): Date[] {
   return Array.from({ length: 42 }, (_, i) => new Date(gridStart.getFullYear(), gridStart.getMonth(), gridStart.getDate() + i));
 }
 
+function dayStart(d: Date): Date {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+/** An event's first and last calendar day (local), or null for an unreadable date. */
+function eventDays(ev: CalendarEvent): { first: Date; last: Date } | null {
+  const start = new Date(ev.startsAt);
+  if (Number.isNaN(start.getTime())) return null;
+  const end = ev.endsAt && !Number.isNaN(new Date(ev.endsAt).getTime()) ? new Date(ev.endsAt) : start;
+  const first = dayStart(start);
+  let last = dayStart(end < start ? start : end);
+  const cap = new Date(first.getFullYear(), first.getMonth(), first.getDate() + MAX_SPAN_DAYS - 1);
+  if (last > cap) last = cap;
+  return { first, last };
+}
+
 /** Buckets events by the calendar day(s) they touch - a multi-day event appears on every day in its range. */
 function bucketEvents(events: CalendarEvent[]): Map<string, CalendarEvent[]> {
   const map = new Map<string, CalendarEvent[]>();
   for (const ev of events) {
-    const start = new Date(ev.startsAt);
-    if (Number.isNaN(start.getTime())) continue;
-    const end = ev.endsAt && !Number.isNaN(new Date(ev.endsAt).getTime()) ? new Date(ev.endsAt) : start;
-    const cursor = new Date(start.getFullYear(), start.getMonth(), start.getDate());
-    const last = new Date(end.getFullYear(), end.getMonth(), end.getDate());
-    let days = 0;
-    while (cursor.getTime() <= last.getTime() && days < MAX_SPAN_DAYS) {
+    const range = eventDays(ev);
+    if (!range) continue;
+    for (const cursor = new Date(range.first); cursor <= range.last; cursor.setDate(cursor.getDate() + 1)) {
       const key = dateKey(cursor);
-      const bucket = map.get(key) ?? [];
-      bucket.push(ev);
-      map.set(key, bucket);
-      cursor.setDate(cursor.getDate() + 1);
-      days++;
+      map.set(key, [...(map.get(key) ?? []), ev]);
     }
   }
   return map;
+}
+
+/** Separate entries for the same thing on back-to-back days become one event, drawn as one bar. */
+function mergeConsecutive(events: CalendarEvent[]): CalendarEvent[] {
+  const groups = new Map<string, { ev: CalendarEvent; first: Date; last: Date }[]>();
+  const loose: CalendarEvent[] = [];
+  for (const ev of events) {
+    const range = eventDays(ev);
+    if (!range) {
+      loose.push(ev);
+      continue;
+    }
+    const key = `${ev.href ?? ''}|${ev.title}|${ev.tone ?? ''}`;
+    groups.set(key, [...(groups.get(key) ?? []), { ev, ...range }]);
+  }
+  const out: CalendarEvent[] = [...loose];
+  for (const list of groups.values()) {
+    list.sort((a, b) => a.first.getTime() - b.first.getTime());
+    let cur = { ...list[0] };
+    for (const next of list.slice(1)) {
+      if (daysBetween(cur.last, next.first) <= 1) {
+        if (next.last > cur.last) cur.last = next.last;
+        const crew = new Map([...(cur.ev.crew ?? []), ...(next.ev.crew ?? [])].map((c) => [c.id, c]));
+        cur.ev = { ...cur.ev, crew: [...crew.values()] };
+      } else {
+        out.push({ ...cur.ev, startsAt: cur.first.toISOString(), endsAt: cur.last.toISOString() });
+        cur = { ...next };
+      }
+    }
+    out.push({ ...cur.ev, startsAt: cur.first.toISOString(), endsAt: cur.last.toISOString() });
+  }
+  return out;
+}
+
+interface WeekSegment {
+  ev: CalendarEvent;
+  /** Columns 0 (Monday) to 6 this piece of the event covers in the week. */
+  from: number;
+  to: number;
+  /** The event carries on from the week before / into the week after. */
+  continuesBefore: boolean;
+  continuesAfter: boolean;
+  lane: number;
+}
+
+const DAY_MS = 86_400_000;
+const daysBetween = (a: Date, b: Date) => Math.round((dayStart(b).getTime() - dayStart(a).getTime()) / DAY_MS);
+
+/**
+ * One week row's events as bars: a multi-day event is one bar across the days it covers (like
+ * Google Calendar), laid out in lanes so bars never overlap. Longer events take the top lanes.
+ */
+function layoutWeek(events: CalendarEvent[], weekStart: Date): WeekSegment[] {
+  const weekEnd = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + 6);
+  const segments: Omit<WeekSegment, 'lane'>[] = [];
+  for (const ev of events) {
+    const range = eventDays(ev);
+    if (!range || range.last < weekStart || range.first > weekEnd) continue;
+    const from = Math.max(0, daysBetween(weekStart, range.first));
+    const to = Math.min(6, daysBetween(weekStart, range.last));
+    segments.push({ ev, from, to, continuesBefore: range.first < weekStart, continuesAfter: range.last > weekEnd });
+  }
+  segments.sort((a, b) => a.from - b.from || b.to - b.from - (a.to - a.from) || a.ev.title.localeCompare(b.ev.title));
+  const laneEnds: number[] = [];
+  return segments.map((seg) => {
+    let lane = laneEnds.findIndex((end) => end < seg.from);
+    if (lane === -1) lane = laneEnds.length;
+    laneEnds[lane] = seg.to;
+    return { ...seg, lane };
+  });
 }
 
 /** A Google-Calendar-style month grid. Pass events with absolute ISO dates; navigation is purely client-side. */
@@ -83,7 +161,8 @@ export default function MonthCalendar({ events, initialMonth }: { events: Calend
   const month = cursor.getMonth();
 
   const gridDays = useMemo(() => buildGridDays(year, month), [year, month]);
-  const buckets = useMemo(() => bucketEvents(events), [events]);
+  const merged = useMemo(() => mergeConsecutive(events), [events]);
+  const buckets = useMemo(() => bucketEvents(merged), [merged]);
   const todayKey = dateKey(today);
   const [openDayKey, setOpenDayKey] = useState<string | null>(null);
   const openDayEvents = openDayKey ? buckets.get(openDayKey) ?? [] : [];
@@ -112,49 +191,71 @@ export default function MonthCalendar({ events, initialMonth }: { events: Calend
       </div>
 
       <div className="month-calendar-grid">
-        {gridDays.map((d) => {
-          const key = dateKey(d);
-          const inMonth = d.getMonth() === month;
-          const dayEvents = buckets.get(key) ?? [];
-          const visible = dayEvents.slice(0, MAX_VISIBLE_PER_DAY);
-          const overflow = dayEvents.length - visible.length;
-          const dayCrew = uniqueCrew(dayEvents);
-          const visibleCrew = dayCrew.slice(0, MAX_VISIBLE_CREW_PER_DAY);
-          const crewOverflow = dayCrew.length - visibleCrew.length;
+        {Array.from({ length: 6 }, (_, w) => {
+          const weekDays = gridDays.slice(w * 7, w * 7 + 7);
+          const segments = layoutWeek(merged, weekDays[0]);
+          const shown = segments.filter((seg) => seg.lane < MAX_VISIBLE_PER_DAY);
           return (
-            <div
-              key={key}
-              className={`month-calendar-day${inMonth ? '' : ' is-outside'}${key === todayKey ? ' is-today' : ''}`}
-              onClick={() => dayEvents.length > 0 && setOpenDayKey(key)}
-              style={dayEvents.length > 0 ? { cursor: 'pointer' } : undefined}
-            >
-              <span className="month-calendar-day-number">{d.getDate()}</span>
-              <div className="month-calendar-events">
-                {visible.map((ev) => {
-                  const chip = <span className={`month-calendar-event chip chip-${ev.tone ?? 'accent'}`}>{ev.title}</span>;
-                  return ev.href ? (
-                    <Link key={ev.id} to={ev.href} className="month-calendar-event-link" onClick={(e) => e.stopPropagation()}>
-                      {chip}
-                    </Link>
-                  ) : (
-                    <span key={ev.id}>{chip}</span>
-                  );
-                })}
-                {overflow > 0 && <span className="month-calendar-event-more">+{overflow} more</span>}
-              </div>
-              {dayCrew.length > 0 && (
-                <div className="month-calendar-day-crew">
-                  {visibleCrew.map((c) => (
-                    <span
-                      key={c.id}
-                      className="month-calendar-crew-dot"
-                      style={{ background: c.color }}
-                      title={`${c.name} · ${c.role}`}
-                    />
-                  ))}
-                  {crewOverflow > 0 && <span className="month-calendar-crew-more">+{crewOverflow}</span>}
-                </div>
-              )}
+            <div key={dateKey(weekDays[0])} className="month-calendar-week">
+              {weekDays.map((d, col) => {
+                const key = dateKey(d);
+                const inMonth = d.getMonth() === month;
+                const dayEvents = buckets.get(key) ?? [];
+                const hidden = segments.filter((seg) => seg.lane >= MAX_VISIBLE_PER_DAY && seg.from <= col && seg.to >= col).length;
+                const dayCrew = uniqueCrew(dayEvents);
+                const visibleCrew = dayCrew.slice(0, MAX_VISIBLE_CREW_PER_DAY);
+                const crewOverflow = dayCrew.length - visibleCrew.length;
+                return (
+                  <div
+                    key={key}
+                    className={`month-calendar-day${inMonth ? '' : ' is-outside'}${key === todayKey ? ' is-today' : ''}`}
+                    style={{ gridColumn: col + 1, cursor: dayEvents.length > 0 ? 'pointer' : undefined }}
+                    onClick={() => dayEvents.length > 0 && setOpenDayKey(key)}
+                  >
+                    <span className="month-calendar-day-number">{d.getDate()}</span>
+                    {hidden > 0 && (
+                      <span className="month-calendar-event-more" aria-label={`${hidden} more`}>
+                        +{hidden}
+                        <span className="month-calendar-more-word"> more</span>
+                      </span>
+                    )}
+                    {dayCrew.length > 0 && (
+                      <div className="month-calendar-day-crew">
+                        {visibleCrew.map((c) => (
+                          <span key={c.id} className="month-calendar-crew-dot" style={{ background: c.color }} title={`${c.name} · ${c.role}`} />
+                        ))}
+                        {crewOverflow > 0 && <span className="month-calendar-crew-more">+{crewOverflow}</span>}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+              {shown.map((seg) => {
+                const cls = `month-calendar-event chip chip-${seg.ev.tone ?? 'accent'}${seg.continuesBefore ? ' continues-before' : ''}${seg.continuesAfter ? ' continues-after' : ''}`;
+                const style = { gridColumn: `${seg.from + 1} / ${seg.to + 2}`, gridRow: seg.lane + 2 };
+                const span = seg.to - seg.from + 1;
+                const label = (
+                  <span className={cls} title={seg.ev.title}>
+                    {seg.ev.title}
+                  </span>
+                );
+                return seg.ev.href ? (
+                  <Link
+                    key={`${seg.ev.id}:${w}`}
+                    to={seg.ev.href}
+                    className="month-calendar-event-link"
+                    style={style}
+                    aria-label={span > 1 ? `${seg.ev.title}, ${span} days` : seg.ev.title}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {label}
+                  </Link>
+                ) : (
+                  <span key={`${seg.ev.id}:${w}`} className="month-calendar-event-link" style={style}>
+                    {label}
+                  </span>
+                );
+              })}
             </div>
           );
         })}
