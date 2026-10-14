@@ -29,11 +29,23 @@ export default function VersionBadge() {
                 <strong>
                   v{entry.version} <span className="muted" style={{ fontWeight: 400 }}>- {entry.date}</span>
                 </strong>
-                <ul style={{ margin: '0.35rem 0 0' }}>
-                  {entry.notes.map((note, i) => (
-                    <li key={i}>{note}</li>
-                  ))}
-                </ul>
+                {entry.notes.length > 0 && (
+                  <ul style={{ margin: '0.35rem 0 0' }}>
+                    {entry.notes.map((note, i) => (
+                      <li key={i}>{note}</li>
+                    ))}
+                  </ul>
+                )}
+                {(entry.sections ?? []).map((section) => (
+                  <div key={section.title} className="changelog-section">
+                    <div className="changelog-section-title">{section.title}</div>
+                    <ul style={{ margin: '0.2rem 0 0' }}>
+                      {section.notes.map((note, i) => (
+                        <li key={i}>{note}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
               </div>
             ))}
             {data.changelog.length === 0 && <p className="muted">No changelog entries yet.</p>}

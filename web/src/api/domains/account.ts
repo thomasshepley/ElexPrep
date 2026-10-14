@@ -4,7 +4,7 @@ import type { ActivityLogEntry, AppNotification, AuthedUser, BugReport, LoginReq
 export const accountApi = {
   version: {
     get: () =>
-      request<{ version: string; changelog: { version: string; date: string; notes: string[] }[] }>('/version'),
+      request<{ version: string; changelog: { version: string; date: string; notes: string[]; sections?: { title: string; notes: string[] }[] }[] }>('/version'),
   },
   auth: {
     status: () => request<{ needsSetup: boolean }>('/auth/status'),

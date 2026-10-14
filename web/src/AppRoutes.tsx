@@ -18,6 +18,8 @@ const ApplyPage = lazy(() => import('./pages/ApplyPage'))
 const OnboardPage = lazy(() => import('./pages/OnboardPage'))
 const OnboardCompletePage = lazy(() => import('./pages/OnboardCompletePage'))
 const SignagePage = lazy(() => import('./pages/SignagePage'))
+const ScanPage = lazy(() => import('./pages/ScanPage'))
+const PrepBaysPage = lazy(() => import('./pages/PrepBaysPage'))
 const CrewJobPage = lazy(() => import('./pages/CrewJobPage'))
 const CrewAccountPage = lazy(() => import('./pages/CrewAccountPage'))
 const SettingsLayout = lazy(() => import('./pages/SettingsLayout'))
@@ -46,6 +48,7 @@ export default function AppRoutes() {
           <Route path="/onboard" element={<OnboardPage />} />
           <Route path="/onboard/complete/:token" element={<OnboardCompletePage />} />
           <Route path="/signage" element={<SignagePage />} />
+          <Route path="/scan" element={<ScanPage />} />
           <Route path="/crew" element={<CrewLayout />}>
             <Route index element={<CrewSchedulePage />} />
             <Route path="jobs/:jobId" element={<CrewJobPage />} />
@@ -69,6 +72,7 @@ export default function AppRoutes() {
               <Route path="crew-applications" element={<CrewApplicationsPage />} />
               <Route path="onboarding" element={<OnboardingPage />} />
               <Route path="printer" element={<PrinterSettingsPage />} />
+              <Route path="prep-bays" element={<PrepBaysPage />} />
               <Route path="current-rms" element={<CurrentRmsSettingsPage />} />
               <Route path="onedrive" element={<OneDriveSettingsPage />} />
               <Route path="crew-portal" element={<CrewPortalSettingsPage />} />

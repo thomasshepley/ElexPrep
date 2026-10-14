@@ -9,7 +9,12 @@ export default function LoginPage() {
   const navigate = useNavigate();
   // Set by the onboarding page after it creates an account, so the person lands here knowing it
   // worked and with their username already filled in.
-  const createdUsername = (useLocation().state as { accountCreated?: string } | null)?.accountCreated;
+  const location = useLocation();
+  const createdUsername = (location.state as { accountCreated?: string } | null)?.accountCreated;
+  // Where to go after signing in, e.g. the phone scanner page a bay's pairing QR opened. Only a
+  // path on this site is accepted, never another origin.
+  const nextParam = new URLSearchParams(location.search).get('next');
+  const next = nextParam && nextParam.startsWith('/') && !nextParam.startsWith('//') ? nextParam : null;
   const [needsSetup, setNeedsSetup] = useState(false);
   const [username, setUsername] = useState(createdUsername ?? '');
   const [password, setPassword] = useState('');
@@ -29,8 +34,8 @@ export default function LoginPage() {
   }, []);
 
   useEffect(() => {
-    if (user) navigate(user.role === 'SIGNAGE' ? '/signage' : user.role === 'CREW' ? '/crew' : '/', { replace: true });
-  }, [user, navigate]);
+    if (user) navigate(next ?? (user.role === 'SIGNAGE' ? '/signage' : user.role === 'CREW' ? '/crew' : '/'), { replace: true });
+  }, [user, navigate, next]);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();

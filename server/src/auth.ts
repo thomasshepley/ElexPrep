@@ -111,7 +111,9 @@ export function toAuthedUser(u: {
 // The one deliberate, narrow write exception for the otherwise read-only SIGNAGE role: prep
 // crew tick items off directly on the prep-bay TV as they pull them. Everything else SIGNAGE
 // touches stays GET-only.
-const SIGNAGE_WRITE_ALLOWLIST = [/^\/api\/jobs\/[^/]+\/current-rms\/pick-list\/[^/]+\/prepped$/];
+// Prep bay writes (routes/prep.ts) are allowed too: they need a crew member signed in on the
+// screen, checked there, and anything admin-only in that router still requires ADMIN.
+const SIGNAGE_WRITE_ALLOWLIST = [/^\/api\/jobs\/[^/]+\/current-rms\/pick-list\/[^/]+\/prepped$/, /^\/api\/prep\/(?!admin\/)/];
 
 // The crew portal (routes/crewPortal.ts) is entirely self-service: every path here only ever
 // returns the logged-in crew member's own data (profile, their jobs, a job's Who/What/When/
@@ -133,6 +135,9 @@ const CREW_ALLOWLIST = [
   /^\/api\/crew\/me\/jobs\/[^/]+(\/.*)?$/,
   /^\/api\/notifications(\/.*)?$/,
   /^\/api\/bug-reports$/,
+  // Phone scanner: pairing with a bay and scanning into jobs they are on (checked in routes/prep.ts).
+  /^\/api\/prep\/(pair|stream|operator\/jobs)$/,
+  /^\/api\/prep\/jobs\/[^/]+\/(view|scan|lines|cases\/[^/]+|sign-off|transport|diff|diff\/acknowledge)$/,
 ];
 
 /**

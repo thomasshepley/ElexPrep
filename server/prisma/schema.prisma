@@ -99,6 +99,8 @@ model Job {
   roleRates               RoleRate[]
   discussionGroups        DiscussionGroup[]
   crewMarginLineOverrides CrewMarginLineOverride[]
+  prepSessions            PrepSession[]
+  screenDevices           ScreenDevice[]
 }
 
 /// A named subdivision of one job's prep - a "stage" at a multi-stage event, or any other
@@ -682,6 +684,9 @@ model CaseGroupRecord {
   /// one stage (see shared/src/casePacking.ts), so it inherits that stage here too.
   groupId       String?
   group         FixtureGroup? @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  /// Ticked on the prep-bay screen when the case is packed.
+  packedAt       DateTime?
+  packedByUserId String?
 
   @@index([jobId])
   @@index([groupId])
@@ -839,6 +844,7 @@ model User {
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
   sessions              Session[]
+  prepOperatorSessions  PrepOperatorSession[]
   crewProfile           CrewProfile?
   notifications         Notification[]
   jobDiscussionMessages JobDiscussionMessage[]
@@ -1038,4 +1044,143 @@ model CrewMarginLineOverride {
 
   @@unique([jobId, lineKey])
   @@index([jobId])
+}
+
+/// A prep bay's screen (the TV and the computer behind it, with its scanner). An admin names the
+/// bays in Settings > Prep bays; a TV claims one on first boot and keeps its token, which is
+/// also what a phone scanner pairs with (the TV shows it as a QR code).
+model ScreenDevice {
+  id               String                @id @default(cuid())
+  name             String
+  token            String                @unique
+  currentJobId     String?
+  currentJob       Job?                  @relation(fields: [currentJobId], references: [id], onDelete: SetNull)
+  lastSeenAt       DateTime?
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+  operatorSessions PrepOperatorSession[]
+}
+
+/// The crew member signed in on a bay's screen. The screen itself is signed in as a prep or
+/// signage account; this second sign-in decides who is prepping and which jobs they can open
+/// (a crew member only sees jobs they are on). Ends on sign-out or after the idle timeout.
+model PrepOperatorSession {
+  id           String       @id @default(cuid())
+  token        String       @unique
+  deviceId     String
+  device       ScreenDevice @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt    DateTime     @default(now())
+  lastActiveAt DateTime     @default(now())
+  endedAt      DateTime?
+
+  @@index([deviceId])
+}
+
+/// One prep run of a job: OPEN while it is being pulled, AWAITING_TRANSPORT once signed off,
+/// BOOKED_OUT once the transport-arrived tick has booked the prepped kit out.
+model PrepSession {
+  id                   String          @id @default(cuid())
+  jobId                String
+  job                  Job             @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  status               String          @default("OPEN")
+  startedAt            DateTime        @default(now())
+  startedByUserId      String?
+  completedAt          DateTime?
+  completedByUserId    String?
+  /// Lines that were short or not fully pulled at sign-off: [{ lineKey, name, required, pulled, short, shortNote }].
+  missingJson          String?
+  /// Set when sign-off or book-out found missing kit; cleared by an admin.
+  flaggedAt            DateTime?
+  flagResolvedAt       DateTime?
+  flagResolvedByUserId String?
+  transportAt          DateTime?
+  transportByUserId    String?
+  /// What the book-out sent to Current RMS (or would have, in dry-run), and anything not prepped.
+  bookOutJson          String?
+  notes                String?
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+  lines                PrepLineState[]
+  scans                ScanEvent[]
+  assets               PrepAssetScan[]
+
+  @@index([jobId])
+}
+
+/// Counts for one pick-list line in a prep session: 7 of 12 pulled, 2 short. lineKey is
+/// "rms:<opportunity item id>" for a Current RMS line or "case:<fixture type>" for a job
+/// without one.
+model PrepLineState {
+  id            String      @id @default(cuid())
+  prepSessionId String
+  prepSession   PrepSession @relation(fields: [prepSessionId], references: [id], onDelete: Cascade)
+  lineKey       String
+  name          String
+  required      Int
+  pulled        Int         @default(0)
+  short         Int         @default(0)
+  shortNote     String?
+  updatedAt     DateTime    @updatedAt
+
+  @@unique([prepSessionId, lineKey])
+}
+
+/// Every scan or tap on a prep screen or phone, append-only.
+/// kind: ASSET | PRODUCT | CASE | JOB | TAP | UNKNOWN; result: OK | OVER | DUPLICATE | WRONG_JOB | UNKNOWN | LOCKED.
+model ScanEvent {
+  id            String       @id @default(cuid())
+  jobId         String
+  prepSessionId String?
+  prepSession   PrepSession? @relation(fields: [prepSessionId], references: [id], onDelete: Cascade)
+  code          String
+  kind          String
+  lineKey       String?
+  result        String
+  message       String
+  source        String
+  deviceId      String?
+  userId        String?
+  createdAt     DateTime     @default(now())
+
+  @@index([jobId, createdAt])
+}
+
+/// One physical unit counted into a prep session. A serialised asset (a fixture's asset tag) can
+/// only be counted once per session; bulk stock (most cables) is one row per scan. Also what
+/// the Current RMS write-back prepares and books out.
+model PrepAssetScan {
+  id              String      @id @default(cuid())
+  prepSessionId   String
+  prepSession     PrepSession @relation(fields: [prepSessionId], references: [id], onDelete: Cascade)
+  code            String
+  serialised      Boolean     @default(true)
+  lineKey         String
+  rmsItemId       Int?
+  rmsStockLevelId Int?
+  userId          String?
+  createdAt       DateTime    @default(now())
+  rmsPreparedAt   DateTime?
+  rmsBookedOutAt  DateTime?
+  rmsError        String?
+
+  @@index([prepSessionId, code])
+}
+
+/// Maps a barcode the app did not print to Current RMS stock: an asset number (one unit) or a
+/// product barcode (bulk stock). Filled from Current RMS lookups as codes are first scanned, or
+/// taught by an admin in Settings > Prep bays for anything Current RMS does not know.
+model BarcodeAlias {
+  id              String   @id @default(cuid())
+  code            String   @unique
+  /// ASSET | PRODUCT
+  kind            String
+  rmsProductId    Int?
+  rmsStockLevelId Int?
+  label           String
+  /// RMS (looked up) | TAUGHT (set by an admin)
+  source          String   @default("RMS")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 }

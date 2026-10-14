@@ -1,31 +1,45 @@
-import { SkeletonList, SkeletonRegion } from '../components/Skeleton';
-import { useEffect, useState } from 'react';
-import type { PickListDiff } from '@elexprep/shared';
-import { api, type CaseGroup, type CurrentRmsPickItem, type Job } from '../api/client';
-import { formatDate, formatTime } from '../utils/format';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
+import QRCode from 'qrcode';
+import type { PickListDiff } from '@elexprep/shared';
+import { api, ApiError, bayStore, type BayInfo, type PrepJobOption, type PrepLine, type PrepScan, type PrepView } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
+import { isAdminRole } from '../auth/roles';
 import { SignOutIcon } from '../components/Icons';
+import { Skeleton, SkeletonList, SkeletonRegion } from '../components/Skeleton';
+import PrepScreen from '../components/prepBay/PrepScreen';
+import ItemsDiffOverlay from '../components/prepBay/ItemsDiffOverlay';
+import { useLiveJob } from '../hooks/useLiveJob';
+import { useScannerInput } from '../hooks/useScannerInput';
+import { formatDate, formatTime } from '../utils/format';
+import { playScanTone, toneFor, unlockScanAudio } from '../utils/scanFeedback';
 
-const DATA_REFRESH_MS = 60_000;
-const DIFF_POLL_MS = 20_000;
-const STORED_JOB_KEY = 'elex-signage-job';
-
-function readStoredJobId(): string | null {
-  try {
-    return localStorage.getItem(STORED_JOB_KEY);
-  } catch {
-    return null;
-  }
-}
-
-function storeJobId(id: string | null) {
-  try {
-    if (id) localStorage.setItem(STORED_JOB_KEY, id);
-    else localStorage.removeItem(STORED_JOB_KEY);
-  } catch {
-    // A locked-down kiosk browser may block storage - the screen still works, it just asks again.
-  }
+/**
+ * The prep-bay screen: a TV at a bay, signed in as a prep or signage account. On first boot it
+ * asks which bay it is; then a crew member signs in on the screen itself (a second sign-in that
+ * leaves the screen's own login alone) and sees only the jobs they are on. Scans come from a
+ * scanner plugged into the screen's computer or from a phone paired with the bay's QR code, and
+ * every screen and phone on the job updates live.
+ */
+export default function SignagePage() {
+  const { user, loading, logout } = useAuth();
+  if (loading) return null;
+  if (!user) return <Navigate to="/login" replace />;
+  if (user.role === 'CREW') return <Navigate to="/scan" replace />;
+  // The screen's own way out, kept small: in the header once the bay is running, in the corner before.
+  const exit = (
+    <>
+      {user.role !== 'SIGNAGE' && (
+        <Link to="/" className="button secondary">
+          Back to portal
+        </Link>
+      )}
+      <button type="button" className="secondary" onClick={logout}>
+        <SignOutIcon /> Sign out screen
+      </button>
+    </>
+  );
+  return <BayScreen isAdmin={isAdminRole(user.role)} exit={exit} />;
 }
 
 function useClock() {
@@ -37,390 +51,517 @@ function useClock() {
   return now;
 }
 
-/**
- * Chromeless fullscreen view for prep-bay TV screens: shows a job's Current RMS pick list (if
- * linked and reachable) or its locally-generated case list, refreshing itself. The chosen job is
- * remembered so a TV reboot comes straight back to it; on first boot it picks the next job by date.
- * Works with the read-only SIGNAGE role - the one exception is ticking an item's prepped checkbox,
- * which is explicitly allowlisted since prep is the whole point here.
- */
-/**
- * /signage sits outside the normal shell, so it needs its own signed-in guard and its own way
- * out: a sign-out button (and a link back to the portal for staff), kept small and faded so it
- * doesn't distract on a TV, but always reachable.
- */
-export default function SignagePage() {
-  const { user, loading, logout } = useAuth();
-  if (loading) return null;
-  if (!user) return <Navigate to="/login" replace />;
-  return (
-    <>
-      <div className="signage-exit">
-        {user.role !== 'SIGNAGE' && (
-          <Link to="/" className="button secondary">
-            Back to portal
-          </Link>
-        )}
-        <button type="button" className="secondary" onClick={logout}>
-          <SignOutIcon /> Sign out
-        </button>
-      </div>
-      <SignageScreen />
-    </>
-  );
+/** Keeps the TV from sleeping while the page is open (re-asked whenever the tab comes back). */
+function useWakeLock() {
+  useEffect(() => {
+    let lock: { release: () => Promise<void> } | null = null;
+    const nav = navigator as Navigator & { wakeLock?: { request: (t: 'screen') => Promise<{ release: () => Promise<void> }> } };
+    const request = () => {
+      if (document.visibilityState !== 'visible' || !nav.wakeLock) return;
+      nav.wakeLock
+        .request('screen')
+        .then((l) => {
+          lock = l;
+        })
+        .catch(() => {});
+    };
+    request();
+    document.addEventListener('visibilitychange', request);
+    return () => {
+      document.removeEventListener('visibilitychange', request);
+      void lock?.release().catch(() => {});
+    };
+  }, []);
 }
 
-function SignageScreen() {
-  const [jobs, setJobs] = useState<Job[]>([]);
-  const [job, setJob] = useState<Job | null>(null);
-  const [choosing, setChoosing] = useState(false);
-  const [cases, setCases] = useState<CaseGroup[]>([]);
-  const [pickItems, setPickItems] = useState<CurrentRmsPickItem[] | null>(null);
-  const [pickListError, setPickListError] = useState<string | null>(null);
-  const [diff, setDiff] = useState<PickListDiff | null>(null);
-  const [logoOk, setLogoOk] = useState(true);
-  const [refreshedAt, setRefreshedAt] = useState<Date | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const now = useClock();
+function BayScreen({ isAdmin, exit }: { isAdmin: boolean; exit: React.ReactNode }) {
+  const [bayToken, setBayToken] = useState(() => bayStore.bayToken());
+  const [bay, setBay] = useState<BayInfo | null>(null);
+  const [bayError, setBayError] = useState<string | null>(null);
+  useWakeLock();
 
-  useEffect(() => {
-    Promise.all([api.jobs.list(), api.dashboard.get().catch(() => ({ orders: [] }))])
-      .then(([list, dashboard]) => {
-        setJobs(list);
-        const stored = readStoredJobId();
-        const remembered = stored ? list.find((j) => j.id === stored) : undefined;
-        if (remembered) return setJob(remembered);
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const next = dashboard.orders
-          .filter((o) => o.startsAt && new Date(o.endsAt ?? o.startsAt) >= today)
-          .sort((a, b) => new Date(a.startsAt!).getTime() - new Date(b.startsAt!).getTime())[0];
-        const pick = next ? list.find((j) => j.id === next.jobId) : list.length === 1 ? list[0] : undefined;
-        if (pick) setJob(pick);
-        else setChoosing(true);
-      })
-      .catch((e) => setLoadError((e as Error).message));
+  const loadBay = useCallback(async () => {
+    if (!bayStore.bayToken()) return;
+    // Only forget the sign-in if this request carried it and it was refused; a reply to a request
+    // sent before a sign-in finished must not wipe the token that sign-in just stored.
+    const sentOperator = bayStore.operatorToken();
+    try {
+      const info = await api.bays.current();
+      if (sentOperator && !info.operator && bayStore.operatorToken() === sentOperator) bayStore.setOperatorToken(null);
+      if (!info.operator && bayStore.operatorToken() && bayStore.operatorToken() !== sentOperator) return;
+      setBay(info);
+      setBayError(null);
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 404) {
+        bayStore.setBayToken(null);
+        bayStore.setOperatorToken(null);
+        setBayToken(null);
+        setBay(null);
+      } else setBayError((e as Error).message);
+    }
   }, []);
 
-  const linked = Boolean(job?.currentRmsOpportunityId);
-
   useEffect(() => {
-    if (!job) return;
-    const load = () => {
-      api.jobs.get(job.id).then(setJob).catch(() => {});
-      // The case list is always loaded so it can stand in if the pick list can't be reached
-      // (integration off, RMS down) instead of the screen going dark.
-      api.cases
-        .list(job.id)
-        .then((c) => {
-          setCases(c);
-          setRefreshedAt(new Date());
-        })
-        .catch(() => {});
-      if (job.currentRmsOpportunityId) {
-        api.jobCurrentRms
-          .pickList(job.id)
-          .then((res) => {
-            setPickItems(res.items);
-            setPickListError(null);
-            setRefreshedAt(new Date());
-          })
-          .catch((e) => setPickListError((e as Error).message));
-      }
-    };
-    load();
-    const t = setInterval(load, DATA_REFRESH_MS);
-    return () => clearInterval(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [job?.id, linked]);
+    void loadBay();
+  }, [bayToken, loadBay]);
 
-  // Polled separately (and more often) so the full-screen change alert shows up promptly -
-  // this is cheap: it's just reading a column already on the job row, not a live CRMS call.
-  useEffect(() => {
-    if (!job || !linked) return;
-    const check = () =>
-      api.jobCurrentRms
-        .itemsDiff(job.id)
-        .then((res) => {
-          if (res.diff) setDiff(res.diff);
-        })
-        .catch(() => {});
-    check();
-    const t = setInterval(check, DIFF_POLL_MS);
-    return () => clearInterval(t);
-  }, [job?.id, linked]);
-
-  const choose = (j: Job | null) => {
-    storeJobId(j?.id ?? null);
-    setPickItems(null);
-    setPickListError(null);
-    setCases([]);
-    setJob(j);
-    setChoosing(!j);
-  };
-
-  const togglePrepped = async (item: CurrentRmsPickItem) => {
-    if (!job) return;
-    const next = !item.prepped;
-    setPickItems((items) => items?.map((i) => (i.id === item.id ? { ...i, prepped: next } : i)) ?? null);
-    await api.jobCurrentRms.setPrepped(job.id, item.id, next).catch(() => {
-      setPickItems((items) => items?.map((i) => (i.id === item.id ? { ...i, prepped: !next } : i)) ?? null);
-    });
-  };
-
-  const dismissDiff = async () => {
-    if (!job) return;
-    setDiff(null);
-    await api.jobCurrentRms.acknowledgeItemsDiff(job.id).catch(() => {});
-  };
-
-  if (!job) {
+  const cornerExit = <div className="signage-exit">{exit}</div>;
+  if (!bayToken) {
     return (
-      <div className="signage-chooser">
-        <div className="panel" style={{ width: 420 }}>
-          <h2>Prep display</h2>
-          {loadError ? (
-            <p className="error">Could not load jobs: {loadError}</p>
-          ) : !choosing ? (
+      <>
+      {cornerExit}
+      <BaySetup
+        isAdmin={isAdmin}
+        onClaimed={(token) => {
+          bayStore.setBayToken(token);
+          setBayToken(token);
+        }}
+      />
+      </>
+    );
+  }
+  if (!bay) {
+    return (
+      <div className="bay-center">
+        {cornerExit}
+        <div className="bay-panel">
+          {bayError ? (
+            <p className="error">Could not reach the server: {bayError}. Retrying…</p>
+          ) : (
             <SkeletonRegion>
+              <Skeleton w="60%" h={34} style={{ marginBottom: 16 }} />
               <SkeletonList items={3} />
             </SkeletonRegion>
-          ) : (
-            <>
-              <p className="muted">Choose the job this screen should show. It will be remembered on this screen.</p>
-              {jobs.map((j) => (
-                <button key={j.id} className="secondary signage-chooser-option" onClick={() => choose(j)}>
-                  {j.name}
-                  {j.venue ? ` - ${j.venue}` : ''}
-                </button>
-              ))}
-              {jobs.length === 0 && <p className="muted">No jobs found.</p>}
-            </>
           )}
+          {bayError && <RetryEvery ms={10_000} run={loadBay} />}
         </div>
       </div>
     );
   }
+  return <BayLive bay={bay} reloadBay={loadBay} exit={exit} />;
+}
 
-  const byType = new Map<string, CaseGroup[]>();
-  for (const c of cases) {
-    if (!byType.has(c.fixtureType)) byType.set(c.fixtureType, []);
-    byType.get(c.fixtureType)!.push(c);
-  }
-  const showPickList = linked && !pickListError;
+function RetryEvery({ ms, run }: { ms: number; run: () => void }) {
+  useEffect(() => {
+    const t = setInterval(run, ms);
+    return () => clearInterval(t);
+  }, [ms, run]);
+  return null;
+}
 
+/** First boot: which bay is this screen? */
+function BaySetup({ isAdmin, onClaimed }: { isAdmin: boolean; onClaimed: (token: string) => void }) {
+  const [bays, setBays] = useState<{ id: string; name: string }[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    api.bays
+      .list()
+      .then(setBays)
+      .catch((e) => setError((e as Error).message));
+  }, []);
   return (
-    <div className="signage">
-      {diff && <ItemsDiffOverlay diff={diff} onDismiss={dismissDiff} />}
-
-      <header className="signage-header">
-        {job.logoPath && logoOk && <img src={api.jobs.logoUrl(job.id)} alt="" className="signage-logo" onError={() => setLogoOk(false)} />}
-        <div>
-          <h1 className="signage-title">{job.name}</h1>
-          {job.venue && <p className="muted signage-venue">{job.venue}</p>}
-        </div>
-        <div className="signage-meta">
-          <div className="signage-clock">{formatTime(now)}</div>
-          <div className="muted">{formatDate(now)}</div>
-          {refreshedAt && <div className="muted signage-refreshed">Updated {formatTime(refreshedAt)}</div>}
-        </div>
-        <button className="secondary" onClick={() => choose(null)}>
-          Change job
-        </button>
-      </header>
-
-      {linked && pickListError && (
-        <p className="muted signage-fallback-note">
-          The Current RMS pick list isn't available right now ({pickListError}) - showing this job's case list instead.
-        </p>
-      )}
-
-      {showPickList ? (
-        <PickListView items={pickItems} onToggle={togglePrepped} />
-      ) : (
-        <>
-          {cases.length === 0 && <p className="muted signage-empty">No cases generated for this job yet.</p>}
-          <div className="signage-case-grid">
-            {[...byType.entries()].map(([type, groups]) => (
-              <div key={type} className="panel" style={{ marginBottom: 0 }}>
-                <h2 className="signage-case-type">{type}</h2>
-                {groups.map((g) => (
-                  <div key={g.id} className="signage-case-row">
-                    <strong>{g.label}</strong>
-                    {g.location && <span className="muted"> - {g.location}</span>}
-                  </div>
-                ))}
-              </div>
-            ))}
-          </div>
-        </>
-      )}
+    <div className="bay-center">
+      <div className="bay-panel">
+        <h1>Which bay is this screen?</h1>
+        <p className="bay-card-sub">This screen remembers its bay, so you only do this once.</p>
+        {error && <p className="error">{error}</p>}
+        {!bays && !error && <SkeletonList items={3} />}
+        {bays?.map((b) => (
+          <button key={b.id} type="button" className="bay-option" onClick={async () => onClaimed((await api.bays.claim(b.id)).token)}>
+            {b.name}
+          </button>
+        ))}
+        {bays?.length === 0 && (
+          <p className="bay-card-sub">
+            No bays are set up yet.{' '}
+            {isAdmin ? (
+              <Link to="/settings/prep-bays">Add one in Settings, Prep bays.</Link>
+            ) : (
+              'Ask an admin to add one in Settings, Prep bays.'
+            )}
+          </p>
+        )}
+      </div>
     </div>
   );
 }
 
-function PickListView({ items, onToggle }: { items: CurrentRmsPickItem[] | null; onToggle: (item: CurrentRmsPickItem) => void }) {
-  if (!items) return <p className="muted" style={{ fontSize: '1.4rem' }}>Loading pick list…</p>;
-  if (items.length === 0) return <p className="muted" style={{ fontSize: '1.4rem' }}>No items on this opportunity yet.</p>;
+function BayLive({ bay, reloadBay, exit }: { bay: BayInfo; reloadBay: () => Promise<void>; exit: React.ReactNode }) {
+  const now = useClock();
+  const [view, setView] = useState<PrepView | null>(null);
+  const [viewError, setViewError] = useState<string | null>(null);
+  const [lastScan, setLastScan] = useState<PrepScan | null>(null);
+  const [flash, setFlash] = useState<{ tone: string; key: number } | null>(null);
+  const [diff, setDiff] = useState<PickListDiff | null>(null);
+  const [showPair, setShowPair] = useState(false);
+  const [choosingJob, setChoosingJob] = useState(false);
+  const seenScans = useRef(new Set<string>());
+  const failures = useRef(0);
+  const lastActivity = useRef(Date.now());
+  const operator = bay.operator;
+  const jobId = choosingJob ? null : bay.currentJobId;
 
-  // Group rows are Current RMS's own section headings (e.g. "Lighting - Moving Lights"),
-  // not real items to pick - shown as titles, excluded from the prepped count.
-  const pickable = items.filter((i) => !i.isGroup);
-  const preppedCount = pickable.filter((i) => i.prepped).length;
+  const loadView = useCallback(async () => {
+    if (!bay.currentJobId) return;
+    try {
+      const v = await api.prepJob.view(bay.currentJobId);
+      setView(v);
+      setViewError(null);
+      failures.current = 0;
+      if (v.job.hasRmsDiff) {
+        const d = await api.prepJob.diff(bay.currentJobId).catch(() => null);
+        if (d?.diff) setDiff(d.diff);
+      }
+    } catch (e) {
+      setViewError((e as Error).message);
+      failures.current++;
+      // After about five minutes of failures with the network up, start afresh.
+      if (failures.current >= 10 && navigator.onLine) window.location.reload();
+    }
+  }, [bay.currentJobId]);
+
+  useEffect(() => {
+    setView(null);
+    setDiff(null);
+    setLastScan(null);
+    void loadView();
+  }, [loadView]);
+
+  const showScan = useCallback(
+    (scan: PrepScan) => {
+      if (seenScans.current.has(scan.id)) return;
+      seenScans.current.add(scan.id);
+      setLastScan(scan);
+      const tone = toneFor(scan.result);
+      setFlash({ tone, key: Date.now() });
+      if (bay.config.sound) playScanTone(tone);
+    },
+    [bay.config.sound]
+  );
+
+  const live = useLiveJob({
+    jobId: bay.currentJobId,
+    bayToken: bay.token,
+    onChange: () => void loadView(),
+    onScan: showScan,
+    onBay: () => void reloadBay(),
+    onRmsDiff: () => {
+      if (bay.currentJobId) api.prepJob.diff(bay.currentJobId).then((d) => d.diff && setDiff(d.diff)).catch(() => {});
+    },
+  });
+
+  // The idle timer runs on the server; this tells it someone is still here.
+  useEffect(() => {
+    if (!operator) return;
+    const mark = () => {
+      lastActivity.current = Date.now();
+    };
+    window.addEventListener('pointerdown', mark);
+    window.addEventListener('keydown', mark);
+    const t = setInterval(() => {
+      if (Date.now() - lastActivity.current < 60_000) {
+        api.bays.operatorPing().catch((e) => {
+          if (e instanceof ApiError && e.status === 401) void reloadBay();
+        });
+      }
+    }, 60_000);
+    return () => {
+      window.removeEventListener('pointerdown', mark);
+      window.removeEventListener('keydown', mark);
+      clearInterval(t);
+    };
+  }, [operator, reloadBay]);
+
+  const switchJob = useCallback(
+    async (id: string | null) => {
+      await api.bays.setJob(id);
+      setChoosingJob(false);
+      await reloadBay();
+    },
+    [reloadBay]
+  );
+
+  const scan = useCallback(
+    async (code: string) => {
+      lastActivity.current = Date.now();
+      if (!operator) {
+        showScan({ id: `local-${Date.now()}`, code, kind: 'UNKNOWN', result: 'LOCKED', message: 'Sign in on the screen first', source: 'HID', by: null, at: new Date().toISOString() });
+        return;
+      }
+      if (!bay.currentJobId) return;
+      try {
+        const result = await api.prepJob.scan(bay.currentJobId, code, 'HID');
+        showScan(result);
+        if (result.result === 'SWITCH_JOB' && result.switchToJobId) await switchJob(result.switchToJobId).catch(() => {});
+      } catch (e) {
+        showScan({ id: `err-${Date.now()}`, code, kind: 'UNKNOWN', result: 'UNKNOWN', message: (e as Error).message, source: 'HID', by: null, at: new Date().toISOString() });
+      }
+    },
+    [operator, bay.currentJobId, showScan, switchJob]
+  );
+
+  useScannerInput({ onScan: (c) => void scan(c), prefix: bay.config.scannerPrefix, suffix: bay.config.scannerSuffix, enabled: Boolean(bay.currentJobId) || !operator });
+
+  const signOut = async () => {
+    await api.bays.operatorLogout().catch(() => {});
+    bayStore.setOperatorToken(null);
+    await reloadBay();
+  };
+
+  const adjust = async (line: PrepLine, change: { delta?: 1 | -1; short?: number; shortNote?: string | null }) => {
+    if (!bay.currentJobId) return;
+    const res = await api.prepJob.adjust(bay.currentJobId, { lineKey: line.key, ...change });
+    showScan(res.scan);
+    await loadView();
+  };
+
+  const header = (
+    <header className="bay-header">
+      {view?.job.hasLogo && bay.currentJobId && <img src={api.jobs.logoUrl(bay.currentJobId)} alt="" className="bay-logo" onError={(e) => (e.currentTarget.style.display = 'none')} />}
+      <div className="bay-title">
+        <h1>{bay.currentJobId && view ? view.job.name : bay.name}</h1>
+        <p>
+          {bay.currentJobId && view ? `${bay.name}${view.job.venue ? ` · ${view.job.venue}` : ''}` : 'Prep bay'}
+        </p>
+      </div>
+      <div className="bay-status">
+        <span className={`bay-chip ${live === 'live' ? 'bay-chip-green' : 'bay-chip-grey'}`}>{live === 'live' ? 'Live' : 'Reconnecting'}</span>
+        {operator && <span className="bay-chip">{operator.displayName}</span>}
+        {view && view.source !== 'RMS' && view.job.linked && <span className="bay-chip bay-chip-amber">Current RMS offline</span>}
+      </div>
+      <div className="bay-clock">
+        <span>{formatTime(now)}</span>
+        <span className="bay-card-sub">{formatDate(now)}</span>
+      </div>
+      <div className="bay-header-actions">
+        <button type="button" className="bay-button" onClick={() => setShowPair(true)}>
+          Pair phone
+        </button>
+        {operator && (
+          <>
+            <button type="button" className="bay-button" onClick={() => setChoosingJob(true)}>
+              Change job
+            </button>
+            <button type="button" className="bay-button" onClick={signOut}>
+              Sign out {operator.displayName.split(' ')[0]}
+            </button>
+          </>
+        )}
+        <div className="bay-screen-exit">{exit}</div>
+      </div>
+    </header>
+  );
+
+  let body: React.ReactNode;
+  if (!operator) {
+    body = <OperatorSignIn bay={bay} view={bay.currentJobId ? view : null} onSignedIn={reloadBay} />;
+  } else if (!jobId) {
+    body = <JobChooser current={bay.currentJobId} onPick={switchJob} onCancel={bay.currentJobId ? () => setChoosingJob(false) : undefined} />;
+  } else if (!view) {
+    body = (
+      <main className="bay-main">
+        {viewError ? (
+          <p className="error">Could not load this job: {viewError}</p>
+        ) : (
+          <SkeletonRegion className="bay-left">
+            <Skeleton h={160} r={14} style={{ marginBottom: 20 }} />
+            <SkeletonList items={6} itemHeight={70} />
+          </SkeletonRegion>
+        )}
+      </main>
+    );
+  } else {
+    body = (
+      <PrepScreen
+        view={view}
+        lastScan={lastScan}
+        locked={view.session?.status !== undefined && view.session.status !== 'OPEN'}
+        canAct={Boolean(operator)}
+        onAdjust={adjust}
+        onCasePacked={async (caseId, packed) => {
+          await api.prepJob.setCasePacked(bay.currentJobId!, caseId, packed);
+          await loadView();
+        }}
+        onSignOff={async () => {
+          await api.prepJob.signOff(bay.currentJobId!);
+          await loadView();
+        }}
+        onTransport={async () => {
+          await api.prepJob.transport(bay.currentJobId!);
+          await loadView();
+        }}
+      />
+    );
+  }
 
   return (
-    <div>
-      <div className="signage-progress" aria-label={`${preppedCount} of ${pickable.length} prepped`}>
-        <div className="signage-progress-bar">
-          <div className="signage-progress-fill" style={{ width: `${pickable.length ? (preppedCount / pickable.length) * 100 : 0}%` }} />
-        </div>
-        <span>
-          {preppedCount} / {pickable.length} prepped - tap a row as you pull it
-        </span>
-      </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-        {items.map((item) => {
-          const name = item.name || item.product_name || item.description || `Item #${item.id}`;
-          if (item.isGroup) {
-            return (
-              <h3
-                key={item.id}
-                style={{ fontSize: '1.4rem', margin: '1rem 0 0', paddingBottom: '0.3rem', borderBottom: '2px solid currentColor' }}
-              >
-                {name}
-              </h3>
-            );
-          }
-          return (
+    <div className="bay" onPointerDown={unlockScanAudio}>
+      {flash && <div key={flash.key} className={`bay-flash is-${flash.tone}`} aria-hidden="true" />}
+      {diff && view && (
+        <ItemsDiffOverlay
+          diff={diff}
+          lines={view.groups.flatMap((g) => g.lines)}
+          onDismiss={() => {
+            setDiff(null);
+            if (bay.currentJobId) api.prepJob.acknowledgeDiff(bay.currentJobId).catch(() => {});
+          }}
+        />
+      )}
+      {header}
+      {body}
+      {showPair && <PairPhone bay={bay} onClose={() => setShowPair(false)} />}
+    </div>
+  );
+}
+
+/** The crew sign-in on the screen. Uses the person's normal portal login (and 2FA code). */
+function OperatorSignIn({ bay, view, onSignedIn }: { bay: BayInfo; view: PrepView | null; onSignedIn: () => Promise<void> }) {
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [code, setCode] = useState('');
+  const [needsCode, setNeedsCode] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    unlockScanAudio();
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await api.bays.operatorLogin({ username, password, ...(needsCode ? (code.length > 6 ? { backupCode: code } : { code }) : {}) });
+      if (res.requiresTotp) {
+        setNeedsCode(true);
+        return;
+      }
+      if (res.token) {
+        bayStore.setOperatorToken(res.token);
+        setPassword('');
+        setCode('');
+        await onSignedIn();
+      }
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <main className="bay-center bay-signin">
+      <form className="bay-panel" onSubmit={submit}>
+        <h1>Sign in to start prepping</h1>
+        <p className="bay-card-sub">Use your own portal login. You will see the jobs you are on.</p>
+        {!needsCode ? (
+          <>
+            <label className="bay-label">
+              Username
+              <input className="bay-input" value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="off" autoCapitalize="none" spellCheck={false} required />
+            </label>
+            <label className="bay-label">
+              Password
+              <input className="bay-input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="off" required />
+            </label>
+          </>
+        ) : (
+          <label className="bay-label">
+            Two-factor code (or a backup code)
+            <input className="bay-input" value={code} onChange={(e) => setCode(e.target.value.trim())} inputMode="numeric" autoComplete="one-time-code" autoFocus required />
+          </label>
+        )}
+        {error && <p className="error">{error}</p>}
+        <div className="bay-sheet-row">
+          {needsCode && (
             <button
-              key={item.id}
-              onClick={() => onToggle(item)}
-              className="panel"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '1rem',
-                marginBottom: 0,
-                textAlign: 'left',
-                border: item.prepped ? '2px solid #1FA34C' : undefined,
-                opacity: item.prepped ? 0.75 : 1,
-                cursor: 'pointer',
-                width: '100%',
+              type="button"
+              className="bay-button"
+              onClick={() => {
+                setNeedsCode(false);
+                setCode('');
               }}
             >
-              <div
-                style={{
-                  width: 32,
-                  height: 32,
-                  flexShrink: 0,
-                  borderRadius: 6,
-                  border: '2px solid currentColor',
-                  display: 'grid',
-                  placeItems: 'center',
-                  background: item.prepped ? '#1FA34C' : 'transparent',
-                  color: item.prepped ? '#fff' : 'inherit',
-                  fontSize: '1.3rem',
-                  fontWeight: 700,
-                }}
-              >
-                {item.prepped ? '✓' : ''}
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: '1.5rem', fontWeight: 600, textDecoration: item.prepped ? 'line-through' : 'none' }}>
-                  {name}
-                </div>
-                {item.status_name && <span className="muted" style={{ fontSize: '1rem' }}>{item.status_name}</span>}
-              </div>
-              <div style={{ fontSize: '1.5rem', fontWeight: 700 }}>×{item.quantity ?? 1}</div>
-              <span
-                style={{
-                  fontSize: '0.95rem',
-                  fontWeight: 700,
-                  padding: '0.25rem 0.6rem',
-                  borderRadius: 999,
-                  background: item.bookedOut ? '#1FA34C' : '#555',
-                  color: '#fff',
-                }}
-              >
-                {item.bookedOut ? 'Booked out' : 'Not booked out'}
-              </span>
+              Back
             </button>
-          );
-        })}
-      </div>
-    </div>
+          )}
+          <button type="submit" className="bay-button bay-button-primary" disabled={busy}>
+            {busy ? 'Signing in…' : 'Sign in'}
+          </button>
+        </div>
+      </form>
+      {view && (
+        <div className="bay-panel bay-idle-job">
+          <span className="bay-next-label">{bay.name} is on</span>
+          <h2>{view.job.name}</h2>
+          <div className="bay-progress">
+            <div className="bay-progress-fill" style={{ width: `${view.totals.required ? (view.totals.pulled / view.totals.required) * 100 : 0}%` }} />
+          </div>
+          <p className="bay-card-sub">
+            {view.totals.pulled} of {view.totals.required} pulled
+            {view.session?.status === 'AWAITING_TRANSPORT' ? ' · awaiting transport' : view.session?.status === 'BOOKED_OUT' ? ' · booked out' : ''}
+          </p>
+        </div>
+      )}
+    </main>
   );
 }
 
-/**
- * Full-screen GitHub-diff-style alert: red for what was removed from the pick list, green for
- * what was added, orange for quantity changes - flashed the moment the sync poller detects the
- * linked opportunity's items changed, until someone on this screen dismisses it.
- */
-function ItemsDiffOverlay({ diff, onDismiss }: { diff: PickListDiff; onDismiss: () => void }) {
+const STATUS_LABEL: Record<string, string> = { OPEN: 'Prepping', AWAITING_TRANSPORT: 'Awaiting transport', BOOKED_OUT: 'Booked out' };
+
+function JobChooser({ current, onPick, onCancel }: { current: string | null; onPick: (id: string) => Promise<void>; onCancel?: () => void }) {
+  const [jobs, setJobs] = useState<PrepJobOption[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    api.bays
+      .jobs()
+      .then(setJobs)
+      .catch((e) => setError((e as Error).message));
+  }, []);
   return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 1000,
-        background: 'rgba(10, 10, 10, 0.97)',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '3rem',
-        animation: 'signage-flash 1s ease-in-out 3',
-      }}
-    >
-      <style>{`
-        @keyframes signage-flash {
-          0%, 100% { background-color: rgba(10, 10, 10, 0.97); }
-          50% { background-color: rgba(120, 20, 20, 0.97); }
-        }
-      `}</style>
-      <h1 style={{ fontSize: '3rem', margin: 0 }}>⚠ Job changed</h1>
-      <p className="muted" style={{ fontSize: '1.3rem', marginBottom: '2rem' }}>
-        The linked Current RMS opportunity's pick list has changed.
-      </p>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.5rem', maxWidth: 1100, width: '100%' }}>
-        {diff.removed.length > 0 && (
-          <div>
-            <h3 style={{ color: '#f87171' }}>Removed</h3>
-            {diff.removed.map((i) => (
-              <div key={i.id} style={{ fontSize: '1.3rem', color: '#f87171' }}>
-                − {i.name} ×{i.quantity}
-              </div>
-            ))}
-          </div>
-        )}
-        {diff.added.length > 0 && (
-          <div>
-            <h3 style={{ color: '#4ade80' }}>Added</h3>
-            {diff.added.map((i) => (
-              <div key={i.id} style={{ fontSize: '1.3rem', color: '#4ade80' }}>
-                + {i.name} ×{i.quantity}
-              </div>
-            ))}
-          </div>
-        )}
-        {diff.changed.length > 0 && (
-          <div>
-            <h3 style={{ color: '#fb923c' }}>Quantity changed</h3>
-            {diff.changed.map((i) => (
-              <div key={i.id} style={{ fontSize: '1.3rem', color: '#fb923c' }}>
-                {i.name}: {i.before} → {i.after}
-              </div>
-            ))}
-          </div>
+    <main className="bay-center">
+      <div className="bay-panel bay-panel-wide">
+        <h1>Choose a job to prep</h1>
+        {error && <p className="error">{error}</p>}
+        {!jobs && !error && <SkeletonList items={4} itemHeight={70} />}
+        {jobs?.length === 0 && <p className="bay-card-sub">You are not on any upcoming jobs. Ask the office to add you to the job's crew.</p>}
+        <div className="bay-job-list">
+          {jobs?.map((j) => (
+            <button key={j.id} type="button" className={`bay-option${j.id === current ? ' is-current' : ''}`} onClick={() => onPick(j.id)}>
+              <span className="bay-option-name">{j.name}</span>
+              <span className="bay-card-sub">
+                {j.startsAt ? formatDate(j.startsAt) : 'No date'}
+                {j.venue ? ` · ${j.venue}` : ''}
+              </span>
+              {j.prep && <span className={`bay-chip${j.prep.flagged ? ' bay-chip-amber' : ''}`}>{STATUS_LABEL[j.prep.status]}</span>}
+            </button>
+          ))}
+        </div>
+        {onCancel && (
+          <button type="button" className="bay-button" onClick={onCancel}>
+            Back
+          </button>
         )}
       </div>
-      <button
-        onClick={onDismiss}
-        style={{ marginTop: '2.5rem', fontSize: '1.3rem', padding: '0.8rem 2rem' }}
-      >
-        Dismiss
-      </button>
+    </main>
+  );
+}
+
+/** A QR the phone camera opens: the phone scanner page, paired to this bay. */
+function PairPhone({ bay, onClose }: { bay: BayInfo; onClose: () => void }) {
+  const [src, setSrc] = useState<string | null>(null);
+  const url = `${window.location.origin}/scan?bay=${encodeURIComponent(bay.token)}`;
+  useEffect(() => {
+    QRCode.toDataURL(url, { margin: 1, width: 520, errorCorrectionLevel: 'M' }).then(setSrc).catch(() => {});
+  }, [url]);
+  return (
+    <div className="bay-sheet-backdrop" onClick={onClose}>
+      <div className="bay-sheet bay-pair" role="dialog" aria-label="Pair a phone" onClick={(e) => e.stopPropagation()}>
+        <h2>Scan with a phone to pair it with {bay.name}</h2>
+        {src ? <img src={src} alt="Pairing code" width={360} height={360} /> : <Skeleton w={360} h={360} />}
+        <p className="bay-card-sub">Open the camera, scan this, and sign in. Scans from that phone show up here.</p>
+        <button type="button" className="bay-button" onClick={onClose}>
+          Close
+        </button>
+      </div>
     </div>
   );
 }

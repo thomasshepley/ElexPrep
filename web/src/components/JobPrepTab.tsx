@@ -6,6 +6,9 @@ import CasesPanel from './CasesPanel';
 import LabelsPanel from './LabelsPanel';
 import PrintQueuePanel from './PrintQueuePanel';
 import StagesManager from './StagesManager';
+import PrepBayStatus from './PrepBayStatus';
+import { useAuth } from '../auth/AuthContext';
+import { isAdminRole } from '../auth/roles';
 
 const PREP_TABS = ['Patch Import', 'Cases', 'Labels', 'Print Queue'] as const;
 type PrepTab = (typeof PREP_TABS)[number];
@@ -35,9 +38,11 @@ export default function JobPrepTab({ jobId }: { jobId: string }) {
   }, [jobId]);
 
   const hasStages = (groups?.length ?? 0) > 0;
+  const { user } = useAuth();
 
   return (
     <div>
+      {isAdminRole(user?.role) && <PrepBayStatus jobId={jobId} />}
       {groups === null && <Skeleton w="55%" h={14} style={{ margin: '0.25rem 0 1.1rem' }} />}
       {groups !== null && hasStages && (
         <div className="row tabs tabs-sub" style={{ marginBottom: '0.5rem' }}>

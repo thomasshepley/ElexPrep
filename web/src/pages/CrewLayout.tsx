@@ -2,7 +2,7 @@ import { PageSkeleton } from '../components/Skeleton';
 import { Suspense } from 'react';
 import { Navigate, NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
-import { JobsIcon, SettingsIcon, SignOutIcon } from '../components/Icons';
+import { JobsIcon, SettingsIcon, SignOutIcon, ScanIcon } from '../components/Icons';
 import ThemeToggle from '../components/ThemeToggle';
 import NotificationBell from '../components/NotificationBell';
 import VersionBadge from '../components/VersionBadge';
@@ -42,7 +42,10 @@ export default function CrewLayout() {
       <div className="shell">
         {phone ? (
           <MobileTabBar
-            tabs={[{ to: '/crew', end: true, label: 'Schedule', icon: <JobsIcon /> }]}
+            tabs={[
+              { to: '/crew', end: true, label: 'Schedule', icon: <JobsIcon /> },
+              { to: '/scan', label: 'Scanner', icon: <ScanIcon /> },
+            ]}
             after={[{ to: '/crew/account', label: 'Account', icon: <SettingsIcon /> }]}
           />
         ) : (
@@ -56,6 +59,10 @@ export default function CrewLayout() {
               <NavLink to="/crew" end aria-label="Schedule">
                 <JobsIcon />
                 <span>Schedule</span>
+              </NavLink>
+              <NavLink to="/scan" aria-label="Scanner">
+                <ScanIcon />
+                <span>Scanner</span>
               </NavLink>
               <NavLink to="/crew/account" aria-label="My account">
                 <SettingsIcon />

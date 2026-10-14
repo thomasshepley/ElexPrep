@@ -9,6 +9,12 @@
 // One change per line: pass a separate <feature|fix> "<summary>" pair for each added feature and
 // each fixed bug rather than joining several into one sentence.
 //
+// Lines that belong to a named area go under that area's heading: put `section "<Name>"` before
+// them and every following pair lands under "### <Name>" until the next `section`. Known areas:
+// "Signage Mode" and "Cable calculator (beta)".
+//
+//   node scripts/bump-version.mjs feature "Faster search" section "Signage Mode" feature "Bays" fix "Clock drift"
+//
 // Versioning scheme (as specified by the project owner - v1.0.1 is the starting point):
 //   X.Y.Z, e.g. "1.0.1"
 //   - every push bumps Z (the last digit), regardless of whether it's a feature or a fix
@@ -32,14 +38,19 @@ const changelogPath = path.join(repoRoot, 'CHANGELOG.md');
 // <feature|fix> "<summary>" pairs, one changelog line each.
 const args = process.argv.slice(2);
 const entries = [];
+let section = '';
 for (let i = 0; i < args.length; i += 2) {
   const kind = args[i];
   const summary = (args[i + 1] ?? '').trim();
+  if (kind === 'section' && summary) {
+    section = summary;
+    continue;
+  }
   if ((kind !== 'feature' && kind !== 'fix') || !summary) {
-    console.error('Usage: node scripts/bump-version.mjs <feature|fix> "<summary>" [<feature|fix> "<summary>" ...]');
+    console.error('Usage: node scripts/bump-version.mjs [section "<Name>"] <feature|fix> "<summary>" [...]');
     process.exit(1);
   }
-  entries.push({ kind, summary });
+  entries.push({ kind, summary, section });
 }
 if (entries.length === 0) {
   console.error('A changelog summary is required, e.g.:\n  node scripts/bump-version.mjs fix "Fix sign-out redirect"');
@@ -71,11 +82,18 @@ const date = new Date().toISOString().slice(0, 10);
 const changelog = readFileSync(changelogPath, 'utf8');
 const marker = '\n## v';
 const insertAt = changelog.indexOf(marker);
-// Features first, then fixes.
-const lines = [...entries.filter((e) => e.kind === 'feature'), ...entries.filter((e) => e.kind === 'fix')].map(
-  (e) => `${e.kind === 'feature' ? '+' : '-'} ${e.summary}`
-);
-const entry = `## v${next} - ${date}\n\n${lines.join('\n')}\n\n`;
+// Ungrouped lines first, then each section in the order it was first named; within each, features
+// first, then fixes.
+const sections = [...new Set(entries.map((e) => e.section))].sort((a, b) => (a === '' ? -1 : b === '' ? 1 : 0));
+const blocks = sections.map((name) => {
+  const own = entries.filter((e) => e.section === name);
+  const lines = [...own.filter((e) => e.kind === 'feature'), ...own.filter((e) => e.kind === 'fix')].map(
+    (e) => `${e.kind === 'feature' ? '+' : '-'} ${e.summary}`
+  );
+  return `${name ? `### ${name}\n\n` : ''}${lines.join('\n')}`;
+});
+const lines = blocks;
+const entry = `## v${next} - ${date}\n\n${blocks.join('\n\n')}\n\n`;
 const updated =
   insertAt === -1
     ? `${changelog.trimEnd()}\n\n${entry}`

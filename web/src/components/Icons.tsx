@@ -153,6 +153,15 @@ export function SignageIcon() {
   );
 }
 
+export function ScanIcon() {
+  return (
+    <svg {...common}>
+      <path d="M2.5 5V3.2c0-.4.3-.7.7-.7H5M11 2.5h1.8c.4 0 .7.3.7.7V5M13.5 11v1.8c0 .4-.3.7-.7.7H11M5 13.5H3.2c-.4 0-.7-.3-.7-.7V11" {...stroke} />
+      <path d="M5 5.5v5M7 5.5v5M9.2 5.5v5M11 5.5v5" {...stroke} />
+    </svg>
+  );
+}
+
 export function SearchIcon() {
   return (
     <svg {...common}>

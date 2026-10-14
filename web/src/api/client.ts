@@ -12,6 +12,8 @@ import { crewApi } from './domains/crew';
 import { jobsApi } from './domains/jobs';
 import { prepApi } from './domains/prep';
 import { integrationsApi } from './domains/integrations';
+import { baysApi } from './domains/bays';
+export * from './domains/bays';
 
 export const api = {
   ...accountApi,
@@ -19,4 +21,5 @@ export const api = {
   ...jobsApi,
   ...prepApi,
   ...integrationsApi,
+  ...baysApi,
 };

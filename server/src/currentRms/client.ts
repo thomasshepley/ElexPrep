@@ -26,7 +26,8 @@ async function request(
   config: Pick<CurrentRmsConfig, 'subdomain' | 'apiKey'>,
   path: string,
   params: Record<string, string | number | undefined> = {},
-  attempt = 1
+  attempt = 1,
+  write?: { method: 'POST' | 'PUT'; body: unknown }
 ): Promise<unknown> {
   if (!config.subdomain || !config.apiKey) {
     throw new CurrentRmsError('Current RMS is not configured (missing subdomain or API key)', 400);
@@ -39,17 +40,21 @@ async function request(
   }
 
   const res = await fetch(url, {
+    method: write?.method ?? 'GET',
     headers: {
       'X-SUBDOMAIN': config.subdomain,
       'X-AUTH-TOKEN': config.apiKey,
       Accept: 'application/json',
+      ...(write ? { 'Content-Type': 'application/json' } : {}),
     },
+    body: write ? JSON.stringify(write.body) : undefined,
   });
 
   if (res.status === 429 && attempt <= 3) {
-    const retryAfterSec = Number(res.headers.get('retry-after')) || 5 * attempt;
-    await new Promise((r) => setTimeout(r, retryAfterSec * 1000));
-    return request(config, path, params, attempt + 1);
+    // X-RateLimit-Reset is what Current RMS documents; Retry-After is the generic fallback.
+    const retryAfterSec = Number(res.headers.get('retry-after')) || Number(res.headers.get('x-ratelimit-reset')) || 5 * attempt;
+    await new Promise((r) => setTimeout(r, Math.min(retryAfterSec, 60) * 1000));
+    return request(config, path, params, attempt + 1, write);
   }
 
   if (!res.ok) {
@@ -211,8 +216,26 @@ export interface RawOpportunityItem {
   // computed against ElexPrep's own crew pay rates instead (see routes/currentRms.ts).
   charge_excluding_tax_total?: string;
   charge_total?: string;
+  /** Only present when fetched with include[]=item_assets. */
+  item_assets?: RawItemAsset[];
   [key: string]: unknown;
 }
+
+/** One unit (or a bulk quantity) of stock allocated to an opportunity item. */
+export interface RawItemAsset {
+  id: number;
+  opportunity_item_id?: number;
+  stock_level_id?: number;
+  stock_level_asset_number?: string;
+  /** 10 Allocated, 15 Prepared, 20 Booked Out, 30 Checked In (per Current RMS's API reference). */
+  status?: number;
+  status_name?: string;
+  quantity?: string | number;
+  container?: string;
+}
+
+/** Item-asset status code for "Prepared". */
+export const ITEM_ASSET_PREPARED = 15;
 
 /** Current RMS's own opportunity_item_type code for a section-heading row, not a real item. */
 export const GROUP_ITEM_TYPE = 0;
@@ -232,7 +255,8 @@ const MAX_ITEM_PAGES = 20; // hard cap so a misbehaving API can't loop forever
  */
 export async function fetchOpportunityItems(
   config: Pick<CurrentRmsConfig, 'subdomain' | 'apiKey'>,
-  rmsId: number
+  rmsId: number,
+  opts: { withAssets?: boolean } = {}
 ): Promise<RawOpportunityItem[]> {
   const perPage = 100;
   const all: RawOpportunityItem[] = [];
@@ -240,6 +264,9 @@ export async function fetchOpportunityItems(
     const body = (await request(config, `/opportunities/${rmsId}/opportunity_items`, {
       page,
       per_page: perPage,
+      // The units allocated to each line (asset numbers and their prepared/booked-out state),
+      // in the same request rather than one extra call per line.
+      ...(opts.withAssets ? { 'include[]': 'item_assets' } : {}),
     })) as OpportunityItemsPage;
     const items = body.opportunity_items ?? [];
     all.push(...items);
@@ -247,4 +274,68 @@ export async function fetchOpportunityItems(
     if (items.length < perPage || (totalPages !== undefined && page >= totalPages)) break;
   }
   return all;
+}
+
+export interface RawStockLevel {
+  id: number;
+  item_id?: number;
+  item_name?: string;
+  asset_number?: string;
+  /** 50 = Bulk Stock in the documented example; serialised stock carries its own asset number. */
+  stock_category?: number;
+  stock_category_name?: string;
+  [key: string]: unknown;
+}
+
+/** The stock level whose asset (barcode) number is exactly `code`, if Current RMS has one. */
+export async function findStockLevelByAssetNumber(
+  config: Pick<CurrentRmsConfig, 'subdomain' | 'apiKey'>,
+  code: string
+): Promise<RawStockLevel | null> {
+  const body = (await request(config, '/stock_levels', { 'q[asset_number_eq]': code, per_page: 1 })) as { stock_levels?: RawStockLevel[] };
+  return body.stock_levels?.[0] ?? null;
+}
+
+export interface RawProduct {
+  id: number;
+  name?: string;
+  barcode?: string;
+  [key: string]: unknown;
+}
+
+/** A bulk or non-stock product whose product barcode is exactly `code`. */
+export async function findProductByBarcode(
+  config: Pick<CurrentRmsConfig, 'subdomain' | 'apiKey'>,
+  code: string
+): Promise<RawProduct | null> {
+  const body = (await request(config, '/products', { 'q[barcode_eq]': code, per_page: 1 })) as { products?: RawProduct[] };
+  const found = body.products?.[0];
+  // Ransack ignores a filter it does not know rather than failing, so check the match itself.
+  return found && found.barcode === code ? found : null;
+}
+
+type ScanBody = { stock_level_asset_number: string; quantity?: number; mark_as_prepared?: number; container?: string };
+
+/** Allocates a unit (by asset or barcode number) to the opportunity, optionally preparing it in the same call. */
+export async function quickAllocate(config: Pick<CurrentRmsConfig, 'subdomain' | 'apiKey'>, rmsId: number, body: ScanBody) {
+  return request(config, `/opportunities/${rmsId}/quick_allocate`, {}, 1, { method: 'POST', body });
+}
+
+/** Marks an already-allocated unit (by asset or barcode number) as prepared. */
+export async function quickPrepare(config: Pick<CurrentRmsConfig, 'subdomain' | 'apiKey'>, rmsId: number, body: ScanBody) {
+  return request(config, `/opportunities/${rmsId}/quick_prepare`, {}, 1, { method: 'POST', body });
+}
+
+/** Books out the given opportunity item assets in one request. */
+export async function bookOutItemAssets(
+  config: Pick<CurrentRmsConfig, 'subdomain' | 'apiKey'>,
+  rmsId: number,
+  itemAssetIds: number[]
+): Promise<{ result?: boolean; item_asset_ids?: number[]; error_messages?: string[]; warning_messages?: string[] }> {
+  return request(config, `/opportunities/${rmsId}/book_out`, {}, 1, { method: 'POST', body: { item_asset_ids: itemAssetIds } }) as Promise<{
+    result?: boolean;
+    item_asset_ids?: number[];
+    error_messages?: string[];
+    warning_messages?: string[];
+  }>;
 }

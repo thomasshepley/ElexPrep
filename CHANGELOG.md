@@ -4,6 +4,22 @@ Newest entries first. Each push/merge gets exactly one entry - see
 `scripts/bump-version.mjs` for how the version number itself advances. A `+` marks a
 feature addition, a `-` marks a bug fix.
 
+## v1.5.1 - 2026-10-14
+
+### Signage Mode
+
++ The prep screen is rebuilt for the bay TV with next up, the pick list by group with counts, cases, shortages and recent scans
++ Crew sign in on the prep screen with their own login and only see the jobs they are on
++ Scan every unit with a USB or Bluetooth barcode scanner
++ Phones pair with a bay by QR code and scan with the camera
++ Scanner in the crew portal
++ Screens and phones on a job update live
++ Mark items short with a note
++ Prep complete moves a job to Awaiting Transport and Transport arrived books it out
++ Missing kit is flagged to the office at sign-off and at book-out
++ New admin feature for Settings
++ New admin feature for the job page
+
 ## v1.5.0 - 2026-10-14
 
 - Fixed Project Manager Picker

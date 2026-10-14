@@ -6,10 +6,18 @@ import path from 'path';
 // VERSION and CHANGELOG.md live (see scripts/bump-version.mjs, which writes them).
 const REPO_ROOT = path.resolve(__dirname, '../..');
 
+export interface ChangelogSection {
+  /** e.g. "Signage Mode"; lines under a "### Name" heading in CHANGELOG.md. */
+  title: string;
+  notes: string[];
+}
+
 export interface ChangelogEntry {
   version: string;
   date: string;
+  /** Lines not under any area heading. */
   notes: string[];
+  sections: ChangelogSection[];
 }
 
 function readSafe(filePath: string): string | null {
@@ -31,8 +39,17 @@ function parseChangelog(markdown: string): ChangelogEntry[] {
     const body = markdown.slice(start, end);
     // Captures the +/- marker along with the text (not stripped) so the in-app changelog
     // viewer shows the same feature/fix marker the changelog file itself uses.
-    const notes = [...body.matchAll(/^([+-] .+)$/gm)].map((n) => n[1].trim());
-    entries.push({ version: m[1], date: m[2], notes });
+    const notes: string[] = [];
+    const sections: ChangelogSection[] = [];
+    for (const line of body.split('\n')) {
+      const heading = line.match(/^###\s+(.+?):?\s*$/);
+      if (heading) {
+        sections.push({ title: heading[1], notes: [] });
+        continue;
+      }
+      if (/^[+-] .+/.test(line)) (sections.at(-1)?.notes ?? notes).push(line.trim());
+    }
+    entries.push({ version: m[1], date: m[2], notes, sections });
   }
   return entries;
 }

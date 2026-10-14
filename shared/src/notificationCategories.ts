@@ -11,6 +11,7 @@ export const NOTIFICATION_CATEGORIES = [
   'crew_assignment',
   'job_discussion',
   'onboarding',
+  'prep',
 ] as const;
 
 export type NotificationCategory = (typeof NOTIFICATION_CATEGORIES)[number];
@@ -21,8 +22,9 @@ export const NOTIFICATION_CATEGORY_LABELS: Record<NotificationCategory, string> 
   crew_assignment: "Added to a job's crew",
   job_discussion: 'New discussion messages',
   onboarding: 'New onboarding requests',
+  prep: 'Prep finished or booked out with kit missing',
 };
 
 /** Categories that only ever reach staff (they come from admin-side events), so the crew
  * portal's preferences don't offer toggles that can never fire for a crew account. */
-export const STAFF_ONLY_NOTIFICATION_CATEGORIES: readonly NotificationCategory[] = ['crew_application', 'onboarding'];
+export const STAFF_ONLY_NOTIFICATION_CATEGORIES: readonly NotificationCategory[] = ['crew_application', 'onboarding', 'prep'];

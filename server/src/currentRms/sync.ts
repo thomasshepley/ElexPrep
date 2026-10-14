@@ -1,6 +1,7 @@
 import { prisma, logActivity } from '../db';
 import { getCurrentRmsConfig, saveCurrentRmsConfig, CurrentRmsConfig } from './config';
 import { fetchAllOpportunities, fetchMember, fetchOpportunityItems, GROUP_ITEM_TYPE, RawOpportunity } from './client';
+import { notifyPrepJobChanged } from '../prep/notify';
 import { diffPickListItems, pickListDiffIsEmpty, type PickListItemSnapshot } from '@elexprep/shared';
 import type { CurrentRmsOpportunity } from '@prisma/client';
 
@@ -210,6 +211,7 @@ export async function runCurrentRmsSync(): Promise<SyncResult> {
             console.error(`Could not diff pick list for opportunity ${raw.id}:`, (err as Error).message);
           }
           await prisma.job.update({ where: { id: job.id }, data });
+          notifyPrepJobChanged(job.id);
           await logActivity('current_rms.opportunity_changed', extractSubject(raw), job.id);
           alertsRaised++;
         }

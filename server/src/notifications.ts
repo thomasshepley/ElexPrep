@@ -131,3 +131,13 @@ export async function notifyDiscussionMessage(jobId: string, jobName: string, au
     });
   }
 }
+
+/** A prep was signed off or booked out with kit still missing - flagged to every admin. */
+export async function notifyPrepMissing(jobId: string, jobName: string, stage: 'signed off' | 'booked out', missingCount: number) {
+  await notifyAdmins(
+    'prep.missing',
+    `${jobName}: ${missingCount} ${missingCount === 1 ? 'item' : 'items'} missing`,
+    `Prep was ${stage} with ${missingCount} pick-list ${missingCount === 1 ? 'line' : 'lines'} not fully pulled.`,
+    `/jobs/${jobId}`
+  );
+}

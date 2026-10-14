@@ -23,6 +23,7 @@ const GROUPS: { title: string; sections: SettingsSection[] }[] = [
       { to: '/settings/location-colors', label: 'Location Colours' },
       { to: '/settings/import-mapping', label: 'Import Mapping' },
       { to: '/settings/printer', label: 'Printer', adminOnly: true },
+      { to: '/settings/prep-bays', label: 'Prep bays', permission: 'managePrepSettings' },
     ],
   },
   {
