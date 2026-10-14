@@ -7,6 +7,7 @@ import {
   SEED_ITEM_RULES,
   SEED_TRUCK_CASES,
   SEED_VEHICLES,
+  TRUCK_SEED_VERSION,
   buildManifest,
   type CableKind,
   type CableSpec,
@@ -134,9 +135,15 @@ async function seedTruckPack() {
     const settings = await getTruckPackSettings();
     if (!settings.trunkCaseId && byName.get('Cable trunk')) await saveTruckPackSettings({ trunkCaseId: byName.get('Cable trunk')! });
   }
-  if ((await prisma.truckVehicle.count()) === 0) {
+  // Vehicles: all of them on a fresh database; later additions to the seed list once each on an
+  // older one (one deleted on purpose stays deleted, as it only arrives once).
+  const versionRow = await prisma.appSetting.findUnique({ where: { key: SEED_VERSION_KEY } });
+  const seeded = versionRow ? Number(JSON.parse(versionRow.valueJson)) || 1 : (await prisma.truckVehicle.count()) > 0 ? 1 : 0;
+  const have = new Set((await prisma.truckVehicle.findMany({ select: { name: true } })).map((v) => v.name));
+  const toAdd = SEED_VEHICLES.filter((v) => (v.since ?? 1) > seeded && !have.has(v.name));
+  if (toAdd.length) {
     await prisma.truckVehicle.createMany({
-      data: SEED_VEHICLES.map((v) => ({
+      data: toAdd.map((v) => ({
         name: v.name,
         lengthMm: v.lengthMm,
         widthMm: v.widthMm,
@@ -147,12 +154,22 @@ async function seedTruckPack() {
         archFromMm: v.arch?.fromMm ?? null,
         archToMm: v.arch?.toMm ?? null,
         archClearWidthMm: v.arch?.clearWidthMm ?? null,
+        trailerLengthMm: v.trailer?.lengthMm ?? null,
+        trailerWidthMm: v.trailer?.widthMm ?? null,
+        trailerHeightMm: v.trailer?.heightMm ?? null,
         licence: v.licence,
         notes: v.notes,
+        enabled: !v.disabled,
       })),
     });
   }
+  if (seeded < TRUCK_SEED_VERSION) {
+    const valueJson = JSON.stringify(TRUCK_SEED_VERSION);
+    await prisma.appSetting.upsert({ where: { key: SEED_VERSION_KEY }, create: { key: SEED_VERSION_KEY, valueJson }, update: { valueJson } });
+  }
 }
+
+const SEED_VERSION_KEY = 'truckPackSeedVersion';
 
 type CaseRow = Awaited<ReturnType<typeof prisma.truckCase.findMany>>[number];
 type VehicleRow = Awaited<ReturnType<typeof prisma.truckVehicle.findMany>>[number];
@@ -181,6 +198,7 @@ export const toVehicleLike = (v: VehicleRow): VehicleLike => ({
   doorWidthMm: v.doorWidthMm,
   doorHeightMm: v.doorHeightMm,
   arch: v.archFromMm != null && v.archToMm != null && v.archClearWidthMm != null ? { fromMm: v.archFromMm, toMm: v.archToMm, clearWidthMm: v.archClearWidthMm } : null,
+  trailer: v.trailerLengthMm != null && v.trailerWidthMm != null && v.trailerHeightMm != null ? { lengthMm: v.trailerLengthMm, widthMm: v.trailerWidthMm, heightMm: v.trailerHeightMm } : null,
 });
 
 export interface ManualCase {

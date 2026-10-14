@@ -1376,6 +1376,10 @@ model TruckVehicle {
   archFromMm       Int?
   archToMm         Int?
   archClearWidthMm Int?
+  /// A drawbar trailer's own load space (the payload covers both).
+  trailerLengthMm  Int?
+  trailerWidthMm   Int?
+  trailerHeightMm  Int?
   licence          String?
   notes            String?
   enabled          Boolean  @default(true)

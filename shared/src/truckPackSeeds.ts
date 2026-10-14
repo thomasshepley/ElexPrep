@@ -127,8 +127,13 @@ export interface SeedVehicle {
   doorWidthMm?: number;
   doorHeightMm?: number;
   arch?: { fromMm: number; toMm: number; clearWidthMm: number };
+  trailer?: { lengthMm: number; widthMm: number; heightMm: number };
   licence: string;
   notes: string;
+  /** Seeded but not tried when packing until switched on. */
+  disabled?: boolean;
+  /** Which seed set it arrived in, so later additions reach databases seeded before them. */
+  since?: number;
 }
 
 export const SEED_VEHICLES: SeedVehicle[] = [
@@ -222,4 +227,45 @@ export const SEED_VEHICLES: SeedVehicle[] = [
     licence: 'C+E (artic)',
     notes: 'The taller trailer touring hauliers favour: room to triple-stack cable trunks.',
   },
+  {
+    name: '15.65 m longer semi-trailer (LST)',
+    lengthMm: 15400,
+    widthMm: 2460,
+    heightMm: 2700,
+    payloadKg: 22500,
+    doorWidthMm: 2440,
+    doorHeightMm: 2600,
+    licence: 'C+E (artic)',
+    notes: 'The longest trailer allowed in Great Britain, since 31 May 2023: about two metres more than a standard trailer, with a steering rear axle. Still 44 t gross, and about 1.5 t heavier empty. Check the route and the venue dock.',
+    since: 2,
+  },
+  {
+    name: 'Drawbar (jumbo truck and trailer)',
+    lengthMm: 7700,
+    widthMm: 2460,
+    heightMm: 2950,
+    payloadKg: 18000,
+    doorWidthMm: 2440,
+    doorHeightMm: 2850,
+    trailer: { lengthMm: 7700, widthMm: 2460, heightMm: 2950 },
+    licence: 'C+E',
+    notes: 'A volume (jumbo) drawbar, 18.75 m overall: two 3 m high load spaces, more volume than any artic. Common with European touring hauliers. Typical figures: check the operator\'s spec.',
+    since: 2,
+  },
+  {
+    name: '53 ft dry van (US)',
+    lengthMm: 16000,
+    widthMm: 2510,
+    heightMm: 2740,
+    payloadKg: 20000,
+    doorWidthMm: 2490,
+    doorHeightMm: 2650,
+    licence: 'US CDL Class A',
+    notes: 'For touring in North America only: not road legal in the UK or EU. About 52 ft 6 in by 99 in by 108 in inside.',
+    disabled: true,
+    since: 2,
+  },
 ];
+
+/** Bumped whenever vehicles are added to the seed list, so they reach databases seeded before. */
+export const TRUCK_SEED_VERSION = 2;

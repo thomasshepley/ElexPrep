@@ -116,6 +116,12 @@ function vehicleData(b: Record<string, unknown>) {
   const archToMm = optNum(b.archToMm, 0, 20000);
   const archClearWidthMm = optNum(b.archClearWidthMm, 100, 3000);
   const arch = archFromMm !== null && archToMm !== null && archClearWidthMm !== null && archToMm > archFromMm;
+  const trailerLengthMm = optNum(b.trailerLengthMm, 500, 20000);
+  const trailerWidthMm = optNum(b.trailerWidthMm, 500, 3000);
+  const trailerHeightMm = optNum(b.trailerHeightMm, 500, 4000);
+  const anyTrailer = [b.trailerLengthMm, b.trailerWidthMm, b.trailerHeightMm].some((x) => x !== '' && x !== null && x !== undefined);
+  const trailer = trailerLengthMm !== null && trailerWidthMm !== null && trailerHeightMm !== null;
+  if (anyTrailer && !trailer) return { error: 'A trailer needs its length, width and height' };
   return {
     data: {
       name,
@@ -128,6 +134,9 @@ function vehicleData(b: Record<string, unknown>) {
       archFromMm: arch ? archFromMm : null,
       archToMm: arch ? archToMm : null,
       archClearWidthMm: arch ? archClearWidthMm : null,
+      trailerLengthMm: trailer ? Math.round(trailerLengthMm!) : null,
+      trailerWidthMm: trailer ? Math.round(trailerWidthMm!) : null,
+      trailerHeightMm: trailer ? Math.round(trailerHeightMm!) : null,
       licence: text(b.licence, 60),
       notes: text(b.notes, 300),
       enabled: b.enabled !== false,
@@ -232,10 +241,11 @@ jobTruckPackRouter.get('/:jobId/truck-pack/export.csv', async (req, res) => {
   r.packs.forEach((p, i) => {
     rows.push([]);
     rows.push([`${r.packs.length > 1 ? `Vehicle ${i + 1}: ` : ''}${p.vehicleName}`, `${p.kg} kg of ${p.payloadKg} kg`, `${(p.usedLengthMm / 1000).toFixed(1)} m of floor used`]);
-    rows.push(['Step', 'From the cab (m)', 'From the left wall (m)', 'Stack', 'Cases', 'Height (m)', 'Weight (kg)', 'Category']);
+    rows.push(['Step', 'In', 'From its front (m)', 'From the left wall (m)', 'Stack', 'Cases', 'Height (m)', 'Weight (kg)', 'Category']);
     for (const s of p.stacks) {
       rows.push([
         s.step,
+        p.bodies[s.body]?.label ?? '',
         (s.xMm / 1000).toFixed(2),
         (s.yMm / 1000).toFixed(2),
         s.cases.map((c) => c.label).join(' / '),
@@ -245,7 +255,7 @@ jobTruckPackRouter.get('/:jobId/truck-pack/export.csv', async (req, res) => {
         PACK_CATEGORY_LABEL[s.category],
       ]);
     }
-    for (const u of p.unplaced) rows.push(['Not packed', '', '', u.label, u.count, '', '', u.reason]);
+    for (const u of p.unplaced) rows.push(['Not packed', '', '', '', u.label, u.count, '', '', u.reason]);
   });
   rows.push([]);
   rows.push(['Manifest', 'Case', 'Cases', 'Each (kg)', 'Contents']);

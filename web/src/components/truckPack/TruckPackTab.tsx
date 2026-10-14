@@ -160,7 +160,7 @@ export default function TruckPackTab({ jobId, jobName }: { jobId: string; jobNam
         {pack && vehicle && (
           <div>
             <span className="tp-summary-n">
-              {metres(pack.usedLengthMm)} of {metres(vehicle.lengthMm)}
+              {metres(pack.usedLengthMm)} of {metres(pack.floorLengthMm)}
             </span>
             <span className="muted">floor used in the {result.packs.length > 1 ? `vehicle ${packIndex + 1}` : 'vehicle shown'}</span>
           </div>
@@ -192,7 +192,8 @@ export default function TruckPackTab({ jobId, jobName }: { jobId: string; jobNam
               >
                 <span className="tp-vehicle-name">{v.name}</span>
                 <span className="tp-vehicle-size muted">
-                  {metres(v.lengthMm)} x {metres(v.widthMm)} x {metres(v.heightMm)}, {kg(v.payloadKg)}
+                  {metres(v.lengthMm)}
+                  {v.trailer ? ` + ${metres(v.trailer.lengthMm)}` : ''} x {metres(v.widthMm)} x {metres(v.heightMm)}, {kg(v.payloadKg)}
                 </span>
                 <span className={`tp-fit ${c.fits ? 'is-ok' : 'is-no'}`}>
                   {c.fits ? `Fits, ${metres(c.usedLengthMm)} of floor` : c.reason ?? 'Does not fit'}
@@ -423,7 +424,7 @@ function WeightPanel({ pack, vehicle }: { pack: VehiclePack; vehicle: JobTruckPa
       </div>
       {pack.cog && (
         <p className="muted">
-          Centre of the weight: {Math.round(pack.cog.xPct)}% of the way back from the cab, {Math.abs(Math.round(pack.cog.yPct - 50))}%{' '}
+          Centre of the weight{pack.bodies.length > 1 ? ' in the truck' : ''}: {Math.round(pack.cog.xPct)}% of the way back from the cab, {Math.abs(Math.round(pack.cog.yPct - 50))}%{' '}
           {pack.cog.yPct < 50 ? 'left' : pack.cog.yPct > 50 ? 'right' : ''} of the middle. Marked with a cross on the plan.
         </p>
       )}
@@ -714,7 +715,7 @@ function PrintView({ jobName, packs, vehicles, data }: { jobName: string; packs:
           <div key={i} className="tp-print-vehicle">
             <h2>
               {packs.length > 1 ? `Vehicle ${i + 1}: ` : ''}
-              {v.name}: {kg(p.kg)} of {kg(p.payloadKg)}, {metres(p.usedLengthMm)} of {metres(v.lengthMm)}
+              {v.name}: {kg(p.kg)} of {kg(p.payloadKg)}, {metres(p.usedLengthMm)} of {metres(p.floorLengthMm)}
             </h2>
             <PlanView pack={p} vehicle={v} step={p.stacks.length} selectedId={null} onSelect={() => {}} />
             <SideView pack={p} vehicle={v} step={p.stacks.length} selectedId={null} onSelect={() => {}} />

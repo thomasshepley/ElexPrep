@@ -55,7 +55,31 @@ export interface VehicleLike {
   doorHeightMm?: number | null;
   /** Wheel arches inside the load space (vans): the floor between `fromMm` and `toMm` is only `clearWidthMm` wide. */
   arch?: { fromMm: number; toMm: number; clearWidthMm: number } | null;
+  /** A drawbar trailer's own load space, towed behind; the payload covers both. */
+  trailer?: { lengthMm: number; widthMm: number; heightMm: number } | null;
 }
+
+/** Every load space in a vehicle, laid end to end for drawing: the truck, then any trailer. */
+export interface LoadBody {
+  label: string;
+  /** Where it starts along the drawing, from the front of the truck's load space. */
+  xMm: number;
+  lengthMm: number;
+  widthMm: number;
+  heightMm: number;
+}
+
+/** The gap drawn between a truck and its drawbar trailer. */
+export const DRAWBAR_GAP_MM = 1500;
+
+export function vehicleBodies(v: VehicleLike): LoadBody[] {
+  const bodies: LoadBody[] = [{ label: v.trailer ? 'Truck' : 'Load space', xMm: 0, lengthMm: v.lengthMm, widthMm: v.widthMm, heightMm: v.heightMm }];
+  if (v.trailer) bodies.push({ label: 'Trailer', xMm: v.lengthMm + DRAWBAR_GAP_MM, ...v.trailer });
+  return bodies;
+}
+
+/** Inside volume of every load space, in cubic millimetres. */
+export const vehicleVolume = (v: VehicleLike) => vehicleBodies(v).reduce((n, b) => n + b.lengthMm * b.widthMm * b.heightMm, 0);
 
 export interface PackSettingsLike {
   /** Kept free under the roof. */
@@ -470,9 +494,11 @@ export interface PlacedCase {
 
 export interface PlacedStack {
   id: string;
+  /** Which load space it's in (0 the truck, 1 a drawbar trailer). Positions are within it. */
+  body: number;
   /** Loading order, 1 goes in first (at the cab end). */
   step: number;
-  /** Along the length from the cab bulkhead. */
+  /** Along the length from the front of its load space. */
   xMm: number;
   /** Across the width from the left wall (driver's side in the UK). */
   yMm: number;
@@ -495,6 +521,9 @@ export interface Unplaced {
 export interface VehiclePack {
   vehicleId: string;
   vehicleName: string;
+  bodies: LoadBody[];
+  /** Floor length of every load space together. */
+  floorLengthMm: number;
   stacks: PlacedStack[];
   unplaced: Unplaced[];
   kg: number;
@@ -503,7 +532,7 @@ export interface VehiclePack {
   /** Share of the load space's volume taken by cases. */
   fillPct: number;
   cases: number;
-  /** Centre of the load, as shares of the length (0 at the cab) and the width (0 at the left). */
+  /** Centre of the load in the truck's load space, as shares of its length (0 at the cab) and width (0 at the left). */
   cog: { xPct: number; yPct: number } | null;
   flags: string[];
   fits: boolean;
@@ -511,7 +540,7 @@ export interface VehiclePack {
 }
 
 /** Highest a case may be stacked in this space, itself included. */
-function levelsFor(spec: CaseSpecLike, v: VehicleLike, s: PackSettingsLike) {
+function levelsFor(spec: CaseSpecLike, v: { heightMm: number }, s: PackSettingsLike) {
   return Math.max(1, Math.min(spec.maxStack, Math.floor((v.heightMm - s.clearanceMm) / spec.heightMm)));
 }
 
@@ -521,7 +550,7 @@ interface Stack {
   footW: number;
 }
 
-function buildStacks(units: Unit[], v: VehicleLike, s: PackSettingsLike): Stack[] {
+function buildStacks(units: Unit[], v: { heightMm: number }, s: PackSettingsLike): Stack[] {
   const groups = new Map<string, Unit[]>();
   for (const u of units) groups.set(u.spec.id, [...(groups.get(u.spec.id) ?? []), u]);
   const stacks: Stack[] = [];
@@ -590,7 +619,7 @@ function carve(free: Rect[], used: Rect): Rect[] {
 }
 
 /** Can a single case get into the vehicle at all, and if not, why. */
-function wontGoIn(spec: CaseSpecLike, v: VehicleLike, s: PackSettingsLike): string | null {
+function wontGoIn(spec: CaseSpecLike, v: Pick<VehicleLike, 'lengthMm' | 'widthMm' | 'heightMm' | 'doorWidthMm' | 'doorHeightMm'>, s: PackSettingsLike): string | null {
   const short = Math.min(spec.lengthMm, spec.widthMm);
   const long = Math.max(spec.lengthMm, spec.widthMm);
   if (spec.heightMm > v.heightMm - s.clearanceMm) return 'Taller than the load space';
@@ -616,18 +645,30 @@ function expand(lines: ManifestLine[], cases: CaseSpecLike[]): { units: Unit[]; 
   return { units, missing };
 }
 
-function packUnits(units: Unit[], v: VehicleLike, s: PackSettingsLike): { pack: VehiclePack; left: Unit[] } {
-  const unplaced = new Map<string, Unplaced>();
-  const addUnplaced = (u: Unit, reason: string) => {
-    const k = `${u.lineKey}|${reason}`;
-    const e = unplaced.get(k) ?? { lineKey: u.lineKey, label: u.label, count: 0, reason };
-    e.count++;
-    unplaced.set(k, e);
-  };
+interface BodySpace {
+  lengthMm: number;
+  widthMm: number;
+  heightMm: number;
+  doorWidthMm?: number | null;
+  doorHeightMm?: number | null;
+  arch?: VehicleLike['arch'];
+  payloadKg: number;
+}
+
+interface BodyResult {
+  stacks: PlacedStack[];
+  /** Units that didn't go in, with why. */
+  left: { u: Unit; reason: string }[];
+  kg: number;
+}
+
+/** One load space: stacks laid from the front back, what's needed first at the venue loaded last. */
+function packBody(units: Unit[], v: BodySpace, s: PackSettingsLike, body: number): BodyResult {
+  const left: BodyResult['left'] = [];
   const fitting: Unit[] = [];
   for (const u of units) {
     const why = wontGoIn(u.spec, v, s);
-    if (why) addUnplaced(u, why);
+    if (why) left.push({ u, reason: why });
     else fitting.push(u);
   }
 
@@ -664,10 +705,8 @@ function packUnits(units: Unit[], v: VehicleLike, s: PackSettingsLike): { pack: 
   }
 
   const placed: PlacedStack[] = [];
-  const left: Unit[] = [];
   const leave = (st: Stack, reason: string) => {
-    left.push(...st.units);
-    for (const u of st.units) addUnplaced(u, reason);
+    for (const u of st.units) left.push({ u, reason });
   };
   let kg = 0;
   // Kit needed sooner at the venue never goes further forward than kit loaded before it in an
@@ -695,7 +734,7 @@ function packUnits(units: Unit[], v: VehicleLike, s: PackSettingsLike): { pack: 
       for (const o of options) {
         if (x + o.l > f.x + f.l || o.w > f.w) continue;
         const r = { x, y: f.y, l: o.l, w: o.w };
-        // Nearest the cab, then nearest the left wall; ties go to the snugger fit.
+        // Nearest the cab, then nearest the left wall.
         if (!best || r.x < best.r.x - 0.5 || (Math.abs(r.x - best.r.x) <= 0.5 && r.y < best.r.y - 0.5)) best = { r, rotated: o.rotated };
       }
     }
@@ -711,26 +750,56 @@ function packUnits(units: Unit[], v: VehicleLike, s: PackSettingsLike): { pack: 
       z += u.spec.heightMm;
       return c;
     });
-    placed.push({ id: '', step: 0, xMm: best.r.x, yMm: best.r.y, lengthMm: best.r.l, widthMm: best.r.w, heightMm: z, rotated: best.rotated, kg: stKg, category: st.units[0].category, cases });
+    placed.push({ id: '', step: 0, body, xMm: best.r.x, yMm: best.r.y, lengthMm: best.r.l, widthMm: best.r.w, heightMm: z, rotated: best.rotated, kg: stKg, category: st.units[0].category, cases });
   }
-
   placed.sort((a, b) => a.xMm - b.xMm || a.yMm - b.yMm);
-  placed.forEach((p, i) => {
+  return { stacks: placed, left, kg };
+}
+
+/**
+ * A whole vehicle. With a drawbar trailer the truck is packed first, with what's needed last at
+ * the venue, and the trailer takes the rest (what's needed first comes off it straight away);
+ * one payload covers both.
+ */
+function packUnits(units: Unit[], v: VehicleLike, s: PackSettingsLike): { pack: VehiclePack; left: Unit[] } {
+  const bodies = vehicleBodies(v);
+  const front = packBody(units, v, s, 0);
+  let stacks = front.stacks;
+  let kg = front.kg;
+  let leftOver = front.left;
+  if (v.trailer) {
+    // Whatever the truck couldn't take, for space or because it won't go in, tries the trailer.
+    const tryTrailer = leftOver.filter((l) => l.reason !== 'Over the payload').map((l) => l.u);
+    const stay = leftOver.filter((l) => l.reason === 'Over the payload');
+    const back = packBody(tryTrailer, { ...v.trailer, doorWidthMm: v.doorWidthMm, doorHeightMm: v.doorHeightMm, arch: null, payloadKg: v.payloadKg - kg }, s, 1);
+    stacks = [...stacks, ...back.stacks];
+    kg += back.kg;
+    leftOver = [...stay, ...back.left];
+  }
+  stacks.forEach((p, i) => {
     p.step = i + 1;
     p.id = `s${i + 1}`;
   });
 
-  const total = placed.reduce((n, p) => n + p.kg, 0);
-  const cog = total > 0
+  const unplaced = new Map<string, Unplaced>();
+  for (const { u, reason } of leftOver) {
+    const k = `${u.lineKey}|${reason}`;
+    const e = unplaced.get(k) ?? { lineKey: u.lineKey, label: u.label, count: 0, reason };
+    e.count++;
+    unplaced.set(k, e);
+  }
+  const list = [...unplaced.values()];
+  const frontStacks = stacks.filter((p) => p.body === 0);
+  const frontKg = frontStacks.reduce((n, p) => n + p.kg, 0);
+  const cog = frontKg > 0
     ? {
-        xPct: (placed.reduce((n, p) => n + p.kg * (p.xMm + p.lengthMm / 2), 0) / total / v.lengthMm) * 100,
-        yPct: (placed.reduce((n, p) => n + p.kg * (p.yMm + p.widthMm / 2), 0) / total / v.widthMm) * 100,
+        xPct: (frontStacks.reduce((n, p) => n + p.kg * (p.xMm + p.lengthMm / 2), 0) / frontKg / v.lengthMm) * 100,
+        yPct: (frontStacks.reduce((n, p) => n + p.kg * (p.yMm + p.widthMm / 2), 0) / frontKg / v.widthMm) * 100,
       }
     : null;
-  const usedLengthMm = placed.reduce((n, p) => Math.max(n, p.xMm + p.lengthMm), 0);
-  const volume = placed.reduce((n, p) => n + p.cases.reduce((m, c) => m + c.lengthMm * c.widthMm * c.heightMm, 0), 0);
+  const usedLengthMm = bodies.reduce((n, _b, i) => n + stacks.filter((p) => p.body === i).reduce((m, p) => Math.max(m, p.xMm + p.lengthMm), 0), 0);
+  const volume = stacks.reduce((n, p) => n + p.cases.reduce((m, c) => m + c.lengthMm * c.widthMm * c.heightMm, 0), 0);
   const flags: string[] = [];
-  const list = [...unplaced.values()];
   const overweight = list.some((u) => u.reason === 'Over the payload');
   if (overweight) flags.push(`Over the ${Math.round(v.payloadKg)} kg payload: ${list.filter((u) => u.reason === 'Over the payload').reduce((n, u) => n + u.count, 0)} cases left off.`);
   if (list.some((u) => u.reason === 'No room left')) flags.push(`No room for ${list.filter((u) => u.reason === 'No room left').reduce((n, u) => n + u.count, 0)} cases.`);
@@ -740,19 +809,21 @@ function packUnits(units: Unit[], v: VehicleLike, s: PackSettingsLike): { pack: 
     pack: {
       vehicleId: v.id,
       vehicleName: v.name,
-      stacks: placed,
+      bodies,
+      floorLengthMm: bodies.reduce((n, b) => n + b.lengthMm, 0),
+      stacks,
       unplaced: list,
-      kg: Math.round(total),
+      kg: Math.round(kg),
       payloadKg: v.payloadKg,
       usedLengthMm: Math.round(usedLengthMm),
-      fillPct: Math.round((volume / (v.lengthMm * v.widthMm * v.heightMm)) * 1000) / 10,
-      cases: placed.reduce((n, p) => n + p.cases.length, 0),
+      fillPct: Math.round((volume / vehicleVolume(v)) * 1000) / 10,
+      cases: stacks.reduce((n, p) => n + p.cases.length, 0),
       cog: cog && { xPct: Math.round(cog.xPct * 10) / 10, yPct: Math.round(cog.yPct * 10) / 10 },
       flags,
       fits: list.length === 0,
       overweight,
     },
-    left,
+    left: leftOver.map((l) => l.u),
   };
 }
 
@@ -779,7 +850,7 @@ export interface TruckPackResult {
 }
 
 /** Smallest first: by the size of the load space, then by payload. */
-export const vehicleOrder = (a: VehicleLike, b: VehicleLike) => a.lengthMm * a.widthMm * a.heightMm - b.lengthMm * b.widthMm * b.heightMm || a.payloadKg - b.payloadKg;
+export const vehicleOrder = (a: VehicleLike, b: VehicleLike) => vehicleVolume(a) - vehicleVolume(b) || a.payloadKg - b.payloadKg;
 
 export function planTruckPack(lines: ManifestLine[], cases: CaseSpecLike[], vehicles: VehicleLike[], settings: PackSettingsLike, opts: { vehicleId?: string | null } = {}): TruckPackResult {
   const { units, missing } = expand(lines, cases);

@@ -194,14 +194,34 @@ export default function TruckPackSettingsPage() {
             onClick={() =>
               setEditVehicle({
                 id: null,
-                data: { name: '', lengthMm: 4000, widthMm: 2000, heightMm: 2100, payloadKg: 1000, doorWidthMm: null, doorHeightMm: null, archFromMm: null, archToMm: null, archClearWidthMm: null, licence: null, notes: null, enabled: true },
+                data: {
+                  name: '',
+                  lengthMm: 4000,
+                  widthMm: 2000,
+                  heightMm: 2100,
+                  payloadKg: 1000,
+                  doorWidthMm: null,
+                  doorHeightMm: null,
+                  archFromMm: null,
+                  archToMm: null,
+                  archClearWidthMm: null,
+                  trailerLengthMm: null,
+                  trailerWidthMm: null,
+                  trailerHeightMm: null,
+                  licence: null,
+                  notes: null,
+                  enabled: true,
+                },
               })
             }
           >
             Add vehicle
           </button>
         </div>
-        <p className="muted">Inside load space. The truck pack tries each one, smallest payload first, and shows the smallest the whole load fits in.</p>
+        <p className="muted">
+          Inside load space. The truck pack tries each one, smallest first, and shows the smallest the whole load fits in. A drawbar's trailer is a second load space under the
+          same payload. Vehicles marked not used are kept but never tried.
+        </p>
         <div className="table-scroll">
           <table>
             <thead>
@@ -225,6 +245,11 @@ export default function TruckPackSettingsPage() {
                   </td>
                   <td className="num">
                     {m(v.lengthMm)} x {m(v.widthMm)} x {m(v.heightMm)}
+                    {v.trailerLengthMm != null && (
+                      <div className="muted">
+                        Trailer {m(v.trailerLengthMm)} x {m(v.trailerWidthMm)} x {m(v.trailerHeightMm)}
+                      </div>
+                    )}
                   </td>
                   <td className="num">{v.payloadKg.toLocaleString('en-GB')} kg</td>
                   <td>{v.doorWidthMm || v.doorHeightMm ? `${m(v.doorWidthMm)} x ${m(v.doorHeightMm)}` : <span className="muted">Full size</span>}</td>
@@ -595,6 +620,21 @@ function VehicleForm({ initial, title, onClose, onSave }: { initial: Omit<TruckV
           <label className="field">
             <span className="field-label">Clear between them (mm)</span>
             <input type="number" min={0} {...n('archClearWidthMm', true)} />
+          </label>
+        </fieldset>
+        <fieldset className="profile-form-group profile-form-full">
+          <legend>Drawbar trailer (leave blank for none)</legend>
+          <label className="field">
+            <span className="field-label">Trailer length (mm)</span>
+            <input type="number" min={0} {...n('trailerLengthMm', true)} />
+          </label>
+          <label className="field">
+            <span className="field-label">Trailer width (mm)</span>
+            <input type="number" min={0} {...n('trailerWidthMm', true)} />
+          </label>
+          <label className="field">
+            <span className="field-label">Trailer height (mm)</span>
+            <input type="number" min={0} {...n('trailerHeightMm', true)} />
           </label>
         </fieldset>
         <label className="field">

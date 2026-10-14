@@ -223,3 +223,32 @@ test('names match with or without the maker and with different spacing', () => {
   assert.ok(matchItemRule('F34 Truss 3 m', [{ match: 'f34 3m' }]));
   assert.equal(matchItemRule('F34 Truss 2m', [{ match: 'f34 3m' }]), null);
 });
+
+test('a drawbar fills the truck first, then its trailer, under one payload', () => {
+  const c = caseSpec('c', 1200, 600, 900, 40, { maxStack: 3 });
+  const drawbar: VehicleLike = { id: 'db', name: 'Drawbar', lengthMm: 7700, widthMm: 2480, heightMm: 2950, payloadKg: 18000, trailer: { lengthMm: 7700, widthMm: 2480, heightMm: 2950 } };
+  const truckOnly: VehicleLike = { ...drawbar, id: 'rigid', trailer: null };
+  // 40 stacks three high: one 7.7 m body takes 24 (four across, six rows), the pair 48.
+  const lines = [line('a', 'c', 120, 60)];
+  const one = planTruckPack(lines, [c], [truckOnly], DEFAULT_PACK_SETTINGS, { vehicleId: 'rigid' }).packs[0];
+  assert.ok(!one.fits);
+  const two = planTruckPack(lines, [c], [drawbar], DEFAULT_PACK_SETTINGS, { vehicleId: 'db' }).packs[0];
+  assert.ok(two.fits);
+  assert.equal(two.bodies.length, 2);
+  assert.ok(two.stacks.some((s) => s.body === 1));
+  for (const s of two.stacks.filter((x) => x.body === 1)) assert.ok(s.xMm + s.lengthMm <= 7700);
+  // Steps carry on from the truck into the trailer.
+  const lastTruck = Math.max(...two.stacks.filter((x) => x.body === 0).map((x) => x.step));
+  assert.ok(two.stacks.filter((x) => x.body === 1).every((x) => x.step > lastTruck));
+  // One payload covers both: too heavy for it, cases stay off.
+  const heavy = planTruckPack([line('a', 'c', 120, 160)], [c], [drawbar], DEFAULT_PACK_SETTINGS, { vehicleId: 'db' }).packs[0];
+  assert.ok(heavy.overweight && heavy.kg <= 18000);
+});
+
+test('vehicles are ordered by their whole load space, trailer included', () => {
+  const c = caseSpec('c', 1200, 600, 900, 40, { maxStack: 3 });
+  const artic: VehicleLike = { id: 'artic', name: 'Artic', lengthMm: 13620, widthMm: 2460, heightMm: 2700, payloadKg: 24000 };
+  const drawbar: VehicleLike = { id: 'db', name: 'Drawbar', lengthMm: 7700, widthMm: 2480, heightMm: 2950, payloadKg: 18000, trailer: { lengthMm: 7700, widthMm: 2480, heightMm: 2950 } };
+  const r = planTruckPack([line('a', 'c', 1, 60)], [c], [drawbar, artic], DEFAULT_PACK_SETTINGS);
+  assert.deepEqual(r.checks.map((x) => x.vehicleId), ['artic', 'db']);
+});

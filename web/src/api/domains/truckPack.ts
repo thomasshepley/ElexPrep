@@ -28,6 +28,10 @@ export interface TruckVehicle {
   archFromMm: number | null;
   archToMm: number | null;
   archClearWidthMm: number | null;
+  /** A drawbar trailer's load space. */
+  trailerLengthMm: number | null;
+  trailerWidthMm: number | null;
+  trailerHeightMm: number | null;
   licence: string | null;
   notes: string | null;
   enabled: boolean;

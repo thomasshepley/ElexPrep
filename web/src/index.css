@@ -5552,6 +5552,10 @@ div.bay-center {
 .tp-arch {
   stroke: var(--border-strong);
 }
+.tp-drawbar {
+  stroke: var(--content-muted);
+  stroke-width: 3;
+}
 .tp-roofline {
   stroke: var(--content-muted);
   stroke-dasharray: 4 4;
