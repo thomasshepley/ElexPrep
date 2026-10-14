@@ -21,6 +21,40 @@ import { getCurrentRmsConfig } from '../currentRms/config';
 import { fetchPickListSnapshot } from '../currentRms/sync';
 import { plotsDir } from './plots';
 import { hashBytes, readPlotGeometry, type PlotGeometry } from '../cable/plotRead';
+import { getOneDriveConfig } from '../oneDrive/config';
+import { findSharedCadPdf } from '../oneDrive/cad';
+import { streamOneDriveFile } from '../oneDrive/client';
+
+/** Every CAD plot on the job, wherever it lives: uploaded on the Plots tab, the CAD PDF found in
+ * the job's OneDrive folder, or a OneDrive file marked as a CAD plot. Same list the Plots tab's
+ * CAD view shows. */
+async function jobCadPlots(jobId: string): Promise<{ source: 'UPLOAD' | 'ONEDRIVE'; ref: string; name: string; note?: string }[]> {
+  const job = await prisma.job.findUnique({ where: { id: jobId }, select: { oneDriveFolderId: true } });
+  const [uploads, cadPdf, shares] = await Promise.all([
+    prisma.plot.findMany({ where: { jobId }, select: { id: true, originalName: true }, orderBy: { createdAt: 'desc' } }),
+    job ? findSharedCadPdf(job).catch(() => null) : Promise.resolve(null),
+    prisma.oneDriveShare.findMany({ where: { jobId, isCadPlot: true, isFolder: false }, orderBy: { sharedAt: 'desc' } }),
+  ]);
+  const out: { source: 'UPLOAD' | 'ONEDRIVE'; ref: string; name: string; note?: string }[] = [];
+  if (cadPdf) out.push({ source: 'ONEDRIVE', ref: cadPdf.itemId, name: cadPdf.name, note: 'OneDrive CAD folder' });
+  for (const s of shares) if (s.itemId !== cadPdf?.itemId) out.push({ source: 'ONEDRIVE', ref: s.itemId, name: s.itemName, note: 'OneDrive' });
+  for (const u of uploads) out.push({ source: 'UPLOAD', ref: u.id, name: u.originalName, note: 'Uploaded' });
+  return out;
+}
+
+const MAX_PLOT_BYTES = 100 * 1024 * 1024;
+
+async function readOneDriveBytes(itemId: string): Promise<Uint8Array> {
+  const { stream } = await streamOneDriveFile(await getOneDriveConfig(), itemId);
+  const chunks: Buffer[] = [];
+  let size = 0;
+  for await (const chunk of stream) {
+    size += (chunk as Buffer).length;
+    if (size > MAX_PLOT_BYTES) throw new Error('That PDF is too large to read (over 100 MB)');
+    chunks.push(chunk as Buffer);
+  }
+  return new Uint8Array(Buffer.concat(chunks));
+}
 
 /**
  * Cable calculator (beta, admin only). Company rules and the fixture database live under
@@ -251,7 +285,7 @@ jobCableRouter.get('/:jobId/cable', async (req, res) => {
   const [built, plan, plots, kit, extraction] = await Promise.all([
     buildInputs(jobId),
     prisma.cablePlan.findUnique({ where: { jobId } }),
-    prisma.plot.findMany({ where: { jobId }, select: { id: true, originalName: true }, orderBy: { createdAt: 'desc' } }),
+    jobCadPlots(jobId),
     kitCables(jobId),
     prisma.plotExtraction.findFirst({ where: { jobId }, orderBy: { createdAt: 'desc' } }),
   ]);
@@ -371,12 +405,27 @@ jobCableRouter.get('/:jobId/cable/export.csv', async (req, res) => {
   res.send(rows.map((r) => r.map(csvCell).join(',')).join('\n'));
 });
 
-/** Reads truss geometry from one of the job's plots and fills in positions that match. */
+/** Reads truss geometry from one of the job's CAD plots (uploaded or on OneDrive) and fills in
+ * positions that match. */
 jobCableRouter.post('/:jobId/cable/read-plot', async (req, res) => {
   const jobId = req.params.jobId;
-  const plot = await prisma.plot.findFirst({ where: { id: String(req.body?.plotId ?? ''), jobId } });
+  const source = req.body?.source === 'ONEDRIVE' ? 'ONEDRIVE' : 'UPLOAD';
+  const ref = String(req.body?.ref ?? req.body?.plotId ?? '');
+  // Only a plot this job actually has, never an arbitrary OneDrive item.
+  const plot = (await jobCadPlots(jobId)).find((p) => p.source === source && p.ref === ref);
   if (!plot) return res.status(404).json({ error: 'not found' });
-  const data = new Uint8Array(await fs.promises.readFile(path.join(plotsDir, plot.fileName)));
+  let data: Uint8Array;
+  try {
+    if (source === 'UPLOAD') {
+      const row = await prisma.plot.findFirst({ where: { id: ref, jobId } });
+      if (!row) return res.status(404).json({ error: 'not found' });
+      data = new Uint8Array(await fs.promises.readFile(path.join(plotsDir, row.fileName)));
+    } else {
+      data = await readOneDriveBytes(ref);
+    }
+  } catch (err) {
+    return res.status(502).json({ error: `Could not fetch that plot: ${(err as Error).message}` });
+  }
   const hash = hashBytes(data);
   let extraction = await prisma.plotExtraction.findUnique({ where: { jobId_sourceHash: { jobId, sourceHash: hash } } });
   if (!extraction) {
@@ -386,7 +435,7 @@ jobCableRouter.post('/:jobId/cable/read-plot', async (req, res) => {
     } catch (err) {
       return res.status(422).json({ error: `Could not read that PDF: ${(err as Error).message}` });
     }
-    extraction = await prisma.plotExtraction.create({ data: { jobId, sourceName: plot.originalName, sourceHash: hash, method: 'PDF_TEXT', resultJson: JSON.stringify(geometry) } });
+    extraction = await prisma.plotExtraction.create({ data: { jobId, sourceName: plot.name, sourceHash: hash, method: 'PDF_TEXT', resultJson: JSON.stringify(geometry) } });
   }
   const geometry = JSON.parse(extraction.resultJson) as PlotGeometry;
   const { positions } = await syncPositions(jobId);
@@ -403,6 +452,6 @@ jobCableRouter.post('/:jobId/cable/read-plot', async (req, res) => {
     applied.push(match.name);
   }
   await prisma.plotExtraction.update({ where: { id: extraction.id }, data: { confirmedAt: new Date() } });
-  await logActivity('cable.plot_read', `${plot.originalName}: ${applied.length ? applied.join(', ') : 'no matching positions'}`, jobId, req.user!.id);
+  await logActivity('cable.plot_read', `${plot.name}: ${applied.length ? applied.join(', ') : 'no matching positions'}`, jobId, req.user!.id);
   res.json({ geometry, applied });
 });

@@ -104,14 +104,14 @@ function RulesPanel() {
               A node on each truss <span className="field-help">One Cat run to a node, DMX tails from its ports.</span>
             </span>
           </label>
-          <label className="checkbox-row">
+          <label className="check-field">
             <input type="checkbox" checked={rules.spareDmxLinePerPosition} onChange={(e) => save({ spareDmxLinePerPosition: e.target.checked })} />
-            Add a spare DMX line to each position
+            <span>Add a spare DMX line to each position</span>
           </label>
         </fieldset>
         <div className="radio-stack">
-          <label>
-            Dimmer city
+          <label className="field">
+            <span className="field-label">Dimmer city</span>
             <select value={rules.distroSide} onChange={(e) => save({ distroSide: e.target.value as CableRules['distroSide'] })}>
               <option value="SR">Stage right</option>
               <option value="SL">Stage left</option>
@@ -119,17 +119,17 @@ function RulesPanel() {
               <option value="DS">Downstage</option>
             </select>
           </label>
-          <label className="checkbox-row">
+          <label className="check-field">
             <input type="checkbox" checked={rules.allowChainWhenThru} onChange={(e) => save({ allowChainWhenThru: e.target.checked })} />
-            Chain fixtures with a power thru on one circuit
+            <span>Chain fixtures with a power thru on one circuit</span>
           </label>
           <span className="field-help">Off: always one fixture per 16A circuit. On: fixtures with a thru share a circuit up to their maker's per-line figure.</span>
         </div>
       </div>
-      <div className="form-grid">
+      <div className="form-grid settings-grid">
         {NUMBERS.map((n) => (
-          <label key={n.key}>
-            {n.label}
+          <label key={n.key} className="field">
+            <span className="field-label">{n.label}</span>
             <input
               type="number"
               step={n.step ?? 1}
@@ -144,8 +144,8 @@ function RulesPanel() {
           </label>
         ))}
         {LISTS.map((l) => (
-          <label key={l.key}>
-            {l.label} (m)
+          <label key={l.key} className="field">
+            <span className="field-label">{l.label} (m)</span>
             <input
               value={lists[l.key] ?? ''}
               onChange={(e) => setLists({ ...lists, [l.key]: e.target.value })}
@@ -157,13 +157,13 @@ function RulesPanel() {
       </div>
       <h3>Rigging</h3>
       <p className="muted">Motors are a rigging pack: the calculator lists them separately from the lighting cables so they are never pulled together by mistake.</p>
-      <div className="form-grid">
-        <label className="checkbox-row">
+      <div className="form-grid settings-grid">
+        <label className="check-field check-field-inline">
           <input type="checkbox" checked={rules.motorsEnabled} onChange={(e) => save({ motorsEnabled: e.target.checked })} />
-          Include motor cables and controllers
+          <span>Include motor cables and controllers</span>
         </label>
-        <label>
-          Ways per motor controller
+        <label className="field">
+          <span className="field-label">Ways per motor controller</span>
           <input
             type="number"
             defaultValue={rules.motorWaysPerController}
@@ -171,8 +171,8 @@ function RulesPanel() {
             onBlur={(e) => Number(e.target.value) !== rules.motorWaysPerController && save({ motorWaysPerController: Number(e.target.value) })}
           />
         </label>
-        <label>
-          Motor cable lengths (m)
+        <label className="field">
+          <span className="field-label">Motor cable lengths (m)</span>
           <input
             value={lists.motorCableLengthsM ?? ''}
             onChange={(e) => setLists({ ...lists, motorCableLengthsM: e.target.value })}
@@ -311,6 +311,7 @@ function ProfileForm({ initial, title, onClose, onSave }: { initial: FixtureProf
   return (
     <Modal title={title} onClose={onClose}>
       <form
+        className="profile-form"
         onSubmit={async (e) => {
           e.preventDefault();
           setBusy(true);
@@ -324,17 +325,23 @@ function ProfileForm({ initial, title, onClose, onSave }: { initial: FixtureProf
           }
         }}
       >
-        <div className="form-grid">
-          <label>
-            Name
-            <input value={d.displayName} onChange={(e) => setD({ ...d, displayName: e.target.value })} required />
-          </label>
-          <label>
-            Maximum watts at 230 V
-            <input type="number" min={0} value={d.watts} onChange={(e) => setD({ ...d, watts: Number(e.target.value) })} required />
-          </label>
-          <label>
-            Power in
+        <label className="field profile-form-full">
+          <span className="field-label">Name</span>
+          <input value={d.displayName} onChange={(e) => setD({ ...d, displayName: e.target.value })} placeholder="e.g. Robe Spiider" required />
+        </label>
+        <label className="field">
+          <span className="field-label">Maximum watts at 230 V</span>
+          <input type="number" min={0} value={d.watts} onChange={(e) => setD({ ...d, watts: Number(e.target.value) })} required />
+        </label>
+        <label className="field">
+          <span className="field-label">Inrush (A)</span>
+          <input type="number" min={0} step={0.1} value={d.inrushA ?? ''} onChange={(e) => setD({ ...d, inrushA: optNum(e.target.value) })} placeholder="Only if high" />
+        </label>
+
+        <fieldset className="profile-form-group profile-form-full">
+          <legend>Power</legend>
+          <label className="field">
+            <span className="field-label">Power in</span>
             <select value={d.powerConnector} onChange={(e) => setD({ ...d, powerConnector: e.target.value as PowerConnector })}>
               {Object.entries(POWER_LABEL).map(([v, l]) => (
                 <option key={v} value={v}>
@@ -343,16 +350,27 @@ function ProfileForm({ initial, title, onClose, onSave }: { initial: FixtureProf
               ))}
             </select>
           </label>
-          <label className="checkbox-row">
+          <label className="field">
+            <span className="field-label">Most per line on the thru</span>
+            <input
+              type="number"
+              min={1}
+              value={d.maxPerLine ?? ''}
+              disabled={!d.hasPowerThru}
+              onChange={(e) => setD({ ...d, maxPerLine: optNum(e.target.value) })}
+              placeholder={d.hasPowerThru ? "Maker's figure" : 'No thru'}
+            />
+          </label>
+          <label className="check-field profile-form-full">
             <input type="checkbox" checked={d.hasPowerThru} onChange={(e) => setD({ ...d, hasPowerThru: e.target.checked })} />
-            Has a power thru
+            <span>Has a power thru (power out to the next fixture)</span>
           </label>
-          <label>
-            Most per line on the thru
-            <input type="number" min={1} value={d.maxPerLine ?? ''} onChange={(e) => setD({ ...d, maxPerLine: optNum(e.target.value) })} placeholder="Maker's figure" />
-          </label>
-          <label>
-            Data
+        </fieldset>
+
+        <fieldset className="profile-form-group profile-form-full">
+          <legend>Data</legend>
+          <label className="field">
+            <span className="field-label">Data in</span>
             <select value={d.dataConnector} onChange={(e) => setD({ ...d, dataConnector: e.target.value as DataConnector })}>
               {Object.entries(DATA_LABEL).map(([v, l]) => (
                 <option key={v} value={v}>
@@ -361,25 +379,22 @@ function ProfileForm({ initial, title, onClose, onSave }: { initial: FixtureProf
               ))}
             </select>
           </label>
-          <label className="checkbox-row">
+          <label className="check-field check-field-inline">
             <input type="checkbox" checked={d.hasDataThru} onChange={(e) => setD({ ...d, hasDataThru: e.target.checked })} />
-            RJ45 data in and out
+            <span>RJ45 data in and out</span>
           </label>
-          <label>
-            Inrush (A)
-            <input type="number" min={0} step={0.1} value={d.inrushA ?? ''} onChange={(e) => setD({ ...d, inrushA: optNum(e.target.value) })} placeholder="Only if high" />
-          </label>
-          <label className="form-grid-full">
-            Also called (comma separated)
-            <input value={d.aliases ?? ''} onChange={(e) => setD({ ...d, aliases: e.target.value || null })} placeholder="Names the patch uses" />
-          </label>
-          <label className="form-grid-full">
-            Notes
-            <input value={d.notes ?? ''} onChange={(e) => setD({ ...d, notes: e.target.value || null })} />
-          </label>
-        </div>
-        {error && <p className="error">{error}</p>}
-        <div className="modal-actions">
+        </fieldset>
+
+        <label className="field profile-form-full">
+          <span className="field-label">Also called</span>
+          <input value={d.aliases ?? ''} onChange={(e) => setD({ ...d, aliases: e.target.value || null })} placeholder="Other names the patch uses, comma separated" />
+        </label>
+        <label className="field profile-form-full">
+          <span className="field-label">Notes</span>
+          <input value={d.notes ?? ''} onChange={(e) => setD({ ...d, notes: e.target.value || null })} />
+        </label>
+        {error && <p className="error profile-form-full">{error}</p>}
+        <div className="modal-actions profile-form-full">
           <button type="button" className="secondary" onClick={onClose}>
             Cancel
           </button>

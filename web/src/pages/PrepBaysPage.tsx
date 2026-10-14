@@ -214,9 +214,9 @@ function ScannerPanel({ isAdmin }: { isAdmin: boolean }) {
   return (
     <section className="panel">
       <h2>Scanners and screens</h2>
-      <div className="form-grid">
-        <label>
-          Scanner prefix
+      <div className="form-grid settings-grid">
+        <label className="field">
+          <span className="field-label">Scanner prefix</span>
           <input
             value={config.scannerPrefix}
             maxLength={4}
@@ -229,15 +229,15 @@ function ScannerPanel({ isAdmin }: { isAdmin: boolean }) {
             apart by speed.
           </span>
         </label>
-        <label>
-          Scanner sends after each code
+        <label className="field">
+          <span className="field-label">Scanner sends after each code</span>
           <select value={config.scannerSuffix} onChange={(e) => save({ scannerSuffix: e.target.value as PrepConfig['scannerSuffix'] })} disabled={saving}>
             <option value="Enter">Enter</option>
             <option value="Tab">Tab</option>
           </select>
         </label>
-        <label>
-          Sign crew out after (minutes idle)
+        <label className="field">
+          <span className="field-label">Sign crew out after (minutes idle)</span>
           <input
             type="number"
             min={1}
@@ -247,9 +247,9 @@ function ScannerPanel({ isAdmin }: { isAdmin: boolean }) {
             onBlur={() => save({ operatorIdleMinutes: config.operatorIdleMinutes })}
           />
         </label>
-        <label className="checkbox-row">
+        <label className="check-field check-field-inline">
           <input type="checkbox" checked={config.sound} onChange={(e) => save({ sound: e.target.checked })} disabled={saving} />
-          Beep on scans
+          <span>Beep on scans</span>
         </label>
       </div>
       <p className="field-help">
@@ -416,9 +416,9 @@ function TeachDialog({ code, onClose, onSaved }: { code: UnknownCode; onClose: (
         {!lines && !error && <Skeleton h={40} />}
         {lines && lines.length === 0 && <p className="muted">This job has no Current RMS pick list to link to.</p>}
         {lines && lines.length > 0 && (
-          <div className="form-grid">
-            <label>
-              Item
+          <div className="form-grid settings-grid">
+            <label className="field">
+              <span className="field-label">Item</span>
               <select value={lineKey} onChange={(e) => setLineKey(e.target.value)}>
                 <option value="">Choose an item</option>
                 {lines.map((l) => (
@@ -428,8 +428,8 @@ function TeachDialog({ code, onClose, onSaved }: { code: UnknownCode; onClose: (
                 ))}
               </select>
             </label>
-            <label>
-              Counts as
+            <label className="field">
+              <span className="field-label">Counts as</span>
               <select value={kind} onChange={(e) => setKind(e.target.value as 'ASSET' | 'PRODUCT')}>
                 <option value="ASSET">One unit (an asset tag, scanned once)</option>
                 <option value="PRODUCT">Bulk (a product barcode, one per scan)</option>

@@ -47,7 +47,8 @@ export interface JobCable {
     positionCount: number;
     unplaced: string[];
     unknownTypes: string[];
-    plots: { id: string; originalName: string }[];
+    /** Every CAD plot on the job: uploaded, or on OneDrive (the CAD folder's PDF or a file marked as a CAD plot). */
+    plots: { source: 'UPLOAD' | 'ONEDRIVE'; ref: string; name: string; note?: string }[];
     kit: { linked: boolean; lines: { name: string; quantity: number }[]; error: string | null };
   };
   positions: JobPosition[];
@@ -72,7 +73,8 @@ export const cableApi = {
       request<JobPosition>(`/jobs/${jobId}/cable/positions/${id}`, { method: 'PUT', body: json(data) }),
     setOverride: (jobId: string, key: string, quantity: number | null) =>
       request<{ overrides: Record<string, number> }>(`/jobs/${jobId}/cable/overrides`, { method: 'PUT', body: json({ key, quantity }) }),
-    readPlot: (jobId: string, plotId: string) => request<{ geometry: PlotGeometry; applied: string[] }>(`/jobs/${jobId}/cable/read-plot`, { method: 'POST', body: json({ plotId }) }),
+    readPlot: (jobId: string, source: 'UPLOAD' | 'ONEDRIVE', ref: string) =>
+      request<{ geometry: PlotGeometry; applied: string[] }>(`/jobs/${jobId}/cable/read-plot`, { method: 'POST', body: json({ source, ref }) }),
     csvUrl: (jobId: string) => `/api/jobs/${jobId}/cable/export.csv`,
   },
 };

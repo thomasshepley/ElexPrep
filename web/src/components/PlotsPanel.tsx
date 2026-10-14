@@ -9,11 +9,11 @@ import { useAsyncAction } from '../hooks/useAsyncAction';
 import { formatDateTime } from '../utils/format';
 
 /**
- * Upload/manage uploaded CAD plot PDFs. Previewing lives in CadPlotsViewer, shown once above
+ * Upload/manage CAD plot PDFs uploaded to the job. Previewing lives in CadPlotsViewer, shown once above
  * this panel on the Plots tab (alongside the auto-detected OneDrive CAD PDF and any
  * CAD-flagged OneDrive shares) - this panel only needs to handle add/remove.
  */
-export default function PlotsPanel({ jobId, onChange, onSettled }: { jobId: string; onChange?: (plots: Plot[]) => void; onSettled?: () => void }) {
+export default function PlotsPanel({ jobId, onChange, onSettled, embedded }: { jobId: string; onChange?: (plots: Plot[]) => void; onSettled?: () => void; /** Inside the CAD plots panel rather than a panel of its own. */ embedded?: boolean }) {
   const dialog = useDialog();
   const { run } = useAsyncAction();
   const { user } = useAuth();
@@ -57,9 +57,9 @@ export default function PlotsPanel({ jobId, onChange, onSettled }: { jobId: stri
   };
 
   return (
-    <div className="panel">
-      <h3>Plot CAD PDFs</h3>
-      {canEdit && <FileInput accept="application/pdf,.pdf" disabled={busy} onFile={upload} label="Choose PDF" />}
+    <div className={embedded ? 'plots-uploads' : 'panel'}>
+      {embedded ? <h4>Uploaded here</h4> : <h3>CAD plots</h3>}
+      {canEdit && <FileInput accept="application/pdf,.pdf" disabled={busy} onFile={upload} label="Upload a CAD PDF" />}
       {error && <p className="error">{error}</p>}
       {plots.length > 0 && (
         <div className="table-scroll">
@@ -90,7 +90,7 @@ export default function PlotsPanel({ jobId, onChange, onSettled }: { jobId: stri
         </div>
       )}
       {plotsLoaded === null && <SkeletonRegion><SkeletonList items={2} /></SkeletonRegion>}
-      {plotsLoaded !== null && plots.length === 0 && <p className="muted">No plots uploaded yet.</p>}
+      {plotsLoaded !== null && plots.length === 0 && <p className="muted">None uploaded here yet.</p>}
     </div>
   );
 }

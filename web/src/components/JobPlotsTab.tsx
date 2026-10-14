@@ -44,7 +44,7 @@ export default function JobPlotsTab({ jobId }: { jobId: string }) {
       {!ready && (
         <SkeletonRegion label="Loading plots…">
           <div className="panel">
-            <h3>CAD</h3>
+            <h3>CAD plots</h3>
             <Skeleton h={320} r={6} />
           </div>
           <SkeletonPanel lines={2} list={2} />
@@ -52,11 +52,15 @@ export default function JobPlotsTab({ jobId }: { jobId: string }) {
       )}
       <div hidden={!ready} className={ready ? 'load-fade' : undefined}>
         <div className="panel">
-          <h3>CAD</h3>
+          <h3>CAD plots</h3>
           <CadPlotsViewer candidates={candidates} />
+          <p className="muted plots-sources">
+            A PDF in the job's OneDrive CAD folder, and any OneDrive file marked as a CAD plot below, show here automatically alongside
+            anything uploaded. The Cable (beta) tab reads from the same list.
+          </p>
+          <PlotsPanel jobId={jobId} embedded onChange={onPlots} onSettled={() => setPlotsSettled(true)} />
         </div>
         <OneDriveFilesPanel jobId={jobId} onChange={setOneDrive} onSettled={() => setDriveSettled(true)} />
-        <PlotsPanel jobId={jobId} onChange={onPlots} onSettled={() => setPlotsSettled(true)} />
       </div>
     </div>
   );

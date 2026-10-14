@@ -4,6 +4,15 @@ Newest entries first. Each push/merge gets exactly one entry - see
 `scripts/bump-version.mjs` for how the version number itself advances. A `+` marks a
 feature addition, a `-` marks a bug fix.
 
+## v1.6.4 - 2026-10-14
+
+- CAD plots are in one place on the Plots tab instead of split between CAD and Plot CAD PDFs
+
+### Cable calculator (beta)
+
+- (Beta) The cable calculator now finds the CAD plot in the job's OneDrive CAD folder, not just uploaded plots
+- (Beta) The Add fixture form lines up properly
+
 ## v1.6.3 - 2026-10-14
 
 + Updates to the site no longer take it offline, at most a short pause while the new version starts
@@ -18,8 +27,18 @@ feature addition, a `-` marks a bug fix.
 
 ### Cable calculator (beta)
 
-+ New admin feature for the job page
-+ New admin feature for Settings
++ (Beta) Only admins can see the cable calculator for now
++ (Beta) A Cable tab on each job works out the cable pack for every truss and floor position from the patch, the plot and the company's cable rules
++ (Beta) Per position: circuits, Socas and whether each spider is TRUE1 or 16A, loom length rounded up to the lengths in stock, Soca extensions along the truss, DMX lines and jumpers
++ (Beta) Every number shows the rule that produced it, and anything assumed or worth checking is flagged
++ (Beta) Truss lengths and cable picks are read straight from the plot's Rigging Points table
++ (Beta) Motors are listed separately as a rigging pack
++ (Beta) Job totals by stock item, with quantities you can change by hand that stay when the plan is worked out again
++ (Beta) Dimmer city: Soca outs and amps per phase
++ (Beta) The job's cable lines from the Current RMS kit list are shown alongside to check against
++ (Beta) Download the cable list as CSV or copy it as text
++ (Beta) Settings > Cable rules: stock lengths, slack, swag, DMX from the distro or a node per truss, and which side dimmer city is on
++ (Beta) A fixture database of power draw, connectors and data, filled with common fixtures and editable
 
 ## v1.6.0 - 2026-10-14
 

@@ -95,10 +95,17 @@ export default function CableTab({ jobId }: { jobId: string }) {
           </li>
           <li className={data.plot ? 'is-ok' : data.inputs.plots.length ? 'is-partial' : 'is-missing'}>
             <strong>Plot:</strong>{' '}
-            {data.inputs.plots.length === 0 && 'none on the Plots tab. Truss sizes can be typed in below.'}
+            {data.inputs.plots.length === 0 && 'no CAD plot on the job yet (upload one on the Plots tab, or put it in the job\'s OneDrive CAD folder). Truss sizes can be typed in below.'}
             {data.inputs.plots.map((p) => (
-              <button key={p.id} type="button" className="secondary cable-inline-button" disabled={busy !== null} onClick={() => run('plot', () => api.cable.readPlot(jobId, p.id), 'Read the plot')}>
-                Read truss sizes from {p.originalName}
+              <button
+                key={`${p.source}:${p.ref}`}
+                type="button"
+                className="secondary cable-inline-button"
+                disabled={busy !== null}
+                onClick={() => run('plot', () => api.cable.readPlot(jobId, p.source, p.ref), 'Read the plot')}
+              >
+                {busy === 'plot' ? 'Reading…' : `Read truss sizes from ${p.name}`}
+                {p.note && <span className="muted"> ({p.note})</span>}
               </button>
             ))}
             {data.plot && (
