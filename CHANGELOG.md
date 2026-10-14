@@ -4,18 +4,33 @@ Newest entries first. Each push/merge gets exactly one entry - see
 `scripts/bump-version.mjs` for how the version number itself advances. A `+` marks a
 feature addition, a `-` marks a bug fix.
 
+## v1.4.8 - 2026-10-14
+
++ Select fixtures and move them to another stage
+- Patches imported from OneDrive now go into the stage you have selected instead of Ungrouped
+- The project manager picker lists everyone who can run a job
+- Fewer pages jump around while they load
+
 ## v1.4.7 - 2026-10-13
 
-- Chat messages with long words no longer spill off small phones, phones held sideways and tablets get the app-style tab bar, and the Schedule tab and filter tabs fit narrower screens
++ Phones held sideways and tablets get the app-style tab bar
+- Chat messages with long words no longer spill off small phones
+- The Schedule tab and filter tabs fit narrower screens
 
 ## v1.4.6 - 2026-10-13
 
-- On phones the site now feels like an app: a floating tab bar with Home, Jobs, Alerts and More that stays clear of curved screen corners, and no more sideways scrolling
++ On phones the site now feels like an app, with a floating tab bar: Home, Jobs, Alerts and More
 + New admin feature for job discussions
+- The phone tab bar no longer gets cut off by curved screen corners
+- Pages no longer scroll sideways on phones
 
 ## v1.4.5 - 2026-10-13
 
-+ Reply to a specific message and send images or GIFs in job discussions, named days with call and estimated wrap times, deadline-style schedule points (same start and end time), and your next call time on the crew home page
++ Reply to a specific message in job discussions
++ Send images and GIFs in job discussions
++ Named days with call and estimated wrap times
++ Deadline-style schedule points for entries with the same start and end time
++ Your next call time on the crew home page
 + New admin features for the job page, Schedule tab and Print Queue
 
 ## v1.4.4 - 2026-10-13
@@ -33,36 +48,61 @@ feature addition, a `-` marks a bug fix.
 
 ## v1.4.1 - 2026-10-13
 
-- Crew on a schedule entry is now a searchable list you click to add people, and checkboxes in forms no longer drop onto their own line
++ Crew on a schedule entry is now a searchable list you click to add people
+- Checkboxes in forms no longer drop onto their own line
 
 ## v1.4.0 - 2026-10-13
 
-- Table rows on the Crew and Location Colours pages line up again, and colour pickers show their colour
-+ Chat groups in job discussions, schedule entries open into a popup with where, who and notes, your own slots are highlighted on your schedule, location dropdowns on cases and labels, and new admin features for the Crew tab and Crew settings
+- Table rows on the Crew and Location Colours pages line up again
+- Colour pickers show their colour
++ Chat groups in job discussions
++ Schedule entries open into a popup with where, who and notes
++ Your own slots are highlighted on your schedule
++ Location dropdowns on cases and labels
++ New admin features for the Crew tab and Crew settings
 
 ## v1.3.9 - 2026-10-13
 
-+ Added Copy all and Download .md buttons for bug reports on the Webmaster page
++ New admin feature for bug reports
 
 ## v1.3.8 - 2026-10-13
 
-- Editable crew day rates, crew margin counts scheduled days, location dropdown on fixtures, Pix columns only for pixel fixtures, PM tag and coloured names, adjustable logo size
++ Editable crew day rates
++ Location dropdown on fixtures
++ PM tag and coloured names
++ Adjustable logo size
+- Crew margin counts scheduled days
+- Pix columns only show for pixel fixtures
 
 ## v1.3.7 - 2026-10-13
 
-+ Dashboard this-week strip, crew next call and calendar export, clearer print queue and schedule, tidier crew settings and a browser smoke test
++ Dashboard this-week strip
++ Crew next call and calendar export
++ Clearer print queue and schedule
++ Tidier crew settings
 
 ## v1.3.6 - 2026-10-13
 
-+ New ELEX brand colours and logo, a bottom tab bar on phones, jobs list with dates and prep progress, grouped settings, click-to-edit tables, contact cards and a reorganised job settings page
++ New ELEX brand colours and logo
++ A bottom tab bar on phones
++ Jobs list with dates and prep progress
++ Grouped settings
++ Click-to-edit tables
++ Contact cards
++ A reorganised job settings page
 
 ## v1.3.5 - 2026-10-13
 
-- Replaced browser pop-ups with in-app dialogs, 24-hour UK dates throughout, and fixed a batch of form and loading bugs
++ In-app dialogs instead of browser pop-ups
++ 24-hour UK dates throughout
+- Fixed a batch of form and loading bugs
 
 ## v1.3.4 - 2026-10-13
 
-- Fix job dates on the dashboard and crew schedule, phone layout, signage fallback and spare labels
+- Job dates on the dashboard and crew schedule are correct again
+- Phone layout fixes
+- Signage fallback fixed
+- Spare labels fixed
 
 ## v1.3.3 - 2026-10-13
 
@@ -78,7 +118,9 @@ feature addition, a `-` marks a bug fix.
 
 ## v1.3.0 - 2026-10-13
 
-+ Color-code schedule entries, drag crew onto specific tasks, and default new entries to the selected day
++ Colour-code schedule entries
++ Drag crew onto specific tasks
++ New entries default to the selected day
 
 ## v1.2.9 - 2026-10-13
 
@@ -126,7 +168,9 @@ feature addition, a `-` marks a bug fix.
 
 ## v1.1.8 - 2026-10-12
 
-+ Discussion threads can now be edited, locked, and removed messages leave an audit trail
++ Discussion messages can be edited
++ Discussion threads can be locked
++ Removed messages leave an audit trail
 
 ## v1.1.7 - 2026-10-12
 
@@ -154,7 +198,8 @@ feature addition, a `-` marks a bug fix.
 
 ## v1.1.1 - 2026-10-12
 
-+ Added search to the pick list and imported fixtures list, plus a category filter on the pick list
++ Search on the pick list and imported fixtures list
++ Category filter on the pick list
 
 ## v1.1.0 - 2026-10-12
 
@@ -178,7 +223,8 @@ feature addition, a `-` marks a bug fix.
 
 ## v1.0.5 - 2026-10-12
 
-+ CAD plots now auto-fit their real width instead of a fixed zoom, and added a Save plot button
++ Save plot button for CAD plots
+- CAD plots now fit their real width instead of a fixed zoom
 
 ## v1.0.4 - 2026-10-12
 
@@ -186,7 +232,8 @@ feature addition, a `-` marks a bug fix.
 
 ## v1.0.3 - 2026-10-12
 
-- Fixed wide tables spilling out of their panel instead of scrolling, and widened some fixture columns so text doesn't get cut off
+- Wide tables scroll inside their panel instead of spilling out
+- Some fixture columns are wider so text doesn't get cut off
 
 ## v1.0.2 - 2026-10-12
 

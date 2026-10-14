@@ -1,3 +1,4 @@
+import { Skeleton, SkeletonRegion } from './Skeleton';
 import { useState } from 'react';
 import { api, type JobOneDriveStatus, type Plot } from '../api/client';
 import CadPlotsViewer, { type CadPlotCandidate } from './CadPlotsViewer';
@@ -13,6 +14,9 @@ import PlotsPanel from './PlotsPanel';
 export default function JobPlotsTab({ jobId }: { jobId: string }) {
   const [oneDrive, setOneDrive] = useState<JobOneDriveStatus | null>(null);
   const [plotCandidates, setPlotCandidates] = useState<CadPlotCandidate[]>([]);
+  // The CAD view waits for both sources, so it doesn't say "No CAD plots yet" and then fill in.
+  const [plotsSettled, setPlotsSettled] = useState(false);
+  const [driveSettled, setDriveSettled] = useState(false);
 
   // The panels below own the fetching and report what they loaded, so each list is requested
   // once per change rather than once by the panel and again here.
@@ -35,10 +39,16 @@ export default function JobPlotsTab({ jobId }: { jobId: string }) {
     <div>
       <div className="panel">
         <h3>CAD</h3>
-        <CadPlotsViewer candidates={candidates} />
+        {plotsSettled && driveSettled ? (
+          <CadPlotsViewer candidates={candidates} />
+        ) : (
+          <SkeletonRegion label="Loading plots…">
+            <Skeleton h="auto" r={6} style={{ aspectRatio: '1.414', maxHeight: '75vh' }} />
+          </SkeletonRegion>
+        )}
       </div>
-      <OneDriveFilesPanel jobId={jobId} onChange={setOneDrive} />
-      <PlotsPanel jobId={jobId} onChange={onPlots} />
+      <OneDriveFilesPanel jobId={jobId} onChange={setOneDrive} onSettled={() => setDriveSettled(true)} />
+      <PlotsPanel jobId={jobId} onChange={onPlots} onSettled={() => setPlotsSettled(true)} />
     </div>
   );
 }

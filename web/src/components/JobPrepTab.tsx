@@ -1,3 +1,4 @@
+import { Skeleton } from './Skeleton';
 import { useEffect, useState } from 'react';
 import { api, type FixtureGroup } from '../api/client';
 import PatchImportPanel from './PatchImportPanel';
@@ -22,7 +23,7 @@ type PrepTab = (typeof PREP_TABS)[number];
  */
 export default function JobPrepTab({ jobId }: { jobId: string }) {
   const [tab, setTab] = useState<PrepTab>('Patch Import');
-  const [groups, setGroups] = useState<FixtureGroup[]>([]);
+  const [groups, setGroups] = useState<FixtureGroup[] | null>(null);
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
   const [managingStages, setManagingStages] = useState(false);
 
@@ -33,16 +34,17 @@ export default function JobPrepTab({ jobId }: { jobId: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [jobId]);
 
-  const hasStages = groups.length > 0;
+  const hasStages = (groups?.length ?? 0) > 0;
 
   return (
     <div>
-      {hasStages && (
+      {groups === null && <Skeleton w="55%" h={14} style={{ margin: '0.25rem 0 1.1rem' }} />}
+      {groups !== null && hasStages && (
         <div className="row tabs tabs-sub" style={{ marginBottom: '0.5rem' }}>
           <button className={activeGroupId === null ? 'active' : ''} onClick={() => setActiveGroupId(null)}>
             Ungrouped
           </button>
-          {groups.map((g) => (
+          {groups!.map((g) => (
             <button key={g.id} className={activeGroupId === g.id ? 'active' : ''} onClick={() => setActiveGroupId(g.id)}>
               {g.name}
             </button>
@@ -52,7 +54,7 @@ export default function JobPrepTab({ jobId }: { jobId: string }) {
           </button>
         </div>
       )}
-      {!hasStages && (
+      {groups !== null && !hasStages && (
         <p className="muted" style={{ marginBottom: '0.75rem', fontSize: 'var(--text-sm)' }}>
           Multi-stage job?{' '}
           <button type="button" className="link-button" onClick={() => setManagingStages(true)}>
@@ -65,7 +67,7 @@ export default function JobPrepTab({ jobId }: { jobId: string }) {
       {managingStages && (
         <StagesManager
           jobId={jobId}
-          groups={groups}
+          groups={groups ?? []}
           onChanged={refreshGroups}
           onClose={() => setManagingStages(false)}
         />
@@ -78,7 +80,7 @@ export default function JobPrepTab({ jobId }: { jobId: string }) {
           </button>
         ))}
       </div>
-      {tab === 'Patch Import' && <PatchImportPanel jobId={jobId} groupId={activeGroupId} />}
+      {tab === 'Patch Import' && <PatchImportPanel jobId={jobId} groupId={activeGroupId} stages={groups ?? []} />}
       {tab === 'Cases' && <CasesPanel jobId={jobId} groupId={activeGroupId} />}
       {tab === 'Labels' && <LabelsPanel jobId={jobId} groupId={activeGroupId} />}
       {tab === 'Print Queue' && <PrintQueuePanel jobId={jobId} groupId={activeGroupId} />}

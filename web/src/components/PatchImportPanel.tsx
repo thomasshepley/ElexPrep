@@ -1,13 +1,14 @@
 import { Fragment, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PATCH_FIELD_LABELS, type PatchFieldKey } from '@elexprep/shared';
-import { api, type Fixture, type PatchImportCandidate, type PatchImportResult } from '../api/client';
+import { api, type Fixture, type FixtureGroup, type PatchImportCandidate, type PatchImportResult } from '../api/client';
 import FileInput from './FileInput';
 import { useToast } from './Toast';
 import { useDialog } from './Dialog';
 import { formatDateTime } from '../utils/format';
 import InlineEdit from './InlineEdit';
 import LocationSelect, { useJobLocations } from './LocationSelect';
+import { Skeleton, SkeletonRegion, SkeletonRows } from './Skeleton';
 import PatchFilePicker from './PatchFilePicker';
 
 /** Fixture types that actually take a separate pixel-map patch - only these get the Pix
@@ -39,7 +40,16 @@ function summarizeImport(res: PatchImportResult): string {
   return parts.length > 0 ? `${res.imported} fixtures (${parts.join(', ')})` : `${res.imported} fixtures`;
 }
 
-export default function PatchImportPanel({ jobId, groupId = null }: { jobId: string; groupId?: string | null }) {
+export default function PatchImportPanel({
+  jobId,
+  groupId = null,
+  stages = [],
+}: {
+  jobId: string;
+  groupId?: string | null;
+  /** The job's stages, for "Move to stage" (empty when the job doesn't use stages). */
+  stages?: FixtureGroup[];
+}) {
   const dialog = useDialog();
   const { showToast } = useToast();
   const [rows, setRows] = useState<Record<string, string>[]>([]);
@@ -72,7 +82,7 @@ export default function PatchImportPanel({ jobId, groupId = null }: { jobId: str
     setScanBusy(true);
     setScanError(null);
     try {
-      const res = await api.patch.approveOneDriveCandidate(jobId);
+      const res = await api.patch.approveOneDriveCandidate(jobId, groupId);
       setCandidate(res.candidate);
       await loadFixtures();
       showToast(`Imported ${summarizeImport(res)}`);
@@ -137,6 +147,25 @@ export default function PatchImportPanel({ jobId, groupId = null }: { jobId: str
     group.items.push(f);
     return groups;
   }, []).sort((a, b) => a.type.localeCompare(b.type));
+
+  const currentStageName = stages.length > 0 ? (groupId === null ? 'Ungrouped' : stages.find((g) => g.id === groupId)?.name ?? null) : null;
+  const [moveTarget, setMoveTarget] = useState('');
+
+  const bulkMove = async () => {
+    if (!moveTarget) return;
+    const target = moveTarget === '__ungrouped' ? null : moveTarget;
+    const name = target === null ? 'Ungrouped' : stages.find((g) => g.id === target)?.name ?? 'that stage';
+    const count = selected.size;
+    try {
+      await api.patch.bulkMoveFixtures(jobId, [...selected], target);
+      setSelected(new Set());
+      setMoveTarget('');
+      await loadFixtures();
+      showToast(`Moved ${count} fixture${count === 1 ? '' : 's'} to ${name}`);
+    } catch (e) {
+      showToast((e as Error).message, 'error');
+    }
+  };
 
   const bulkSetLocation = async () => {
     await api.patch.bulkSetLocation(jobId, [...selected], bulkLocation);
@@ -226,7 +255,7 @@ export default function PatchImportPanel({ jobId, groupId = null }: { jobId: str
           a patch PDF, or a CAD drawing with the patch table on it. Nothing is applied
           automatically - the file's rows wait here for review until approved. A file that's been
           imported before can be chosen again.
-          {groupId !== null && ' This always imports into "Ungrouped" - use the CSV upload below to import straight into the current stage.'}
+          {currentStageName && ` Imports into ${currentStageName}.`}
         </p>
         {scanError && <p className="error">{scanError}</p>}
         {picking && (
@@ -357,7 +386,6 @@ export default function PatchImportPanel({ jobId, groupId = null }: { jobId: str
           Refresh
         </button>
       </div>
-      {!fixtures && <p className="muted">Not loaded yet.</p>}
       {fixtures && stageFixtures.length === 0 && <p className="muted">No fixtures imported for this stage yet.</p>}
       {fixtures && stageFixtures.length > 0 && (
         <>
@@ -382,6 +410,24 @@ export default function PatchImportPanel({ jobId, groupId = null }: { jobId: str
               <button onClick={bulkSetLocation} disabled={!bulkLocation}>
                 Set location
               </button>
+              {stages.length > 0 && (
+                <>
+                  <select aria-label="Stage to move the selected fixtures to" value={moveTarget} onChange={(e) => setMoveTarget(e.target.value)} style={{ width: '12rem' }}>
+                    <option value="">Move to stage…</option>
+                    {groupId !== null && <option value="__ungrouped">Ungrouped</option>}
+                    {stages
+                      .filter((g) => g.id !== groupId)
+                      .map((g) => (
+                        <option key={g.id} value={g.id}>
+                          {g.name}
+                        </option>
+                      ))}
+                  </select>
+                  <button onClick={bulkMove} disabled={!moveTarget}>
+                    Move
+                  </button>
+                </>
+              )}
               <button className="secondary" onClick={bulkDelete}>
                 Delete selected
               </button>
@@ -488,8 +534,25 @@ export default function PatchImportPanel({ jobId, groupId = null }: { jobId: str
   const hasFixtures = stageFixtures.length > 0;
   const reviewPending = rows.length > 0 || candidate?.status === 'PENDING';
 
+  // Until fixtures load we can't tell which layout this stage gets, so hold one shaped like the
+  // common case (fixtures listed, import tucked away) instead of flashing the import tools.
+  if (fixtures === null) {
+    return (
+      <SkeletonRegion>
+        <div className="panel">
+          <div className="row" style={{ justifyContent: 'space-between' }}>
+            <h3>Imported fixtures</h3>
+            <Skeleton w={84} h={36} r={8} />
+          </div>
+          <Skeleton w="45%" h={12} style={{ marginBottom: 14 }} />
+          <SkeletonRows rows={8} cols={6} />
+        </div>
+      </SkeletonRegion>
+    );
+  }
+
   return (
-    <div>
+    <div className="load-fade">
       {hasFixtures && !reviewPending && fixturesSection}
       {hasFixtures ? (
         <details className="reimport" open={reviewPending}>

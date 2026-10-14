@@ -1,16 +1,18 @@
 import type { ReactNode } from 'react';
 import type { LoadResult } from '../hooks/useLoad';
+import { SkeletonPanel } from './Skeleton';
 
 /** Standard loading / error / ready rendering for a useLoad result - an error is always shown
  * with a retry, never swallowed into a blank panel. */
 export default function LoadState<T>({
   load,
   children,
-  loadingText = 'Loading…',
+  skeleton = <SkeletonPanel lines={3} />,
 }: {
   load: LoadResult<T>;
   children: (data: T) => ReactNode;
-  loadingText?: string;
+  /** What to show while loading - shaped like the content. */
+  skeleton?: ReactNode;
 }) {
   if (load.error && load.data === undefined) {
     return (
@@ -24,6 +26,6 @@ export default function LoadState<T>({
       </div>
     );
   }
-  if (load.data === undefined) return <p className="muted">{loadingText}</p>;
+  if (load.data === undefined) return <>{skeleton}</>;
   return <>{children(load.data)}</>;
 }

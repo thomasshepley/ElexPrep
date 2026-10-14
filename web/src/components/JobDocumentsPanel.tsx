@@ -1,3 +1,4 @@
+import { SkeletonRegion, SkeletonRows } from './Skeleton';
 import { useEffect, useState } from 'react';
 import { api, type JobDocument } from '../api/client';
 import FileInput from './FileInput';
@@ -8,7 +9,8 @@ import { useToast } from './Toast';
 export default function JobDocumentsPanel({ jobId }: { jobId: string }) {
   const dialog = useDialog();
   const { showToast } = useToast();
-  const [documents, setDocuments] = useState<JobDocument[]>([]);
+  const [documentsLoaded, setDocuments] = useState<JobDocument[] | null>(null);
+  const documents = documentsLoaded ?? [];
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -50,7 +52,8 @@ export default function JobDocumentsPanel({ jobId }: { jobId: string }) {
       <FileInput accept="application/pdf,image/*" disabled={busy} onFile={upload} label="Upload document" />
       {error && <p className="error">{error}</p>}
 
-      {documents.length === 0 && !error && <p className="muted">No documents yet.</p>}
+      {documentsLoaded === null && !error && <SkeletonRegion style={{ marginTop: '0.75rem' }}><SkeletonRows rows={3} cols={3} /></SkeletonRegion>}
+      {documentsLoaded !== null && documents.length === 0 && !error && <p className="muted">No documents yet.</p>}
       {documents.length > 0 && (
         <div className="table-scroll">
           <table style={{ marginTop: '0.75rem' }}>

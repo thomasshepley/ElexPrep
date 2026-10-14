@@ -1,3 +1,4 @@
+import { SkeletonPanel } from './Skeleton';
 import { useEffect, useState } from 'react';
 import { api, type AdHocLabel, type CrewLabelRequest } from '../api/client';
 import LabelTypeForm, { TYPE_LABELS, type AdHocType } from './LabelTypeForm';
@@ -13,7 +14,8 @@ import LocationSelect, { useJobLocations } from './LocationSelect';
  * them for anything a crew member has asked for via the Why section's label creator.
  */
 export default function LabelsPanel({ jobId, groupId = null }: { jobId: string; groupId?: string | null }) {
-  const [items, setItems] = useState<AdHocLabel[]>([]);
+  const [itemsLoaded, setItems] = useState<AdHocLabel[] | null>(null);
+  const items = itemsLoaded ?? [];
 
   const refresh = () => api.adHocLabels.list(jobId).then(setItems);
 
@@ -23,10 +25,23 @@ export default function LabelsPanel({ jobId, groupId = null }: { jobId: string; 
   }, [jobId]);
 
   const stageItems = items.filter((i) => (i.groupId ?? null) === groupId);
+  // The requests queue sits above the sections, so wait for it too - otherwise it would push
+  // the sections down when it arrives.
+  const [requestsReady, setRequestsReady] = useState(false);
+  const ready = itemsLoaded !== null && requestsReady;
 
   return (
     <div>
-      <RequestedLabelsPanel jobId={jobId} onChanged={refresh} />
+      <RequestedLabelsPanel jobId={jobId} onChanged={refresh} onReady={() => setRequestsReady(true)} />
+      {!ready && (
+        <>
+          <SkeletonPanel lines={2} rows={2} cols={4} />
+          <SkeletonPanel lines={2} rows={2} cols={4} />
+          <SkeletonPanel lines={2} rows={2} cols={4} />
+        </>
+      )}
+      {ready && (
+      <div className="load-fade">
       <LabelSection
         jobId={jobId}
         groupId={groupId}
@@ -54,6 +69,8 @@ export default function LabelsPanel({ jobId, groupId = null }: { jobId: string; 
         items={stageItems}
         onChanged={refresh}
       />
+      </div>
+      )}
     </div>
   );
 }
@@ -77,13 +94,18 @@ function summarizeContent(labelType: string, content: Record<string, unknown>): 
   }
 }
 
-function RequestedLabelsPanel({ jobId, onChanged }: { jobId: string; onChanged: () => void }) {
+function RequestedLabelsPanel({ jobId, onChanged, onReady }: { jobId: string; onChanged: () => void; onReady: () => void }) {
   const dialog = useDialog();
   const [requests, setRequests] = useState<CrewLabelRequest[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
 
-  const refresh = () => api.labelRequests.list(jobId, 'PENDING').then(setRequests).catch((e) => setError(e.message));
+  const refresh = () =>
+    api.labelRequests
+      .list(jobId, 'PENDING')
+      .then(setRequests)
+      .catch((e) => setError(e.message))
+      .finally(onReady);
 
   useEffect(() => {
     refresh();

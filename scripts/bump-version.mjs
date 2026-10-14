@@ -3,7 +3,11 @@
 // push/merge, right before pushing, as part of committing that push's changes:
 //
 //   node scripts/bump-version.mjs feature "Add crew margin side-by-side comparison"
-//   node scripts/bump-version.mjs fix "Fix stale sign-out and pick-list filtering"
+//   node scripts/bump-version.mjs fix "Fix stale sign-out redirect"
+//   node scripts/bump-version.mjs feature "Add chat replies" feature "Add chat images" fix "Fix pick-list filtering"
+//
+// One change per line: pass a separate <feature|fix> "<summary>" pair for each added feature and
+// each fixed bug rather than joining several into one sentence.
 //
 // Versioning scheme (as specified by the project owner - v1.0.1 is the starting point):
 //   X.Y.Z, e.g. "1.0.1"
@@ -25,14 +29,19 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'
 const versionPath = path.join(repoRoot, 'VERSION');
 const changelogPath = path.join(repoRoot, 'CHANGELOG.md');
 
-const [, , kind, ...summaryParts] = process.argv;
-const summary = summaryParts.join(' ').trim();
-
-if (kind !== 'feature' && kind !== 'fix') {
-  console.error('Usage: node scripts/bump-version.mjs <feature|fix> "<changelog summary>"');
-  process.exit(1);
+// <feature|fix> "<summary>" pairs, one changelog line each.
+const args = process.argv.slice(2);
+const entries = [];
+for (let i = 0; i < args.length; i += 2) {
+  const kind = args[i];
+  const summary = (args[i + 1] ?? '').trim();
+  if ((kind !== 'feature' && kind !== 'fix') || !summary) {
+    console.error('Usage: node scripts/bump-version.mjs <feature|fix> "<summary>" [<feature|fix> "<summary>" ...]');
+    process.exit(1);
+  }
+  entries.push({ kind, summary });
 }
-if (!summary) {
+if (entries.length === 0) {
   console.error('A changelog summary is required, e.g.:\n  node scripts/bump-version.mjs fix "Fix sign-out redirect"');
   process.exit(1);
 }
@@ -62,12 +71,15 @@ const date = new Date().toISOString().slice(0, 10);
 const changelog = readFileSync(changelogPath, 'utf8');
 const marker = '\n## v';
 const insertAt = changelog.indexOf(marker);
-const prefix = kind === 'feature' ? '+' : '-';
-const entry = `## v${next} - ${date}\n\n${prefix} ${summary}\n\n`;
+// Features first, then fixes.
+const lines = [...entries.filter((e) => e.kind === 'feature'), ...entries.filter((e) => e.kind === 'fix')].map(
+  (e) => `${e.kind === 'feature' ? '+' : '-'} ${e.summary}`
+);
+const entry = `## v${next} - ${date}\n\n${lines.join('\n')}\n\n`;
 const updated =
   insertAt === -1
     ? `${changelog.trimEnd()}\n\n${entry}`
     : `${changelog.slice(0, insertAt + 1)}${entry}${changelog.slice(insertAt + 1)}`;
 writeFileSync(changelogPath, updated);
 
-console.log(`Bumped version ${current} -> ${next} (${kind}): ${summary}`);
+console.log(`Bumped version ${current} -> ${next}:\n${lines.join('\n')}`);

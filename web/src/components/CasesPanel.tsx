@@ -1,3 +1,4 @@
+import { SkeletonRegion, SkeletonRows } from './Skeleton';
 import { useEffect, useState } from 'react';
 import { api, type CaseGroup } from '../api/client';
 import { useDialog } from './Dialog';
@@ -6,7 +7,8 @@ import LocationSelect, { useJobLocations } from './LocationSelect';
 
 export default function CasesPanel({ jobId, groupId = null }: { jobId: string; groupId?: string | null }) {
   const dialog = useDialog();
-  const [cases, setCases] = useState<CaseGroup[]>([]);
+  const [casesLoaded, setCases] = useState<CaseGroup[] | null>(null);
+  const cases = casesLoaded ?? [];
   const [busy, setBusy] = useState(false);
   const [newType, setNewType] = useState('');
   const [newLabel, setNewLabel] = useState('');
@@ -122,7 +124,12 @@ export default function CasesPanel({ jobId, groupId = null }: { jobId: string; g
         importing a new patch or editing case rules - it replaces every row here, so add any
         one-off cases below afterwards rather than before.
       </p>
-      {stageCases.length === 0 && <p className="muted">No cases yet - generate from the patch, or add one below.</p>}
+      {casesLoaded === null && (
+        <SkeletonRegion>
+          <SkeletonRows rows={6} cols={5} />
+        </SkeletonRegion>
+      )}
+      {casesLoaded !== null && stageCases.length === 0 && <p className="muted">No cases yet - generate from the patch, or add one below.</p>}
       {stageCases.length > 0 && (
         <>
           {selected.size > 0 && (

@@ -1,3 +1,4 @@
+import { Skeleton, SkeletonPanel, SkeletonRegion } from './Skeleton';
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { toLocationColorMapEntry, type LocationColorMap } from '@elexprep/shared';
@@ -12,6 +13,9 @@ export default function PrintQueuePanel({ jobId, groupId = null }: { jobId: stri
   const dialog = useDialog();
   const { showToast } = useToast();
   const [queue, setQueue] = useState<PrintQueueItem[]>([]);
+  // The queue and the printer settings both shape this page - hold a skeleton until both arrive.
+  const [queueReady, setQueueReady] = useState(false);
+  const [configReady, setConfigReady] = useState(false);
   const [adHoc, setAdHoc] = useState<AdHocLabel[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [trayMap, setTrayMap] = useState<Record<string, string>>({});
@@ -24,10 +28,13 @@ export default function PrintQueuePanel({ jobId, groupId = null }: { jobId: stri
   const [confirmingPrint, setConfirmingPrint] = useState(false);
 
   const refresh = () =>
-    api.printQueue.list(jobId).then(({ queue, adHoc }) => {
-      setQueue(queue);
-      setAdHoc(adHoc);
-    });
+    api.printQueue
+      .list(jobId)
+      .then(({ queue, adHoc }) => {
+        setQueue(queue);
+        setAdHoc(adHoc);
+      })
+      .finally(() => setQueueReady(true));
 
   const refreshPrintJobs = () => api.printJobs.list(jobId).then(setPrintJobs);
 
@@ -42,10 +49,13 @@ export default function PrintQueuePanel({ jobId, groupId = null }: { jobId: stri
     refresh();
     refreshPrintJobs();
     api.jobs.get(jobId).then(setJob).catch(() => {});
-    api.printQueue.printerConfig(jobId).then((c) => {
-      setTrayMap(c.trayMap);
-      setMethod(c.method);
-    });
+    api.printQueue
+      .printerConfig(jobId)
+      .then((c) => {
+        setTrayMap(c.trayMap);
+        setMethod(c.method);
+      })
+      .finally(() => setConfigReady(true));
     Promise.all([api.locationColorRules.list(), api.jobLocationColorRules.list(jobId)]).then(([global, job]) => {
       const map: LocationColorMap = new Map(global.map(toLocationColorMapEntry));
       for (const rule of job) {
@@ -194,8 +204,28 @@ export default function PrintQueuePanel({ jobId, groupId = null }: { jobId: stri
   const summary = [...copiesByType.entries()].map(([t, n]) => `${n} ${labelTypeName(t)}`).join(' · ');
   const nothingToSend = pendingItems.length === 0 && stageAdHoc.length === 0;
 
+  if (!queueReady || !configReady) {
+    return (
+      <SkeletonRegion>
+        <div className="panel">
+          <h3>Printer routing</h3>
+          <Skeleton w="70%" h={13} style={{ marginBottom: 10 }} />
+          <Skeleton w="45%" h={13} />
+        </div>
+        <div className="panel">
+          <div className="row" style={{ justifyContent: 'space-between' }}>
+            <h3>Print queue</h3>
+            <Skeleton w={190} h={38} r={8} />
+          </div>
+          <Skeleton w="50%" h={13} />
+        </div>
+        <SkeletonPanel rows={4} cols={4} />
+      </SkeletonRegion>
+    );
+  }
+
   return (
-    <div>
+    <div className="load-fade">
       <div className="panel">
         <h3>Printer routing</h3>
         <p className="muted">

@@ -1,3 +1,4 @@
+import { Skeleton, SkeletonRegion } from './Skeleton';
 import { useEffect, useRef, useState } from 'react';
 
 /**
@@ -173,8 +174,13 @@ export default function InlinePdfViewer({ url, title }: { url: string; title: st
         </div>
       </div>
       {saveError && <p className="error">Could not save: {saveError}</p>}
-      {loading && <p className="muted">Loading PDF…</p>}
       <div ref={containerRef} style={{ overflow: 'auto', border: '1px solid var(--border)', borderRadius: 6, maxHeight: '75vh' }}>
+        {/* A landscape page's worth of space while the plot renders, so it doesn't pop in. */}
+        {loading && (
+          <SkeletonRegion label="Loading plot…">
+            <Skeleton h="auto" r={0} style={{ aspectRatio: '1.414', maxHeight: '75vh' }} />
+          </SkeletonRegion>
+        )}
         <canvas ref={canvasRef} style={{ display: loading ? 'none' : 'block' }} />
       </div>
     </div>

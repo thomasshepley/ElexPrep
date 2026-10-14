@@ -1,3 +1,4 @@
+import { SkeletonPanel } from './Skeleton';
 import { useEffect, useState } from 'react';
 import { api, type JobOneDriveStatus, type OneDriveItem } from '../api/client';
 
@@ -9,7 +10,16 @@ import { api, type JobOneDriveStatus, type OneDriveItem } from '../api/client';
  * until real Azure credentials are added in Settings -> OneDrive, `enabled` stays false and
  * this renders a clear "not connected yet" state rather than a broken file browser.
  */
-export default function OneDriveFilesPanel({ jobId, onChange }: { jobId: string; onChange?: (status: JobOneDriveStatus) => void }) {
+export default function OneDriveFilesPanel({
+  jobId,
+  onChange,
+  onSettled,
+}: {
+  jobId: string;
+  onChange?: (status: JobOneDriveStatus) => void;
+  /** Called once the first load finishes, whether or not it worked. */
+  onSettled?: () => void;
+}) {
   const [status, setStatus] = useState<JobOneDriveStatus | null>(null);
   const [crumbs, setCrumbs] = useState<{ id: string | undefined; name: string }[]>([{ id: undefined, name: 'Project folder' }]);
   const [items, setItems] = useState<OneDriveItem[]>([]);
@@ -24,7 +34,8 @@ export default function OneDriveFilesPanel({ jobId, onChange }: { jobId: string;
         setStatus(s);
         onChange?.(s);
       })
-      .catch((e) => setError(e.message));
+      .catch((e) => setError(e.message))
+      .finally(() => onSettled?.());
 
   useEffect(() => {
     load();
@@ -118,7 +129,7 @@ export default function OneDriveFilesPanel({ jobId, onChange }: { jobId: string;
     }
   };
 
-  if (!status) return error ? <p className="error">Could not load OneDrive details: {error}</p> : <p className="muted">Loading…</p>;
+  if (!status) return error ? <p className="error">Could not load OneDrive details: {error}</p> : <SkeletonPanel lines={2} list={3} />;
 
   // Not set up: one line rather than a panel of explanation; manual plot upload works regardless.
   if (!status.enabled) {

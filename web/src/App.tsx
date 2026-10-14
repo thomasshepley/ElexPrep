@@ -1,3 +1,5 @@
+import { PageSkeleton } from './components/Skeleton'
+import { Suspense } from 'react'
 import { NavLink, Navigate, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from './auth/AuthContext'
 import { DashboardIcon, JobsIcon, SettingsIcon, SignageIcon, SignOutIcon } from './components/Icons'
@@ -120,7 +122,9 @@ function App() {
         )}
         <main className="shell-main">
           <div className="shell-main-inner">
-            <Outlet />
+            <Suspense fallback={<PageSkeleton />}>
+              <Outlet />
+            </Suspense>
           </div>
         </main>
       </div>

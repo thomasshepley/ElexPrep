@@ -1,3 +1,4 @@
+import { SkeletonList, SkeletonRegion } from './Skeleton';
 import { useEffect, useState } from 'react';
 import { api, type Plot } from '../api/client';
 import FileInput from './FileInput';
@@ -12,19 +13,24 @@ import { formatDateTime } from '../utils/format';
  * this panel on the Plots tab (alongside the auto-detected OneDrive CAD PDF and any
  * CAD-flagged OneDrive shares) - this panel only needs to handle add/remove.
  */
-export default function PlotsPanel({ jobId, onChange }: { jobId: string; onChange?: (plots: Plot[]) => void }) {
+export default function PlotsPanel({ jobId, onChange, onSettled }: { jobId: string; onChange?: (plots: Plot[]) => void; onSettled?: () => void }) {
   const dialog = useDialog();
   const { run } = useAsyncAction();
   const { user } = useAuth();
   const canEdit = hasPermission(user, 'editJobs');
-  const [plots, setPlots] = useState<Plot[]>([]);
+  const [plotsLoaded, setPlots] = useState<Plot[] | null>(null);
+  const plots = plotsLoaded ?? [];
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const refresh = () => api.plots.list(jobId).then((p) => {
-    setPlots(p);
-    onChange?.(p);
-  });
+  const refresh = () =>
+    api.plots
+      .list(jobId)
+      .then((p) => {
+        setPlots(p);
+        onChange?.(p);
+      })
+      .finally(() => onSettled?.());
 
   useEffect(() => {
     refresh();
@@ -83,7 +89,8 @@ export default function PlotsPanel({ jobId, onChange }: { jobId: string; onChang
           </table>
         </div>
       )}
-      {plots.length === 0 && <p className="muted">No plots uploaded yet.</p>}
+      {plotsLoaded === null && <SkeletonRegion><SkeletonList items={2} /></SkeletonRegion>}
+      {plotsLoaded !== null && plots.length === 0 && <p className="muted">No plots uploaded yet.</p>}
     </div>
   );
 }

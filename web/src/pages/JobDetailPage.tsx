@@ -1,3 +1,4 @@
+import { Skeleton, SkeletonRegion, SkeletonRows } from '../components/Skeleton';
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api, type Job, type CrewFeatures, CREW_FEATURE_KEYS, CREW_FEATURE_LABELS } from '../api/client';
@@ -67,14 +68,16 @@ export default function JobDetailPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   // Whether the signed-in staff member is on this job's crew - if so they land on the crew
   // view (what their crew-mates see) and can flip to the admin tabs.
-  const [onCrew, setOnCrew] = useState(false);
+  // null while still checking - the page waits for this so it doesn't open on the admin view
+  // and then flip to the crew view.
+  const [onCrew, setOnCrew] = useState<boolean | null>(null);
   const [view, setView] = useState<JobView>('admin');
   usePageTitle(job?.name);
 
   useEffect(() => {
     if (!jobId) return;
     setLoadError(null);
-    setOnCrew(false);
+    setOnCrew(null);
     setView('admin');
     api.jobs.get(jobId).then(setJob).catch((e) => setLoadError((e as Error).message));
     api.crewPortal
@@ -101,6 +104,8 @@ export default function JobDetailPage() {
     );
   }
 
+  if (!job || onCrew === null) return <JobPageSkeleton />;
+
   if (onCrew && view === 'crew') {
     return <CrewJobView jobId={jobId} setTitle={false} toolbar={<ViewSwitch view={view} onChange={changeView} />} />;
   }
@@ -108,10 +113,10 @@ export default function JobDetailPage() {
   return (
     <div>
       <div className="row" style={{ justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
-        <h1 style={{ margin: 0 }}>{job?.name ?? 'Job'}</h1>
+        <h1 style={{ margin: 0 }}>{job.name}</h1>
         {onCrew && <ViewSwitch view={view} onChange={changeView} />}
       </div>
-      {(job?.venue || job?.projectManager) && (
+      {(job.venue || job.projectManager) && (
         <p className="muted job-subtitle">
           {job.venue}
           {job.venue && job.projectManager && ' · '}
@@ -154,6 +159,31 @@ export default function JobDetailPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+/** The job page's frame (title, subtitle, tab column, a panel) while the job loads. */
+function JobPageSkeleton() {
+  return (
+    <SkeletonRegion>
+      <Skeleton w="46%" h={34} style={{ marginBottom: 12 }} />
+      <Skeleton w="24%" h={14} style={{ marginBottom: 24 }} />
+      <div className="secondary-shell">
+        <nav className="secondary-nav" aria-hidden="true">
+          {TABS.map((t) => (
+            <button key={t} type="button" tabIndex={-1} disabled>
+              {t}
+            </button>
+          ))}
+        </nav>
+        <div className="secondary-content">
+          <div className="panel">
+            <Skeleton w="30%" h={20} style={{ marginBottom: 16 }} />
+            <SkeletonRows rows={6} cols={5} />
+          </div>
+        </div>
+      </div>
+    </SkeletonRegion>
   );
 }
 

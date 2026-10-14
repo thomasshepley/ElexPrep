@@ -1991,7 +1991,7 @@ button.discussion-quote:hover:not(:disabled) {
 }
 
 .route-loading {
-  padding: 2rem 0;
+  padding: 2rem;
 }
 
 /* Signage (prep-bay TV) */
@@ -3391,4 +3391,106 @@ button.secondary.danger-text {
   font-weight: 600;
   color: var(--content-muted);
   margin: -0.15rem 0 0.35rem;
+}
+
+/* Always reserve the scrollbar's space, so the page doesn't shift sideways the moment content
+   grows tall enough to scroll. */
+html {
+  scrollbar-gutter: stable;
+}
+
+/* Skeleton placeholders (components/Skeleton.tsx) - a soft shimmer the size of what's coming. */
+.skeleton {
+  display: block;
+  flex-shrink: 0;
+  max-width: 100%;
+  border-radius: 6px;
+  background-color: color-mix(in srgb, var(--content) 8%, transparent);
+  background-image: linear-gradient(
+    100deg,
+    transparent 20%,
+    color-mix(in srgb, var(--content) 7%, transparent) 50%,
+    transparent 80%
+  );
+  background-size: 200% 100%;
+  background-repeat: no-repeat;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes skeleton-shimmer {
+  from {
+    background-position: 150% 0;
+  }
+  to {
+    background-position: -50% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+    background-image: none;
+  }
+}
+
+.skeleton-stack {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.skeleton-rows {
+  display: flex;
+  flex-direction: column;
+}
+
+.skeleton-row {
+  display: grid;
+  align-items: center;
+  gap: 1rem;
+  padding: 0 0.75rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.skeleton-row-head {
+  height: 36px;
+}
+
+.skeleton-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.skeleton-list-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 0;
+}
+
+.skeleton-list-item + .skeleton-list-item {
+  border-top: 1px solid var(--border);
+}
+
+/* Content that replaces a skeleton fades in rather than snapping. */
+.load-fade {
+  animation: load-fade 180ms ease-out;
+}
+
+@keyframes load-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .load-fade {
+    animation: none;
+  }
+}
+
+.skeleton.skeleton-inline {
+  display: inline-block;
+  height: 0.9em;
+  vertical-align: -0.1em;
 }

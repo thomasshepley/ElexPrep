@@ -1,3 +1,5 @@
+import { PageSkeleton } from '../components/Skeleton';
+import { Suspense } from 'react';
 import { Navigate, NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { JobsIcon, SettingsIcon, SignOutIcon } from '../components/Icons';
@@ -83,7 +85,9 @@ export default function CrewLayout() {
         )}
         <main className="shell-main">
           <div className="shell-main-inner">
-            <Outlet />
+            <Suspense fallback={<PageSkeleton />}>
+              <Outlet />
+            </Suspense>
           </div>
         </main>
       </div>

@@ -1,3 +1,5 @@
+import { PageSkeleton } from '../components/Skeleton';
+import { Suspense } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { isAdminRole } from '../auth/roles';
@@ -70,7 +72,9 @@ export default function SettingsLayout() {
           ))}
         </nav>
         <div className="secondary-content" key={pathname}>
-          <Outlet />
+          <Suspense fallback={<PageSkeleton />}>
+            <Outlet />
+          </Suspense>
         </div>
       </div>
     </div>

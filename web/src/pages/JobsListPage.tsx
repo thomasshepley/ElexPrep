@@ -1,3 +1,4 @@
+import { Skeleton, SkeletonInline, SkeletonRegion, SkeletonRows } from '../components/Skeleton';
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
@@ -207,7 +208,7 @@ function OnboardingOptionsForm({
 }
 
 function OnboardOpportunitiesPanel({ existingOppIds, onOnboarded }: { existingOppIds: Set<string>; onOnboarded: () => void }) {
-  const [opportunities, setOpportunities] = useState<CurrentRmsOpportunity[]>([]);
+  const [opportunities, setOpportunities] = useState<CurrentRmsOpportunity[] | null>(null);
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [pendingSingle, setPendingSingle] = useState<CurrentRmsOpportunity | null>(null);
@@ -223,7 +224,7 @@ function OnboardOpportunitiesPanel({ existingOppIds, onOnboarded }: { existingOp
   }, []);
 
   const unOnboarded = useMemo(
-    () => opportunities.filter((o) => (o.kind === 'QUOTE' || o.kind === 'ORDER') && !existingOppIds.has(String(o.rmsId))),
+    () => (opportunities ?? []).filter((o) => (o.kind === 'QUOTE' || o.kind === 'ORDER') && !existingOppIds.has(String(o.rmsId))),
     [opportunities, existingOppIds]
   );
 
@@ -308,7 +309,12 @@ function OnboardOpportunitiesPanel({ existingOppIds, onOnboarded }: { existingOp
         )}
       </div>
 
-      {unOnboarded.length === 0 && (
+      {opportunities === null && !error && (
+        <SkeletonRegion className="panel">
+          <SkeletonRows rows={5} cols={5} />
+        </SkeletonRegion>
+      )}
+      {opportunities !== null && unOnboarded.length === 0 && (
         <div className="empty-state">
           <p style={{ margin: 0 }}>
             No un-onboarded Quotes or Orders cached yet - sync Current RMS from{' '}
@@ -376,11 +382,41 @@ function prepStage(s: JobSummary | undefined): { label: string; step: number } {
 
 const PREP_STEPS = ['Patch', 'Cases', 'Labels', 'Printed'];
 
+/** Job cards' shape while the list loads. */
+function JobGridSkeleton({ cards = 6 }: { cards?: number }) {
+  return (
+    <SkeletonRegion className="job-grid">
+      {Array.from({ length: cards }, (_, i) => (
+        <div key={i} className="job-card">
+          <div className="job-card-top">
+            <Skeleton w={i % 2 ? '70%' : '85%'} h={20} />
+          </div>
+          <div className="job-card-meta">
+            <Skeleton w="45%" h={12} />
+            <Skeleton w="30%" h={12} />
+          </div>
+          <div className="prep-progress">
+            {PREP_STEPS.map((step) => (
+              <span key={step} className="prep-progress-step">
+                {step}
+              </span>
+            ))}
+          </div>
+          <div className="job-card-tags">
+            <Skeleton w={58} h={22} r={999} />
+          </div>
+        </div>
+      ))}
+    </SkeletonRegion>
+  );
+}
+
 export default function JobsListPage() {
   const { user } = useAuth();
   const isAdmin = isAdminRole(user?.role);
   const canOnboard = isAdmin || Boolean(user?.permissions?.onboardJobs);
-  const [jobs, setJobs] = useState<Job[]>([]);
+  // null until the first load - shows a skeleton instead of the "No jobs yet" empty state.
+  const [jobs, setJobs] = useState<Job[] | null>(null);
   const [tab, setTab] = useState<'portal' | 'onboard'>('portal');
   const [search, setSearch] = useState('');
   const [when, setWhen] = useState<WhenFilter>('upcoming');
@@ -403,7 +439,7 @@ export default function JobsListPage() {
       return end ? new Date(end) < startOfToday : false;
     };
     const q = search.trim().toLowerCase();
-    return jobs
+    return (jobs ?? [])
       .filter((j) => !q || j.name.toLowerCase().includes(q) || (j.venue ?? '').toLowerCase().includes(q))
       .filter((j) => (when === 'all' ? true : when === 'past' ? isPast(j) : !isPast(j)))
       .filter((j) => (visibility === 'all' ? true : visibility === 'public' ? j.isPublic : !j.isPublic))
@@ -419,7 +455,7 @@ export default function JobsListPage() {
   }, [jobs, search, when, visibility]);
 
   const existingOppIds = useMemo(
-    () => new Set(jobs.filter((j) => j.currentRmsOpportunityId).map((j) => j.currentRmsOpportunityId!)),
+    () => new Set((jobs ?? []).filter((j) => j.currentRmsOpportunityId).map((j) => j.currentRmsOpportunityId!)),
     [jobs]
   );
 
@@ -428,7 +464,7 @@ export default function JobsListPage() {
       <div className="dashboard-header">
         <div>
           <h1>Jobs</h1>
-          <p className="muted">{jobs.length === 0 ? 'Nothing here yet' : `${jobs.length} job${jobs.length === 1 ? '' : 's'}`}</p>
+          <p className="muted">{jobs === null ? <SkeletonInline w="4em" /> : jobs.length === 0 ? 'Nothing here yet' : `${jobs.length} job${jobs.length === 1 ? '' : 's'}`}</p>
         </div>
       </div>
 
@@ -447,7 +483,7 @@ export default function JobsListPage() {
 
       {tab === 'portal' && (
         <>
-          {jobs.length > 0 && (
+          {(jobs === null || jobs.length > 0) && (
             <div className="toolbar">
               <div className="search-field">
                 <SearchIcon />
@@ -472,7 +508,8 @@ export default function JobsListPage() {
 
           {error && <p className="error">{error}</p>}
 
-          {jobs.length === 0 && (
+          {jobs === null && !error && <JobGridSkeleton />}
+          {jobs !== null && jobs.length === 0 && (
             <div className="empty-state">
               <p style={{ margin: 0 }}>
                 No jobs yet
@@ -490,7 +527,7 @@ export default function JobsListPage() {
               </p>
             </div>
           )}
-          {jobs.length > 0 && filtered.length === 0 && (
+          {jobs !== null && jobs.length > 0 && filtered.length === 0 && (
             <div className="empty-state">
               <p style={{ margin: 0 }}>{search ? `No jobs match "${search}".` : when === 'upcoming' ? 'No upcoming jobs - check Past or All.' : 'No jobs here.'}</p>
             </div>

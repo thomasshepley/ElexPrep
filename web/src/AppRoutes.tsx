@@ -1,6 +1,7 @@
 import { Suspense, lazy } from 'react'
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import App from './App.tsx'
+import { PageSkeleton } from './components/Skeleton'
 import LoginPage from './pages/LoginPage'
 import DashboardPage from './pages/DashboardPage'
 import JobsListPage from './pages/JobsListPage'
@@ -38,7 +39,7 @@ export default function AppRoutes() {
   return (
     <ErrorBoundary resetKey={pathname}>
       <RouteTitle />
-      <Suspense fallback={<p className="muted route-loading">Loading…</p>}>
+      <Suspense fallback={<RouteFallback />}>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/apply" element={<ApplyPage />} />
@@ -80,5 +81,14 @@ export default function AppRoutes() {
         </Routes>
       </Suspense>
     </ErrorBoundary>
+  )
+}
+
+/** While a page's code downloads: a page-shaped skeleton inside whatever shell is already up. */
+function RouteFallback() {
+  return (
+    <div className="route-loading">
+      <PageSkeleton />
+    </div>
   )
 }

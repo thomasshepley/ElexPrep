@@ -135,15 +135,22 @@ async function addMissingFixtureTypeRules(fixtureTypes: string[]): Promise<strin
   return missing;
 }
 
+/** A stage id from a request: undefined/null mean "Ungrouped"; anything else must be one of this job's stages. */
+async function resolveGroupId(jobId: string, raw: unknown): Promise<{ groupId: string | null } | { error: string }> {
+  if (raw === undefined || raw === null || raw === '') return { groupId: null };
+  if (typeof raw !== 'string') return { error: 'groupId must be a stage id or null' };
+  const group = await prisma.fixtureGroup.findFirst({ where: { id: raw, jobId }, select: { id: true } });
+  return group ? { groupId: group.id } : { error: "That stage isn't part of this job" };
+}
+
 patchRouter.post('/:jobId/patch/import', async (req, res) => {
   const { jobId } = req.params;
   const { mapping, rows, groupId } = req.body ?? {};
   if (!Array.isArray(rows)) {
     return res.status(400).json({ error: 'rows are required' });
   }
-  if (groupId !== undefined && groupId !== null && typeof groupId !== 'string') {
-    return res.status(400).json({ error: 'groupId must be a string or null' });
-  }
+  const stage = await resolveGroupId(jobId, groupId);
+  if ('error' in stage) return res.status(400).json({ error: stage.error });
   const job = await prisma.job.findUnique({ where: { id: jobId } });
   if (!job) return res.status(404).json({ error: 'job not found' });
 
@@ -158,7 +165,7 @@ patchRouter.post('/:jobId/patch/import', async (req, res) => {
   }
 
   const fixtures = buildFixturesFromRows(rows as Record<string, string>[], m);
-  const result = await mergeFixtures(jobId, fixtures, groupId ?? null);
+  const result = await mergeFixtures(jobId, fixtures, stage.groupId);
   const newFixtureTypes = await addMissingFixtureTypeRules(fixtures.map((f) => f.fixtureType));
 
   await logActivity(
@@ -340,6 +347,9 @@ patchRouter.post('/:jobId/patch/onedrive-candidate/approve', requirePermission('
   if (candidate.status !== 'PENDING') {
     return res.status(409).json({ error: `This import was already ${candidate.status.toLowerCase()}` });
   }
+  // Imports into the stage being viewed when it was approved (Ungrouped when none).
+  const stage = await resolveGroupId(jobId, req.body?.groupId);
+  if ('error' in stage) return res.status(400).json({ error: stage.error });
 
   // A PDF-extracted table always has the same columns (see patchPdfExtract.ts), so it gets its
   // own fixed mapping rather than the CSV mapping from Settings, whose column names won't match.
@@ -353,7 +363,7 @@ patchRouter.post('/:jobId/patch/onedrive-candidate/approve', requirePermission('
 
   const rows = withPdfMode(JSON.parse(candidate.rowsJson) as Record<string, string>[], candidate.extractedFrom);
   const fixtures = buildFixturesFromRows(rows, m);
-  const result = await mergeFixtures(jobId, fixtures);
+  const result = await mergeFixtures(jobId, fixtures, stage.groupId);
   const newFixtureTypes = await addMissingFixtureTypeRules(fixtures.map((f) => f.fixtureType));
   const updated = await prisma.patchImportCandidate.update({
     where: { jobId },
@@ -418,15 +428,26 @@ const FIXTURE_EDITABLE_FIELDS = [
  * Bulk endpoints must be registered before the /:id routes below - Express matches routes in
  * registration order, and a literal "bulk" segment would otherwise be swallowed by :id.
  */
+// Bulk edit of selected fixtures: set their location, and/or move them to another stage
+// (groupId: a stage id, or null for Ungrouped).
 patchRouter.put('/:jobId/fixtures/bulk', async (req, res) => {
   const { ids, location } = req.body ?? {};
+  const movingStage = req.body && 'groupId' in req.body;
   if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ error: 'ids array is required' });
-  if (typeof location !== 'string') return res.status(400).json({ error: 'location is required' });
-  const result = await prisma.fixture.updateMany({
-    where: { id: { in: ids }, jobId: req.params.jobId },
-    data: { location: location.trim() === '' ? null : location },
-  });
-  await logActivity('patch.bulk_update', `${result.count} fixtures -> location "${location}"`, req.params.jobId, req.user?.id);
+  if (location !== undefined && typeof location !== 'string') return res.status(400).json({ error: 'location must be text' });
+  if (location === undefined && !movingStage) return res.status(400).json({ error: 'location or groupId is required' });
+  const data: { location?: string | null; groupId?: string | null } = {};
+  if (location !== undefined) data.location = location.trim() === '' ? null : location;
+  let stageName = 'Ungrouped';
+  if (movingStage) {
+    const stage = await resolveGroupId(req.params.jobId, req.body.groupId);
+    if ('error' in stage) return res.status(400).json({ error: stage.error });
+    data.groupId = stage.groupId;
+    if (stage.groupId) stageName = (await prisma.fixtureGroup.findUnique({ where: { id: stage.groupId }, select: { name: true } }))?.name ?? stageName;
+  }
+  const result = await prisma.fixture.updateMany({ where: { id: { in: ids }, jobId: req.params.jobId }, data });
+  const changes = [location !== undefined && `location "${location}"`, movingStage && `moved to ${stageName}`].filter(Boolean).join(', ');
+  await logActivity('patch.bulk_update', `${result.count} fixtures -> ${changes}`, req.params.jobId, req.user?.id);
   res.json({ updated: result.count });
 });
 

@@ -1,3 +1,4 @@
+import { SkeletonList, SkeletonRegion } from './Skeleton';
 import { useEffect, useState } from 'react';
 import { api, type JobContact } from '../api/client';
 import WhatsAppButton from './WhatsAppButton';
@@ -8,7 +9,8 @@ import { PlusIcon } from './Icons';
 export default function JobContactsPanel({ jobId }: { jobId: string }) {
   const dialog = useDialog();
   const { showToast } = useToast();
-  const [contacts, setContacts] = useState<JobContact[]>([]);
+  const [contactsLoaded, setContacts] = useState<JobContact[] | null>(null);
+  const contacts = contactsLoaded ?? [];
   const [adding, setAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -92,6 +94,10 @@ export default function JobContactsPanel({ jobId }: { jobId: string }) {
             ),
           )}
         </div>
+      ) : contactsLoaded === null && !error ? (
+        <SkeletonRegion>
+          <SkeletonList items={2} />
+        </SkeletonRegion>
       ) : (
         !adding && <p className="muted">No contacts added yet.</p>
       )}

@@ -59,6 +59,9 @@ export const prepApi = {
       request<void>(`/jobs/${jobId}/fixtures/${id}`, { method: 'DELETE' }),
     bulkSetLocation: (jobId: string, ids: string[], location: string) =>
       request<{ updated: number }>(`/jobs/${jobId}/fixtures/bulk`, { method: 'PUT', body: JSON.stringify({ ids, location }) }),
+    /** Moves fixtures to another stage (null = Ungrouped). */
+    bulkMoveFixtures: (jobId: string, ids: string[], groupId: string | null) =>
+      request<{ updated: number }>(`/jobs/${jobId}/fixtures/bulk`, { method: 'PUT', body: JSON.stringify({ ids, groupId }) }),
     bulkRemoveFixtures: (jobId: string, ids: string[]) =>
       request<{ deleted: number }>(`/jobs/${jobId}/fixtures/bulk`, { method: 'DELETE', body: JSON.stringify({ ids }) }),
     listOneDriveFiles: (jobId: string) =>
@@ -67,10 +70,11 @@ export const prepApi = {
       request<{ candidate: PatchImportCandidate }>(`/jobs/${jobId}/patch/onedrive-files/read`, { method: 'POST', body: JSON.stringify({ key }) }),
     getOneDriveCandidate: (jobId: string) =>
       request<PatchImportCandidate | null>(`/jobs/${jobId}/patch/onedrive-candidate`),
-    approveOneDriveCandidate: (jobId: string) =>
+    /** Imports the reviewed file into the given stage (null = Ungrouped). */
+    approveOneDriveCandidate: (jobId: string, groupId: string | null = null) =>
       request<PatchImportResult & { candidate: PatchImportCandidate }>(
         `/jobs/${jobId}/patch/onedrive-candidate/approve`,
-        { method: 'POST' }
+        { method: 'POST', body: JSON.stringify({ groupId }) }
       ),
     rejectOneDriveCandidate: (jobId: string, note?: string) =>
       request<{ candidate: PatchImportCandidate }>(`/jobs/${jobId}/patch/onedrive-candidate/reject`, {

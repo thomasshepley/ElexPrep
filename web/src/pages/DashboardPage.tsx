@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Skeleton, SkeletonInline, SkeletonRegion, SkeletonRows, SkeletonText } from '../components/Skeleton';
 import { Link } from 'react-router-dom';
 import { api, type DashboardData } from '../api/client';
 import MonthCalendar, { type CalendarEvent } from '../components/MonthCalendar';
@@ -51,7 +52,7 @@ export default function DashboardPage() {
         <div>
           <h1>Dashboard</h1>
           <p className="muted">
-            {orders === null ? 'Loading…' : `${orders.length} active order${orders.length === 1 ? '' : 's'}`}
+            {orders === null ? <SkeletonInline w="8em" /> : `${orders.length} active order${orders.length === 1 ? '' : 's'}`}
             {hasValues && ` · ${formatValue(totalValue)} total value`}
           </p>
         </div>
@@ -75,12 +76,17 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {data && <ThisWeek days={data.thisWeek} />}
+      {data ? <ThisWeek days={data.thisWeek} /> : !error && <ThisWeekSkeleton />}
 
       <MonthCalendar events={events} />
 
       <div className="panel" style={{ marginTop: '1.25rem' }}>
         <h3>Active orders</h3>
+        {orders === null && !error && (
+          <SkeletonRegion>
+            <SkeletonRows rows={3} cols={5} />
+          </SkeletonRegion>
+        )}
         {orders !== null && orders.length === 0 && (
           <p className="muted">No jobs are linked to a Current RMS order yet.</p>
         )}
@@ -137,6 +143,22 @@ export default function DashboardPage() {
         )}
       </div>
     </div>
+  );
+}
+
+function ThisWeekSkeleton() {
+  return (
+    <SkeletonRegion className="panel">
+      <h3>This week</h3>
+      <div className="week-strip">
+        <section className="week-day">
+          <Skeleton w="45%" h={12} style={{ marginBottom: 12 }} />
+          <Skeleton w="60%" h={16} style={{ marginBottom: 8 }} />
+          <Skeleton w="35%" h={12} style={{ marginBottom: 10 }} />
+          <SkeletonText lines={2} gap={8} />
+        </section>
+      </div>
+    </SkeletonRegion>
   );
 }
 
