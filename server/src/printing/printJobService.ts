@@ -25,7 +25,7 @@ export async function createPrintJobs(jobId: string, userId?: string) {
   const byType = await collectConfirmedContent(jobId);
   const pdfs = await buildPdfPerType(jobId, byType);
   if (pdfs.length === 0) {
-    throw new Error('Nothing confirmed to print — confirm items in the print queue first');
+    throw new Error('Nothing confirmed to print - confirm items in the print queue first');
   }
 
   const created = [];

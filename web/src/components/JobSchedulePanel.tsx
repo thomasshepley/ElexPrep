@@ -1,52 +1,133 @@
-import { useEffect, useState } from 'react';
-import { api, type JobScheduleItem } from '../api/client';
-import DayTimeline from './DayTimeline';
+import { Skeleton, SkeletonRegion } from './Skeleton';
+import { useEffect, useMemo, useState } from 'react';
+import { DndContext, DragOverlay, PointerSensor, useSensor, useSensors, type DragEndEvent, type DragStartEvent } from '@dnd-kit/core';
+import { resolveCrewColor } from '@elexprep/shared';
+import { api, type JobScheduleItem, type JobCrewAssignment, type JobDay } from '../api/client';
+import { dateKey, dayMarkers, isPointInTime, SingleDayTimeline } from './DayTimeline';
+import DayBlocksColumn, { localMidnightIso, useDayBlockActions, type DayBlockView } from './DayBlocksColumn';
+import { useAuth } from '../auth/AuthContext';
+import { isAdminRole } from '../auth/roles';
+import { useToast } from './Toast';
+import { formatDayHeading, formatTime } from '../utils/format';
+import DateTimeInput from './DateTimeInput';
+import Modal from './Modal';
+import ScheduleEntryModal, { SCHEDULE_COLOR_PRESETS } from './ScheduleEntryModal';
+import { useDialog } from './Dialog';
+import { PlusIcon } from './Icons';
 
 // The native datetime-local spinner/scroll-wheel snaps to this step, so picking a time quickly
-// moves in 15-minute jumps — typing a value directly (e.g. 09:07) is still unrestricted, so an
+// moves in 15-minute jumps - typing a value directly (e.g. 09:07) is still unrestricted, so an
 // exact, non-aligned time is still just as easy to enter.
 const TIME_STEP_SECONDS = 15 * 60;
+
+// A handful of sensible preset colors for schedule entries, rather than a full color-wheel
+// picker - quick to pick from, matching the small-fixed-palette convention already used for
+// crew swatches (see shared/src/crewColors.ts).
 
 function toDatetimeLocal(d: Date): string {
   const pad = (n: number) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-/** Today at 09:00 — the sensible default for a fresh "Starts" field. */
-function defaultStartsAt(): string {
-  const d = new Date();
-  d.setHours(9, 0, 0, 0);
+/** 09:00 on the given day key (or today if none selected yet) - the default "Starts" value. */
+function nineAmOn(dateKeyStr: string | null): string {
+  const d = dateKeyStr ? new Date(`${dateKeyStr}T09:00:00`) : new Date();
+  if (!dateKeyStr) d.setHours(9, 0, 0, 0);
   return toDatetimeLocal(d);
 }
 
-/** One hour after the given datetime-local value, same day unless that rolls into the next one. */
-function plusOneHour(datetimeLocal: string): string {
+/** 18:00 on the same calendar day as the given datetime-local value - the default "Ends". */
+function sixPmSameDay(datetimeLocal: string): string {
   const d = new Date(datetimeLocal);
-  d.setHours(d.getHours() + 1);
+  d.setHours(18, 0, 0, 0);
   return toDatetimeLocal(d);
 }
 
 export default function JobSchedulePanel({ jobId }: { jobId: string }) {
+  const { user } = useAuth();
+  const { showToast } = useToast();
+  const dialog = useDialog();
   const [items, setItems] = useState<JobScheduleItem[]>([]);
+  const [jobDays, setJobDays] = useState<JobDay[]>([]);
+  const [roster, setRoster] = useState<JobCrewAssignment[]>([]);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [title, setTitle] = useState('');
-  const [startsAt, setStartsAt] = useState(defaultStartsAt);
-  const [endsAt, setEndsAt] = useState(() => plusOneHour(defaultStartsAt()));
-  // Once the user edits Ends directly, stop overwriting it when Starts changes — only the
-  // still-untouched default should track Starts automatically.
+  const [startsAt, setStartsAt] = useState(() => nineAmOn(null));
+  const [endsAt, setEndsAt] = useState(() => sixPmSameDay(nineAmOn(null)));
+  // Once the user edits Ends directly, stop overwriting it when Starts (or the selected day)
+  // changes - only the still-untouched default should track those automatically.
   const [endsAtTouched, setEndsAtTouched] = useState(false);
   const [notes, setNotes] = useState('');
+  const [location, setLocation] = useState('');
+  const [color, setColor] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [activeRosterAssignmentId, setActiveRosterAssignmentId] = useState<string | null>(null);
+  const [addingEntry, setAddingEntry] = useState(false);
+  const [assigningItemId, setAssigningItemId] = useState<string | null>(null);
+  const [pointInTime, setPointInTime] = useState(false);
+  const [editingDay, setEditingDay] = useState(false);
 
-  const refresh = () => api.jobSchedule.list(jobId).then(setItems).catch((e) => setError(e.message));
+  const canManageCrew = isAdminRole(user?.role) || Boolean(user?.permissions?.manageCrewAssignments);
+  const canManageDays = isAdminRole(user?.role);
+
+  // The split view's shape depends on all three lists, so hold a skeleton until each has loaded once.
+  const [loaded, setLoaded] = useState({ items: false, days: false, roster: false });
+  const mark = (key: keyof typeof loaded) => () => setLoaded((l) => (l[key] ? l : { ...l, [key]: true }));
+  const refresh = () => api.jobSchedule.list(jobId).then(setItems).catch((e) => setError(e.message)).finally(mark('items'));
+  const refreshDays = () => api.jobDays.list(jobId).then(setJobDays).catch((e) => setError(e.message)).finally(mark('days'));
+  const refreshRoster = () => api.jobCrewAssignments.list(jobId).then(setRoster).catch(() => {}).finally(mark('roster'));
 
   useEffect(() => {
     refresh();
+    refreshDays();
+    refreshRoster();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [jobId]);
 
+  // Merges real JobDay rows with any schedule-item date that doesn't have one yet (see
+  // DayBlocksColumn's comment) into one sorted list of day blocks for the overview column.
+  const blocks = useMemo<DayBlockView[]>(() => {
+    const byDate = new Map<string, DayBlockView>();
+    for (const day of jobDays) {
+      const key = dateKey(new Date(day.date));
+      byDate.set(key, { dateKey: key, day, itemCount: 0 });
+    }
+    for (const item of items) {
+      const key = dateKey(new Date(item.startsAt));
+      const existing = byDate.get(key);
+      if (existing) existing.itemCount += 1;
+      else byDate.set(key, { dateKey: key, day: null, itemCount: 1 });
+    }
+    return [...byDate.values()].sort((a, b) => a.dateKey.localeCompare(b.dateKey));
+  }, [jobDays, items]);
+
+  useEffect(() => {
+    if (blocks.length === 0) {
+      if (selectedDate !== null) setSelectedDate(null);
+      return;
+    }
+    if (!selectedDate || !blocks.some((b) => b.dateKey === selectedDate)) {
+      setSelectedDate(blocks[0].dateKey);
+    }
+  }, [blocks, selectedDate]);
+
+  // Keeps "Add schedule entry" defaulted to the day currently being looked at - 9am-6pm of
+  // that day - so adding an entry while viewing e.g. Thu 16 Oct doesn't default to today.
+  useEffect(() => {
+    const next = nineAmOn(selectedDate);
+    setStartsAt(next);
+    setEndsAt(sixPmSameDay(next));
+    setEndsAtTouched(false);
+  }, [selectedDate]);
+
+  const itemsForSelectedDate = useMemo(
+    () => (selectedDate ? items.filter((i) => dateKey(new Date(i.startsAt)) === selectedDate) : []),
+    [items, selectedDate]
+  );
+
   const handleStartsChange = (value: string) => {
     setStartsAt(value);
-    if (!endsAtTouched && value) setEndsAt(plusOneHour(value));
+    if (!endsAtTouched && value) setEndsAt(sixPmSameDay(value));
   };
 
   const handleEndsChange = (value: string) => {
@@ -61,100 +142,409 @@ export default function JobSchedulePanel({ jobId }: { jobId: string }) {
       await api.jobSchedule.create(jobId, {
         title,
         startsAt: new Date(startsAt).toISOString(),
-        endsAt: endsAt ? new Date(endsAt).toISOString() : undefined,
+        endsAt: pointInTime ? new Date(startsAt).toISOString() : endsAt ? new Date(endsAt).toISOString() : undefined,
         notes: notes || undefined,
+        location: location || undefined,
+        color: color || undefined,
       });
       setTitle('');
-      const next = defaultStartsAt();
-      setStartsAt(next);
-      setEndsAt(plusOneHour(next));
-      setEndsAtTouched(false);
       setNotes('');
+      setLocation('');
+      setColor(null);
+      const next = nineAmOn(selectedDate);
+      setStartsAt(next);
+      setEndsAt(sixPmSameDay(next));
+      setEndsAtTouched(false);
+      setPointInTime(false);
       refresh();
+      setAddingEntry(false);
+      showToast(`Added "${title}" to the schedule`);
     } catch (err) {
       setError((err as Error).message);
     }
   };
 
-  const remove = async (id: string) => {
-    await api.jobSchedule.remove(jobId, id);
+  const remove = async (item: JobScheduleItem): Promise<boolean> => {
+    if (!(await dialog.confirm({ title: `Remove "${item.title}"?`, confirmLabel: 'Remove', danger: true }))) return false;
+    try {
+      await api.jobSchedule.remove(jobId, item.id);
+      showToast('Schedule entry removed', 'info');
+    } catch (err) {
+      showToast((err as Error).message, 'error');
+    }
     refresh();
+    return true;
+  };
+
+  // The keyboard/tap alternative to dragging a crew chip onto a block.
+  const toggleTaskCrew = async (item: JobScheduleItem, assignment: JobCrewAssignment) => {
+    const existing = item.crew.find((c) => c.jobCrewAssignmentId === assignment.id);
+    try {
+      if (existing) await api.jobSchedule.unassignCrew(jobId, item.id, existing.id);
+      else await api.jobSchedule.assignCrew(jobId, item.id, assignment.id, localMidnightIso(dateKey(new Date(item.startsAt))));
+      refresh();
+      refreshDays();
+    } catch (err) {
+      showToast((err as Error).message, 'error');
+    }
+  };
+
+  const unassignTaskCrew = async (itemId: string, crewRowId: string) => {
+    try {
+      await api.jobSchedule.unassignCrew(jobId, itemId, crewRowId);
+      refresh();
+    } catch (err) {
+      showToast((err as Error).message, 'error');
+    }
+  };
+
+  const { addDay, removeDay, unassignCrew } = useDayBlockActions(
+    jobId,
+    () => {
+      refreshDays();
+      refreshRoster();
+    },
+    setSelectedDate
+  );
+
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
+
+  const onDragStart = (e: DragStartEvent) => {
+    setActiveRosterAssignmentId(String(e.active.id).replace(/^roster:/, ''));
+  };
+
+  const onDragEnd = async (e: DragEndEvent) => {
+    setActiveRosterAssignmentId(null);
+    const { active, over } = e;
+    if (!over) return;
+    const assignmentId = String(active.id).replace(/^roster:/, '');
+    const overId = String(over.id);
+    try {
+      if (overId.startsWith('day:')) {
+        const targetDateKey = overId.replace(/^day:/, '');
+        const block = blocks.find((b) => b.dateKey === targetDateKey);
+        if (!block) return;
+        let dayId = block.day?.id;
+        if (!dayId) {
+          const created = await api.jobDays.create(jobId, localMidnightIso(targetDateKey));
+          dayId = created.id;
+        }
+        await api.jobDays.assignCrew(jobId, dayId, assignmentId);
+        refreshDays();
+      } else if (overId.startsWith('task:')) {
+        const scheduleItemId = overId.replace(/^task:/, '');
+        const item = items.find((i) => i.id === scheduleItemId);
+        if (!item) return;
+        const itemDateKey = dateKey(new Date(item.startsAt));
+        await api.jobSchedule.assignCrew(jobId, scheduleItemId, assignmentId, localMidnightIso(itemDateKey));
+        refresh();
+        refreshDays();
+      }
+    } catch (err) {
+      showToast((err as Error).message, 'error');
+    }
+  };
+
+  const selectedDay = blocks.find((b) => b.dateKey === selectedDate)?.day ?? null;
+  const selectedMarkers = dayMarkers(selectedDay);
+
+  const saveDay = async (data: { name: string; callTime: string; wrapTime: string }) => {
+    if (!selectedDate) return;
+    let dayId = selectedDay?.id;
+    if (!dayId) dayId = (await api.jobDays.create(jobId, localMidnightIso(selectedDate))).id;
+    await api.jobDays.update(jobId, dayId, { name: data.name || null, callTime: data.callTime || null, wrapTime: data.wrapTime || null });
+    setEditingDay(false);
+    refreshDays();
+    showToast('Day saved');
+  };
+
+  const activeAssignment = roster.find((a) => a.id === activeRosterAssignmentId);
+  const assigningItem = items.find((i) => i.id === assigningItemId) ?? null;
+
+  if (!loaded.items || !loaded.days || !loaded.roster) return <ScheduleSkeleton />;
+
+  return (
+    <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
+      <div className="schedule-split load-fade">
+        <DayBlocksColumn
+          blocks={blocks}
+          roster={roster}
+          selectedDate={selectedDate}
+          onSelectDate={setSelectedDate}
+          canManageDays={canManageDays}
+          canManageCrew={canManageCrew}
+          onAddDay={addDay}
+          onRemoveDay={removeDay}
+          onUnassignCrew={unassignCrew}
+        />
+
+        <div className="schedule-hour-view">
+          {addingEntry && (
+            <Modal title="Add schedule entry" onClose={() => setAddingEntry(false)}>
+            <p className="muted" style={{ marginTop: 0 }}>
+              Not limited to the Current RMS opportunity's own dates - add a Prep entry on an
+              earlier day if kit needs building before the hire starts.
+            </p>
+            <form onSubmit={create} className="row" style={{ flexWrap: 'wrap', alignItems: 'flex-end', gap: '0.9rem' }}>
+              <div className="field" style={{ width: '14rem' }}>
+                <label htmlFor="sched-title">Title</label>
+                <input id="sched-title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Load in / Prep" required />
+              </div>
+              <div className="field">
+                <label htmlFor="sched-starts">Starts</label>
+                <DateTimeInput id="sched-starts" stepMinutes={TIME_STEP_SECONDS / 60} value={startsAt} onChange={handleStartsChange} required />
+              </div>
+              {!pointInTime && (
+                <div className="field">
+                  <label htmlFor="sched-ends">Ends (optional)</label>
+                  <DateTimeInput id="sched-ends" stepMinutes={TIME_STEP_SECONDS / 60} value={endsAt} onChange={handleEndsChange} defaultTime="18:00" />
+                </div>
+              )}
+              <label className="row" style={{ gap: '0.4rem', width: '100%' }}>
+                <input type="checkbox" checked={pointInTime} onChange={(e) => setPointInTime(e.target.checked)} />
+                Just a moment in time - a deadline or info point like "Arrive on site"
+              </label>
+              <div className="field" style={{ width: '12rem' }}>
+                <label htmlFor="sched-location">Where</label>
+                <input id="sched-location" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Loading bay" />
+              </div>
+              <div className="field" style={{ width: '16rem' }}>
+                <label htmlFor="sched-notes">Notes</label>
+                <input id="sched-notes" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Via loading bay" />
+              </div>
+              <div className="field" style={{ width: 'auto' }}>
+                <label>Color</label>
+                <div className="row" style={{ gap: '0.3rem' }}>
+                  <button
+                    type="button"
+                    className="schedule-color-swatch"
+                    style={{ background: 'var(--surface-sunken)', border: color === null ? '2px solid var(--accent)' : '1px solid var(--border)' }}
+                    onClick={() => setColor(null)}
+                    aria-label="Default color"
+                    title="Default"
+                  />
+                  {SCHEDULE_COLOR_PRESETS.map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      className="schedule-color-swatch"
+                      style={{ background: c, border: color === c ? '2px solid var(--content)' : '1px solid var(--border)' }}
+                      onClick={() => setColor(c)}
+                      aria-label={`Color ${c}`}
+                      title={c}
+                    />
+                  ))}
+                </div>
+              </div>
+              <button type="submit">Add</button>
+            </form>
+            {error && <p className="error">{error}</p>}
+            </Modal>
+          )}
+
+          <div className="panel">
+            <div className="row" style={{ justifyContent: 'space-between' }}>
+              <div>
+                <h3 style={{ margin: 0 }}>
+                  {selectedDate ? formatDayHeading(`${selectedDate}T00:00:00`) : 'Schedule'}
+                  {selectedDay?.name && <span className="day-heading-name"> · {selectedDay.name}</span>}
+                </h3>
+                {(selectedDay?.callTime || selectedDay?.wrapTime) && (
+                  <p className="day-summary" style={{ margin: '0.2rem 0 0' }}>
+                    {[selectedDay.callTime && `Call ${selectedDay.callTime}`, selectedDay.wrapTime && `Estimated wrap ${selectedDay.wrapTime}`].filter(Boolean).join(' · ')}
+                  </p>
+                )}
+              </div>
+              <div className="row" style={{ gap: '0.5rem' }}>
+                {canManageDays && selectedDate && (
+                  <button type="button" className="secondary" onClick={() => setEditingDay(true)}>
+                    Name &amp; times
+                  </button>
+                )}
+                <button type="button" onClick={() => setAddingEntry(true)} aria-label="Add schedule entry">
+                  <PlusIcon /> Entry
+                </button>
+              </div>
+            </div>
+            {selectedDate && (itemsForSelectedDate.length > 0 || selectedMarkers.length > 0) ? (
+              <>
+                <SingleDayTimeline
+                  items={itemsForSelectedDate}
+                  dropTargets
+                  canManageCrew={canManageCrew}
+                  onUnassignCrew={unassignTaskCrew}
+                  onOpen={setAssigningItemId}
+                  markers={selectedMarkers}
+                />
+                {/* Doubles as the colour legend, and gives every block keyboard/tap actions. */}
+                <ul className="plain-list schedule-entries">
+                  {itemsForSelectedDate.map((i) => (
+                    <li key={i.id} className={`schedule-entry${isPointInTime(i) ? ' is-point' : ''}`}>
+                      <span className="crew-swatch-dot" style={{ background: i.color ?? 'var(--accent)' }} aria-hidden="true" />
+                      <span className="schedule-entry-time">
+                        {formatTime(i.startsAt)}
+                        {i.endsAt && !isPointInTime(i) ? `–${formatTime(i.endsAt)}` : ''}
+                        {isPointInTime(i) && <span className="chip chip-neutral schedule-point-chip">Point</span>}
+                      </span>
+                      <span className="schedule-entry-title">
+                        <button type="button" className="link-button queue-row-preview" onClick={() => setAssigningItemId(i.id)}>
+                          <strong>{i.title}</strong>
+                        </button>
+                        {i.location && <span className="muted"> · {i.location}</span>}
+                        {i.notes && <span className="muted"> · {i.notes}</span>}
+                        {i.crew.length > 0 && <span className="muted"> · {i.crew.map((c) => c.displayName).join(', ')}</span>}
+                      </span>
+                      <span className="row" style={{ gap: '0.4rem' }}>
+                        <button type="button" className="secondary" onClick={() => setAssigningItemId(i.id)}>
+                          {canManageCrew ? 'Details & crew…' : 'Details'}
+                        </button>
+                        <button type="button" className="secondary" onClick={() => remove(i)}>
+                          Remove
+                        </button>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            ) : (
+              <p className="muted">
+                {selectedDate ? 'No schedule entries for this day yet.' : 'Add a day on the left, or add a schedule entry to get started.'}
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+      {assigningItem && (
+        <ScheduleEntryModal
+          key={assigningItem.id}
+          item={assigningItem}
+          roster={roster}
+          editable={canManageDays}
+          canManageCrew={canManageCrew}
+          onClose={() => setAssigningItemId(null)}
+          onToggleCrew={(a) => toggleTaskCrew(assigningItem, a)}
+          onSave={async (patch) => {
+            await api.jobSchedule.update(jobId, assigningItem.id, patch);
+            setAssigningItemId(null);
+            refresh();
+            refreshDays();
+            showToast('Schedule entry saved');
+          }}
+          onDelete={canManageDays ? () => remove(assigningItem).then((done) => done && setAssigningItemId(null)) : undefined}
+        />
+      )}
+      {editingDay && selectedDate && (
+        <DayDetailsModal dateKey={selectedDate} day={selectedDay} onClose={() => setEditingDay(false)} onSave={saveDay} />
+      )}
+      <DragOverlay>
+        {activeAssignment && (
+          <div className="day-block-crew-chip">
+            <span className="crew-swatch-dot" style={{ background: resolveCrewColor(activeAssignment.crewProfileId, activeAssignment.color) }} />
+            {activeAssignment.displayName}
+          </div>
+        )}
+      </DragOverlay>
+    </DndContext>
+  );
+}
+
+/** A day's name ("Prep Day") and its call and estimated wrap times. */
+function DayDetailsModal({
+  dateKey: key,
+  day,
+  onClose,
+  onSave,
+}: {
+  dateKey: string;
+  day: JobDay | null;
+  onClose: () => void;
+  onSave: (data: { name: string; callTime: string; wrapTime: string }) => Promise<void>;
+}) {
+  const [name, setName] = useState(day?.name ?? '');
+  const [callTime, setCallTime] = useState(day?.callTime ?? '');
+  const [wrapTime, setWrapTime] = useState(day?.wrapTime ?? '');
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const runsPastMidnight = Boolean(callTime && wrapTime && wrapTime < callTime);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      await onSave({ name: name.trim(), callTime, wrapTime });
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
-    <div>
-      <div className="panel">
-        <h3>Add schedule entry</h3>
-        <form onSubmit={create} className="row" style={{ flexWrap: 'wrap', alignItems: 'flex-end', gap: '0.9rem' }}>
-          <div className="field" style={{ width: '14rem' }}>
-            <label htmlFor="sched-title">Title</label>
-            <input id="sched-title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Load in" required />
-          </div>
-          <div className="field" style={{ width: '13rem' }}>
-            <label htmlFor="sched-starts">Starts</label>
-            <input
-              id="sched-starts"
-              type="datetime-local"
-              step={TIME_STEP_SECONDS}
-              value={startsAt}
-              onChange={(e) => handleStartsChange(e.target.value)}
-              required
-            />
-          </div>
-          <div className="field" style={{ width: '13rem' }}>
-            <label htmlFor="sched-ends">Ends (optional)</label>
-            <input
-              id="sched-ends"
-              type="datetime-local"
-              step={TIME_STEP_SECONDS}
-              value={endsAt}
-              onChange={(e) => handleEndsChange(e.target.value)}
-            />
-          </div>
-          <div className="field" style={{ width: '16rem' }}>
-            <label htmlFor="sched-notes">Notes</label>
-            <input id="sched-notes" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Via loading bay" />
-          </div>
-          <button type="submit">Add</button>
-        </form>
-        {error && <p className="error">{error}</p>}
-      </div>
-
-      {items.length > 0 && (
-        <div className="panel">
-          <h3>Day timeline</h3>
-          <DayTimeline items={items} />
+    <Modal title={formatDayHeading(`${key}T00:00:00`)} onClose={onClose}>
+      <form onSubmit={submit}>
+        <div className="field">
+          <label htmlFor="day-name">Day name</label>
+          <input id="day-name" value={name} maxLength={60} onChange={(e) => setName(e.target.value)} placeholder="e.g. Prep Day, Show Day 1" />
         </div>
-      )}
+        <div className="row" style={{ gap: '0.9rem', flexWrap: 'wrap' }}>
+          <div className="field" style={{ width: '9rem' }}>
+            <label htmlFor="day-call">Call time</label>
+            <input id="day-call" type="time" step={TIME_STEP_SECONDS} value={callTime} onChange={(e) => setCallTime(e.target.value)} />
+          </div>
+          <div className="field" style={{ width: '9rem' }}>
+            <label htmlFor="day-wrap">Estimated wrap</label>
+            <input id="day-wrap" type="time" step={TIME_STEP_SECONDS} value={wrapTime} onChange={(e) => setWrapTime(e.target.value)} />
+          </div>
+        </div>
+        <p className="muted" style={{ marginTop: 0 }}>
+          {runsPastMidnight ? 'Wrap is earlier than call, so it runs past midnight into the next day.' : 'Crew see these on their schedule, and the call time on their home page.'}
+        </p>
+        {error && <p className="error">{error}</p>}
+        <div className="row" style={{ gap: '0.5rem' }}>
+          <button type="submit" disabled={busy}>
+            Save day
+          </button>
+          <button type="button" className="secondary" onClick={onClose}>
+            Cancel
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
 
-      {items.length > 0 && (
-        <table>
-          <thead>
-            <tr>
-              <th>Title</th>
-              <th>Starts</th>
-              <th>Ends</th>
-              <th>Notes</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((i) => (
-              <tr key={i.id}>
-                <td>{i.title}</td>
-                <td>{new Date(i.startsAt).toLocaleString(undefined, { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</td>
-                <td>{i.endsAt ? new Date(i.endsAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) : '—'}</td>
-                <td className="muted">{i.notes ?? '—'}</td>
-                <td>
-                  <button className="secondary" onClick={() => remove(i.id)}>
-                    Remove
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-    </div>
+/** The Schedule tab's split view (crew strip and day blocks beside the hour view) while it loads. */
+function ScheduleSkeleton() {
+  return (
+    <SkeletonRegion className="schedule-split">
+      <div className="day-blocks-column">
+        <div className="day-blocks-roster">
+          <h4>Crew on this job</h4>
+          <Skeleton w="80%" h={12} style={{ marginBottom: 10 }} />
+          <div className="row" style={{ gap: '0.4rem' }}>
+            <Skeleton w={110} h={26} r={999} />
+            <Skeleton w={90} h={26} r={999} />
+          </div>
+        </div>
+        <div className="day-blocks-list">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="day-block">
+              <Skeleton w="55%" h={16} style={{ marginBottom: 10 }} />
+              <Skeleton w="35%" h={11} />
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="schedule-hour-view">
+        <div className="panel">
+          <div className="row" style={{ justifyContent: 'space-between' }}>
+            <Skeleton w="45%" h={22} />
+            <Skeleton w={96} h={38} r={8} />
+          </div>
+          <Skeleton h={440} r={8} style={{ marginTop: 16 }} />
+        </div>
+      </div>
+    </SkeletonRegion>
   );
 }

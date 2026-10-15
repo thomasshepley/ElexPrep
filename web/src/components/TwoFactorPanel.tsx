@@ -1,10 +1,11 @@
+import { SkeletonPanel } from './Skeleton';
 import { useEffect, useState } from 'react';
 import QRCode from 'qrcode';
 import { api } from '../api/client';
 import PasswordInput from './PasswordInput';
 
 /**
- * Self-service TOTP enrollment — any signed-in account (admin, user, signage, crew) can set
+ * Self-service TOTP enrollment - any signed-in account (admin, user, signage, crew) can set
  * this up for themselves; nothing here is enforced/required yet (see routes/auth.ts's login
  * flow for where it actually gates sign-in once a user opts in). A setup is only persisted
  * once the user proves they can generate a valid code from it (see /confirm), so an abandoned
@@ -105,7 +106,7 @@ export default function TwoFactorPanel() {
     }
   };
 
-  if (!status) return null;
+  if (!status) return error ? <p className="error">Could not load two-factor settings: {error}</p> : <SkeletonPanel lines={3} />;
 
   return (
     <div>
@@ -116,7 +117,7 @@ export default function TwoFactorPanel() {
         <div className="panel" style={{ borderColor: 'var(--accent)' }}>
           <h4>Save your backup codes</h4>
           <p className="muted">
-            Each works once, if you lose access to your authenticator app. They won't be shown again — save them somewhere safe.
+            Each works once, if you lose access to your authenticator app. They won't be shown again - save them somewhere safe.
           </p>
           <div
             style={{
@@ -160,9 +161,15 @@ export default function TwoFactorPanel() {
                   <label htmlFor="totp-confirm-code">6-digit code</label>
                   <input
                     id="totp-confirm-code"
+                    name="one-time-code"
+                    type="text"
                     value={confirmCode}
                     onChange={(e) => setConfirmCode(e.target.value)}
                     inputMode="numeric"
+                    autoComplete="one-time-code"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    maxLength={8}
                     autoFocus
                     required
                   />

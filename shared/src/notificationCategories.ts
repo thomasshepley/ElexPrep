@@ -1,5 +1,5 @@
 /**
- * Coarse notification categories a person can opt out of individually — one per logical kind
+ * Coarse notification categories a person can opt out of individually - one per logical kind
  * of event, derived from the dotted notification `type` strings' prefix (e.g.
  * "crew_assignment.added" -> "crew_assignment"). Stored per-user under prefs.notifications as
  * { [category]: boolean }, missing/true = enabled, false = opted out. Shared so the server
@@ -11,6 +11,7 @@ export const NOTIFICATION_CATEGORIES = [
   'crew_assignment',
   'job_discussion',
   'onboarding',
+  'prep',
 ] as const;
 
 export type NotificationCategory = (typeof NOTIFICATION_CATEGORIES)[number];
@@ -21,4 +22,9 @@ export const NOTIFICATION_CATEGORY_LABELS: Record<NotificationCategory, string> 
   crew_assignment: "Added to a job's crew",
   job_discussion: 'New discussion messages',
   onboarding: 'New onboarding requests',
+  prep: 'Prep finished or booked out with kit missing',
 };
+
+/** Categories that only ever reach staff (they come from admin-side events), so the crew
+ * portal's preferences don't offer toggles that can never fire for a crew account. */
+export const STAFF_ONLY_NOTIFICATION_CATEGORIES: readonly NotificationCategory[] = ['crew_application', 'onboarding', 'prep'];

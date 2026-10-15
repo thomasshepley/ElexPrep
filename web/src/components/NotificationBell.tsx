@@ -1,3 +1,4 @@
+import { SkeletonList, SkeletonRegion } from './Skeleton';
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api, type AppNotification } from '../api/client';
@@ -16,8 +17,8 @@ function formatRelative(iso: string): string {
   return `${days}d ago`;
 }
 
-/** Polling notification bell — shared by the admin and crew sidebars. Self-contained: it owns its own open/unread state and only needs to be dropped into a sidebar. */
-export default function NotificationBell() {
+/** Polling notification bell - shared by the admin and crew sidebars. Self-contained: it owns its own open/unread state and only needs to be dropped into a sidebar. */
+export default function NotificationBell({ variant = 'sidebar' }: { variant?: 'sidebar' | 'tab' }) {
   const [open, setOpen] = useState(false);
   const [unread, setUnread] = useState(0);
   const [items, setItems] = useState<AppNotification[] | null>(null);
@@ -73,20 +74,37 @@ export default function NotificationBell() {
   };
 
   return (
-    <div className="notification-bell" ref={rootRef}>
-      <button
-        ref={buttonRef}
-        className="secondary sidebar-signout"
-        onClick={toggleOpen}
-        aria-label={unread > 0 ? `Notifications, ${unread} unread` : 'Notifications'}
-        aria-expanded={open}
-      >
-        <BellIcon />
-        <span>Notifications</span>
-        {unread > 0 && <span className="notification-badge">{unread > 9 ? '9+' : unread}</span>}
-      </button>
+    <div className={`notification-bell${variant === 'tab' ? ' is-tab' : ''}`} ref={rootRef}>
+      {variant === 'tab' ? (
+        <button
+          ref={buttonRef}
+          type="button"
+          className={`mobile-tab${open ? ' active' : ''}`}
+          onClick={toggleOpen}
+          aria-label={unread > 0 ? `Alerts, ${unread} unread` : 'Alerts'}
+          aria-expanded={open}
+        >
+          <span className="mobile-tab-icon">
+            <BellIcon />
+            {unread > 0 && <span className="notification-badge">{unread > 9 ? '9+' : unread}</span>}
+          </span>
+          <span className="mobile-tab-label">Alerts</span>
+        </button>
+      ) : (
+        <button
+          ref={buttonRef}
+          className="secondary sidebar-signout"
+          onClick={toggleOpen}
+          aria-label={unread > 0 ? `Notifications, ${unread} unread` : 'Notifications'}
+          aria-expanded={open}
+        >
+          <BellIcon />
+          <span>Notifications</span>
+          {unread > 0 && <span className="notification-badge">{unread > 9 ? '9+' : unread}</span>}
+        </button>
+      )}
       {open && panelPos && (
-        <div className="notification-panel" style={{ left: panelPos.left, bottom: panelPos.bottom }}>
+        <div className={`notification-panel${variant === 'tab' ? ' is-sheet' : ''}`} style={variant === 'tab' ? undefined : { left: panelPos.left, bottom: panelPos.bottom }}>
           <div className="notification-panel-header">
             <strong>Notifications</strong>
             {items && items.some((i) => !i.readAt) && (
@@ -95,7 +113,11 @@ export default function NotificationBell() {
               </button>
             )}
           </div>
-          {items === null && <p className="muted" style={{ padding: '0.75rem' }}>Loading…</p>}
+          {items === null && (
+            <SkeletonRegion style={{ padding: '0 0.8rem' }}>
+              <SkeletonList items={3} />
+            </SkeletonRegion>
+          )}
           {items !== null && items.length === 0 && <p className="muted" style={{ padding: '0.75rem' }}>No notifications yet.</p>}
           {items !== null &&
             items.map((n) => (

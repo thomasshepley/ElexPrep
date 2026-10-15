@@ -9,6 +9,11 @@ import {
 } from '@elexprep/shared';
 import { api } from '../api/client';
 import FileInput from '../components/FileInput';
+import { useAuth } from '../auth/AuthContext';
+import { hasPermission } from '../auth/roles';
+import PermissionFieldset from '../components/PermissionFieldset';
+
+const PREP_SETTINGS_NOTE = 'You can view these settings, but changing them needs the "Manage prep settings" permission.';
 
 const normalizeHeader = (h: string) => h.toLowerCase().replace(/[^a-z]/g, '');
 
@@ -17,6 +22,8 @@ const normalizeHeader = (h: string) => h.toLowerCase().replace(/[^a-z]/g, '');
  * is configured once here and every import uses it automatically.
  */
 export default function ImportMappingPage() {
+  const { user } = useAuth();
+  const canEdit = hasPermission(user, 'managePrepSettings');
   const [mapping, setMapping] = useState<Partial<Record<PatchFieldKey, string>>>({});
   const [sampleHeaders, setSampleHeaders] = useState<string[]>([]);
   const [saved, setSaved] = useState(false);
@@ -74,8 +81,9 @@ export default function ImportMappingPage() {
   return (
     <div>
       <h1>Import mapping</h1>
+      <PermissionFieldset allowed={canEdit} note={PREP_SETTINGS_NOTE}>
       <p className="muted" style={{ maxWidth: 640 }}>
-        Set once which CSV columns from your Wysiwyg patch export map onto each field — every
+        Set once which CSV columns from your Wysiwyg patch export map onto each field - every
         patch import then uses this automatically. Upload a sample export to pick columns from a
         list instead of typing them.
       </p>
@@ -90,33 +98,35 @@ export default function ImportMappingPage() {
 
       <div className="panel">
         <h3>Column mapping</h3>
-        <table>
-          <thead>
-            <tr>
-              <th>Field</th>
-              <th>CSV column name</th>
-            </tr>
-          </thead>
-          <tbody>
-            {PATCH_FIELD_KEYS.map((key) => (
-              <tr key={key}>
-                <td>
-                  {PATCH_FIELD_LABELS[key]}
-                  {(key === 'address' || key === 'fixtureType') && <span className="error"> *</span>}
-                </td>
-                <td>
-                  <input
-                    list={sampleHeaders.length ? 'sample-headers' : undefined}
-                    value={mapping[key] ?? ''}
-                    placeholder="— not mapped —"
-                    onChange={(e) => setMapping((m) => ({ ...m, [key]: e.target.value }))}
-                    style={{ width: 260 }}
-                  />
-                </td>
+        <div className="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Field</th>
+                <th>CSV column name</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {PATCH_FIELD_KEYS.map((key) => (
+                <tr key={key}>
+                  <td>
+                    {PATCH_FIELD_LABELS[key]}
+                    {(key === 'address' || key === 'fixtureType') && <span className="error"> *</span>}
+                  </td>
+                  <td>
+                    <input aria-label={`Column for ${PATCH_FIELD_LABELS[key]}`}
+                      list={sampleHeaders.length ? 'sample-headers' : undefined}
+                      value={mapping[key] ?? ''}
+                      placeholder="- not mapped -"
+                      onChange={(e) => setMapping((m) => ({ ...m, [key]: e.target.value }))}
+                      style={{ width: 260 }}
+                    />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
         {sampleHeaders.length > 0 && (
           <datalist id="sample-headers">
             {sampleHeaders.map((h) => (
@@ -130,6 +140,7 @@ export default function ImportMappingPage() {
           {error && <span className="error">{error}</span>}
         </div>
       </div>
+      </PermissionFieldset>
     </div>
   );
 }

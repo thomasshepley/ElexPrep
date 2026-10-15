@@ -1,3 +1,4 @@
+import { Skeleton, SkeletonPanel } from '../components/Skeleton';
 import { useEffect, useState } from 'react';
 import { api, type OneDriveConfig } from '../api/client';
 import PasswordInput from '../components/PasswordInput';
@@ -6,7 +7,7 @@ import PasswordInput from '../components/PasswordInput';
  * Azure app-registration credentials for the Microsoft Graph / OneDrive scaffold (see
  * server/src/oneDrive/). Until these are filled in with a real app registration (client-
  * credentials flow, Files.Read.All + Sites.Read.All application permissions granted by an
- * admin in Azure AD), `enabled` has no effect — every job's Files tab shows "not connected".
+ * admin in Azure AD), `enabled` has no effect - every job's Files tab shows "not connected".
  */
 export default function OneDriveSettingsPage() {
   const [config, setConfig] = useState<OneDriveConfig | null>(null);
@@ -20,15 +21,20 @@ export default function OneDriveSettingsPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  const [loadError, setLoadError] = useState<string | null>(null);
+
   const load = () =>
-    api.oneDrive.getConfig().then((c) => {
+    api.oneDrive
+      .getConfig()
+      .then((c) => {
       setConfig(c);
       setTenantId(c.tenantId);
       setClientId(c.clientId);
       setDriveId(c.driveId);
       setRootFolderPath(c.rootFolderPath);
       setEnabled(c.enabled);
-    });
+      })
+      .catch((e) => setLoadError((e as Error).message));
 
   useEffect(() => {
     load();
@@ -72,13 +78,19 @@ export default function OneDriveSettingsPage() {
     }
   };
 
-  if (!config) return null;
+  if (!config) return loadError ? <p className="error">Could not load OneDrive settings: {loadError}</p> : (
+      <div>
+        <h1>OneDrive</h1>
+        <Skeleton w="60%" h={14} style={{ marginBottom: 20 }} />
+        <SkeletonPanel lines={5} /><SkeletonPanel lines={2} />
+      </div>
+    );
 
   return (
     <div>
       <h1>OneDrive</h1>
       <p className="muted">
-        Scaffolded against the Microsoft Graph API — matches each onboarded job to a folder under{' '}
+        Scaffolded against the Microsoft Graph API - matches each onboarded job to a folder under{' '}
         <code>{rootFolderPath || 'Projects'}/&lt;year&gt;/&lt;project name&gt;</code>, lets admins
         browse it and share individual files or folders with crew, and auto-surfaces the first PDF
         in a "CAD" subfolder on the job's Plots tab. Everything stays inert until a real Azure app
@@ -90,34 +102,29 @@ export default function OneDriveSettingsPage() {
       <div className="panel">
         <h3>Connection</h3>
         <div className="row" style={{ flexWrap: 'wrap' }}>
-          <label>
-            Tenant ID
-            <br />
+          <label className="field">
+            <span className="field-label">Tenant ID</span>
             <input value={tenantId} onChange={(e) => setTenantId(e.target.value)} style={{ width: 260 }} />
           </label>
-          <label>
-            Client (application) ID
-            <br />
+          <label className="field">
+            <span className="field-label">Client (application) ID</span>
             <input value={clientId} onChange={(e) => setClientId(e.target.value)} style={{ width: 260 }} />
           </label>
-          <label>
-            Client secret
-            <br />
+          <label className="field">
+            <span className="field-label">Client secret</span>
             <PasswordInput
               value={clientSecret}
-              placeholder={config.hasClientSecret ? '•••••••• (set — leave blank to keep)' : 'paste client secret'}
+              placeholder={config.hasClientSecret ? '•••••••• (set - leave blank to keep)' : 'paste client secret'}
               onChange={(e) => setClientSecret(e.target.value)}
               style={{ width: 260 }}
             />
           </label>
-          <label>
-            Drive ID
-            <br />
+          <label className="field">
+            <span className="field-label">Drive ID</span>
             <input value={driveId} onChange={(e) => setDriveId(e.target.value)} placeholder="SharePoint/OneDrive drive id" style={{ width: 260 }} />
           </label>
-          <label>
-            Root folder
-            <br />
+          <label className="field">
+            <span className="field-label">Root folder</span>
             <input value={rootFolderPath} onChange={(e) => setRootFolderPath(e.target.value)} style={{ width: 160 }} />
           </label>
           <label style={{ alignSelf: 'flex-end' }}>

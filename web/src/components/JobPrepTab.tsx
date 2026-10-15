@@ -1,22 +1,83 @@
-import { useState } from 'react';
+import { Skeleton } from './Skeleton';
+import { useEffect, useState } from 'react';
+import { api, type FixtureGroup } from '../api/client';
 import PatchImportPanel from './PatchImportPanel';
 import CasesPanel from './CasesPanel';
 import LabelsPanel from './LabelsPanel';
 import PrintQueuePanel from './PrintQueuePanel';
+import StagesManager from './StagesManager';
+import PrepBayStatus from './PrepBayStatus';
+import { useAuth } from '../auth/AuthContext';
+import { isAdminRole } from '../auth/roles';
 
 const PREP_TABS = ['Patch Import', 'Cases', 'Labels', 'Print Queue'] as const;
 type PrepTab = (typeof PREP_TABS)[number];
 
 /**
  * Patch Import / Cases / Labels / Print Queue combined under one "Prep" tab, switching via
- * sub-tabs — these four used to be separate top-level tabs, which got messy since they're all
+ * sub-tabs - these four used to be separate top-level tabs, which got messy since they're all
  * steps of the same prep workflow (import fixtures, pack cases, generate labels, print them).
+ *
+ * The stage bar above the sub-tabs only appears once the job has at least one FixtureGroup
+ * ("stage") - a job that never uses stages looks and behaves exactly as before. Once stages
+ * exist, picking one here scopes every sub-tab below to it: Patch Import only shows/replaces
+ * that stage's fixtures, Cases only regenerates that stage's cases, and so on - see
+ * routes/fixtureGroups.ts for the full model.
  */
 export default function JobPrepTab({ jobId }: { jobId: string }) {
   const [tab, setTab] = useState<PrepTab>('Patch Import');
+  const [groups, setGroups] = useState<FixtureGroup[] | null>(null);
+  const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
+  const [managingStages, setManagingStages] = useState(false);
+
+  const refreshGroups = () => api.fixtureGroups.list(jobId).then(setGroups);
+
+  useEffect(() => {
+    refreshGroups();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jobId]);
+
+  const hasStages = (groups?.length ?? 0) > 0;
+  const { user } = useAuth();
 
   return (
     <div>
+      {isAdminRole(user?.role) && <PrepBayStatus jobId={jobId} />}
+      {groups === null && <Skeleton w="55%" h={14} style={{ margin: '0.25rem 0 1.1rem' }} />}
+      {groups !== null && hasStages && (
+        <div className="row tabs tabs-sub" style={{ marginBottom: '0.5rem' }}>
+          <button className={activeGroupId === null ? 'active' : ''} onClick={() => setActiveGroupId(null)}>
+            Ungrouped
+          </button>
+          {groups!.map((g) => (
+            <button key={g.id} className={activeGroupId === g.id ? 'active' : ''} onClick={() => setActiveGroupId(g.id)}>
+              {g.name}
+            </button>
+          ))}
+          <button className="secondary" onClick={() => setManagingStages(true)}>
+            Manage stages
+          </button>
+        </div>
+      )}
+      {groups !== null && !hasStages && (
+        <p className="muted" style={{ marginBottom: '0.75rem', fontSize: 'var(--text-sm)' }}>
+          Multi-stage job?{' '}
+          <button type="button" className="link-button" onClick={() => setManagingStages(true)}>
+            Split it into stages
+          </button>{' '}
+          to run patch import, cases and labels separately per stage.
+        </p>
+      )}
+
+      {managingStages && (
+        <StagesManager
+          jobId={jobId}
+          groups={groups ?? []}
+          onChanged={refreshGroups}
+          onClose={() => setManagingStages(false)}
+        />
+      )}
+
       <div className="tabs tabs-sub">
         {PREP_TABS.map((t) => (
           <button key={t} className={t === tab ? 'active' : ''} onClick={() => setTab(t)}>
@@ -24,10 +85,10 @@ export default function JobPrepTab({ jobId }: { jobId: string }) {
           </button>
         ))}
       </div>
-      {tab === 'Patch Import' && <PatchImportPanel jobId={jobId} />}
-      {tab === 'Cases' && <CasesPanel jobId={jobId} />}
-      {tab === 'Labels' && <LabelsPanel jobId={jobId} />}
-      {tab === 'Print Queue' && <PrintQueuePanel jobId={jobId} />}
+      {tab === 'Patch Import' && <PatchImportPanel jobId={jobId} groupId={activeGroupId} stages={groups ?? []} />}
+      {tab === 'Cases' && <CasesPanel jobId={jobId} groupId={activeGroupId} />}
+      {tab === 'Labels' && <LabelsPanel jobId={jobId} groupId={activeGroupId} />}
+      {tab === 'Print Queue' && <PrintQueuePanel jobId={jobId} groupId={activeGroupId} />}
     </div>
   );
 }

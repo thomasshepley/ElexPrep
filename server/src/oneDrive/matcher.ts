@@ -10,10 +10,10 @@ export interface FolderMatch {
  * Matches an opportunity being onboarded to a folder under the configured root
  * (default "Projects"), following the <root>/<year>/<project name> convention described by
  * the user: Projects -> each year -> each project. Tries the opportunity's start-year folder
- * first (the year the job is actually happening), falling back to the current year — a job
+ * first (the year the job is actually happening), falling back to the current year - a job
  * onboarded close to its date, before Current RMS has the final start date locked in, should
  * still have a reasonable shot at matching. Returns null (not a throw) on no match, since
- * "we couldn't find it automatically" is an expected, common outcome, not an error — the
+ * "we couldn't find it automatically" is an expected, common outcome, not an error - the
  * onboarding flow falls back to a manual folder pick either way.
  */
 export async function matchJobFolder(
@@ -36,7 +36,7 @@ export async function matchJobFolder(
   return null;
 }
 
-/** Exact (case-insensitive) match first, then a substring match in either direction — a
+/** Exact (case-insensitive) match first, then a substring match in either direction - a
  * project folder is often named slightly differently from the opportunity subject (an
  * abbreviation, a trailing client reference), so a pure exact match alone would miss too much
  * to be useful as an "automatic" step. */

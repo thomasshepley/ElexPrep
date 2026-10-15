@@ -1,8 +1,14 @@
+import { SkeletonRegion, SkeletonRows } from './Skeleton';
 import { useEffect, useState } from 'react';
 import { api, type CaseGroup } from '../api/client';
+import { useDialog } from './Dialog';
+import InlineEdit from './InlineEdit';
+import LocationSelect, { useJobLocations } from './LocationSelect';
 
-export default function CasesPanel({ jobId }: { jobId: string }) {
-  const [cases, setCases] = useState<CaseGroup[]>([]);
+export default function CasesPanel({ jobId, groupId = null }: { jobId: string; groupId?: string | null }) {
+  const dialog = useDialog();
+  const [casesLoaded, setCases] = useState<CaseGroup[] | null>(null);
+  const cases = casesLoaded ?? [];
   const [busy, setBusy] = useState(false);
   const [newType, setNewType] = useState('');
   const [newLabel, setNewLabel] = useState('');
@@ -17,18 +23,24 @@ export default function CasesPanel({ jobId }: { jobId: string }) {
     refresh();
   }, [jobId]);
 
+  const stageCases = cases.filter((c) => (c.groupId ?? null) === groupId);
+  const locationOptions = useJobLocations(jobId, cases.map((c) => c.location));
+
   const generate = async () => {
     if (
-      cases.length > 0 &&
-      !confirm(
-        `This replaces all ${cases.length} case row(s) below with a fresh set built from the current patch and case rules — any manual edits or additions will be lost. Continue?`
-      )
+      stageCases.length > 0 &&
+      !(await dialog.confirm({
+        title: 'Regenerate cases?',
+        message: `This replaces all ${stageCases.length} case row(s) with a fresh set built from the current patch and case rules - any manual edits or additions will be lost.`,
+        confirmLabel: 'Regenerate',
+        danger: true,
+      }))
     ) {
       return;
     }
     setBusy(true);
     try {
-      await api.cases.generate(jobId);
+      await api.cases.generate(jobId, groupId);
       setSelected(new Set());
       await refresh();
     } finally {
@@ -43,7 +55,7 @@ export default function CasesPanel({ jobId }: { jobId: string }) {
   };
 
   const remove = async (id: string) => {
-    if (!confirm('Delete this case row?')) return;
+    if (!(await dialog.confirm({ title: 'Delete this case?', confirmLabel: 'Delete', danger: true }))) return;
     await api.cases.remove(jobId, id);
     setSelected((s) => {
       const next = new Set(s);
@@ -63,7 +75,7 @@ export default function CasesPanel({ jobId }: { jobId: string }) {
   };
 
   const toggleSelectAll = () => {
-    setSelected((s) => (s.size === cases.length ? new Set() : new Set(cases.map((c) => c.id))));
+    setSelected((s) => (s.size === stageCases.length ? new Set() : new Set(stageCases.map((c) => c.id))));
   };
 
   const bulkSetLocation = async () => {
@@ -74,7 +86,7 @@ export default function CasesPanel({ jobId }: { jobId: string }) {
   };
 
   const bulkDelete = async () => {
-    if (!confirm(`Delete ${selected.size} selected case rows?`)) return;
+    if (!(await dialog.confirm({ title: `Delete ${selected.size} cases?`, confirmLabel: 'Delete', danger: true }))) return;
     await api.cases.bulkRemove(jobId, [...selected]);
     setSelected(new Set());
     refresh();
@@ -88,7 +100,7 @@ export default function CasesPanel({ jobId }: { jobId: string }) {
       return;
     }
     try {
-      await api.cases.create(jobId, { fixtureType: newType, label: newLabel, location: newLocation || undefined });
+      await api.cases.create(jobId, { fixtureType: newType, label: newLabel, location: newLocation || undefined, groupId });
       setNewType('');
       setNewLabel('');
       setNewLocation('');
@@ -107,23 +119,23 @@ export default function CasesPanel({ jobId }: { jobId: string }) {
         </button>
       </div>
       <p className="muted">
-        Groups fixtures into cases using the units-per-case rule for each fixture type. Every
-        field below is editable in place (click and type, saves on blur); use Regenerate after
-        importing a new patch or editing case rules — it replaces every row here, so add any
+        Groups fixtures into cases using the units-per-case rule for each fixture type. Click any
+        value below to edit it; use Regenerate after
+        importing a new patch or editing case rules - it replaces every row here, so add any
         one-off cases below afterwards rather than before.
       </p>
-      {cases.length === 0 && <p className="muted">No cases yet — generate from the patch, or add one below.</p>}
-      {cases.length > 0 && (
+      {casesLoaded === null && (
+        <SkeletonRegion>
+          <SkeletonRows rows={6} cols={5} />
+        </SkeletonRegion>
+      )}
+      {casesLoaded !== null && stageCases.length === 0 && <p className="muted">No cases yet - generate from the patch, or add one below.</p>}
+      {stageCases.length > 0 && (
         <>
           {selected.size > 0 && (
             <div className="row panel" style={{ background: 'rgba(255,255,255,0.04)', alignItems: 'center', gap: '0.6rem' }}>
               <strong>{selected.size} selected</strong>
-              <input
-                placeholder="Set location to…"
-                value={bulkLocation}
-                onChange={(e) => setBulkLocation(e.target.value)}
-                style={{ width: 160 }}
-              />
+              <LocationSelect ariaLabel="Set location to" placeholder="Set location to…" value={bulkLocation} options={locationOptions} onChange={setBulkLocation} width="12rem" />
               <button onClick={bulkSetLocation}>Set location</button>
               <button className="secondary" onClick={bulkDelete}>
                 Delete selected
@@ -133,60 +145,56 @@ export default function CasesPanel({ jobId }: { jobId: string }) {
               </button>
             </div>
           )}
-          <table>
-            <thead>
-              <tr>
-                <th>
-                  <input
-                    type="checkbox"
-                    checked={selected.size === cases.length && cases.length > 0}
-                    onChange={toggleSelectAll}
-                  />
-                </th>
-                <th>Fixture type</th>
-                <th>Case label</th>
-                <th>Location</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {cases.map((c) => (
-                <tr key={c.id}>
-                  <td>
-                    <input type="checkbox" checked={selected.has(c.id)} onChange={() => toggleSelected(c.id)} />
-                  </td>
-                  <td>
+          <div className="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>
                     <input
-                      defaultValue={c.fixtureType}
-                      onBlur={(e) => updateField(c, 'fixtureType', e.target.value)}
+                      type="checkbox"
+                      checked={selected.size === stageCases.length && stageCases.length > 0}
+                      onChange={toggleSelectAll}
                     />
-                  </td>
-                  <td>
-                    <input defaultValue={c.label} onBlur={(e) => updateField(c, 'label', e.target.value)} />
-                  </td>
-                  <td>
-                    <input
-                      defaultValue={c.location ?? ''}
-                      onBlur={(e) => updateField(c, 'location', e.target.value)}
-                    />
-                  </td>
-                  <td>
-                    <button className="secondary" onClick={() => remove(c.id)}>
-                      Delete
-                    </button>
-                  </td>
+                  </th>
+                  <th>Fixture type</th>
+                  <th>Case label</th>
+                  <th>Location</th>
+                  <th></th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {stageCases.map((c) => (
+                  <tr key={c.id}>
+                    <td>
+                      <input type="checkbox" checked={selected.has(c.id)} onChange={() => toggleSelected(c.id)} />
+                    </td>
+                    <td>
+                      <InlineEdit label="Fixture type" value={c.fixtureType} onSave={(v) => updateField(c, 'fixtureType', v)} />
+                    </td>
+                    <td>
+                      <InlineEdit label="Case label" value={c.label} onSave={(v) => updateField(c, 'label', v)} />
+                    </td>
+                    <td>
+                      <LocationSelect ariaLabel={`Location for ${c.label}`} value={c.location ?? ''} options={locationOptions} onChange={(v) => updateField(c, 'location', v)} />
+                    </td>
+                    <td>
+                      <button className="secondary" onClick={() => remove(c.id)}>
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </>
       )}
 
       <h4 style={{ marginTop: '1.25rem' }}>Add a case</h4>
       <form className="row" onSubmit={addCase}>
-        <input placeholder="Fixture type" value={newType} onChange={(e) => setNewType(e.target.value)} />
-        <input placeholder="Case label (e.g. 501 + 502)" value={newLabel} onChange={(e) => setNewLabel(e.target.value)} />
-        <input placeholder="Location (optional)" value={newLocation} onChange={(e) => setNewLocation(e.target.value)} />
+        <input aria-label="Fixture type" placeholder="Fixture type" value={newType} onChange={(e) => setNewType(e.target.value)} />
+        <input aria-label="Case label" placeholder="Case label (e.g. 501 + 502)" value={newLabel} onChange={(e) => setNewLabel(e.target.value)} />
+        <LocationSelect ariaLabel="Location" placeholder="Location (optional)" value={newLocation} options={locationOptions} onChange={setNewLocation} width="12rem" />
         <button type="submit">Add case</button>
       </form>
       {error && <p className="error">{error}</p>}

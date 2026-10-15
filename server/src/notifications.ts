@@ -2,7 +2,7 @@ import { prisma } from './db';
 import { NOTIFICATION_CATEGORIES, type NotificationCategory } from '@elexprep/shared';
 
 /**
- * In-app notifications v1 — deliberately a handful of trigger points, not a general event
+ * In-app notifications v1 - deliberately a handful of trigger points, not a general event
  * bus (see the plan's "notifications v1" milestone). Each helper below is called from exactly
  * the route that causes the thing it describes; nothing here polls or infers.
  */
@@ -13,7 +13,7 @@ function categoryOf(type: string): NotificationCategory | null {
 }
 
 /** A category with no entry in prefs.notifications, or no parseable prefs at all, defaults to
- * enabled — opting out is an explicit choice, not the starting state (same "default false, admin
+ * enabled - opting out is an explicit choice, not the starting state (same "default false, admin
  * must opt in" posture permissions.ts uses, just inverted since these default to on). */
 function isCategoryEnabled(prefsJson: string, type: string): boolean {
   const category = categoryOf(type);
@@ -32,11 +32,11 @@ export async function notifyUser(userId: string, type: string, title: string, bo
   await prisma.notification.create({ data: { userId, type, title, body, link } });
 }
 
-/** Every ADMIN account — used for events only staff with full access should see (a new crew
+/** Every ADMIN account - used for events only staff with full access should see (a new crew
  * application, a new label request) rather than every USER, which would be noisier than useful
  * for a small team. */
 async function notifyAdmins(type: string, title: string, body?: string, link?: string) {
-  const admins = await prisma.user.findMany({ where: { role: 'ADMIN' }, select: { id: true, prefsJson: true } });
+  const admins = await prisma.user.findMany({ where: { role: { in: ['ADMIN', 'WEBMASTER'] } }, select: { id: true, prefsJson: true } });
   const recipients = admins.filter((a) => isCategoryEnabled(a.prefsJson, type));
   if (recipients.length === 0) return;
   await prisma.notification.createMany({
@@ -83,17 +83,21 @@ export async function notifyLabelRequestReviewed(userId: string, jobId: string, 
 const EXCERPT_LENGTH = 80;
 
 /**
- * A new message in a job's discussion thread — notifies every ADMIN/USER staff account and
+ * A new message in a job's discussion thread - notifies every staff account that can see the job and
  * every crew member assigned to the job, excluding whoever just posted it. Two batches because
  * the two audiences land on different shells (staff -> the job's Discussion tab, crew -> their
  * portal's job page), so they need different links.
  */
-export async function notifyDiscussionMessage(jobId: string, jobName: string, authorUserId: string, authorName: string, body: string) {
+export async function notifyDiscussionMessage(jobId: string, jobName: string, authorUserId: string, authorName: string, body: string, groupId?: string) {
   const excerpt = body.length > EXCERPT_LENGTH ? `${body.slice(0, EXCERPT_LENGTH)}…` : body;
-  const title = `${authorName} in ${jobName}`;
+  const group = groupId ? await prisma.discussionGroup.findUnique({ where: { id: groupId }, include: { members: { select: { jobCrewAssignmentId: true } } } }) : null;
+  const title = group && !group.isDefault ? `${authorName} in ${jobName} · ${group.name}` : `${authorName} in ${jobName}`;
 
+  // USER accounts can't open a private job, so they aren't told about its messages either.
+  const job = await prisma.job.findUnique({ where: { id: jobId }, select: { isPublic: true } });
+  const staffRoles = job?.isPublic ? ['ADMIN', 'WEBMASTER', 'USER'] : ['ADMIN', 'WEBMASTER'];
   const staff = await prisma.user.findMany({
-    where: { role: { in: ['ADMIN', 'USER'] }, id: { not: authorUserId } },
+    where: { role: { in: staffRoles }, id: { not: authorUserId } },
     select: { id: true, prefsJson: true },
   });
   const staffRecipients = staff.filter((u) => isCategoryEnabled(u.prefsJson, 'job_discussion.message'));
@@ -103,11 +107,17 @@ export async function notifyDiscussionMessage(jobId: string, jobName: string, au
     });
   }
 
+  // Crew only hear about groups they can see (members-only groups: just the members).
   const assignments = await prisma.jobCrewAssignment.findMany({
-    where: { jobId, crewProfile: { userId: { not: authorUserId } } },
+    where: {
+      jobId,
+      crewProfile: { userId: { not: authorUserId } },
+      ...(group?.visibility === 'MEMBERS' ? { id: { in: group.members.map((m) => m.jobCrewAssignmentId) } } : {}),
+    },
     select: { crewProfile: { select: { userId: true, user: { select: { prefsJson: true } } } } },
   });
-  const seen = new Set<string>();
+  // Staff who are also on the crew already heard (or opted out) as staff above.
+  const seen = new Set<string>(staff.map((u) => u.id));
   const crewRecipients = assignments
     .map((a) => a.crewProfile)
     .filter((p) => {
@@ -120,4 +130,14 @@ export async function notifyDiscussionMessage(jobId: string, jobName: string, au
       data: crewRecipients.map((p) => ({ userId: p.userId, type: 'job_discussion.message', title, body: excerpt, link: `/crew/jobs/${jobId}` })),
     });
   }
+}
+
+/** A prep was signed off or booked out with kit still missing - flagged to every admin. */
+export async function notifyPrepMissing(jobId: string, jobName: string, stage: 'signed off' | 'booked out', missingCount: number) {
+  await notifyAdmins(
+    'prep.missing',
+    `${jobName}: ${missingCount} ${missingCount === 1 ? 'item' : 'items'} missing`,
+    `Prep was ${stage} with ${missingCount} pick-list ${missingCount === 1 ? 'line' : 'lines'} not fully pulled.`,
+    `/jobs/${jobId}`
+  );
 }

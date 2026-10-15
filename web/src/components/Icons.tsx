@@ -1,5 +1,5 @@
 /**
- * A small, consistent-weight icon set (1.6pt stroke, 16x16, currentColor) — matches Chevron.tsx's
+ * A small, consistent-weight icon set (1.6pt stroke, 16x16, currentColor) - matches Chevron.tsx's
  * style so every icon in the app (sidebar nav, dashboard toolbar, the crew job page's cards)
  * shares one visual language rather than mixing glyph styles.
  */
@@ -87,6 +87,24 @@ export function BellIcon() {
   );
 }
 
+export function MoreIcon() {
+  return (
+    <svg {...common}>
+      <circle cx="3.3" cy="8" r="1.25" fill="currentColor" />
+      <circle cx="8" cy="8" r="1.25" fill="currentColor" />
+      <circle cx="12.7" cy="8" r="1.25" fill="currentColor" />
+    </svg>
+  );
+}
+
+export function ChevronRightIcon() {
+  return (
+    <svg {...common}>
+      <path d="m6 3.5 4.5 4.5L6 12.5" {...stroke} />
+    </svg>
+  );
+}
+
 export function WhyIcon() {
   return (
     <svg {...common}>
@@ -131,6 +149,15 @@ export function SignageIcon() {
     <svg {...common}>
       <rect x="2.2" y="3" width="11.6" height="8" rx="1.2" {...stroke} />
       <path d="M6 13.4h4M8 11v2.4" {...stroke} />
+    </svg>
+  );
+}
+
+export function ScanIcon() {
+  return (
+    <svg {...common}>
+      <path d="M2.5 5V3.2c0-.4.3-.7.7-.7H5M11 2.5h1.8c.4 0 .7.3.7.7V5M13.5 11v1.8c0 .4-.3.7-.7.7H11M5 13.5H3.2c-.4 0-.7-.3-.7-.7V11" {...stroke} />
+      <path d="M5 5.5v5M7 5.5v5M9.2 5.5v5M11 5.5v5" {...stroke} />
     </svg>
   );
 }

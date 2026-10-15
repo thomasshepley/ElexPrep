@@ -4,10 +4,19 @@ import { prisma, logActivity } from '../db';
 
 export const casesRouter = Router();
 
+// Scoped to one stage (groupId, null meaning "ungrouped") - only that stage's fixtures are
+// packed and only that stage's existing case rows are replaced, leaving every other stage's
+// cases untouched. See routes/fixtureGroups.ts for the stage model.
 casesRouter.post('/:jobId/cases/generate', async (req, res) => {
   const { jobId } = req.params;
+  const { groupId } = req.body ?? {};
+  if (groupId !== undefined && groupId !== null && typeof groupId !== 'string') {
+    return res.status(400).json({ error: 'groupId must be a string or null' });
+  }
+  const resolvedGroupId: string | null = groupId ?? null;
+
   const [fixtures, rules] = await Promise.all([
-    prisma.fixture.findMany({ where: { jobId } }),
+    prisma.fixture.findMany({ where: { jobId, groupId: resolvedGroupId } }),
     prisma.fixtureTypeRule.findMany(),
   ]);
 
@@ -15,18 +24,20 @@ casesRouter.post('/:jobId/cases/generate', async (req, res) => {
     address: f.address,
     fixtureType: f.fixtureType,
     location: f.location,
+    groupId: f.groupId,
   }));
 
   const groups = packFixturesIntoCases(inputs, rules);
 
   await prisma.$transaction([
-    prisma.caseGroupRecord.deleteMany({ where: { jobId } }),
+    prisma.caseGroupRecord.deleteMany({ where: { jobId, groupId: resolvedGroupId } }),
     prisma.caseGroupRecord.createMany({
       data: groups.map((g) => ({
         jobId,
         fixtureType: g.fixtureType,
         label: g.label,
         location: g.location ?? null,
+        groupId: g.groupId ?? null,
         addressesJson: JSON.stringify(g.addresses),
       })),
     }),
@@ -48,10 +59,10 @@ casesRouter.get('/:jobId/cases', async (req, res) => {
   res.json(records.map(serializeCase));
 });
 
-/** Adds a single manual case row — for cases the algorithm didn't create (or got wrong)
+/** Adds a single manual case row - for cases the algorithm didn't create (or got wrong)
  * without needing a full regenerate, which would wipe every other manual edit. */
 casesRouter.post('/:jobId/cases', async (req, res) => {
-  const { fixtureType, label, location, addresses } = req.body ?? {};
+  const { fixtureType, label, location, addresses, groupId } = req.body ?? {};
   if (!fixtureType || !label) {
     return res.status(400).json({ error: 'fixtureType and label are required' });
   }
@@ -61,6 +72,7 @@ casesRouter.post('/:jobId/cases', async (req, res) => {
       fixtureType,
       label,
       location: location || null,
+      groupId: groupId || null,
       addressesJson: JSON.stringify(Array.isArray(addresses) ? addresses : []),
     },
   });
@@ -69,7 +81,7 @@ casesRouter.post('/:jobId/cases', async (req, res) => {
 });
 
 /**
- * Bulk endpoints must be registered before the /:id routes below — Express matches routes in
+ * Bulk endpoints must be registered before the /:id routes below - Express matches routes in
  * registration order, and a literal "bulk" segment would otherwise be swallowed by :id.
  */
 casesRouter.put('/:jobId/cases/bulk', async (req, res) => {
@@ -93,19 +105,24 @@ casesRouter.delete('/:jobId/cases/bulk', async (req, res) => {
 });
 
 casesRouter.put('/:jobId/cases/:id', async (req, res) => {
-  const { fixtureType, label, location } = req.body ?? {};
+  const { fixtureType, label, location, groupId } = req.body ?? {};
+  if (!(await prisma.caseGroupRecord.findFirst({ where: { id: req.params.id, jobId: req.params.jobId }, select: { id: true } }))) {
+    return res.status(404).json({ error: 'not found' });
+  }
   const record = await prisma.caseGroupRecord.update({
     where: { id: req.params.id },
     data: {
       ...(fixtureType !== undefined ? { fixtureType } : {}),
       ...(label !== undefined ? { label } : {}),
       ...(location !== undefined ? { location: location || null } : {}),
+      ...(groupId !== undefined ? { groupId: groupId || null } : {}),
     },
   });
   res.json(serializeCase(record));
 });
 
 casesRouter.delete('/:jobId/cases/:id', async (req, res) => {
-  await prisma.caseGroupRecord.delete({ where: { id: req.params.id } });
+  const { count } = await prisma.caseGroupRecord.deleteMany({ where: { id: req.params.id, jobId: req.params.jobId } });
+  if (count === 0) return res.status(404).json({ error: 'not found' });
   res.status(204).end();
 });

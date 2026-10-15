@@ -1,9 +1,9 @@
-import { useId, useMemo } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import { CREW_CERTIFICATIONS, formatSkills, parseSkills } from '@elexprep/shared';
 
 /**
  * Optional certifications/tickets, tucked behind a <details> disclosure rather than shown
- * inline like SkillPicker — most people hold a handful of these at most, and the application/
+ * inline like SkillPicker - most people hold a handful of these at most, and the application/
  * account forms already have enough always-visible fields (see the user request this answers:
  * "one big dropdown so it doesn't fill up too much"). Reuses the exact same comma-separated-
  * string read/write helpers as SkillPicker (parseSkills/formatSkills are generic despite the
@@ -14,14 +14,21 @@ export default function CertificationPicker({ value, onChange }: { value: string
   const selected = useMemo(() => parseSkills(value), [value]);
   const known = selected.filter((s) => (CREW_CERTIFICATIONS as readonly string[]).includes(s));
   const other = selected.filter((s) => !(CREW_CERTIFICATIONS as readonly string[]).includes(s)).join(', ');
+  // The raw text is kept as typed - re-deriving it from the parsed value on every keystroke
+  // stripped a trailing comma, so a second item could never be started.
+  const [otherText, setOtherText] = useState(other);
+  useEffect(() => {
+    setOtherText((current) => (parseSkills(current).join(', ') === other ? current : other));
+  }, [other]);
   const count = selected.length;
 
   const toggle = (cert: string) => {
     const next = known.includes(cert) ? known.filter((s) => s !== cert) : [...known, cert];
-    onChange(formatSkills([...next, ...parseSkills(other)]));
+    onChange(formatSkills([...next, ...parseSkills(otherText)]));
   };
 
   const setOther = (text: string) => {
+    setOtherText(text);
     onChange(formatSkills([...known, ...parseSkills(text)]));
   };
 
@@ -43,8 +50,9 @@ export default function CertificationPicker({ value, onChange }: { value: string
         <input
           aria-label="Other certifications, comma separated"
           placeholder="Other (comma separated)"
-          value={other}
+          value={otherText}
           onChange={(e) => setOther(e.target.value)}
+          onBlur={() => setOtherText(other)}
           style={{ marginTop: '0.5rem' }}
         />
       </div>

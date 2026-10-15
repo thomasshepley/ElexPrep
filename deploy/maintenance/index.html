@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Down for maintenance · ELEX Portal</title>
+<link rel="icon" href="/__maintenance/elex-mark.png">
+<style>
+  :root {
+    --bg: #f5f6f8; --card: #ffffff; --text: #1b1c20; --muted: #5f6068; --border: #d8dade; --accent: #02899a;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #101113; --card: #1d1e24; --text: #e4e4e7; --muted: #9a9aa2; --border: #33343c; --accent: #02b0bf; }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 24px 16px;
+    background: var(--bg); color: var(--text);
+    font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  main {
+    width: 100%; max-width: 460px; background: var(--card); border: 1px solid var(--border);
+    border-radius: 16px; padding: 32px 28px; text-align: center;
+  }
+  img { width: 56px; height: 56px; border-radius: 12px; }
+  h1 { font-size: 1.5rem; margin: 18px 0 8px; }
+  p { margin: 0 0 12px; color: var(--muted); }
+  #message { color: var(--text); font-weight: 600; }
+  #message:empty { display: none; }
+  .status { display: inline-flex; align-items: center; gap: 8px; font-size: 0.9rem; margin-top: 8px; }
+  .dot { flex-shrink: 0; width: 9px; height: 9px; border-radius: 50%; background: var(--accent); animation: pulse 1.6s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: 0.3; } }
+  @media (prefers-reduced-motion: reduce) { .dot { animation: none; } }
+</style>
+</head>
+<body>
+<main>
+  <img src="/__maintenance/elex-mark.png" alt="" onerror="this.style.display='none'">
+  <h1>Down for maintenance</h1>
+  <p id="message"></p>
+  <p>ELEX Portal is being updated and will be back shortly. Nothing you have saved is affected.</p>
+  <p class="status" role="status"><span class="dot" aria-hidden="true"></span><span id="status">This page reloads by itself when the site is back.</span></p>
+</main>
+<script>
+  // Optional note set with `maintenance on "message"`.
+  fetch('/__maintenance/message.txt', { cache: 'no-store' })
+    .then(function (r) { return r.ok ? r.text() : ''; })
+    .then(function (t) { document.getElementById('message').textContent = t.trim().slice(0, 300); })
+    .catch(function () {});
+  // Check every 10 seconds; reload the moment the app answers again.
+  setInterval(function () {
+    fetch('/api/health', { cache: 'no-store' })
+      .then(function (r) { if (r.ok) location.reload(); })
+      .catch(function () {});
+  }, 10000);
+</script>
+</body>
+</html>

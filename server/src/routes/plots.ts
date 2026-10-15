@@ -3,7 +3,8 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import { prisma, logActivity } from '../db';
-
+import { requirePermission } from '../permissions';
+import { PDF_KINDS, acceptDiskUpload, randomUploadName, sendStoredUpload } from '../uploadSafety';
 import { uploadDir } from './jobs';
 
 export const plotsDir = path.join(uploadDir, 'plots');
@@ -12,10 +13,7 @@ fs.mkdirSync(plotsDir, { recursive: true });
 const upload = multer({
   storage: multer.diskStorage({
     destination: plotsDir,
-    filename: (_req, file, cb) => {
-      const ext = path.extname(file.originalname) || '.pdf';
-      cb(null, `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`);
-    },
+    filename: (_req, _file, cb) => cb(null, randomUploadName()),
   }),
   fileFilter: (_req, file, cb) => {
     cb(null, file.mimetype === 'application/pdf' || file.originalname.toLowerCase().endsWith('.pdf'));
@@ -33,8 +31,9 @@ plotsRouter.get('/:jobId/plots', async (req, res) => {
   res.json(plots);
 });
 
-plotsRouter.post('/:jobId/plots', upload.single('plot'), async (req, res) => {
+plotsRouter.post('/:jobId/plots', requirePermission('editJobs'), upload.single('plot'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'A PDF file is required' });
+  await acceptDiskUpload(req.file, PDF_KINDS);
   const plot = await prisma.plot.create({
     data: {
       jobId: req.params.jobId,
@@ -49,12 +48,10 @@ plotsRouter.post('/:jobId/plots', upload.single('plot'), async (req, res) => {
 plotsRouter.get('/:jobId/plots/:id/file', async (req, res) => {
   const plot = await prisma.plot.findUnique({ where: { id: req.params.id } });
   if (!plot || plot.jobId !== req.params.jobId) return res.status(404).end();
-  res.setHeader('Content-Type', 'application/pdf');
-  res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(plot.originalName)}"`);
-  res.sendFile(path.join(plotsDir, plot.fileName));
+  await sendStoredUpload(res, path.join(plotsDir, plot.fileName), plot.originalName);
 });
 
-plotsRouter.delete('/:jobId/plots/:id', async (req, res) => {
+plotsRouter.delete('/:jobId/plots/:id', requirePermission('editJobs'), async (req, res) => {
   const plot = await prisma.plot.findUnique({ where: { id: req.params.id } });
   if (!plot || plot.jobId !== req.params.jobId) return res.status(404).end();
   await prisma.plot.delete({ where: { id: plot.id } });

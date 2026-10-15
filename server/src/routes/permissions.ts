@@ -35,7 +35,7 @@ permissionsRouter.put('/', async (req, res) => {
   res.json({ permissions: merged });
 });
 
-// Per-user overrides on top of the role baseline above — lets one USER account have different
+// Per-user overrides on top of the role baseline above - lets one USER account have different
 // capabilities from another, rather than every USER sharing one identical policy.
 permissionsRouter.get('/users/:id', async (req, res) => {
   const user = await prisma.user.findUnique({ where: { id: req.params.id } });

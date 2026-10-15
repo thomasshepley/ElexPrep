@@ -7,6 +7,16 @@ function fixture(address: number, fixtureType: string, location?: string): RawFi
   return { address, fixtureType, location: location ?? null };
 }
 
+test('packFixturesIntoCases: a fixture with no address is excluded, not crashed on', () => {
+  const fixtures: RawFixtureInput[] = [
+    fixture(101, 'AstraBlade'),
+    { address: null, fixtureType: 'AstraBlade' },
+  ];
+  const groups = packFixturesIntoCases(fixtures, []);
+  assert.equal(groups.length, 1);
+  assert.deepEqual(groups[0].addresses, [101]);
+});
+
 test('formatCaseLabel: single fixture, one unit per case', () => {
   assert.equal(formatCaseLabel([101], 1), '101');
 });
@@ -22,12 +32,22 @@ test('formatCaseLabel: full group of 3+ collapses to a range', () => {
 
 test('formatCaseLabel: short leftover case fills the gap with Spare', () => {
   assert.equal(formatCaseLabel([303], 2), '303 + Spare');
-  assert.equal(formatCaseLabel([601, 602], 4), '601 + 602 + Spare + Spare');
+  assert.equal(formatCaseLabel([601, 602], 4), '601 - 602 + 2× Spare');
+});
+
+test('formatCaseLabel: spares are counted, not listed one by one', () => {
+  assert.equal(formatCaseLabel([513, 514], 6), '513 - 514 + 4× Spare');
+  assert.equal(formatCaseLabel([513], 6), '513 + 5× Spare');
+  assert.equal(formatCaseLabel([701, 702, 703], 4), '701 - 703 + Spare');
+});
+
+test('formatCaseLabel: a non-consecutive leftover pair is listed, not shown as a range', () => {
+  assert.equal(formatCaseLabel([513, 517], 6), '513 + 517 + 4× Spare');
 });
 
 test('formatCaseLabel: a partial case with 3+ real addresses still collapses to a range', () => {
-  assert.equal(formatCaseLabel([201, 202, 203, 204], 6), '201 - 204 + Spare + Spare');
-  assert.equal(formatCaseLabel([201, 202, 203], 8), '201 - 203 + Spare + Spare + Spare + Spare + Spare');
+  assert.equal(formatCaseLabel([201, 202, 203, 204], 6), '201 - 204 + 2× Spare');
+  assert.equal(formatCaseLabel([201, 202, 203], 8), '201 - 203 + 5× Spare');
 });
 
 test('packFixturesIntoCases: groups by fixture type and chunks by unitsPerCase', () => {

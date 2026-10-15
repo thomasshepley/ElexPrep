@@ -7,12 +7,13 @@ export {
   LocationColorPattern,
   ResolvedLocationColor,
   LocationColorMap,
+  RAINBOW_BAND_COLORS,
   resolveLocationColor,
   contrastingTextIsWhite,
   hexToRgbFractions,
 } from '@elexprep/shared';
 
-/** Seeds the house-standard colors on first run only — never overwrites existing rules. */
+/** Seeds the house-standard colors on first run only - never overwrites existing rules. */
 export async function seedDefaultLocationColorsIfEmpty() {
   const count = await prisma.locationColorRule.count({ where: { jobId: null } });
   if (count > 0) return;
@@ -24,7 +25,7 @@ export async function seedDefaultLocationColorsIfEmpty() {
 /**
  * The count-based seed above only ever fires on a totally empty table, so installs that were
  * seeded before Spare/Rigging existed in DEFAULT_LOCATION_COLOR_RULES would never pick them up.
- * This tops up just those specific, newly-introduced defaults if missing — never touches or
+ * This tops up just those specific, newly-introduced defaults if missing - never touches or
  * overwrites any rule (default or user-added) that already exists.
  */
 export async function seedNewDefaultLocationColorsIfMissing(locations: string[]) {
@@ -38,7 +39,7 @@ export async function seedNewDefaultLocationColorsIfMissing(locations: string[])
 
 /**
  * Loads the global default color rules plus, when jobId is given, that job's own overrides
- * layered on top — so a job with unique location names (e.g. "Cube North", "Entrance Arch
+ * layered on top - so a job with unique location names (e.g. "Cube North", "Entrance Arch
  * Top") can define its own bar colors without touching the shared defaults, and can even
  * override a global location name (e.g. "Floor") for just that job.
  */

@@ -6,7 +6,7 @@ const UEL = `${ESC}%-12345X`; // PJL Universal Exit Language
 /**
  * Sends a PDF straight to a printer's raw port (9100) wrapped in a PJL job that selects
  * the input tray. The bizhub/ineo family accepts direct PDF via PJL ENTER LANGUAGE=PDF.
- * MEDIASOURCE values vary slightly by firmware — they're configurable per tray in settings,
+ * MEDIASOURCE values vary slightly by firmware - they're configurable per tray in settings,
  * and the right values can be confirmed by capturing a driver print job or from the
  * device's PJL documentation.
  */

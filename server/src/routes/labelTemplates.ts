@@ -4,7 +4,7 @@ import { DEFAULT_LABEL_TEMPLATES, LabelType, LabelElementDef, LabelTypeTemplate,
 
 /**
  * Loads a job's effective template for a label type (default merged with its override, if
- * any) — the single source of truth both this route's GET and the actual PDF renderer
+ * any) - the single source of truth both this route's GET and the actual PDF renderer
  * (buildLabelPdfs.ts) use, so a "customize layout" edit in the print-queue editor changes the
  * real printed output, not just what the editor's own preview shows.
  */
@@ -17,7 +17,7 @@ export async function loadMergedTemplate(jobId: string, labelType: LabelType): P
 }
 
 /**
- * Per-job label layout overrides — the data side of the print-queue editor's "customize
+ * Per-job label layout overrides - the data side of the print-queue editor's "customize
  * layout" mode. A job with no override row just gets the default template back; PUT writes a
  * partial, per-element-id patch (never a whole-template replacement) so a default element
  * introduced later still reaches jobs that already customized this label type, per the data

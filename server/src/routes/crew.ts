@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import multer from 'multer';
 import { prisma, logActivity } from '../db';
-import { MIN_PASSWORD_LENGTH, hashPassword, requireRole } from '../auth';
+import { MIN_PASSWORD_LENGTH, hashPassword, requireRole, revokeOtherSessions } from '../auth';
 import { DOCUMENT_FIELDS, deleteDocumentFile, saveDocuments, streamDecryptedDocument } from '../crewDocumentsStorage';
 import { encryptBankDetails, decryptBankDetails, parseBankDetails } from '../bankDetails';
 
@@ -9,10 +9,10 @@ import { encryptBankDetails, decryptBankDetails, parseBankDetails } from '../ban
  * Admin-only crew roster: creates/edits/removes a CREW User + its CrewProfile together, so a
  * CREW account can never exist without a profile (unlike the generic /api/users endpoint,
  * which deliberately refuses the CREW role for exactly that reason). This is the "direct-create
- * path" the plan calls for — the public application flow (a later milestone) is the second,
+ * path" the plan calls for - the public application flow (a later milestone) is the second,
  * approval-based way a User+CrewProfile pair comes into existence. A third path, POST
  * /from-admin, attaches a bare CrewProfile to an EXISTING ADMIN account instead of creating a
- * new User — that one intentionally skips the "profile implies a login lives or dies with it"
+ * new User - that one intentionally skips the "profile implies a login lives or dies with it"
  * rule, since the login is the admin's real one and must survive removal from the crew roster.
  */
 export const crewRouter = Router();
@@ -37,7 +37,7 @@ interface CrewProfileRow {
   bankDetailsCiphertext: string | null;
   active: boolean;
   createdAt: Date;
-  user: { username: string; displayName: string; role: string };
+  user: { username: string; displayName: string; role: string; avatarPath: string | null };
 }
 
 function toCrewDto(p: CrewProfileRow) {
@@ -46,10 +46,9 @@ function toCrewDto(p: CrewProfileRow) {
     userId: p.userId,
     username: p.user.username,
     displayName: p.user.displayName,
-    // ADMIN here means this crew profile belongs to a staff admin account also assigned as
-    // crew (see POST /from-admin below), not a freelancer — the web UI uses this to hide
-    // login-affecting controls (reset password, full delete) that don't make sense from the
-    // Crew page for an account that's really managed on Users.
+    hasAvatar: Boolean(p.user.avatarPath),
+    // Anything but CREW means this crew profile belongs to a staff login also assigned as crew
+    // (see POST /from-admin below), not a freelancer - removing the profile keeps their login.
     userRole: p.user.role,
     phone: p.phone,
     color: p.color,
@@ -69,22 +68,45 @@ function toCrewDto(p: CrewProfileRow) {
   };
 }
 
+const DEFAULT_RATE_SETTING_KEY = 'defaultCrewDayRate';
+
+/** The portal-wide default day rate - the last fallback in the chain (job assignment override
+ * -> crew member's own profile default -> this) when nothing more specific is set. Lives here
+ * rather than the generic settings router since it's crew-financial data, same ADMIN-only
+ * posture as the rest of this file. */
+crewRouter.get('/default-rate', async (_req, res) => {
+  const setting = await prisma.appSetting.findUnique({ where: { key: DEFAULT_RATE_SETTING_KEY } });
+  res.json({ dayRate: setting ? (JSON.parse(setting.valueJson) as { dayRate: string | null }).dayRate : null });
+});
+
+crewRouter.put('/default-rate', async (req, res) => {
+  const { dayRate } = req.body ?? {};
+  const value = { dayRate: dayRate || null };
+  await prisma.appSetting.upsert({
+    where: { key: DEFAULT_RATE_SETTING_KEY },
+    create: { key: DEFAULT_RATE_SETTING_KEY, valueJson: JSON.stringify(value) },
+    update: { valueJson: JSON.stringify(value) },
+  });
+  await logActivity('crew.default_rate_update', value.dayRate ?? '(cleared)', undefined, req.user!.id);
+  res.json(value);
+});
+
 crewRouter.get('/', async (_req, res) => {
   const profiles = await prisma.crewProfile.findMany({
-    include: { user: { select: { username: true, displayName: true, role: true } } },
+    include: { user: { select: { username: true, displayName: true, role: true, avatarPath: true } } },
     orderBy: { createdAt: 'desc' },
   });
   res.json(profiles.map(toCrewDto));
 });
 
 /**
- * Lists ADMIN accounts that don't already have a CrewProfile — the candidate pool for
+ * Lists ADMIN accounts that don't already have a CrewProfile - the candidate pool for
  * POST /from-admin's picker. Not every staff admin works crew shifts, so this is opt-in per
  * account rather than every admin automatically being assignable.
  */
 crewRouter.get('/admin-candidates', async (_req, res) => {
   const admins = await prisma.user.findMany({
-    where: { role: 'ADMIN', crewProfile: null },
+    where: { role: { in: ['ADMIN', 'USER'] }, crewProfile: null },
     select: { id: true, username: true, displayName: true },
     orderBy: { displayName: 'asc' },
   });
@@ -92,7 +114,7 @@ crewRouter.get('/admin-candidates', async (_req, res) => {
 });
 
 /**
- * Turns an existing ADMIN account into assignable crew by giving it a bare CrewProfile — no
+ * Turns an existing ADMIN account into assignable crew by giving it a bare CrewProfile - no
  * new User row, no new login, since they already have one. Lets a staff admin who also works
  * shifts show up in JobCrewAssignment pickers and schedule swatches like freelance crew,
  * without duplicating their identity (see plan's "Admins as crew").
@@ -102,13 +124,15 @@ crewRouter.post('/from-admin', async (req, res) => {
   if (!userId) return res.status(400).json({ error: 'userId is required' });
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) return res.status(404).json({ error: 'User not found' });
-  if (user.role !== 'ADMIN') return res.status(400).json({ error: 'Only ADMIN accounts can be added as crew this way' });
+  // Any staff login can also work as crew (an admin or a prep user who does shifts); signage
+  // screens and existing crew logins can't.
+  if (!['ADMIN', 'USER', 'WEBMASTER'].includes(user.role)) return res.status(400).json({ error: 'Only staff accounts can be added to the crew this way' });
   const existingProfile = await prisma.crewProfile.findUnique({ where: { userId } });
   if (existingProfile) return res.status(409).json({ error: `${user.displayName} is already a crew member` });
 
   const profile = await prisma.crewProfile.create({
     data: { userId },
-    include: { user: { select: { username: true, displayName: true, role: true } } },
+    include: { user: { select: { username: true, displayName: true, role: true, avatarPath: true } } },
   });
   await logActivity('crew.add_admin', user.username, undefined, req.user!.id);
   res.status(201).json(toCrewDto(profile));
@@ -158,12 +182,12 @@ crewRouter.post('/', async (req, res) => {
         create: {
           username,
           displayName: displayName || username,
-          passwordHash: hashPassword(password),
+          passwordHash: await hashPassword(password),
           role: 'CREW',
         },
       },
     },
-    include: { user: { select: { username: true, displayName: true, role: true } } },
+    include: { user: { select: { username: true, displayName: true, role: true, avatarPath: true } } },
   });
   await logActivity('crew.create', `${username}`, undefined, req.user!.id);
   res.status(201).json(toCrewDto(profile));
@@ -199,9 +223,10 @@ crewRouter.put('/:id', async (req, res) => {
       where: { id: existing.userId },
       data: {
         ...(displayName !== undefined ? { displayName } : {}),
-        ...(password !== undefined ? { passwordHash: hashPassword(password) } : {}),
+        ...(password !== undefined ? { passwordHash: await hashPassword(password) } : {}),
       },
     });
+    if (password !== undefined) await revokeOtherSessions(existing.userId);
   }
   const profile = await prisma.crewProfile.update({
     where: { id: req.params.id },
@@ -221,7 +246,7 @@ crewRouter.put('/:id', async (req, res) => {
       ...(active !== undefined ? { active: Boolean(active) } : {}),
       ...bankPatch,
     },
-    include: { user: { select: { username: true, displayName: true, role: true } } },
+    include: { user: { select: { username: true, displayName: true, role: true, avatarPath: true } } },
   });
   await logActivity('crew.update', profile.user.username, undefined, req.user!.id);
   res.json(toCrewDto(profile));
@@ -238,15 +263,15 @@ crewRouter.get('/:id/bank-details', async (req, res) => {
   res.json(details);
 });
 
-// Deletes the User row, not just the CrewProfile — a CREW user with no profile is meaningless,
+// Deletes the User row, not just the CrewProfile - a CREW user with no profile is meaningless,
 // and the FK cascade (CrewProfile.userId -> User, onDelete: Cascade) removes the profile (and
 // its job assignments, via CrewProfile's own cascade) along with it.
 crewRouter.delete('/:id', async (req, res) => {
   const existing = await prisma.crewProfile.findUnique({ where: { id: req.params.id }, include: { user: true } });
   if (!existing) return res.status(404).json({ error: 'Crew member not found' });
-  if (existing.user.role === 'ADMIN') {
-    // This profile only exists to make an admin's own account assignable as crew — removing it
-    // must leave their actual login (Users page) untouched, unlike the freelancer path below.
+  if (existing.user.role !== 'CREW') {
+    // This profile only exists to make a staff account assignable as crew - removing it must
+    // leave their actual login untouched, unlike the freelancer path below.
     await prisma.crewProfile.delete({ where: { id: existing.id } });
     await logActivity('crew.remove_admin', existing.user.username, undefined, req.user!.id);
     return res.status(204).end();
@@ -258,7 +283,7 @@ crewRouter.delete('/:id', async (req, res) => {
 
 // Compliance documents, post-approval. The whole router is already requireRole('ADMIN') (see
 // top of file) with no delegation, matching the plan's "document visibility stays admin-only"
-// decision — unlike the applications review queue, nothing here is ever gated by a permission.
+// decision - unlike the applications review queue, nothing here is ever gated by a permission.
 const documentUpload = multer({
   storage: multer.memoryStorage(),
   fileFilter: (_req, file, cb) => {
@@ -311,7 +336,7 @@ crewRouter.delete('/:id/documents/:docId', async (req, res) => {
 });
 
 // Rate card: named rate lines (e.g. "Day rate", "Overtime") replacing the single free-text
-// dayRate field in the admin UI — see CrewRateLine's schema comment.
+// dayRate field in the admin UI - see CrewRateLine's schema comment.
 crewRouter.get('/:id/rate-lines', async (req, res) => {
   const profile = await prisma.crewProfile.findUnique({ where: { id: req.params.id } });
   if (!profile) return res.status(404).json({ error: 'Crew member not found' });

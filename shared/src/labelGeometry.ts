@@ -1,6 +1,6 @@
 /**
  * Physical label sheet geometry. All dimensions are in inches. Treat these as the starting
- * point for print calibration — printers/stock vary by a few mm, so the app exposes a
+ * point for print calibration - printers/stock vary by a few mm, so the app exposes a
  * per-template X/Y nudge in settings.
  */
 
@@ -23,17 +23,17 @@ export interface SheetGeometry {
 
 /**
  * Fixture and Truss/Spike labels: genuine Avery L7161 stock (63.5 x 46.6mm, 3 columns x 6
- * rows, A4 portrait) — read directly from Avery's own blank Word template (table cell
+ * rows, A4 portrait) - read directly from Avery's own blank Word template (table cell
  * widths/row heights and page margins out of the underlying XML; the template's own
  * `Blank_MP1_panelN` bookmark naming confirms it as an authentic unmodified Avery file, the
  * same convention seen in Avery's PAL sheet template). Columns are very slightly asymmetric
- * in Avery's own file (2.5in / 2.4847in / 2.4847in) — kept as-is rather than rounded to a
+ * in Avery's own file (2.5in / 2.4847in / 2.4847in) - kept as-is rather than rounded to a
  * single uniform width, since the renderer already scales each label's content to its own
  * cell's actual width (see genericRenderer.ts), the same technique PAL_SHEET's own
  * slightly-wider right column relies on.
  *
  * This replaces an earlier, substantially-off calibration (originally sourced from Elex's own
- * Midge_Fixture_Labels.docx) whose ~6-7% error in row pitch compounded down the sheet — bad
+ * Midge_Fixture_Labels.docx) whose ~6-7% error in row pitch compounded down the sheet - bad
  * enough by row 6 that it was worked around by simply not printing that row at all. The
  * correct geometry below fits all 6 rows on the page with margin to spare, so that workaround
  * is removed.
@@ -109,7 +109,7 @@ export const PAL_CELL_LAYOUT: PalCellLayout = {
   content: { x: 0, y: 1.40, w: 5.30, h: 2.12 },
 };
 
-/** No rack label template was supplied yet — reuse the fixture/truss-spike stock as a placeholder. */
+/** No rack label template was supplied yet - reuse the fixture/truss-spike stock as a placeholder. */
 export const RACK_SHEET: SheetGeometry = FIXTURE_TRUSS_SPIKE_SHEET;
 
 /**
@@ -118,8 +118,8 @@ export const RACK_SHEET: SheetGeometry = FIXTURE_TRUSS_SPIKE_SHEET;
  * (table cell/row geometry; the document's stated page margins don't self-consistently add
  * up with its table width, so the nominal 105/148mm product dimensions are trusted as the
  * authoritative label size instead, centered on a standard A4 landscape page). This is a
- * second, alternate sheet for PAL content — printed on plain A4 with Avery's self-adhesive
- * stock through an ordinary office printer — distinct from PAL_SHEET above, which is
+ * second, alternate sheet for PAL content - printed on plain A4 with Avery's self-adhesive
+ * stock through an ordinary office printer - distinct from PAL_SHEET above, which is
  * calibrated against Elex's existing die-cut label stock fed through the dedicated label
  * printer. Reuses PAL_SHEET's own element template (see labelElements.ts's PAL entry) rather
  * than needing a separate one: the two sheets' cell aspect ratios are close enough (1.413:1

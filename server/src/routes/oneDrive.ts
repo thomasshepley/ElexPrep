@@ -7,8 +7,9 @@ import { testOneDriveConnection, listChildren, getItemByPath, streamOneDriveFile
 import { matchJobFolder } from '../oneDrive/matcher';
 import { findSharedCadPdf } from '../oneDrive/cad';
 import { listJobShares, shareItemWithJob, unshareItem, setShareCadPlot } from '../oneDrive/shares';
+import { applyStreamHeaders } from '../uploadSafety';
 
-/** Global OneDrive config — ADMIN-only, holds the Azure app secret. */
+/** Global OneDrive config - ADMIN-only, holds the Azure app secret. */
 export const oneDriveRouter = Router();
 oneDriveRouter.use(requireRole('ADMIN'));
 
@@ -53,7 +54,7 @@ oneDriveRouter.get('/defaults', (_req, res) => {
   res.json(rest);
 });
 
-/** Per-job OneDrive endpoints, mounted under /api/jobs — matching/browsing/sharing is
+/** Per-job OneDrive endpoints, mounted under /api/jobs - matching/browsing/sharing is
  * delegatable via manageOneDrive rather than ADMIN-only, same reasoning as linkCurrentRms. */
 export const jobOneDriveRouter = Router();
 
@@ -75,7 +76,7 @@ jobOneDriveRouter.get('/:jobId/onedrive', requirePermission('manageOneDrive'), a
   });
 });
 
-/** Re-runs the name-based auto-match against the job's opportunity — useful once a project
+/** Re-runs the name-based auto-match against the job's opportunity - useful once a project
  * folder finally exists in OneDrive after a job was onboarded before it was created there. */
 jobOneDriveRouter.post('/:jobId/onedrive/match', requirePermission('manageOneDrive'), async (req, res) => {
   const job = await prisma.job.findUnique({ where: { id: req.params.jobId } });
@@ -98,7 +99,7 @@ jobOneDriveRouter.post('/:jobId/onedrive/match', requirePermission('manageOneDri
   res.json({ matched: Boolean(match), folderPath: updated.oneDriveFolderPath });
 });
 
-/** Manually points a job at a specific OneDrive folder, by path — the fallback when
+/** Manually points a job at a specific OneDrive folder, by path - the fallback when
  * auto-matching fails (a differently-named folder, or it doesn't exist yet). */
 jobOneDriveRouter.put('/:jobId/onedrive/folder', requirePermission('manageOneDrive'), async (req, res) => {
   const { path: folderPath } = req.body ?? {};
@@ -141,15 +142,14 @@ jobOneDriveRouter.get('/:jobId/onedrive/browse', requirePermission('manageOneDri
   }
 });
 
-/** Streams any item under the job's linked folder for the admin browser/CAD preview — unlike
+/** Streams any item under the job's linked folder for the admin browser/CAD preview - unlike
  * the crew-facing equivalent, this isn't limited to explicitly-shared items, since an admin
  * reviewing the folder needs to preview a file before deciding whether to share it. */
 jobOneDriveRouter.get('/:jobId/onedrive/file/:itemId', requirePermission('manageOneDrive'), async (req, res) => {
   try {
     const config = await getOneDriveConfig();
     const { stream, contentType, fileName } = await streamOneDriveFile(config, req.params.itemId);
-    res.setHeader('Content-Type', contentType);
-    res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(fileName)}"`);
+    applyStreamHeaders(res, contentType, fileName);
     stream.pipe(res);
   } catch (err) {
     res.status(502).json({ error: (err as Error).message });

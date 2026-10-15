@@ -3,41 +3,56 @@ services:
     build: .
     container_name: elexprep
     restart: unless-stopped
+    # Time to finish in-flight requests and close the database cleanly when swapped for a new
+    # version (scripts/updatesite.sh).
+    stop_grace_period: 15s
     ports:
-      - "4000:4000"
+      # Bound to the box's own loopback only - reachable over an SSH tunnel (see DEPLOY.md)
+      # for initial admin setup and troubleshooting, never from the public internet. Caddy
+      # below is the only service with a port actually published to 0.0.0.0.
+      - "127.0.0.1:4000:4000"
     environment:
       # Required: a 64-hex-char (32-byte) AES-256-GCM key that encrypts crew compliance
-      # documents, bank details, and 2FA secrets at rest — see DEPLOY.md's "First
-      # deployment" for the one-liner that generates it into a sibling .env file (read
-      # here automatically by Compose's ${...} substitution). Keep .env out of version
-      # control; losing this key makes anything already encrypted with it unrecoverable.
+      # documents, bank details, 2FA secrets, and the Current RMS/OneDrive API credentials at
+      # rest - see DEPLOY.md's "Launch the instance" for the one-liner that generates it into
+      # a sibling .env file (read here automatically by Compose's ${...} substitution). Keep
+      # .env out of version control; losing this key makes anything already encrypted with it
+      # unrecoverable.
       - CREW_DOC_ENCRYPTION_KEY=${CREW_DOC_ENCRYPTION_KEY}
-      # Only set to true in .env once EVERY login goes through HTTPS (see DEPLOY.md's
-      # "Going live at portal.elex.lighting") — a Secure-flagged cookie is dropped by the
-      # browser on any plain-HTTP request, which would break login for whichever access
-      # path doesn't use TLS (e.g. a prep-bay signage TV still on a plain http://<lan-ip>
-      # address). Defaults to false, which works correctly either way, just without that
-      # extra hardening.
+      # Only set to true in .env once Caddy's certificate for your domain is live (see
+      # DEPLOY.md's "Go live") - a Secure-flagged cookie is dropped by the browser on any
+      # plain-HTTP request, which would break the SSH-tunnelled admin setup step that has to
+      # happen before Caddy/DNS are wired up.
       - COOKIE_SECURE=${COOKIE_SECURE:-false}
+      # Only needed if something other than this same box's Caddy ever calls the API
+      # cross-origin with credentials - see DEPLOY.md's "Notes" section. Leave unset normally.
+      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-}
     volumes:
       # Database, logos, plots, and generated print-job PDFs all live here —
       # back this folder up and the whole app state comes with it.
       - ./data:/data
 
-  # Cloudflare Tunnel: exposes the app at your chosen hostname (set up in the Zero Trust
-  # dashboard under Networks -> Tunnels) without opening any port on your router. Uncomment
-  # once you have a tunnel token (paste it into a .env file next to this compose file as
-  # CLOUDFLARE_TUNNEL_TOKEN) — left commented out by default so an unconfigured token
-  # doesn't crash-loop this container. For a quick, temporary preview URL instead (no token
-  # needed), run `cloudflared tunnel --url http://localhost:4000` on the host directly.
-  # cloudflared:
-  #   image: cloudflare/cloudflared:latest
-  #   container_name: elexprep-cloudflared
-  #   restart: unless-stopped
-  #   command: tunnel run
-  #   environment:
-  #     # Paste the tunnel token from Zero Trust -> Networks -> Tunnels -> (your tunnel) ->
-  #     # "Install connector" step.
-  #     - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
-  #   depends_on:
-  #     - elexprep
+  # Reverse proxy + automatic HTTPS (Let's Encrypt) for the public domain - the only service
+  # with ports actually open to the internet. Also serves the maintenance page, both when
+  # maintenance mode is on and while the app is restarting. See DEPLOY.md's "Go live at
+  # portal.elex.lighting" and "Updating to a new version".
+  caddy:
+    image: caddy:2-alpine
+    container_name: elexprep-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      # Folders rather than single files: a git pull replaces files, and a single-file mount
+      # would keep showing the container the old one.
+      - ./deploy/caddy:/etc/caddy:ro
+      - ./deploy/maintenance:/srv/maintenance:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - elexprep
+
+volumes:
+  caddy_data:
+  caddy_config:

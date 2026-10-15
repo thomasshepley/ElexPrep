@@ -2,13 +2,13 @@
  * Pure location-color resolution logic, shared by the server's PDF renderer today and
  * usable by a future web-side print-queue preview without pulling in Prisma. The
  * Prisma-backed loading/seeding functions (loadLocationColorMap, seedDefaultLocationColorsIfEmpty,
- * seedNewDefaultLocationColorsIfMissing) stay server-only — see server/src/pdf/locationColors.ts.
+ * seedNewDefaultLocationColorsIfMissing) stay server-only - see server/src/pdf/locationColors.ts.
  */
 
-/** Used for any location with no matching rule — same look as the original fixed black bar. */
+/** Used for any location with no matching rule - same look as the original fixed black bar. */
 export const DEFAULT_LOCATION_COLOR = '#1a1a1a';
 
-export type LocationColorPattern = 'SOLID' | 'DIAGONAL_STRIPES';
+export type LocationColorPattern = 'SOLID' | 'DIAGONAL_STRIPES' | 'RAINBOW';
 
 export const DEFAULT_LOCATION_COLOR_RULES: {
   location: string;
@@ -24,7 +24,17 @@ export const DEFAULT_LOCATION_COLOR_RULES: {
   // Hazard-stripe conventions: red/white for spares, yellow/black for rigging.
   { location: 'Spare', color: '#D32F2F', pattern: 'DIAGONAL_STRIPES', secondaryColor: '#FFFFFF' },
   { location: 'Rigging', color: '#F5C400', pattern: 'DIAGONAL_STRIPES', secondaryColor: '#1a1a1a' },
+  // For items whose location isn't any one place - e.g. a cable run spanning the whole venue -
+  // a solid or striped bar would misleadingly suggest one specific spot. `color` here is unused
+  // (RAINBOW always draws its own fixed color band) but kept non-empty since the column isn't
+  // nullable.
+  { location: 'Everywhere', color: '#1a1a1a', pattern: 'RAINBOW' },
 ];
+
+/** The 6 bands drawn left-to-right for the "Everywhere" RAINBOW pattern - shared by the PDF
+ * renderer (server/src/pdf/pdfBuilder.ts) and the print-queue's web preview (SheetMirror.tsx)
+ * so neither can drift from the other. */
+export const RAINBOW_BAND_COLORS = ['#D32F2F', '#F57C00', '#F5C400', '#1FA34C', '#1976D2', '#4B0082'];
 
 export interface ResolvedLocationColor {
   color: string;
@@ -49,7 +59,7 @@ export function toLocationColorMapEntry(r: LocationColorRuleLike): [string, Reso
     r.location.toLowerCase().trim(),
     {
       color: r.color,
-      pattern: r.pattern === 'DIAGONAL_STRIPES' ? 'DIAGONAL_STRIPES' : 'SOLID',
+      pattern: r.pattern === 'DIAGONAL_STRIPES' ? 'DIAGONAL_STRIPES' : r.pattern === 'RAINBOW' ? 'RAINBOW' : 'SOLID',
       secondaryColor: r.secondaryColor,
     },
   ];

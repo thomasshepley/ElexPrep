@@ -6,7 +6,7 @@ import { notifyLabelRequestReviewed } from '../notifications';
 /**
  * Admin/staff side of a crew member's label request: review, approve (creates the real
  * AdHocLabel, attributed back to the requester), or reject. Open to any signed-in staff
- * account, same as the rest of the ad hoc label surface (routes/adHocLabels.ts) — not
+ * account, same as the rest of the ad hoc label surface (routes/adHocLabels.ts) - not
  * admin-only. The crew-facing submission endpoint lives in routes/crewPortal.ts.
  */
 export const crewLabelRequestsRouter = Router();

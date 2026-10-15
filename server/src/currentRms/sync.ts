@@ -1,12 +1,13 @@
 import { prisma, logActivity } from '../db';
 import { getCurrentRmsConfig, saveCurrentRmsConfig, CurrentRmsConfig } from './config';
 import { fetchAllOpportunities, fetchMember, fetchOpportunityItems, GROUP_ITEM_TYPE, RawOpportunity } from './client';
+import { notifyPrepJobChanged } from '../prep/notify';
 import { diffPickListItems, pickListDiffIsEmpty, type PickListItemSnapshot } from '@elexprep/shared';
 import type { CurrentRmsOpportunity } from '@prisma/client';
 
 /**
  * Builds the comparable pick-list snapshot for a job's linked opportunity, for diffing.
- * Excludes Group rows (section headings like "Lighting - Moving Lights") — they aren't real
+ * Excludes Group rows (section headings like "Lighting - Moving Lights") - they aren't real
  * pickable items, and their "quantity" is meaningless, so they shouldn't show up as additions/
  * removals/changes in the signage diff alert.
  */
@@ -36,7 +37,7 @@ function extractSubject(raw: RawOpportunity): string {
 
 /**
  * Current RMS's list endpoint returns status/state as integer codes (e.g. `status: 1`) with
- * the human label in a sibling `*_name` field (`status_name: "Provisional"`) — verified
+ * the human label in a sibling `*_name` field (`status_name: "Provisional"`) - verified
  * against a real account. Prefer the name; fall back to stringifying the code if it's ever
  * missing, since the column is a plain string and a raw number would fail to save.
  */
@@ -64,7 +65,7 @@ function extractKind(raw: RawOpportunity): string {
 
 /**
  * Best-effort order value. Current RMS's documented opportunity fields for this aren't
- * verified against a real account yet (see the model comment) — this tries the handful of
+ * verified against a real account yet (see the model comment) - this tries the handful of
  * field names other integrations commonly see on this endpoint (a pre-tax charge total is
  * preferred over a post-tax one, since tax handling varies by account) and falls back to null
  * rather than guessing, since rawJson keeps the full response regardless for later use.
@@ -75,7 +76,7 @@ function extractValue(raw: RawOpportunity): number | null {
   return typeof num === 'number' && Number.isFinite(num) ? num : null;
 }
 
-/** Current RMS's "Project" id, verified against a real account — groups several opportunities
+/** Current RMS's "Project" id, verified against a real account - groups several opportunities
  * together (e.g. a job's main rental plus a separate "<Job> - Crewing" opportunity). */
 function extractProjectId(raw: RawOpportunity): number | null {
   const value = raw.project_id;
@@ -84,7 +85,7 @@ function extractProjectId(raw: RawOpportunity): number | null {
 
 /**
  * The opportunities list endpoint doesn't embed the customer record (just `member_id`) on
- * a real account, so this is usually null from sync alone — see fetchOpportunityMemberName
+ * a real account, so this is usually null from sync alone - see fetchOpportunityMemberName
  * for the richer single-opportunity lookup used when importing one as a job.
  */
 function extractMemberName(raw: RawOpportunity): string | null {
@@ -124,7 +125,7 @@ export interface SyncResult {
 
 /**
  * Pulls opportunities changed since the last sync (or everything, the first time), caches
- * them locally, and raises an alert on any Job whose linked opportunity actually changed —
+ * them locally, and raises an alert on any Job whose linked opportunity actually changed -
  * "actually changed" meaning we'd already cached it before with an earlier updated_at, so a
  * first-ever sync never floods every linked job with a false alert.
  */
@@ -195,7 +196,7 @@ export async function runCurrentRmsSync(): Promise<SyncResult> {
               ? JSON.parse(job.rmsItemsSnapshotJson)
               : [];
             data.rmsItemsSnapshotJson = JSON.stringify(snapshot);
-            // Only flash a diff once there's an actual prior snapshot to compare against —
+            // Only flash a diff once there's an actual prior snapshot to compare against -
             // otherwise linking a job (or the first-ever sync after linking) would look like
             // every item on the pick list was just "added".
             if (prevSnapshot.length > 0) {
@@ -210,6 +211,7 @@ export async function runCurrentRmsSync(): Promise<SyncResult> {
             console.error(`Could not diff pick list for opportunity ${raw.id}:`, (err as Error).message);
           }
           await prisma.job.update({ where: { id: job.id }, data });
+          notifyPrepJobChanged(job.id);
           await logActivity('current_rms.opportunity_changed', extractSubject(raw), job.id);
           alertsRaised++;
         }

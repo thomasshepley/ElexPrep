@@ -12,7 +12,7 @@ import {
   rectangle,
 } from 'pdf-lib';
 import { CellGeometry, SheetGeometry } from '@elexprep/shared';
-import { hexToRgbFractions, ResolvedLocationColor } from './locationColors';
+import { hexToRgbFractions, RAINBOW_BAND_COLORS, ResolvedLocationColor } from './locationColors';
 
 export const PT_PER_IN = 72;
 export const inPt = (inches: number) => inches * PT_PER_IN;
@@ -36,12 +36,12 @@ export function cellToPt(cell: CellGeometry, pageHeightIn: number): CellRectPt {
 
 /**
  * A striped background alternates two colors (e.g. Rigging's yellow/near-black hazard tape),
- * so a single flat text fill can only ever contrast reliably against ONE of the two — for
+ * so a single flat text fill can only ever contrast reliably against ONE of the two - for
  * exactly that reason, the color actually chosen for the fill often coincides with one of the
  * stripe colors (see textColorsFor in genericRenderer.ts), which would otherwise make the
  * text vanish into that stripe. The outline (drawn as offset copies of the opposite color,
  * behind the real text) is what keeps it legible there instead, so it has to read as a real,
- * fairly bold stroke — not just a hairline nudge — or it degrades to a thin, hard-to-read
+ * fairly bold stroke - not just a hairline nudge - or it degrades to a thin, hard-to-read
  * hollow outline exactly where the fill disappears. The radius scales with font size (pdf-lib
  * has no native text-stroke, so this is pure sampled copies) and samples a full ring of
  * points rather than just the 8 compass directions, so the stroke stays smooth at any size.
@@ -76,7 +76,7 @@ export function centerText(
 /**
  * Shrinks font size to fit `text` within `maxWidthPt` at `startSize`, down to `minSize`. If it
  * still doesn't fit at the minimum size (e.g. "Maverick Storm 1 Flex Hybrid"), trailing words
- * are dropped one at a time until what's left fits — so long fixture type names shorten to
+ * are dropped one at a time until what's left fits - so long fixture type names shorten to
  * something like "Maverick Storm 1" rather than overlapping or running off the label.
  */
 export function fitTextToWidth(
@@ -102,7 +102,7 @@ export function fitTextToWidth(
 /**
  * Draws an image to completely cover a rect edge-to-edge (like CSS `object-fit: cover`):
  * scales up to fill both dimensions, preserving aspect ratio, and clips the overflow rather
- * than letterboxing — so a banner-style image slot never shows gaps on the sides regardless
+ * than letterboxing - so a banner-style image slot never shows gaps on the sides regardless
  * of the source image's own aspect ratio.
  */
 export function drawImageCover(page: PDFPage, image: PDFImage, rect: CellRectPt) {
@@ -123,8 +123,31 @@ export function drawImageCover(page: PDFPage, image: PDFImage, rect: CellRectPt)
 }
 
 /**
- * Fills a rect with a resolved location color — a plain solid fill, or classic 45-degree
- * hazard-tape stripes (e.g. red/white for Spare, yellow/black for Rigging) when the rule
+ * Draws an image scaled to fit entirely within a rect (like CSS `object-fit: contain`):
+ * scales down to whichever dimension is the tighter constraint, preserving aspect ratio, and
+ * centers it with no cropping. Used for a job's logo - unlike drawImageCover (a banner-style
+ * slot that should never show gaps), a logo whose aspect ratio differs from its slot needs to
+ * stay fully visible rather than being zoomed in and cropped to fill the box edge-to-edge.
+ */
+export function drawImageContain(page: PDFPage, image: PDFImage, rect: CellRectPt, zoom = 1) {
+  // zoom scales the fitted size around the slot's centre (a job's per-logo size setting);
+  // past 1 the logo would spill over neighbouring content, so it's clipped to the slot.
+  const scale = Math.min(rect.wPt / image.width, rect.hPt / image.height) * zoom;
+  const drawWidth = image.width * scale;
+  const drawHeight = image.height * scale;
+  const x = rect.xPt + (rect.wPt - drawWidth) / 2;
+  const y = rect.yPt + (rect.hPt - drawHeight) / 2;
+  if (zoom > 1) {
+    page.pushOperators(pushGraphicsState(), rectangle(rect.xPt, rect.yPt, rect.wPt, rect.hPt), clip(), endPath());
+  }
+  page.drawImage(image, { x, y, width: drawWidth, height: drawHeight });
+  if (zoom > 1) page.pushOperators(popGraphicsState());
+}
+
+/**
+ * Fills a rect with a resolved location color - a plain solid fill, classic 45-degree
+ * hazard-tape stripes (e.g. red/white for Spare, yellow/black for Rigging), or a rainbow band
+ * (the "Everywhere" location, for items that aren't tied to one specific spot) when the rule
  * says so.
  */
 export function drawLocationFill(page: PDFPage, rect: CellRectPt, resolved: ResolvedLocationColor) {
@@ -132,8 +155,26 @@ export function drawLocationFill(page: PDFPage, rect: CellRectPt, resolved: Reso
     drawDiagonalStripeFill(page, rect, resolved.color, resolved.secondaryColor);
     return;
   }
+  if (resolved.pattern === 'RAINBOW') {
+    drawRainbowFill(page, rect);
+    return;
+  }
   const { r, g, b } = hexToRgbFractions(resolved.color);
   page.drawRectangle({ x: rect.xPt, y: rect.yPt, width: rect.wPt, height: rect.hPt, color: rgb(r, g, b) });
+}
+
+function drawRainbowFill(page: PDFPage, rect: CellRectPt) {
+  const bandWidth = rect.wPt / RAINBOW_BAND_COLORS.length;
+  RAINBOW_BAND_COLORS.forEach((hex, i) => {
+    const { r, g, b } = hexToRgbFractions(hex);
+    page.drawRectangle({
+      x: rect.xPt + bandWidth * i,
+      y: rect.yPt,
+      width: bandWidth,
+      height: rect.hPt,
+      color: rgb(r, g, b),
+    });
+  });
 }
 
 function drawDiagonalStripeFill(page: PDFPage, rect: CellRectPt, colorAHex: string, colorBHex: string) {

@@ -12,37 +12,47 @@ datasource db {
 }
 
 model Job {
-  id          String   @id @default(cuid())
-  name        String
-  venue       String?
+  id             String    @id @default(cuid())
+  name           String
+  venue          String?
   /// Free-text description — the "What" review field at onboarding, editable afterward from
   /// Job Settings. Distinct from `name`: at import time `name` defaults to the Current RMS
   /// opportunity's subject, while this starts blank for the admin to fill in if they want one.
-  description String?
+  description    String?
   /// The actual postal address for this job's location — distinct from `venue` (a display
   /// name/label, often the customer's name as pulled from Current RMS). Drives the "Where"
   /// map preview and Maps-app deep links (see web/src/components/LocationLinks.tsx).
-  address     String?
+  address        String?
   /// Admin-set override of the job's start/end, reviewed at onboarding and editable afterward.
   /// Falls back to the linked Current RMS opportunity's own dates when null (see the "When"
   /// section on both the admin and crew job pages).
-  startsAt    DateTime?
-  endsAt      DateTime?
-  logoPath    String?
+  startsAt       DateTime?
+  endsAt         DateTime?
+  /// The main/legacy logo slot — rendered centered (or alone) in the label sheet's logo bar.
+  /// Predates logoPathLeft/logoPathRight, kept as the "middle" slot so an existing job with
+  /// just one logo uploaded keeps rendering exactly as before.
+  logoPath       String?
+  logoPathLeft   String?
+  logoPathRight  String?
+  /// Per-slot logo size as a percentage of its slot on the label logo bar (100 = fit the slot,
+  /// lower shrinks, higher zooms and clips to the slot) - for logos with odd padding/aspect.
+  logoScaleLeft  Int       @default(100)
+  logoScale      Int       @default(100)
+  logoScaleRight Int       @default(100)
   /// Visible to USER/SIGNAGE roles only when true; ADMIN always sees every job.
-  isPublic    Boolean  @default(false)
+  isPublic       Boolean   @default(false)
 
-  currentRmsOpportunityId  String?
+  currentRmsOpportunityId String?
   /// Set by the sync poller when the linked opportunity's updated_at moves forward;
   /// cleared (set to null) when a viewer acknowledges it. Null = no outstanding alert.
-  rmsAlertAt               DateTime?
+  rmsAlertAt              DateTime?
   /// Last-synced opportunity items (id/name/quantity), kept purely so the next sync can diff
   /// against it to detect what changed — not shown directly, see rmsItemsDiffJson.
-  rmsItemsSnapshotJson     String?
+  rmsItemsSnapshotJson    String?
   /// The most recently computed added/removed/quantity-changed diff versus the previous
   /// snapshot, for the signage full-screen change alert. Null = no outstanding items alert.
-  rmsItemsDiffJson         String?
-  rmsItemsDiffAt           DateTime?
+  rmsItemsDiffJson        String?
+  rmsItemsDiffAt          DateTime?
 
   /// Set when onboarding matched (or an admin manually picked) a folder under the OneDrive
   /// "Projects" root for this job — see server/src/oneDrive/matcher.ts. Null until OneDrive is
@@ -56,25 +66,71 @@ model Job {
   /// onto the global default (see server/src/crewFeatures.ts). Null = use the default as-is;
   /// set at onboarding time, editable later from Job Settings.
   crewFeaturesJson     String?
+  /// Admin/moderator-set freeze on this job's discussion thread - while true, only an account
+  /// with the moderateDiscussion permission can post a new message. Existing messages keep
+  /// their normal edit/delete rules either way.
+  discussionLocked     Boolean @default(false)
+  /// The staff member running this job - shown on the job page and to its crew.
+  projectManagerUserId String?
+  projectManager       User?   @relation("JobProjectManager", fields: [projectManagerUserId], references: [id], onDelete: SetNull)
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  fixtures       Fixture[]
-  caseGroups     CaseGroupRecord[]
-  adHocLabels    AdHocLabel[]
+  fixtures                Fixture[]
+  caseGroups              CaseGroupRecord[]
+  adHocLabels             AdHocLabel[]
+  printQueueItems         PrintQueueItem[]
+  plots                   Plot[]
+  locationColorRules      LocationColorRule[]
+  pickListItemStatuses    PickListItemStatus[]
+  labelTemplates          LabelTemplate[]
+  crewAssignments         JobCrewAssignment[]
+  scheduleItems           JobScheduleItem[]
+  jobDays                 JobDay[]
+  documents               JobDocument[]
+  contacts                JobContact[]
+  labelRequests           CrewLabelRequest[]
+  discussionMessages      JobDiscussionMessage[]
+  oneDriveShares          OneDriveShare[]
+  patchImportCandidate    PatchImportCandidate?
+  linkedRmsOpportunities  JobLinkedRmsOpportunity[]
+  fixtureGroups           FixtureGroup[]
+  roleRates               RoleRate[]
+  discussionGroups        DiscussionGroup[]
+  crewMarginLineOverrides CrewMarginLineOverride[]
+  prepSessions            PrepSession[]
+  screenDevices           ScreenDevice[]
+  positions               JobPosition[]
+  cablePlan               CablePlan?
+  riggingPlan             RiggingPlan?
+  truckPlan               TruckPlan?
+  plotExtractions         PlotExtraction[]
+}
+
+/// A named subdivision of one job's prep - a "stage" at a multi-stage event, or any other
+/// custom split an admin wants (see routes/fixtureGroups.ts). Each stage gets its own patch
+/// import, case packing, and label/print-queue scoping, so two stages' fixtures never collide
+/// even though they share one job. `rmsGroupName` records which Current RMS group-heading
+/// (opportunity_item_type 0 row) this stage was created from, if any, so the admin can re-run
+/// the name-based cross-reference match against newly-imported fixtures later. A job with no
+/// FixtureGroup rows behaves exactly as before this feature existed - every Fixture/
+/// CaseGroupRecord/PrintQueueItem/AdHocLabel's groupId is simply null ("ungrouped").
+model FixtureGroup {
+  id           String   @id @default(cuid())
+  jobId        String
+  job          Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  name         String
+  order        Int      @default(0)
+  rmsGroupName String?
+  createdAt    DateTime @default(now())
+
+  fixtures        Fixture[]
+  cases           CaseGroupRecord[]
   printQueueItems PrintQueueItem[]
-  plots          Plot[]
-  locationColorRules LocationColorRule[]
-  pickListItemStatuses PickListItemStatus[]
-  labelTemplates LabelTemplate[]
-  crewAssignments JobCrewAssignment[]
-  scheduleItems  JobScheduleItem[]
-  documents      JobDocument[]
-  labelRequests  CrewLabelRequest[]
-  discussionMessages JobDiscussionMessage[]
-  oneDriveShares OneDriveShare[]
-  patchImportCandidate PatchImportCandidate?
+  adHocLabels     AdHocLabel[]
+
+  @@index([jobId])
 }
 
 /// A OneDrive file or folder an admin has explicitly chosen to share with this job's crew —
@@ -84,19 +140,19 @@ model Job {
 /// server/src/oneDrive/cad.ts) — that's a convenience, not a security boundary, since CAD plans
 /// are expected to be crew-visible by default.
 model OneDriveShare {
-  id           String   @id @default(cuid())
-  jobId        String
-  job          Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  id             String   @id @default(cuid())
+  jobId          String
+  job            Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
   /// The Microsoft Graph driveItem id of the shared file or folder.
-  itemId       String
-  itemName     String
-  itemPath     String
-  isFolder     Boolean
+  itemId         String
+  itemName       String
+  itemPath       String
+  isFolder       Boolean
   /// Admin-flagged alongside sharing: this shared item is one of the job's CAD plots, so it's
   /// grouped with the rest of the CAD set (uploaded Plot PDFs + the auto-detected one) instead of
   /// the generic "Shared with crew" list — see CadPlotsViewer on the web side.
-  isCadPlot    Boolean  @default(false)
-  sharedAt     DateTime @default(now())
+  isCadPlot      Boolean  @default(false)
+  sharedAt       DateTime @default(now())
   sharedByUserId String?
 
   @@unique([jobId, itemId])
@@ -107,17 +163,73 @@ model OneDriveShare {
 /// Visible/postable by any ADMIN/USER staff account and by crew assigned to the job (see
 /// routes/jobDiscussion.ts for staff, routes/crewPortal.ts's /me/jobs/:jobId/discussion for
 /// crew — two route surfaces over the same table, matching how schedule/documents/kit-list
-/// already work). No edit/delete yet — admin moderation is a later milestone.
+/// already work). An author can edit their own message (editedAt records when); a moderator
+/// removing someone else's message soft-deletes it (deletedAt/deletedByName set, body left in
+/// place but never sent to clients) rather than hard-deleting, so the removal itself shows up
+/// as a placeholder in the thread instead of disappearing without a trace. Deleting your own
+/// message stays a hard delete — there's no moderation story to preserve there.
 model JobDiscussionMessage {
-  id           String   @id @default(cuid())
-  jobId        String
-  job          Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
-  authorUserId String
-  authorUser   User     @relation(fields: [authorUserId], references: [id], onDelete: Cascade)
-  body         String
-  createdAt    DateTime @default(now())
+  id             String                 @id @default(cuid())
+  jobId          String
+  job            Job                    @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  authorUserId   String
+  authorUser     User                   @relation(fields: [authorUserId], references: [id], onDelete: Cascade)
+  body           String
+  createdAt      DateTime               @default(now())
+  editedAt       DateTime?
+  deletedAt      DateTime?
+  deletedByName  String?
+  /// The chat group this was posted in - null only for messages from before groups existed,
+  /// which are moved into the job's General group the first time its discussion is opened.
+  groupId        String?
+  group          DiscussionGroup?       @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  /// The message this one replies to (shown quoted above it). Cleared if that one's deleted.
+  replyToId      String?
+  replyTo        JobDiscussionMessage?  @relation("DiscussionReply", fields: [replyToId], references: [id], onDelete: SetNull)
+  replies        JobDiscussionMessage[] @relation("DiscussionReply")
+  /// An attached image or GIF, stored under uploads/discussion (see routes/jobDiscussion.ts).
+  attachmentPath String?
+  attachmentMime String?
+  attachmentName String?
 
   @@index([jobId])
+  @@index([groupId])
+}
+
+/// A chat group inside a job's discussion ("General", "Riggers", "Production"...). Staff see
+/// every group; crew see EVERYONE groups plus MEMBERS groups they've been added to. Each job
+/// has exactly one isDefault group (General), created on first use, which can be renamed and
+/// recoloured but not deleted.
+model DiscussionGroup {
+  id         String   @id @default(cuid())
+  jobId      String
+  job        Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  name       String
+  color      String?
+  /// EVERYONE (all crew on the job) or MEMBERS (only crew added below).
+  visibility String   @default("EVERYONE")
+  isDefault  Boolean  @default(false)
+  order      Int      @default(0)
+  createdAt  DateTime @default(now())
+
+  messages JobDiscussionMessage[]
+  members  DiscussionGroupMember[]
+
+  @@index([jobId])
+}
+
+/// A crew member (by their assignment on the job) added to a MEMBERS-only discussion group.
+/// Removing them from the job's crew removes this too.
+model DiscussionGroupMember {
+  id                  String            @id @default(cuid())
+  groupId             String
+  group               DiscussionGroup   @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  jobCrewAssignmentId String
+  jobCrewAssignment   JobCrewAssignment @relation(fields: [jobCrewAssignmentId], references: [id], onDelete: Cascade)
+  createdAt           DateTime          @default(now())
+
+  @@unique([groupId, jobCrewAssignmentId])
+  @@index([jobCrewAssignmentId])
 }
 
 /// One timed entry in a job's day schedule (load-in, soundcheck, doors, show, get-out, ...) —
@@ -133,10 +245,85 @@ model JobScheduleItem {
   startsAt  DateTime
   endsAt    DateTime?
   notes     String?
+  /// Where on site this happens ("Loading bay", "Stage left") - shown in the entry's popup.
+  location  String?
+  /// Admin-picked hex color for this entry's block on the day timeline (e.g. to visually group
+  /// "Load in" vs "Show" vs "Get out" at a glance) - null means the timeline's default accent
+  /// color, same look as before this field existed.
+  color     String?
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
+  crewAssignments JobScheduleItemCrewAssignment[]
+
   @@index([jobId])
+}
+
+/// An explicit calendar-day "block" for a job - the admin-managed day-by-day overview (see
+/// routes/jobDays.ts) that crew get dragged onto, shown alongside the hour-by-hour
+/// JobScheduleItem timeline rather than derived from it. A day can exist with no hourly items
+/// yet (crew staged ahead of time, before anyone's written up a running order), and an hourly
+/// item's date can exist with no JobDay row yet - the web client shows that as an
+/// unmaterialized placeholder block until something (explicitly adding the day, or dragging
+/// crew onto it) actually creates this row. `date` is whatever instant the client that created
+/// it sent (local midnight in the browser's own timezone), and is always re-bucketed back into
+/// a calendar day on the client (see DayTimeline.tsx's dateKey) rather than compared in UTC
+/// server-side, so it round-trips to the same calendar day for the browser that set it
+/// regardless of what timezone the server itself runs in.
+model JobDay {
+  id        String   @id @default(cuid())
+  jobId     String
+  job       Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  date      DateTime
+  /// Optional label, e.g. "Prep Day" or "Show Day 1".
+  name      String?
+  /// Wall-clock "HH:MM" in UK local time on this day's date; wrap earlier than call means it
+  /// runs past midnight.
+  callTime  String?
+  wrapTime  String?
+  createdAt DateTime @default(now())
+
+  crewAssignments JobDayCrewAssignment[]
+
+  @@unique([jobId, date])
+  @@index([jobId])
+}
+
+/// Which of a job's already-attributed crew (JobCrewAssignment) are actually working a given
+/// JobDay - the drag-and-drop target record itself. A crew member must already be assigned to
+/// the job before they can be dropped onto one of its days; removing either side cascades here.
+model JobDayCrewAssignment {
+  id                  String            @id @default(cuid())
+  jobDayId            String
+  jobDay              JobDay            @relation(fields: [jobDayId], references: [id], onDelete: Cascade)
+  jobCrewAssignmentId String
+  jobCrewAssignment   JobCrewAssignment @relation(fields: [jobCrewAssignmentId], references: [id], onDelete: Cascade)
+  /// This person's rate for this one day (e.g. a travel or half day) - null uses their rate for
+  /// the job (see crewRates.ts). A plain string like the other day rates.
+  dayRate             String?
+  createdAt           DateTime          @default(now())
+
+  @@unique([jobDayId, jobCrewAssignmentId])
+  @@index([jobDayId])
+  @@index([jobCrewAssignmentId])
+}
+
+/// Which of a job's already-attributed crew (JobCrewAssignment) are doing a specific hourly
+/// schedule entry ("task") - a finer-grain sibling of JobDayCrewAssignment. Dragging someone
+/// onto a task also assigns them to that task's whole day if they weren't already (see
+/// routes/jobSchedule.ts), so this is additive detail on top of the day assignment, never a
+/// substitute for it.
+model JobScheduleItemCrewAssignment {
+  id                  String            @id @default(cuid())
+  scheduleItemId      String
+  scheduleItem        JobScheduleItem   @relation(fields: [scheduleItemId], references: [id], onDelete: Cascade)
+  jobCrewAssignmentId String
+  jobCrewAssignment   JobCrewAssignment @relation(fields: [jobCrewAssignmentId], references: [id], onDelete: Cascade)
+  createdAt           DateTime          @default(now())
+
+  @@unique([scheduleItemId, jobCrewAssignmentId])
+  @@index([scheduleItemId])
+  @@index([jobCrewAssignmentId])
 }
 
 /// General job files (call sheets, info packs, contracts) — unencrypted like Plot, since
@@ -154,6 +341,24 @@ model JobDocument {
   @@index([jobId])
 }
 
+/// A venue/client/production contact worth having on hand for a job - name, role (free text,
+/// e.g. "Venue Manager"), and how to reach them. Same visibility posture as JobDocument: reads
+/// open to any signed-in staff account and to crew assigned to the job, writes admin-only.
+model JobContact {
+  id        String   @id @default(cuid())
+  jobId     String
+  job       Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  name      String
+  role      String?
+  phone     String?
+  email     String?
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([jobId])
+}
+
 /// A freelance crew member's profile — 1:1 with a User whose role is CREW. For now the only
 /// way one of these pairs comes into existence is an admin creating both together on the Crew
 /// settings page (see routes/crew.ts); the public application flow (a later milestone) will be
@@ -161,32 +366,32 @@ model JobDocument {
 /// insurance, bank details) are deliberately not modeled here yet — that needs the encrypted
 /// storage a later milestone builds; this is just contact/professional info for attribution.
 model CrewProfile {
-  id        String   @id @default(cuid())
-  userId    String   @unique
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  phone     String?
+  id                    String   @id @default(cuid())
+  userId                String   @unique
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  phone                 String?
   /// Admin-set hex swatch color (e.g. "#1E88E5") shown next to this crew member on the
   /// schedule calendar popup, so staff can tell who's on which job at a glance. Null = use the
   /// stable id-derived default from shared/src/crewColors.ts rather than a fixed neutral —
   /// unlike LocationColorRule's fallback, every crew member should look visually distinct even
   /// with zero admin setup.
-  color     String?
+  color                 String?
   /// Free-text list of roles/skills (e.g. "LD, Rigger, Spot Op") — a simple string for now
   /// rather than a separate taxonomy table, since nothing queries or filters by skill yet.
-  skills    String?
+  skills                String?
   /// Same comma-separated-string convention as skills (see shared/src/crewCertifications.ts).
-  certifications String?
+  certifications        String?
   /// Default day rate as a plain string (e.g. "250.00") rather than a typed money column —
   /// nothing does arithmetic on it yet; a future Xero integration can introduce real currency
   /// handling once it actually moves money (see xeroContactId on JobCrewAssignment).
-  dayRate   String?
-  notes     String?
-  gender    String?
-  address   String?
-  pronouns  String?
-  instagramUrl String?
-  facebookUrl  String?
-  otherLinkUrl String?
+  dayRate               String?
+  notes                 String?
+  gender                String?
+  address               String?
+  pronouns              String?
+  instagramUrl          String?
+  facebookUrl           String?
+  otherLinkUrl          String?
   /// Bank details, structured (not a file) but still encrypted at rest with the same AES-256-GCM
   /// scheme as CrewDocument (see crewDocCrypto.ts) — ciphertext is the JSON-stringified field set
   /// ({accountName, sortCode, accountNumber, bankName}), base64-encoded. Never returned in a list
@@ -194,15 +399,15 @@ model CrewProfile {
   bankDetailsCiphertext String?
   bankDetailsIv         String?
   bankDetailsAuthTag    String?
-  active    Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  active                Boolean  @default(true)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 
-  assignments JobCrewAssignment[]
-  documents   CrewDocument[]
-  labelRequests CrewLabelRequest[]
+  assignments          JobCrewAssignment[]
+  documents            CrewDocument[]
+  labelRequests        CrewLabelRequest[]
   requestedAdHocLabels AdHocLabel[]
-  rateLines   CrewRateLine[]
+  rateLines            CrewRateLine[]
 }
 
 /// A named rate line on a crew member's rate card (e.g. "Day rate", "Overtime", "Travel day") —
@@ -228,28 +433,28 @@ model CrewRateLine {
 /// the applicant's own free-text statement, not a substitute for the actual document (see
 /// CrewDocument) — this model holds only the form fields.
 model CrewApplication {
-  id            String    @id @default(cuid())
-  fullName      String
-  email         String
-  phone         String?
-  skills        String?
-  certifications String?
-  dayRate       String?
-  rightToWork   String?
-  notes         String?
-  gender        String?
-  address       String?
+  id                    String    @id @default(cuid())
+  fullName              String
+  email                 String
+  phone                 String?
+  skills                String?
+  certifications        String?
+  dayRate               String?
+  rightToWork           String?
+  notes                 String?
+  gender                String?
+  address               String?
   /// See CrewProfile.bankDetailsCiphertext — same scheme, copied across to the CrewProfile on
   /// approval (routes/crewApplications.ts) rather than re-encrypted.
   bankDetailsCiphertext String?
   bankDetailsIv         String?
   bankDetailsAuthTag    String?
   /// PENDING | APPROVED | REJECTED
-  status        String    @default("PENDING")
-  reviewedAt    DateTime?
-  reviewedBy    String?
-  rejectionNote String?
-  createdAt     DateTime  @default(now())
+  status                String    @default("PENDING")
+  reviewedAt            DateTime?
+  reviewedBy            String?
+  rejectionNote         String?
+  createdAt             DateTime  @default(now())
 
   documents CrewDocument[]
 
@@ -267,6 +472,8 @@ model OnboardingInvite {
   token      String?   @unique
   /// PENDING | APPROVED | REJECTED | COMPLETED
   status     String    @default("PENDING")
+  /// Made by an admin as a ready-to-send link, skipping the request (and application) entirely.
+  direct     Boolean   @default(false)
   reviewedAt DateTime?
   reviewedBy String?
   createdAt  DateTime  @default(now())
@@ -320,9 +527,17 @@ model JobCrewAssignment {
   /// (routes/currentRms.ts's /crew-margin). Null is treated as 1 day, so existing assignments
   /// made before this field existed still cost out sensibly.
   days          String?
+  /// Explicitly costs this assignment at zero regardless of dayRate/profile/global defaults —
+  /// distinct from just leaving dayRate blank (which means "use the default", not "free"), for
+  /// e.g. zero-rating an owner/business partner out of the margin calculation.
+  zeroRated     Boolean     @default(false)
   xeroContactId String?
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
+
+  dayAssignments             JobDayCrewAssignment[]
+  taskAssignments            JobScheduleItemCrewAssignment[]
+  discussionGroupMemberships DiscussionGroupMember[]
 
   @@unique([jobId, crewProfileId])
   @@index([jobId])
@@ -336,13 +551,13 @@ model JobCrewAssignment {
 /// the matching default template at render time — never a whole-template replacement, so a
 /// new default element introduced later still reaches jobs that already customized this type.
 model LabelTemplate {
-  id            String   @id @default(cuid())
-  jobId         String
-  job           Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
-  labelType     String
-  elementsJson  String
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id           String   @id @default(cuid())
+  jobId        String
+  job          Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  labelType    String
+  elementsJson String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   @@unique([jobId, labelType])
   @@index([jobId])
@@ -365,12 +580,12 @@ model PickListItemStatus {
 }
 
 model FixtureTypeRule {
-  id                 String   @id @default(cuid())
-  name               String   @unique
-  unitsPerCase       Int      @default(1)
-  caseLabelOverride  String?
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  id                String   @id @default(cuid())
+  name              String   @unique
+  unitsPerCase      Int      @default(1)
+  caseLabelOverride String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 }
 
 /// Maps a stage location string (as it appears in the patch/ad hoc "location" field) to a
@@ -381,39 +596,53 @@ model FixtureTypeRule {
 /// Uniqueness of (jobId, location) is enforced at the application layer rather than a DB
 /// constraint, since SQLite/Prisma's composite unique treats every NULL jobId as distinct.
 model LocationColorRule {
-  id        String   @id @default(cuid())
-  jobId     String?
-  job       Job?     @relation(fields: [jobId], references: [id], onDelete: Cascade)
-  location  String
-  color     String
-  /// "SOLID" (default) or "DIAGONAL_STRIPES" for hazard-tape-style locations (e.g. Spare, Rigging).
-  pattern        String  @default("SOLID")
+  id             String   @id @default(cuid())
+  jobId          String?
+  job            Job?     @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  location       String
+  color          String
+  /// "SOLID" (default), "DIAGONAL_STRIPES" for hazard-tape-style locations (e.g. Spare, Rigging),
+  /// or "RAINBOW" for a fixed multi-color band (the "Everywhere" location, for items not tied
+  /// to one specific spot) - RAINBOW ignores `color`/`secondaryColor` entirely.
+  pattern        String   @default("SOLID")
   /// Second stripe color, only used when pattern is DIAGONAL_STRIPES.
   secondaryColor String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   @@index([jobId])
 }
 
 model Fixture {
-  id            String  @id @default(cuid())
-  jobId         String
-  job           Job     @relation(fields: [jobId], references: [id], onDelete: Cascade)
-  address       Int
-  fixtureType   String
-  mainUniverse  Int?
-  mainAddress   Int?
-  pixUniverse   Int?
-  pixAddress    Int?
-  mode          String?
-  location      String?
-  ipAddress     String?
-  subnetMask    String?
-  notes         String?
-  rawJson       String?
+  id           String        @id @default(cuid())
+  jobId        String
+  job          Job           @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  /// Nullable because a real patch export sometimes has fixtures with no unit/spot number at
+  /// all (e.g. a fixed, unaddressed house light) - those still need to come in as real
+  /// Fixture rows so an admin can fill the address in later, rather than being silently
+  /// dropped by the importer. Also the match key a re-import uses to tell "the same physical
+  /// unit, now re-patched" from "a genuinely new fixture" - see routes/patch.ts's mergeFixtures.
+  address      Int?
+  fixtureType  String
+  mainUniverse Int?
+  mainAddress  Int?
+  pixUniverse  Int?
+  pixAddress   Int?
+  mode         String?
+  location     String?
+  ipAddress    String?
+  subnetMask   String?
+  notes        String?
+  rawJson      String?
+  /// Which stage/area this fixture belongs to, for jobs subdivided into FixtureGroups (e.g.
+  /// multi-stage festivals) - null means "ungrouped", the default for every job that doesn't
+  /// use stages at all. SetNull (not Cascade) so deleting a stage returns its fixtures to
+  /// ungrouped rather than deleting the fixtures themselves.
+  groupId      String?
+  group        FixtureGroup? @relation(fields: [groupId], references: [id], onDelete: SetNull)
 
   @@index([jobId])
+  @@index([groupId])
 }
 
 /// A patch CSV auto-detected in a job's OneDrive "Patch" subfolder, parsed and held for admin
@@ -451,15 +680,23 @@ model PatchImportCandidate {
 /// A generated case grouping (e.g. "AstraBlade 201 + 202"). Regenerated whenever the
 /// packing algorithm re-runs for a job; addressesJson holds the member fixture addresses.
 model CaseGroupRecord {
-  id            String  @id @default(cuid())
+  id            String        @id @default(cuid())
   jobId         String
-  job           Job     @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  job           Job           @relation(fields: [jobId], references: [id], onDelete: Cascade)
   fixtureType   String
   label         String
   location      String?
   addressesJson String
+  /// Same stage/area concept as Fixture.groupId - a case is packed from fixtures all within
+  /// one stage (see shared/src/casePacking.ts), so it inherits that stage here too.
+  groupId       String?
+  group         FixtureGroup? @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  /// Ticked on the prep-bay screen when the case is packed.
+  packedAt       DateTime?
+  packedByUserId String?
 
   @@index([jobId])
+  @@index([groupId])
 }
 
 /// labelType is one of: FIXTURE, TRUSS_SPIKE_POSITION, TRUSS_SPIKE_TIP, TRUSS_SPIKE_SACN,
@@ -468,24 +705,29 @@ model CaseGroupRecord {
 /// Manually-added labels that don't come from the patch (personal Peli cases, generic
 /// equipment cases like "Hazer" or "Powercube", spare cable labels, etc).
 model AdHocLabel {
-  id          String    @id @default(cuid())
-  jobId       String
-  job         Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
-  labelType   String
-  contentJson String
-  quantity    Int       @default(1)
+  id                       String        @id @default(cuid())
+  jobId                    String
+  job                      Job           @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  labelType                String
+  contentJson              String
+  quantity                 Int           @default(1)
   /// Print-run position, shared with PrintQueueItem's `order` across the same
   /// (jobId, labelType) group — determines which physical cell a copy lands in.
-  order       Int       @default(0)
+  order                    Int           @default(0)
   /// Skips this ad hoc label for the next print run without deleting the label recipe
   /// itself (which stays editable/reusable in the Labels tab).
-  excludeFromPrint Boolean @default(false)
+  excludeFromPrint         Boolean       @default(false)
   /// Set when this label was created by approving a CrewLabelRequest — lets the Labels tab
   /// show "requested by <crew member>" provenance. SetNull (not Cascade) so deleting the crew
   /// member later doesn't delete labels already approved onto the sheet.
   requestedByCrewProfileId String?
-  requestedByCrewProfile   CrewProfile? @relation(fields: [requestedByCrewProfileId], references: [id], onDelete: SetNull)
-  createdAt   DateTime  @default(now())
+  requestedByCrewProfile   CrewProfile?  @relation(fields: [requestedByCrewProfileId], references: [id], onDelete: SetNull)
+  /// Manually-assigned stage for this one-off label (ad hoc labels aren't built from a
+  /// Fixture/CaseGroupRecord, so there's nothing to denormalize this from - see
+  /// FixtureGroup). Null = ungrouped, same as everywhere else this field appears.
+  groupId                  String?
+  group                    FixtureGroup? @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  createdAt                DateTime      @default(now())
 }
 
 /// A crew member's request for an extra/replacement label, built with the same type + content
@@ -514,22 +756,28 @@ model CrewLabelRequest {
 
 /// status is one of: PENDING, CONFIRMED, PRINTED (see @elexprep/shared PrintQueueStatus).
 model PrintQueueItem {
-  id          String   @id @default(cuid())
+  id          String        @id @default(cuid())
   jobId       String
-  job         Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  job         Job           @relation(fields: [jobId], references: [id], onDelete: Cascade)
   labelType   String
   sourceType  String
   sourceId    String?
   contentJson String
-  quantity    Int      @default(1)
-  status      String   @default("PENDING")
+  quantity    Int           @default(1)
+  status      String        @default("PENDING")
   /// Print-run position, shared with AdHocLabel's `order` across the same
   /// (jobId, labelType) group — determines which physical cell a copy lands in.
-  order       Int      @default(0)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  order       Int           @default(0)
+  /// Denormalized from the source Fixture/CaseGroupRecord's own groupId at build time (see
+  /// routes/printQueue.ts's /print-queue/build) - lets the print queue UI filter by stage
+  /// without a join back to the source row.
+  groupId     String?
+  group       FixtureGroup? @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
 
   @@index([jobId])
+  @@index([groupId])
 }
 
 /// ipAddress/userAgent are filled in automatically by logActivity() from the current
@@ -546,6 +794,9 @@ model ActivityLogEntry {
   ipAddress String?
   userAgent String?
   createdAt DateTime @default(now())
+
+  @@index([jobId, createdAt])
+  @@index([createdAt])
 }
 
 /// Free-form key/value app settings, e.g. key "patchMapping" holding the saved CSV
@@ -560,12 +811,17 @@ model AppSetting {
 /// crew = a freelancer's portal login, see CrewProfile — created only via routes/crew.ts,
 /// never through the generic /api/users endpoint, so a CREW user always has a profile).
 model User {
-  id           String    @id @default(cuid())
-  username     String    @unique
-  displayName  String
-  passwordHash String
-  role         String    @default("USER")
-  prefsJson    String    @default("{}")
+  id              String  @id @default(cuid())
+  username        String  @unique
+  displayName     String
+  passwordHash    String
+  role            String  @default("USER")
+  prefsJson       String  @default("{}")
+  /// Self-service profile picture, any role - stored the same way as other unencrypted
+  /// uploads (job logos, plots), served through a dedicated route rather than the static
+  /// uploads mount so visibility can stay "any signed-in account" without exposing the
+  /// whole uploads directory.
+  avatarPath      String?
   /// Per-user override of the role-level permissions baseline (see permissions.ts's
   /// loadRolePermissions/PERMISSION_KEYS) — null means "use the shared USER-role baseline
   /// unmodified", same posture as JobCrewAssignment.dayRate falling back to CrewProfile.dayRate.
@@ -578,18 +834,55 @@ model User {
   /// or returned in plaintext once confirmed. totpEnabled is false (and the secret columns
   /// null) until the user has proven they can generate a valid code for it.
   totpSecretCiphertext String?
-  totpSecretIv          String?
-  totpSecretAuthTag     String?
-  totpEnabled            Boolean   @default(false)
-  totpVerifiedAt         DateTime?
+  totpSecretIv         String?
+  totpSecretAuthTag    String?
+  totpEnabled          Boolean   @default(false)
+  totpVerifiedAt       DateTime?
 
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  sessions     Session[]
-  crewProfile  CrewProfile?
-  notifications Notification[]
+  /// Set by an admin (via the server-side admin CLI's force-password-reset command, or a
+  /// future in-app equivalent) - the account can still log in normally with its current
+  /// password, but the web app blocks everything else until a new password is set, which
+  /// clears this flag automatically (see routes/auth.ts's PUT /me).
+  mustChangePassword Boolean @default(false)
+  /// Admin-set "PM" tag - the account's name shows in purple (instead of the usual role
+  /// colour) across the site, e.g. in job discussions, so the project manager stands out.
+  isProjectManager   Boolean @default(false)
+
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  sessions              Session[]
+  prepOperatorSessions  PrepOperatorSession[]
+  crewProfile           CrewProfile?
+  notifications         Notification[]
   jobDiscussionMessages JobDiscussionMessage[]
-  backupCodes  BackupCode[]
+  managedJobs           Job[]                  @relation("JobProjectManager")
+  backupCodes           BackupCode[]
+  bugReports            BugReport[]
+}
+
+/// A self-submitted bug report - "Submit a bug" in the sidebar, under the version badge.
+/// reporter* fields are denormalized off req.user at submit time (not just a userId FK) so a
+/// report stays readable even if that account is later deleted. recentActionsJson is a
+/// client-captured rolling trail of the last ~15 clicks (element descriptors only - never
+/// input values) leading up to the submission, letting whoever reviews this reconstruct what
+/// the reporter was doing, not just what they typed in the notes box. Visible only on the
+/// WEBMASTER-only Webmaster page (see routes/bugReports.ts) - not even ADMIN can read these.
+model BugReport {
+  id                String   @id @default(cuid())
+  userId            String?
+  user              User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  reporterName      String
+  reporterRole      String
+  pageUrl           String
+  pageTitle         String?
+  userAgent         String?
+  viewportWidth     Int?
+  viewportHeight    Int?
+  recentActionsJson String?
+  notes             String?
+  createdAt         DateTime @default(now())
+
+  @@index([userId])
 }
 
 /// One-time recovery codes for when a 2FA-enabled user loses their authenticator — bcrypt-
@@ -634,6 +927,7 @@ model Session {
   createdAt DateTime @default(now())
 
   @@index([userId])
+  @@index([expiresAt])
 }
 
 /// A physical print job: one PDF destined for one tray. status is one of:
@@ -653,6 +947,7 @@ model PrintJob {
   updatedAt DateTime @updatedAt
 
   @@index([status])
+  @@index([jobId])
 }
 
 model Plot {
@@ -672,6 +967,27 @@ model Plot {
 /// full API response for a given opportunity — field extraction below is a best-effort
 /// read of the documented conventions, to be verified against a real account once linked;
 /// raw data is never discarded even if a specific field turns out to be named differently.
+/// An explicit, admin-set link from a job to another Current RMS opportunity whose charges
+/// should count toward this job's crew margin — e.g. a separate "<Job> - Crewing" opportunity
+/// that isn't itself worth putting on the portal as a job. Additive to the automatic
+/// same-projectId sibling detection in routes/currentRms.ts's /crew-margin (a job can have
+/// both, and the margin calc de-dupes by rmsId): that detection only catches opportunities
+/// Current RMS itself grouped under one Project, while this covers cases where the two
+/// opportunities were created without a shared Project and need a human to say "these go
+/// together."
+model JobLinkedRmsOpportunity {
+  id        String   @id @default(cuid())
+  jobId     String
+  job       Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  rmsId     Int
+  /// Cached at link time purely for display before the next Current RMS sync populates
+  /// CurrentRmsOpportunity locally — not kept in sync afterward.
+  subject   String?
+  createdAt DateTime @default(now())
+
+  @@unique([jobId, rmsId])
+}
+
 model CurrentRmsOpportunity {
   id           String    @id @default(cuid())
   rmsId        Int       @unique
@@ -702,4 +1018,408 @@ model CurrentRmsOpportunity {
 
   @@index([rmsId])
   @@index([projectId])
+}
+
+/// A day rate for a role ("LX Tech" -> 220): jobId null is the portal-wide default for that
+/// role, otherwise it's this job's rate for the role. See crewRates.ts for where these sit in
+/// the fallback order. Roles match case-insensitively on their trimmed name (roleKey).
+model RoleRate {
+  id        String   @id @default(cuid())
+  jobId     String?
+  job       Job?     @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  role      String
+  roleKey   String
+  dayRate   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([jobId, roleKey])
+  @@index([jobId])
+}
+
+/// A job's own choice about one Current RMS charge line in its crew margin: leave it out of the
+/// charge total, or put back one the portal-wide "always leave out" list would drop. lineKey is
+/// "<opportunity id>:<opportunity item id>".
+model CrewMarginLineOverride {
+  id        String   @id @default(cuid())
+  jobId     String
+  job       Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  lineKey   String
+  name      String
+  excluded  Boolean
+  createdAt DateTime @default(now())
+
+  @@unique([jobId, lineKey])
+  @@index([jobId])
+}
+
+/// A prep bay's screen (the TV and the computer behind it, with its scanner). An admin names the
+/// bays in Settings > Prep bays; a TV claims one on first boot and keeps its token, which is
+/// also what a phone scanner pairs with (the TV shows it as a QR code).
+model ScreenDevice {
+  id               String                @id @default(cuid())
+  name             String
+  token            String                @unique
+  currentJobId     String?
+  currentJob       Job?                  @relation(fields: [currentJobId], references: [id], onDelete: SetNull)
+  lastSeenAt       DateTime?
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+  operatorSessions PrepOperatorSession[]
+}
+
+/// The crew member signed in on a bay's screen. The screen itself is signed in as a prep or
+/// signage account; this second sign-in decides who is prepping and which jobs they can open
+/// (a crew member only sees jobs they are on). Ends on sign-out or after the idle timeout.
+model PrepOperatorSession {
+  id           String       @id @default(cuid())
+  token        String       @unique
+  deviceId     String
+  device       ScreenDevice @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt    DateTime     @default(now())
+  lastActiveAt DateTime     @default(now())
+  endedAt      DateTime?
+
+  @@index([deviceId])
+}
+
+/// One prep run of a job: OPEN while it is being pulled, AWAITING_TRANSPORT once signed off,
+/// BOOKED_OUT once the transport-arrived tick has booked the prepped kit out.
+model PrepSession {
+  id                   String          @id @default(cuid())
+  jobId                String
+  job                  Job             @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  status               String          @default("OPEN")
+  startedAt            DateTime        @default(now())
+  startedByUserId      String?
+  completedAt          DateTime?
+  completedByUserId    String?
+  /// Lines that were short or not fully pulled at sign-off: [{ lineKey, name, required, pulled, short, shortNote }].
+  missingJson          String?
+  /// Set when sign-off or book-out found missing kit; cleared by an admin.
+  flaggedAt            DateTime?
+  flagResolvedAt       DateTime?
+  flagResolvedByUserId String?
+  transportAt          DateTime?
+  transportByUserId    String?
+  /// What the book-out sent to Current RMS (or would have, in dry-run), and anything not prepped.
+  bookOutJson          String?
+  notes                String?
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+  lines                PrepLineState[]
+  scans                ScanEvent[]
+  assets               PrepAssetScan[]
+
+  @@index([jobId])
+}
+
+/// Counts for one pick-list line in a prep session: 7 of 12 pulled, 2 short. lineKey is
+/// "rms:<opportunity item id>" for a Current RMS line or "case:<fixture type>" for a job
+/// without one.
+model PrepLineState {
+  id            String      @id @default(cuid())
+  prepSessionId String
+  prepSession   PrepSession @relation(fields: [prepSessionId], references: [id], onDelete: Cascade)
+  lineKey       String
+  name          String
+  required      Int
+  pulled        Int         @default(0)
+  short         Int         @default(0)
+  shortNote     String?
+  updatedAt     DateTime    @updatedAt
+
+  @@unique([prepSessionId, lineKey])
+}
+
+/// Every scan or tap on a prep screen or phone, append-only.
+/// kind: ASSET | PRODUCT | CASE | JOB | TAP | UNKNOWN; result: OK | OVER | DUPLICATE | WRONG_JOB | UNKNOWN | LOCKED.
+model ScanEvent {
+  id            String       @id @default(cuid())
+  jobId         String
+  prepSessionId String?
+  prepSession   PrepSession? @relation(fields: [prepSessionId], references: [id], onDelete: Cascade)
+  code          String
+  kind          String
+  lineKey       String?
+  result        String
+  message       String
+  source        String
+  deviceId      String?
+  userId        String?
+  createdAt     DateTime     @default(now())
+
+  @@index([jobId, createdAt])
+}
+
+/// One physical unit counted into a prep session. A serialised asset (a fixture's asset tag) can
+/// only be counted once per session; bulk stock (most cables) is one row per scan. Also what
+/// the Current RMS write-back prepares and books out.
+model PrepAssetScan {
+  id              String      @id @default(cuid())
+  prepSessionId   String
+  prepSession     PrepSession @relation(fields: [prepSessionId], references: [id], onDelete: Cascade)
+  code            String
+  serialised      Boolean     @default(true)
+  lineKey         String
+  rmsItemId       Int?
+  rmsStockLevelId Int?
+  userId          String?
+  createdAt       DateTime    @default(now())
+  rmsPreparedAt   DateTime?
+  rmsBookedOutAt  DateTime?
+  rmsError        String?
+
+  @@index([prepSessionId, code])
+}
+
+/// Maps a barcode the app did not print to Current RMS stock: an asset number (one unit) or a
+/// product barcode (bulk stock). Filled from Current RMS lookups as codes are first scanned, or
+/// taught by an admin in Settings > Prep bays for anything Current RMS does not know.
+model BarcodeAlias {
+  id              String   @id @default(cuid())
+  code            String   @unique
+  /// ASSET | PRODUCT
+  kind            String
+  rmsProductId    Int?
+  rmsStockLevelId Int?
+  label           String
+  /// RMS (looked up) | TAUGHT (set by an admin)
+  source          String   @default("RMS")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+/// The company fixture database for the cable calculator: power draw, connectors and data per
+/// fixture type, matched to patch fixture types by typeKey (lowercase letters and digits) or an
+/// alias. Seeded from the plan's reference table on first use; editable in Settings > Cable rules.
+model FixtureProfile {
+  id             String   @id @default(cuid())
+  typeKey        String   @unique
+  displayName    String
+  watts          Int
+  amps           Float?
+  /// CEE16 | TRUE1 | POWERCON | OTHER
+  powerConnector String
+  hasPowerThru   Boolean  @default(false)
+  /// DMX5 | DMX3 | ETHERCON
+  dataConnector  String   @default("DMX5")
+  hasDataThru    Boolean  @default(false)
+  maxPerLine     Int?
+  inrushA        Float?
+  /// Other names a patch uses for it, comma separated.
+  aliases        String?
+  notes          String?
+  /// Bare weight for the rigging calculator, kg.
+  weightKg       Float?
+  /// Clamp and safety bond, kg; null uses the rigging settings default.
+  clampKg        Float?
+  /// Truck pack (alpha): the case this fixture travels in (a TruckCase id).
+  truckCaseId    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+/// A hanging position on a job (a truss, the floor, FOH) with the geometry the cable calculator
+/// needs. Created from the patch's Position column; lengths come from the plot or are typed in.
+model JobPosition {
+  id          String   @id @default(cuid())
+  jobId       String
+  job         Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  name        String
+  /// TRUSS | FLOOR | FOH | OTHER
+  kind        String   @default("TRUSS")
+  lengthM     Float?
+  trimM       Float?
+  /// Horizontal run from the position's cable pick to dimmer city.
+  distanceM   Float?
+  /// Along the truss, from the cable pick to the truss's near end.
+  pickOffsetM Float?
+  /// Motors on this position (rigging).
+  motors      Int      @default(0)
+  /// PATCH | PLOT | EXPORT | MANUAL: where the geometry came from.
+  source      String   @default("PATCH")
+  /// The CAD plot truss this position is, linked by hand when the names don't match; null to
+  /// match automatically, empty when it isn't on the plot.
+  plotTruss   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([jobId, name])
+}
+
+/// The job's last cable plan and the admin's overrides on it, so re-running keeps the edits.
+model CablePlan {
+  id            String   @id @default(cuid())
+  jobId         String   @unique
+  job           Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  computedAt    DateTime @default(now())
+  inputHash     String
+  resultJson    String
+  /// { "<stock item key>": quantity } set by hand on the totals table.
+  overridesJson String   @default("{}")
+  updatedAt     DateTime @updatedAt
+}
+
+/// Geometry read from a plot PDF (or an export), cached by the file's hash so the same plot is
+/// only ever read once.
+model PlotExtraction {
+  id          String    @id @default(cuid())
+  jobId       String
+  job         Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  sourceName  String
+  sourceHash  String
+  /// Which plot this was read from and which version of it (UPLOAD:<id>, or ONEDRIVE:<itemId>
+  /// plus its modified time), so a plot that hasn't changed is never downloaded again.
+  sourceKey   String?
+  /// PDF_TEXT | EXPORT
+  method      String
+  resultJson  String
+  createdAt   DateTime  @default(now())
+  confirmedAt DateTime?
+
+  @@unique([jobId, sourceHash])
+  @@index([jobId, sourceKey])
+}
+
+/// A truss type for the rigging calculator: its own weight and the maker's allowable load table.
+model TrussProfile {
+  id              String   @id @default(cuid())
+  name            String   @unique
+  maker           String?
+  kgPerM          Float
+  /// [{ spanM, udlKgPerM }]: allowable distributed payload on a single span, from the maker's table.
+  spanTableJson   String   @default("[]")
+  /// Longest cantilever as a share of the adjacent span.
+  cantileverRatio Float    @default(0.25)
+  source          String?
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+/// A chain hoist model: rated load, class and its own weight (body plus chain).
+model HoistModel {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  ratedKg     Float
+  /// D8 | D8+ | C1
+  hoistClass  String   @default("D8+")
+  bodyKg      Float
+  chainKgPerM Float
+  chainM      Float    @default(20)
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+/// A job's rig for the rigging calculator: what was changed on top of the plot and patch (fixture
+/// positions, hoists, capacities, profiles), and the record of who calculated and checked it.
+model RiggingPlan {
+  id             String    @id @default(cuid())
+  jobId          String    @unique
+  job            Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  overridesJson  String    @default("{}")
+  method         String    @default("envelope")
+  calculatedById String?
+  calculatedAt   DateTime?
+  checkedByName  String?
+  checkedAt      DateTime?
+  /// The rig and results as they were when checked, so the record can be reproduced.
+  snapshotJson   String?
+  updatedAt      DateTime  @updatedAt
+}
+
+/// Point capacities for a venue, saved so a repeat venue doesn't need them typed in again.
+model VenuePointSet {
+  id         String   @id @default(cuid())
+  /// The venue name, lowercased.
+  venueKey   String   @unique
+  venueName  String
+  /// [{ name, capacityKg }]
+  pointsJson String
+  updatedAt  DateTime @updatedAt
+}
+
+/// Truck pack (alpha): a road case in the case library, by its outside size (castors and lid
+/// included) and empty weight. Until stock is itemised by container in Current RMS, every case on
+/// a pack is one of these.
+model TruckCase {
+  id         String          @id @default(cuid())
+  name       String          @unique
+  lengthMm   Int
+  widthMm    Int
+  heightMm   Int
+  emptyKg    Float
+  /// How many may stand in one stack, itself included: 1 never stacked, 2 double, 3 triple.
+  maxStack   Int             @default(2)
+  canGoOnTop Boolean         @default(true)
+  canRotate  Boolean         @default(true)
+  /// RIGGING | POWER | CABLE | FIXTURES | CONTROL | OTHER
+  category   String          @default("OTHER")
+  /// Units it holds when no case rule says otherwise.
+  holds      Int             @default(1)
+  notes      String?
+  itemRules  TruckItemRule[]
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+}
+
+/// Truck pack (alpha): a van, truck or trailer by its inside load space.
+model TruckVehicle {
+  id               String   @id @default(cuid())
+  name             String   @unique
+  lengthMm         Int
+  widthMm          Int
+  heightMm         Int
+  payloadKg        Float
+  doorWidthMm      Int?
+  doorHeightMm     Int?
+  /// Wheel arches: from and to along the floor, and the clear width between them.
+  archFromMm       Int?
+  archToMm         Int?
+  archClearWidthMm Int?
+  /// A drawbar trailer's own load space (the payload covers both).
+  trailerLengthMm  Int?
+  trailerWidthMm   Int?
+  trailerHeightMm  Int?
+  licence          String?
+  notes            String?
+  enabled          Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+/// Truck pack (alpha): how a kit-list line that isn't a fixture or cable is packed. Every word
+/// of `match` must appear in the line's name.
+model TruckItemRule {
+  id           String     @id @default(cuid())
+  match        String     @unique
+  caseId       String?
+  case         TruckCase? @relation(fields: [caseId], references: [id], onDelete: SetNull)
+  unitsPerCase Int        @default(1)
+  itemKg       Float      @default(0)
+  ignore       Boolean    @default(false)
+  category     String?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+}
+
+/// Truck pack (alpha): a job's choices on top of the worked-out pack.
+model TruckPlan {
+  id            String   @id @default(cuid())
+  jobId         String   @unique
+  job           Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  /// AUTO (the kit list when linked, else the patch) | PICKLIST | PATCH
+  source        String   @default("AUTO")
+  /// The vehicle chosen by hand; null means the smallest that takes it all.
+  vehicleId     String?
+  /// Case counts typed over the worked-out ones, by manifest line key.
+  overridesJson String   @default("{}")
+  /// Cases added by hand: [{ key, caseId, label, cases, kgEach }].
+  manualJson    String   @default("[]")
+  updatedById   String?
+  updatedAt     DateTime @updatedAt
 }

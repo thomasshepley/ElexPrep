@@ -1,8 +1,8 @@
 /*
- * Sidebar-based shell — replaces the earlier top-nav-bar layout. Shared by the admin/prep
+ * Sidebar-based shell - replaces the earlier top-nav-bar layout. Shared by the admin/prep
  * shell (App.tsx) and the crew portal shell (CrewLayout.tsx); both import this file once via
  * App.tsx, and since Vite's CSS isn't scoped, the classes are available globally once either
- * route has loaded — consistent with how the old top-nav classes already worked across both.
+ * route has loaded - consistent with how the old top-nav classes already worked across both.
  */
 
 .shell {
@@ -11,7 +11,7 @@
 }
 
 /* Two layers: .sidebar is a plain flex item with no height of its own, so it stretches (the
-   flex row's default align-items: stretch) to match .shell-main's actual content height —
+   flex row's default align-items: stretch) to match .shell-main's actual content height -
    its background/border read as full page height for pages taller than one screen, rather
    than stopping after the first viewport. .sidebar-sticky is what actually pins to the
    viewport while scrolling, so the nav stays reachable without the whole page needing a
@@ -44,10 +44,9 @@
 }
 
 .sidebar-brand-mark {
-  width: 1.8rem;
-  height: 1.8rem;
-  border-radius: 7px;
-  background: linear-gradient(150deg, var(--accent), var(--accent-fill));
+  width: 1.9rem;
+  height: 1.9rem;
+  display: block;
   flex-shrink: 0;
 }
 
@@ -131,56 +130,361 @@
   gap: 0.5rem;
 }
 
+.sidebar-version {
+  width: 100%;
+  text-align: center;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--content-muted);
+  text-decoration: none;
+  padding: 0.25rem 0;
+}
+
+.sidebar-version:hover {
+  color: var(--accent);
+  opacity: 1;
+}
+
 .shell-main {
   flex: 1;
   min-width: 0;
   padding: 2.75rem 3rem;
 }
 
+/* Used to cap at 1080px and center, which on a wide desktop screen left large empty margins
+   on both sides and pushed secondary sidebars (e.g. Settings' .secondary-nav) away from the
+   main sidebar instead of sitting right next to it. Just fills .shell-main's padded width now;
+   .shell-main's own 3rem padding is what keeps content off the viewport edges. */
 .shell-main-inner {
-  max-width: 1080px;
-  margin: 0 auto;
+  width: 100%;
 }
 
-@media (max-width: 760px) {
+/* Notifications, theme and sign out as one row of icon buttons rather than three full-width
+   buttons stacked down the sidebar. */
+.sidebar-actions {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.sidebar-actions > * {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.sidebar-actions .notification-bell > button {
+  flex: 1;
+}
+
+.sidebar-actions .notification-bell {
+  display: flex;
+}
+
+.sidebar-actions button {
+  padding: 0.55rem;
+}
+
+.sidebar-actions button > span:not(.notification-badge) {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.mobile-only {
+  display: none !important;
+}
+
+/* The phone tab bar and More sheet (MobileTabBar.tsx) - only rendered on phones. */
+.mobile-tabbar {
+  position: fixed;
+  z-index: 900;
+  /* Inset from every edge, so the rounded corners of the screen never cut off a tab. */
+  left: max(12px, env(safe-area-inset-left));
+  right: max(12px, env(safe-area-inset-right));
+  bottom: max(10px, env(safe-area-inset-bottom));
+  /* On a phone held sideways or a tablet, a compact centred bar rather than one stretched edge to edge. */
+  max-width: 520px;
+  margin-inline: auto;
+  display: grid;
+  grid-auto-columns: 1fr;
+  grid-auto-flow: column;
+  gap: 0.25rem;
+  padding: 0.35rem;
+  border-radius: 26px;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--surface-raised) 82%, transparent);
+  -webkit-backdrop-filter: blur(20px) saturate(1.6);
+  backdrop-filter: blur(20px) saturate(1.6);
+  box-shadow: var(--shadow-md);
+}
+
+.mobile-tabbar .notification-bell {
+  width: auto;
+  display: flex;
+}
+
+.mobile-tab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.15rem;
+  min-width: 0;
+  min-height: 52px;
+  padding: 0.3rem 0.2rem;
+  border: none;
+  border-radius: 20px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--content-muted);
+  font: inherit;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button.mobile-tab:hover:not(:disabled) {
+  transform: none;
+  box-shadow: none;
+  background: transparent;
+}
+
+.mobile-tab.active,
+button.mobile-tab.active:hover:not(:disabled) {
+  color: var(--accent);
+  background: var(--accent-wash);
+}
+
+.mobile-tab-icon {
+  position: relative;
+  display: inline-flex;
+}
+
+.mobile-tab-icon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.mobile-tab-label {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mobile-tab .notification-badge {
+  top: -0.35rem;
+  right: -0.6rem;
+}
+
+/* A bottom sheet: the More menu, and the Alerts list on phones. */
+.sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 950;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: flex-end;
+  animation: sheet-fade 160ms ease-out;
+}
+
+.sheet {
+  width: 100%;
+  max-width: 640px;
+  margin-inline: auto;
+  max-height: 85vh;
+  overflow-y: auto;
+  padding: 0.5rem max(1rem, env(safe-area-inset-right)) calc(1rem + env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
+  background: var(--surface-raised);
+  border-top: 1px solid var(--border);
+  border-radius: 22px 22px 0 0;
+  box-shadow: var(--shadow-md);
+  animation: sheet-up 220ms cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+
+.sheet-grabber {
+  width: 38px;
+  height: 5px;
+  margin: 0.2rem auto 0.9rem;
+  border-radius: 999px;
+  background: var(--border-strong);
+}
+
+.sheet-profile {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 0.6rem 0.75rem;
+  margin-bottom: 0.75rem;
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+  color: var(--content);
+  text-decoration: none;
+}
+
+.sheet-profile > span {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.sheet-profile-sub {
+  font-size: var(--text-xs);
+}
+
+.sheet-list {
+  list-style: none;
+  margin: 0 0 0.75rem;
+  padding: 0;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--surface-sunken);
+}
+
+.sheet-list li + li {
+  border-top: 1px solid var(--border);
+}
+
+.sheet-row {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  min-height: 50px;
+  padding: 0 0.85rem;
+  color: var(--content);
+  text-decoration: none;
+  font-weight: 500;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.sheet-row:active {
+  background: var(--accent-wash);
+}
+
+.sheet-row.active {
+  color: var(--accent);
+}
+
+.sheet-row-icon {
+  display: inline-flex;
+  color: var(--accent);
+}
+
+.sheet-row-icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+.sheet-row-label {
+  flex: 1;
+}
+
+.sheet-row > svg:last-child {
+  color: var(--content-muted);
+}
+
+.sheet-footer {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.sheet-footer > * {
+  min-height: 46px;
+}
+
+.sheet-footer .sidebar-signout {
+  grid-column: 1 / -1;
+  color: var(--danger);
+}
+
+.sheet-footer .sidebar-version {
+  grid-column: 1 / -1;
+  min-height: 0;
+}
+
+@keyframes sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: none;
+  }
+}
+
+@keyframes sheet-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sheet,
+  .sheet-backdrop {
+    animation: none;
+  }
+}
+
+/* Phones (and touch screens up to 1100px - see hooks/useIsPhone.ts, which must match): no
+   sidebar (MobileTabBar replaces it), content kept clear of the floating bar and the notch, and
+   nothing wider than the screen. */
+@media (max-width: 760px), (pointer: coarse) and (max-width: 1100px) {
+  html,
+  body {
+    overflow-x: clip;
+    overscroll-behavior-x: none;
+  }
+
+  body {
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Below 16px, iOS zooms the whole page in when a field is tapped - that zoom is what makes a
+     phone page slide sideways. */
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+
+  .shell {
+    display: block;
+  }
+
   .sidebar {
-    width: 76px;
-  }
-
-  .sidebar-sticky {
-    padding: 1.25rem 0.5rem;
-    align-items: center;
-  }
-
-  .sidebar-brand-text,
-  .sidebar-nav a span,
-  .sidebar-username,
-  .sidebar-signout span,
-  .sidebar-theme-toggle span {
     display: none;
   }
 
-  .sidebar-brand {
-    justify-content: center;
-    padding: 0;
+  .mobile-only {
+    display: flex !important;
   }
 
-  .sidebar-nav a {
-    justify-content: center;
-    padding: 0.65rem;
-  }
-
-  .sidebar-user-row {
-    justify-content: center;
-    padding: 0;
-  }
-
-  .sidebar-signout,
-  .sidebar-theme-toggle {
-    padding: 0.6rem;
+  .mobile-account-actions {
+    flex-direction: column;
+    gap: 0.6rem;
   }
 
   .shell-main {
-    padding: 1.5rem 1rem;
+    padding: max(1.25rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right)) calc(96px + env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
+    overflow-x: clip;
+  }
+
+  .notification-panel.is-sheet {
+    position: fixed;
+    left: max(12px, env(safe-area-inset-left));
+    right: max(12px, env(safe-area-inset-right));
+    max-width: 520px;
+    margin-inline: auto;
+    bottom: calc(max(10px, env(safe-area-inset-bottom)) + 76px);
+    width: auto;
+    max-height: 65vh;
+    border-radius: 20px;
+    z-index: 960;
   }
 }

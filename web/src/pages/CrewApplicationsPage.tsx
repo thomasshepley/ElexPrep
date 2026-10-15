@@ -1,9 +1,12 @@
+import { SkeletonList, SkeletonRegion } from '../components/Skeleton';
 import { useEffect, useState } from 'react';
 import { api, type CrewApplicationDetail, type CrewApplicationSummary } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
+import { isAdminRole } from '../auth/roles';
 import BankDetailsReveal from '../components/BankDetailsReveal';
 import WhatsAppButton from '../components/WhatsAppButton';
 import PasswordInput from '../components/PasswordInput';
+import { useDialog } from '../components/Dialog';
 
 const STATUS_FILTERS = ['PENDING', 'APPROVED', 'REJECTED', 'ALL'] as const;
 type StatusFilter = (typeof STATUS_FILTERS)[number];
@@ -15,10 +18,12 @@ function statusChipClass(status: string) {
 }
 
 export default function CrewApplicationsPage() {
+  const dialog = useDialog();
   const { user } = useAuth();
-  const isAdmin = user?.role === 'ADMIN';
+  const isAdmin = isAdminRole(user?.role);
   const [filter, setFilter] = useState<StatusFilter>('PENDING');
-  const [applications, setApplications] = useState<CrewApplicationSummary[]>([]);
+  const [applicationsLoaded, setApplications] = useState<CrewApplicationSummary[] | null>(null);
+  const applications = applicationsLoaded ?? [];
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<CrewApplicationDetail | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -49,8 +54,9 @@ export default function CrewApplicationsPage() {
   };
 
   const reject = async (id: string) => {
-    const note = prompt('Rejection note (optional):') ?? '';
-    await api.crewApplications.reject(id, note || undefined);
+    const note = await dialog.prompt({ title: 'Reject this application?', label: 'Note (optional)', multiline: true, confirmLabel: 'Reject' });
+    if (note === null) return;
+    await api.crewApplications.reject(id, note.trim() || undefined);
     setExpandedId(null);
     setDetail(null);
     refresh();
@@ -70,8 +76,9 @@ export default function CrewApplicationsPage() {
   const toggleSelectAll = () => setSelected((prev) => (prev.size === pendingIds.length ? new Set() : new Set(pendingIds)));
 
   const bulkReject = async () => {
-    const note = prompt(`Rejection note for ${selected.size} applications (optional):`) ?? '';
-    await Promise.all([...selected].map((id) => api.crewApplications.reject(id, note || undefined)));
+    const note = await dialog.prompt({ title: `Reject ${selected.size} applications?`, label: 'Note (optional)', multiline: true, confirmLabel: 'Reject' });
+    if (note === null) return;
+    await Promise.all([...selected].map((id) => api.crewApplications.reject(id, note.trim() || undefined)));
     setSelected(new Set());
     setExpandedId(null);
     setDetail(null);
@@ -95,7 +102,8 @@ export default function CrewApplicationsPage() {
       </div>
 
       {error && <p className="error">{error}</p>}
-      {applications.length === 0 && <p className="muted">No applications here.</p>}
+      {applicationsLoaded === null && !error && <SkeletonRegion className="panel"><SkeletonList items={4} /></SkeletonRegion>}
+      {applicationsLoaded !== null && applications.length === 0 && <p className="muted">No applications here.</p>}
 
       {pendingIds.length > 0 && (
         <div className="row" style={{ marginBottom: '0.75rem', gap: '0.5rem' }}>
@@ -202,13 +210,25 @@ export default function CrewApplicationsPage() {
                       </span>
                     ))
                   ) : (
-                    <span className="muted">{detail.documents.length} file(s) — admin-only to view</span>
+                    <span className="muted">{detail.documents.length} file(s) - admin-only to view</span>
                   )}
                 </div>
               )}
 
               {a.status === 'PENDING' && (
-                <ApproveForm applicationId={a.id} fullName={a.fullName} onDone={refresh} onReject={() => reject(a.id)} />
+                <ApproveForm
+                  applicationId={a.id}
+                  fullName={a.fullName}
+                  onDone={() => {
+                    setSelected((prev) => {
+                      const next = new Set(prev);
+                      next.delete(a.id);
+                      return next;
+                    });
+                    refresh();
+                  }}
+                  onReject={() => reject(a.id)}
+                />
               )}
 
               {a.status === 'REJECTED' && a.rejectionNote && (

@@ -4,16 +4,18 @@ import type { BankDetails } from '../api/client';
 const EMPTY: BankDetails = { accountName: '', sortCode: '', accountNumber: '', bankName: '' };
 
 /**
- * Structured bank details fields — replaces the old "upload a document" slot (see the schema
+ * Structured bank details fields - replaces the old "upload a document" slot (see the schema
  * comment on CrewProfile.bankDetailsCiphertext). Returns null to the caller when every field is
  * blank, so an untouched form never sends an empty-but-present bankDetails object.
  */
 export default function BankDetailsForm({
   value,
   onChange,
+  title = 'Bank details',
 }: {
   value: BankDetails | null;
   onChange: (next: BankDetails | null) => void;
+  title?: string;
 }) {
   const idPrefix = useId();
   const current = value ?? EMPTY;
@@ -26,7 +28,7 @@ export default function BankDetailsForm({
 
   return (
     <div className="field">
-      <label>Bank details</label>
+      <label>{title}</label>
       <div className="bank-details-grid">
         <div className="field">
           <label htmlFor={`${idPrefix}-name`}>Account holder name</label>
@@ -46,7 +48,7 @@ export default function BankDetailsForm({
         </div>
       </div>
       <p className="muted" style={{ marginTop: '0.3rem' }}>
-        Stored encrypted — only visible to admins reviewing compliance details, and to you.
+        Stored encrypted - only visible to admins reviewing compliance details, and to you.
       </p>
     </div>
   );

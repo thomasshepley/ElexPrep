@@ -1,44 +1,49 @@
 import { NextFunction, Request, Response } from 'express';
 import { prisma } from './db';
 import { AuthedUser, Role } from './auth';
+import { isDevelopmentLockdownEnabled, isFullLockdownEnabled } from './lockdownMode';
 
 /**
  * Granular capabilities an admin can delegate to the USER role, beyond its fixed baseline.
  * ADMIN implicitly has every permission; SIGNAGE has none (it's hardcoded read-only elsewhere).
- * All default to false: introducing this system must not silently change existing behavior —
- * every one of these previously required ADMIN outright, so an admin has to opt in to delegate.
+ * Defaults are in DEFAULT_PERMISSIONS below - mostly off, so an admin opts in to delegate.
  */
 export const PERMISSION_KEYS = [
+  'editJobs',
   'deleteJobs',
   'publishJobs',
-  'viewActivityLog',
   'linkCurrentRms',
   'onboardJobs',
   'manageOneDrive',
   'manageCrewAssignments',
   'manageCrewApplications',
   'moderateDiscussion',
+  'managePrepSettings',
 ] as const;
 
 export type PermissionKey = (typeof PERMISSION_KEYS)[number];
 export type RolePermissions = Record<PermissionKey, boolean>;
 
 export const PERMISSION_LABELS: Record<PermissionKey, string> = {
+  editJobs: "Edit a job's details (name, venue, address, dates) and upload or remove its logos and plots",
   deleteJobs: 'Delete jobs',
   publishJobs: "Publish/unpublish jobs (toggle a job's public visibility)",
-  viewActivityLog: 'View the activity log',
   linkCurrentRms: 'Link or unlink a job to a Current RMS opportunity',
   onboardJobs: 'Onboard a Current RMS Quote/Order into a portal job (the only way jobs are created)',
   manageOneDrive: "Link a job's OneDrive folder and choose which files/folders crew can see",
   manageCrewAssignments: 'Attribute crew members to a job (add/remove/edit their role on it)',
   manageCrewApplications: 'Review freelance crew applications (approve/reject, view compliance documents)',
   moderateDiscussion: "Delete other people's messages in a job's discussion thread",
+  managePrepSettings: 'Edit global prep settings (Case Rules, Location Colours, Import Mapping)',
 };
 
+// managePrepSettings defaults on: USER accounts could always edit those pages, so introducing the
+// flag must not take that away until an admin chooses to.
 export const DEFAULT_PERMISSIONS: RolePermissions = {
+  editJobs: false,
+  managePrepSettings: true,
   deleteJobs: false,
   publishJobs: false,
-  viewActivityLog: false,
   linkCurrentRms: false,
   onboardJobs: false,
   manageOneDrive: false,
@@ -66,7 +71,7 @@ export async function saveRolePermissions(patch: Partial<RolePermissions>): Prom
   return merged;
 }
 
-/** A specific USER account's override on top of the role baseline — null means none set (every
+/** A specific USER account's override on top of the role baseline - null means none set (every
  * key falls back to loadRolePermissions()). Lets one USER have different capabilities from
  * another, rather than every USER account sharing one identical policy. */
 export async function loadUserPermissionOverride(userId: string): Promise<Partial<RolePermissions> | null> {
@@ -96,7 +101,7 @@ export async function saveUserPermissionOverride(userId: string, patch: Partial<
  * is always nothing, USER is the role baseline with that specific account's override (if any)
  * merged on top. */
 export async function resolvePermissionsForUser(userId: string, role: Role): Promise<RolePermissions> {
-  if (role === 'ADMIN') {
+  if (role === 'ADMIN' || role === 'WEBMASTER') {
     return Object.fromEntries(PERMISSION_KEYS.map((k) => [k, true])) as RolePermissions;
   }
   if (role === 'SIGNAGE') {
@@ -107,8 +112,17 @@ export async function resolvePermissionsForUser(userId: string, role: Role): Pro
   return override ? { ...base, ...override } : base;
 }
 
+/** Single choke point used by /auth/me, /login, /login/verify-2fa, /setup and PUT /me - also
+ * surfaces both lockdown tiers here since /api/auth/me is the one route authMiddleware exempts
+ * from the lockdown gate, making it the only reliable way for an about-to-be-blocked account to
+ * learn it's in lockdown (for the web client's banner). */
 export async function authedUserWithPermissions(user: AuthedUser) {
-  return { ...user, permissions: await resolvePermissionsForUser(user.id, user.role) };
+  const [permissions, developmentLockdown, fullLockdown] = await Promise.all([
+    resolvePermissionsForUser(user.id, user.role),
+    isDevelopmentLockdownEnabled(),
+    isFullLockdownEnabled(),
+  ]);
+  return { ...user, permissions, developmentLockdown, fullLockdown };
 }
 
 /**
@@ -118,7 +132,7 @@ export async function authedUserWithPermissions(user: AuthedUser) {
 export function requirePermission(key: PermissionKey) {
   return async (req: Request, res: Response, next: NextFunction) => {
     if (!req.user) return res.status(401).json({ error: 'Not signed in' });
-    if (req.user.role === 'ADMIN') return next();
+    if (req.user.role === 'ADMIN' || req.user.role === 'WEBMASTER') return next();
     if (req.user.role !== 'USER') return res.status(403).json({ error: 'Insufficient permissions' });
     const perms = await resolvePermissionsForUser(req.user.id, req.user.role);
     if (!perms[key]) return res.status(403).json({ error: 'Insufficient permissions' });

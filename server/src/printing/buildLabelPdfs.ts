@@ -5,7 +5,7 @@ import { LabelType, PAL_AVERY_SHEET } from '@elexprep/shared';
 import { prisma } from '../db';
 import { uploadDir } from '../routes/jobs';
 import { loadLocationColorMap, LocationColorMap } from '../pdf/locationColors';
-import { renderLabelTypeGeneric } from '../pdf/genericRenderer';
+import { renderLabelTypeGeneric, type LogoImages } from '../pdf/genericRenderer';
 import { loadMergedTemplate } from '../routes/labelTemplates';
 
 export type LabelContentByType = Record<string, unknown[]>;
@@ -30,7 +30,7 @@ function expandContent(
 
 /**
  * Combines queue items + ad hoc labels into one ordered list per label type, sorted by the
- * shared `order` field rather than simply concatenating queue-then-adhoc — so a manual
+ * shared `order` field rather than simply concatenating queue-then-adhoc - so a manual
  * reorder (which writes `order` across both sources in the same per-type sequence) is
  * respected when building the actual print PDF, not just whatever order the two tables
  * happen to return rows in.
@@ -52,7 +52,7 @@ export async function collectConfirmedContent(jobId: string): Promise<LabelConte
 }
 
 /**
- * The not-yet-confirmed view of the queue (PENDING items + ad hoc labels) — this is what the
+ * The not-yet-confirmed view of the queue (PENDING items + ad hoc labels) - this is what the
  * "what will actually print" preview renders, since it's what a user is looking at before
  * they've hit either confirm action.
  */
@@ -64,14 +64,32 @@ export async function collectPendingContent(jobId: string): Promise<LabelContent
   return buildOrderedByType([...pending, ...adHoc]);
 }
 
-async function loadJobLogo(jobId: string): Promise<{ bytes: Uint8Array; kind: 'png' | 'jpg' } | undefined> {
-  const job = await prisma.job.findUnique({ where: { id: jobId } });
-  if (!job?.logoPath) return undefined;
-  const ext = path.extname(job.logoPath).toLowerCase();
+function loadLogoFile(logoPath: string | null): { bytes: Uint8Array; kind: 'png' | 'jpg' } | undefined {
+  if (!logoPath) return undefined;
+  const ext = path.extname(logoPath).toLowerCase();
   const kind = ext === '.png' ? 'png' : ext === '.jpg' || ext === '.jpeg' ? 'jpg' : null;
-  const filePath = path.join(uploadDir, job.logoPath);
+  const filePath = path.join(uploadDir, logoPath);
   if (!kind || !fs.existsSync(filePath)) return undefined;
   return { bytes: fs.readFileSync(filePath), kind };
+}
+
+/** The job's up-to-three logo slots (left/middle/right - see routes/jobs.ts's LOGO_SLOT_FIELDS),
+ * embedded as pdf-lib images ready to hand to renderLabelTypeGeneric. Most jobs only ever set
+ * the legacy single "middle" slot. */
+async function loadJobLogos(doc: PDFDocument, jobId: string): Promise<LogoImages> {
+  const job = await prisma.job.findUnique({ where: { id: jobId } });
+  if (!job) return {};
+  const embed = async (logoPath: string | null) => {
+    const file = loadLogoFile(logoPath);
+    if (!file) return undefined;
+    return file.kind === 'png' ? doc.embedPng(file.bytes) : doc.embedJpg(file.bytes);
+  };
+  const [left, middle, right] = await Promise.all([
+    embed(job.logoPathLeft),
+    embed(job.logoPath),
+    embed(job.logoPathRight),
+  ]);
+  return { left, middle, right, scales: { left: job.logoScaleLeft, middle: job.logoScale, right: job.logoScaleRight } };
 }
 
 export async function renderLabelType(
@@ -83,12 +101,11 @@ export async function renderLabelType(
 ): Promise<void> {
   const template = await loadMergedTemplate(jobId, labelType as LabelType);
   if (!template) throw new Error(`Unknown label type: ${labelType}`);
-  const logo = template.labelType === 'PAL' ? await loadJobLogo(jobId) : undefined;
-  const logoImage = logo ? await (logo.kind === 'png' ? doc.embedPng(logo.bytes) : doc.embedJpg(logo.bytes)) : undefined;
-  return renderLabelTypeGeneric(doc, template, items, locationColors, logoImage);
+  const logos = template.labelType === 'PAL' ? await loadJobLogos(doc, jobId) : {};
+  return renderLabelTypeGeneric(doc, template, items, locationColors, logos);
 }
 
-/** One PDF per label type — the unit a print job (and its tray selection) operates on. */
+/** One PDF per label type - the unit a print job (and its tray selection) operates on. */
 export async function buildPdfPerType(
   jobId: string,
   byType: LabelContentByType
@@ -106,7 +123,7 @@ export async function buildPdfPerType(
   return out;
 }
 
-/** All types combined into a single PDF — used for both the manual download and the live preview. */
+/** All types combined into a single PDF - used for both the manual download and the live preview. */
 export async function buildCombinedPdf(jobId: string, byType: LabelContentByType): Promise<Buffer> {
   const locationColors = await loadLocationColorMap(jobId);
   const doc = await PDFDocument.create();
@@ -119,10 +136,10 @@ export async function buildCombinedPdf(jobId: string, byType: LabelContentByType
 
 /**
  * PAL content collated 4-up onto an Avery 105x148-R sheet (A4 landscape, plain paper + Avery
- * self-adhesive stock) instead of PAL's usual one-per-page direct-to-label-printer output —
+ * self-adhesive stock) instead of PAL's usual one-per-page direct-to-label-printer output -
  * a separate export for print shops/offices without the dedicated die-cut label printer.
  * Reuses the job's own (possibly customized) PAL template content/logo, swapping only the
- * sheet geometry — see PAL_AVERY_SHEET's own comment for why the same element layout carries
+ * sheet geometry - see PAL_AVERY_SHEET's own comment for why the same element layout carries
  * over to the physically larger Avery label without needing its own template.
  */
 export async function buildPalAverySheetPdf(jobId: string, items: unknown[]): Promise<Buffer> {
@@ -130,8 +147,7 @@ export async function buildPalAverySheetPdf(jobId: string, items: unknown[]): Pr
   const doc = await PDFDocument.create();
   const template = await loadMergedTemplate(jobId, 'PAL');
   const averyTemplate = { ...template, sheet: PAL_AVERY_SHEET };
-  const logo = await loadJobLogo(jobId);
-  const logoImage = logo ? await (logo.kind === 'png' ? doc.embedPng(logo.bytes) : doc.embedJpg(logo.bytes)) : undefined;
-  await renderLabelTypeGeneric(doc, averyTemplate, items, locationColors, logoImage);
+  const logos = await loadJobLogos(doc, jobId);
+  await renderLabelTypeGeneric(doc, averyTemplate, items, locationColors, logos);
   return Buffer.from(await doc.save());
 }

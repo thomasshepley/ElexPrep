@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { requirePermission } from '../permissions';
 import { prisma, logActivity } from '../db';
 
 export const fixtureTypeRulesRouter = Router();
@@ -8,7 +9,7 @@ fixtureTypeRulesRouter.get('/', async (_req, res) => {
   res.json(rules);
 });
 
-fixtureTypeRulesRouter.post('/', async (req, res) => {
+fixtureTypeRulesRouter.post('/', requirePermission('managePrepSettings'), async (req, res) => {
   const { name, unitsPerCase, caseLabelOverride } = req.body ?? {};
   if (!name || typeof name !== 'string') {
     return res.status(400).json({ error: 'name is required' });
@@ -24,7 +25,7 @@ fixtureTypeRulesRouter.post('/', async (req, res) => {
   res.status(201).json(rule);
 });
 
-fixtureTypeRulesRouter.put('/:id', async (req, res) => {
+fixtureTypeRulesRouter.put('/:id', requirePermission('managePrepSettings'), async (req, res) => {
   const { name, unitsPerCase, caseLabelOverride } = req.body ?? {};
   const rule = await prisma.fixtureTypeRule.update({
     where: { id: req.params.id },
@@ -37,7 +38,7 @@ fixtureTypeRulesRouter.put('/:id', async (req, res) => {
   res.json(rule);
 });
 
-fixtureTypeRulesRouter.delete('/:id', async (req, res) => {
+fixtureTypeRulesRouter.delete('/:id', requirePermission('managePrepSettings'), async (req, res) => {
   await prisma.fixtureTypeRule.delete({ where: { id: req.params.id } });
   res.status(204).end();
 });

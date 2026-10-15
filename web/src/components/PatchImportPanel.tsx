@@ -1,10 +1,57 @@
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PATCH_FIELD_LABELS, type PatchFieldKey } from '@elexprep/shared';
-import { api, type Fixture, type PatchImportCandidate } from '../api/client';
+import { api, type Fixture, type FixtureGroup, type PatchImportCandidate, type PatchImportResult } from '../api/client';
 import FileInput from './FileInput';
+import { useToast } from './Toast';
+import { useDialog } from './Dialog';
+import { formatDateTime } from '../utils/format';
+import InlineEdit from './InlineEdit';
+import LocationSelect, { useJobLocations } from './LocationSelect';
+import { Skeleton, SkeletonRegion, SkeletonRows } from './Skeleton';
+import PatchFilePicker from './PatchFilePicker';
 
-export default function PatchImportPanel({ jobId }: { jobId: string }) {
+/** Fixture types that actually take a separate pixel-map patch - only these get the Pix
+ * Uni/Pix Addr columns in the fixtures table. Matched on letters and digits only, so
+ * "Prolights AstraBlade IP", "AstraBladeIP" and "PixelLine IP" all count. */
+const PIXEL_MAPPED_TYPE_KEYS = ['astrabladeip', 'pixellineip'];
+
+function supportsPixelMap(fixtureType: string | null | undefined): boolean {
+  const key = (fixtureType ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  return PIXEL_MAPPED_TYPE_KEYS.some((k) => key.includes(k));
+}
+
+function announceNewFixtureTypes(showToast: ReturnType<typeof useToast>['showToast'], types: string[]) {
+  if (types.length === 0) return;
+  const list = types.length <= 3 ? types.join(', ') : `${types.slice(0, 3).join(', ')} +${types.length - 3} more`;
+  showToast(
+    `${types.length === 1 ? 'New fixture type' : 'New fixture types'} added to case rules: ${list}`,
+    'info'
+  );
+}
+
+/** A re-import merges onto what's already there (see routes/patch.ts's mergeFixtures) rather
+ * than wiping it, so the summary says what actually happened instead of just a flat count. */
+function summarizeImport(res: PatchImportResult): string {
+  const parts: string[] = [];
+  if (res.matched > 0) parts.push(`${res.matched} updated`);
+  if (res.created > 0) parts.push(`${res.created} new`);
+  if (res.removed > 0) parts.push(`${res.removed} removed`);
+  return parts.length > 0 ? `${res.imported} fixtures (${parts.join(', ')})` : `${res.imported} fixtures`;
+}
+
+export default function PatchImportPanel({
+  jobId,
+  groupId = null,
+  stages = [],
+}: {
+  jobId: string;
+  groupId?: string | null;
+  /** The job's stages, for "Move to stage" (empty when the job doesn't use stages). */
+  stages?: FixtureGroup[];
+}) {
+  const dialog = useDialog();
+  const { showToast } = useToast();
   const [rows, setRows] = useState<Record<string, string>[]>([]);
   const [savedMapping, setSavedMapping] = useState<Record<string, string> | null>(null);
   const [missingColumns, setMissingColumns] = useState<{ field: string; column: string }[]>([]);
@@ -14,13 +61,16 @@ export default function PatchImportPanel({ jobId }: { jobId: string }) {
   const [busy, setBusy] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkLocation, setBulkLocation] = useState('');
+  const [fixtureSearch, setFixtureSearch] = useState('');
 
   const [candidate, setCandidate] = useState<PatchImportCandidate | null>(null);
   const [scanError, setScanError] = useState<string | null>(null);
   const [scanBusy, setScanBusy] = useState(false);
+  const [picking, setPicking] = useState(false);
 
   const loadFixtures = () => api.patch.fixtures(jobId).then(setFixtures);
   const loadCandidate = () => api.patch.getOneDriveCandidate(jobId).then(setCandidate);
+
 
   useEffect(() => {
     loadFixtures();
@@ -28,27 +78,15 @@ export default function PatchImportPanel({ jobId }: { jobId: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [jobId]);
 
-  const scanOneDrive = async () => {
-    setScanBusy(true);
-    setScanError(null);
-    try {
-      const res = await api.patch.scanOneDrive(jobId);
-      if (res.candidate) setCandidate(res.candidate);
-      else if (!res.detected) setScanError('No patch CSV in the "Patch" folder, and no usable table found in the CAD PDF either.');
-    } catch (e) {
-      setScanError((e as Error).message);
-    } finally {
-      setScanBusy(false);
-    }
-  };
-
   const approveCandidate = async () => {
     setScanBusy(true);
     setScanError(null);
     try {
-      const res = await api.patch.approveOneDriveCandidate(jobId);
+      const res = await api.patch.approveOneDriveCandidate(jobId, groupId);
       setCandidate(res.candidate);
       await loadFixtures();
+      showToast(`Imported ${summarizeImport(res)}`);
+      announceNewFixtureTypes(showToast, res.newFixtureTypes);
     } catch (e) {
       setScanError((e as Error).message);
     } finally {
@@ -57,11 +95,12 @@ export default function PatchImportPanel({ jobId }: { jobId: string }) {
   };
 
   const rejectCandidate = async () => {
-    const note = prompt('Rejection note (optional):') ?? '';
+    const note = await dialog.prompt({ title: 'Reject this patch file?', label: 'Note (optional)', multiline: true, confirmLabel: 'Reject' });
+    if (note === null) return;
     setScanBusy(true);
     setScanError(null);
     try {
-      const res = await api.patch.rejectOneDriveCandidate(jobId, note || undefined);
+      const res = await api.patch.rejectOneDriveCandidate(jobId, note.trim() || undefined);
       setCandidate(res.candidate);
     } catch (e) {
       setScanError((e as Error).message);
@@ -79,9 +118,53 @@ export default function PatchImportPanel({ jobId }: { jobId: string }) {
     });
   };
 
+  const stageFixtures = (fixtures ?? []).filter((f) => (f.groupId ?? null) === groupId);
+
+  const locationOptions = useJobLocations(jobId, (fixtures ?? []).map((f) => f.location));
+  const showPixColumns = stageFixtures.some((f) => supportsPixelMap(f.fixtureType));
+  const columnCount = showPixColumns ? 10 : 8;
+
   const toggleSelectAll = () => {
-    if (!fixtures) return;
-    setSelected((s) => (s.size === fixtures.length ? new Set() : new Set(fixtures.map((f) => f.id))));
+    setSelected((s) => (s.size === stageFixtures.length ? new Set() : new Set(stageFixtures.map((f) => f.id))));
+  };
+
+  const searchedFixtures = stageFixtures.filter((f) => {
+    if (!fixtureSearch.trim()) return true;
+    const haystack = `${f.address} ${f.fixtureType} ${f.location ?? ''} ${f.mode ?? ''}`.toLowerCase();
+    return haystack.includes(fixtureSearch.trim().toLowerCase());
+  });
+
+  /** Groups fixtures by type (sorted alphabetically, address order preserved within each
+   * group) so a patch with many fixture types reads as sections instead of one long flat
+   * list sorted only by address. */
+  const fixtureGroups = searchedFixtures.reduce<{ type: string; items: Fixture[] }[]>((groups, f) => {
+    const type = f.fixtureType || 'Unlabeled';
+    let group = groups.find((g) => g.type === type);
+    if (!group) {
+      group = { type, items: [] };
+      groups.push(group);
+    }
+    group.items.push(f);
+    return groups;
+  }, []).sort((a, b) => a.type.localeCompare(b.type));
+
+  const currentStageName = stages.length > 0 ? (groupId === null ? 'Ungrouped' : stages.find((g) => g.id === groupId)?.name ?? null) : null;
+  const [moveTarget, setMoveTarget] = useState('');
+
+  const bulkMove = async () => {
+    if (!moveTarget) return;
+    const target = moveTarget === '__ungrouped' ? null : moveTarget;
+    const name = target === null ? 'Ungrouped' : stages.find((g) => g.id === target)?.name ?? 'that stage';
+    const count = selected.size;
+    try {
+      await api.patch.bulkMoveFixtures(jobId, [...selected], target);
+      setSelected(new Set());
+      setMoveTarget('');
+      await loadFixtures();
+      showToast(`Moved ${count} fixture${count === 1 ? '' : 's'} to ${name}`);
+    } catch (e) {
+      showToast((e as Error).message, 'error');
+    }
   };
 
   const bulkSetLocation = async () => {
@@ -92,7 +175,7 @@ export default function PatchImportPanel({ jobId }: { jobId: string }) {
   };
 
   const bulkDelete = async () => {
-    if (!confirm(`Delete ${selected.size} selected fixtures?`)) return;
+    if (!(await dialog.confirm({ title: `Delete ${selected.size} fixtures?`, confirmLabel: 'Delete', danger: true }))) return;
     await api.patch.bulkRemoveFixtures(jobId, [...selected]);
     setSelected(new Set());
     loadFixtures();
@@ -106,13 +189,14 @@ export default function PatchImportPanel({ jobId }: { jobId: string }) {
       await api.patch.updateFixture(jobId, f.id, { [field]: value } as Partial<Fixture>);
       loadFixtures();
     } catch (e) {
-      alert((e as Error).message);
+      showToast((e as Error).message, 'error');
       loadFixtures();
+      throw e;
     }
   };
 
   const removeFixture = async (id: string) => {
-    if (!confirm('Delete this fixture?')) return;
+    if (!(await dialog.confirm({ title: 'Delete this fixture?', confirmLabel: 'Delete', danger: true }))) return;
     await api.patch.removeFixture(jobId, id);
     setSelected((s) => {
       const next = new Set(s);
@@ -139,11 +223,12 @@ export default function PatchImportPanel({ jobId }: { jobId: string }) {
     setBusy(true);
     setError(null);
     try {
-      const res = await api.patch.import(jobId, rows);
+      const res = await api.patch.import(jobId, rows, undefined, groupId);
       await loadFixtures();
       setRows([]);
       setFileName(null);
-      alert(`Imported ${res.imported} fixtures`);
+      showToast(`Imported ${summarizeImport(res)}`);
+      announceNewFixtureTypes(showToast, res.newFixtureTypes);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -156,35 +241,48 @@ export default function PatchImportPanel({ jobId }: { jobId: string }) {
     (m) => m.field === 'address' || m.field === 'fixtureType'
   );
 
-  return (
-    <div>
+  const importSection = (
+    <>
       <div className="panel">
         <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
           <h3>OneDrive patch import</h3>
-          <button className="secondary" onClick={scanOneDrive} disabled={scanBusy}>
-            Scan OneDrive for patch file
+          <button className="secondary" onClick={() => setPicking(true)} disabled={scanBusy}>
+            Choose from OneDrive
           </button>
         </div>
         <p className="muted">
-          Looks for a CSV in this job's OneDrive "Patch" subfolder, falling back to extracting a
-          table from the CAD PDF if there's no CSV. Nothing is applied automatically — a detected
-          file sits here for review until approved.
+          Pick the patch from this job's OneDrive folder (or a PDF on the Plots tab): a CSV export,
+          a patch PDF, or a CAD drawing with the patch table on it. Nothing is applied
+          automatically - the file's rows wait here for review until approved. A file that's been
+          imported before can be chosen again.
+          {currentStageName && ` Imports into ${currentStageName}.`}
         </p>
         {scanError && <p className="error">{scanError}</p>}
+        {picking && (
+          <PatchFilePicker
+            jobId={jobId}
+            onClose={() => setPicking(false)}
+            onPicked={(c) => {
+              setPicking(false);
+              setScanError(null);
+              setCandidate(c);
+            }}
+          />
+        )}
 
         {candidate && candidate.status === 'PENDING' && (
           <div className="row panel" style={{ background: 'rgba(255,255,255,0.04)', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
             <div>
               <strong>{candidate.fileName}</strong>
-              {candidate.extractedFrom === 'pdf' && <span className="chip chip-warning"> Extracted from CAD PDF</span>}
+              {candidate.extractedFrom === 'pdf' && <span className="chip chip-warning"> Read from PDF</span>}
               <p className="muted" style={{ margin: 0 }}>
-                {candidate.rowCount} rows &middot; detected {new Date(candidate.detectedAt).toLocaleString()} &middot;{' '}
+                {candidate.rowCount} rows &middot; detected {formatDateTime(candidate.detectedAt)} &middot;{' '}
                 {candidate.oneDriveItemPath}
               </p>
               {candidate.extractedFrom === 'pdf' && (
                 <p className="error" style={{ margin: '0.3rem 0 0' }}>
-                  No patch CSV was found — these rows were lifted from the CAD PDF by fuzzy table
-                  extraction, not a real export. Check them carefully before approving.
+                  These rows were read out of a PDF's patch table, not a CSV export. Check them
+                  carefully before approving.
                 </p>
               )}
             </div>
@@ -198,7 +296,7 @@ export default function PatchImportPanel({ jobId }: { jobId: string }) {
         )}
         {candidate && candidate.status === 'APPROVED' && (
           <p className="muted">
-            Last approved: {candidate.fileName} ({candidate.rowCount} rows), {new Date(candidate.reviewedAt ?? candidate.detectedAt).toLocaleString()}.
+            Last approved: {candidate.fileName} ({candidate.rowCount} rows), {formatDateTime(candidate.reviewedAt ?? candidate.detectedAt)}.
           </p>
         )}
         {candidate && candidate.status === 'REJECTED' && (
@@ -213,7 +311,7 @@ export default function PatchImportPanel({ jobId }: { jobId: string }) {
         <h3>Upload Wysiwyg patch CSV</h3>
         <p className="muted">
           Columns are mapped using the saved layout from{' '}
-          <Link to="/settings/import-mapping">Settings → Import Mapping</Link> — no need to remap
+          <Link to="/settings/import-mapping">Settings → Import Mapping</Link> - no need to remap
           each time.
         </p>
         <FileInput accept=".csv" onFile={onFile} label="Choose CSV" />
@@ -222,42 +320,44 @@ export default function PatchImportPanel({ jobId }: { jobId: string }) {
 
       {fileName && (
         <div className="panel">
-          <h3>Ready to import — {fileName}</h3>
+          <h3>Ready to import - {fileName}</h3>
           <p className="muted">{rows.length} rows found.</p>
 
           {!mappingOk && (
             <p className="error">
-              No saved column mapping yet — set it up in{' '}
+              No saved column mapping yet - set it up in{' '}
               <Link to="/settings/import-mapping">Settings → Import Mapping</Link> first.
             </p>
           )}
 
           {mappingOk && (
             <>
-              <table style={{ maxWidth: 480 }}>
-                <thead>
-                  <tr>
-                    <th>Field</th>
-                    <th>CSV column</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {Object.entries(savedMapping).map(([field, column]) => (
-                    <tr key={field}>
-                      <td>{PATCH_FIELD_LABELS[field as PatchFieldKey] ?? field}</td>
-                      <td>
-                        {column}
-                        {missingColumns.some((m) => m.field === field) && (
-                          <span className="error"> — not in this file</span>
-                        )}
-                      </td>
+              <div className="table-scroll">
+                <table style={{ maxWidth: 480 }}>
+                  <thead>
+                    <tr>
+                      <th>Field</th>
+                      <th>CSV column</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {Object.entries(savedMapping).map(([field, column]) => (
+                      <tr key={field}>
+                        <td>{PATCH_FIELD_LABELS[field as PatchFieldKey] ?? field}</td>
+                        <td>
+                          {column}
+                          {missingColumns.some((m) => m.field === field) && (
+                            <span className="error"> - not in this file</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
               {requiredMissing && (
                 <p className="error">
-                  This file is missing the mapped Address/Fixture Type columns — check the file or
+                  This file is missing the mapped Address/Fixture Type columns - check the file or
                   update the mapping in Settings.
                 </p>
               )}
@@ -275,44 +375,75 @@ export default function PatchImportPanel({ jobId }: { jobId: string }) {
           )}
         </div>
       )}
+    </>
+  );
 
-      <div className="panel">
-        <div className="row" style={{ justifyContent: 'space-between' }}>
-          <h3>Imported fixtures</h3>
-          <button className="secondary" onClick={loadFixtures}>
-            Refresh
-          </button>
-        </div>
-        {!fixtures && <p className="muted">Not loaded yet.</p>}
-        {fixtures && fixtures.length === 0 && <p className="muted">No fixtures imported yet.</p>}
-        {fixtures && fixtures.length > 0 && (
-          <>
-            <p className="muted">Every field is editable in place (click and type, saves on blur).</p>
-            {selected.size > 0 && (
-              <div className="row panel" style={{ background: 'rgba(255,255,255,0.04)', alignItems: 'center', gap: '0.6rem' }}>
-                <strong>{selected.size} selected</strong>
-                <input
-                  placeholder="Set location to…"
-                  value={bulkLocation}
-                  onChange={(e) => setBulkLocation(e.target.value)}
-                  style={{ width: 160 }}
-                />
-                <button onClick={bulkSetLocation}>Set location</button>
-                <button className="secondary" onClick={bulkDelete}>
-                  Delete selected
-                </button>
-                <button className="secondary" onClick={() => setSelected(new Set())}>
-                  Clear selection
-                </button>
-              </div>
-            )}
+  const fixturesSection = (
+    <div className="panel">
+      <div className="row" style={{ justifyContent: 'space-between' }}>
+        <h3>Imported fixtures</h3>
+        <button className="secondary" onClick={loadFixtures}>
+          Refresh
+        </button>
+      </div>
+      {fixtures && stageFixtures.length === 0 && <p className="muted">No fixtures imported for this stage yet.</p>}
+      {fixtures && stageFixtures.length > 0 && (
+        <>
+          <p className="muted">Click any value to edit it - Enter or clicking away saves, Escape cancels.</p>
+          <input aria-label="Search fixtures"
+            placeholder="Search fixtures…"
+            value={fixtureSearch}
+            onChange={(e) => setFixtureSearch(e.target.value)}
+            style={{ width: '16rem', marginBottom: '0.6rem' }}
+          />
+          {selected.size > 0 && (
+            <div className="row panel" style={{ background: 'rgba(255,255,255,0.04)', alignItems: 'center', gap: '0.6rem' }}>
+              <strong>{selected.size} selected</strong>
+              <LocationSelect
+                value={bulkLocation}
+                options={locationOptions}
+                onChange={setBulkLocation}
+                ariaLabel="Location for the selected fixtures"
+                placeholder="Set location to…"
+                width="12rem"
+              />
+              <button onClick={bulkSetLocation} disabled={!bulkLocation}>
+                Set location
+              </button>
+              {stages.length > 0 && (
+                <>
+                  <select aria-label="Stage to move the selected fixtures to" value={moveTarget} onChange={(e) => setMoveTarget(e.target.value)} style={{ width: '12rem' }}>
+                    <option value="">Move to stage…</option>
+                    {groupId !== null && <option value="__ungrouped">Ungrouped</option>}
+                    {stages
+                      .filter((g) => g.id !== groupId)
+                      .map((g) => (
+                        <option key={g.id} value={g.id}>
+                          {g.name}
+                        </option>
+                      ))}
+                  </select>
+                  <button onClick={bulkMove} disabled={!moveTarget}>
+                    Move
+                  </button>
+                </>
+              )}
+              <button className="secondary" onClick={bulkDelete}>
+                Delete selected
+              </button>
+              <button className="secondary" onClick={() => setSelected(new Set())}>
+                Clear selection
+              </button>
+            </div>
+          )}
+          <div className="table-scroll">
             <table>
               <thead>
                 <tr>
                   <th>
                     <input
                       type="checkbox"
-                      checked={selected.size === fixtures.length && fixtures.length > 0}
+                      checked={selected.size === stageFixtures.length && stageFixtures.length > 0}
                       onChange={toggleSelectAll}
                     />
                   </th>
@@ -320,79 +451,65 @@ export default function PatchImportPanel({ jobId }: { jobId: string }) {
                   <th>Type</th>
                   <th>Main Uni</th>
                   <th>Main Addr</th>
-                  <th>Pix Uni</th>
-                  <th>Pix Addr</th>
+                    {showPixColumns && <th>Pix Uni</th>}
+                    {showPixColumns && <th>Pix Addr</th>}
                   <th>Mode</th>
                   <th>Location</th>
                   <th></th>
                 </tr>
               </thead>
               <tbody>
-                {fixtures.map((f) => (
+                {fixtureGroups.map((group) => (
+                  <Fragment key={group.type}>
+                    <tr>
+                        <td colSpan={columnCount} style={{ fontWeight: 700, paddingTop: '0.75rem' }}>
+                        {group.type} <span className="muted" style={{ fontWeight: 400 }}>({group.items.length})</span>
+                      </td>
+                    </tr>
+                    {group.items.map((f) => (
                   <tr key={f.id}>
                     <td>
                       <input type="checkbox" checked={selected.has(f.id)} onChange={() => toggleSelected(f.id)} />
                     </td>
                     <td>
-                      <input
-                        type="number"
-                        defaultValue={f.address}
-                        style={{ width: 60 }}
-                        onBlur={(e) => updateFixture(f, 'address', e.target.value)}
-                      />
+                      <InlineEdit type="number" label="Address" value={f.address} width={60} onSave={(v) => updateFixture(f, 'address', v)} />
                     </td>
                     <td>
-                      <input
-                        defaultValue={f.fixtureType}
-                        style={{ width: 120 }}
-                        onBlur={(e) => updateFixture(f, 'fixtureType', e.target.value)}
-                      />
+                      <InlineEdit label="Type" value={f.fixtureType} width={150} onSave={(v) => updateFixture(f, 'fixtureType', v)} />
                     </td>
                     <td>
-                      <input
-                        type="number"
-                        defaultValue={f.mainUniverse ?? ''}
-                        style={{ width: 55 }}
-                        onBlur={(e) => updateFixture(f, 'mainUniverse', e.target.value)}
-                      />
+                      <InlineEdit type="number" label="Main universe" value={f.mainUniverse} width={55} onSave={(v) => updateFixture(f, 'mainUniverse', v)} />
                     </td>
                     <td>
-                      <input
-                        type="number"
-                        defaultValue={f.mainAddress ?? ''}
-                        style={{ width: 55 }}
-                        onBlur={(e) => updateFixture(f, 'mainAddress', e.target.value)}
-                      />
+                      <InlineEdit type="number" label="Main address" value={f.mainAddress} width={55} onSave={(v) => updateFixture(f, 'mainAddress', v)} />
+                    </td>
+                      {showPixColumns &&
+                        (supportsPixelMap(f.fixtureType) ? (
+                          <>
+                            <td>
+                              <InlineEdit type="number" label="Pixel universe" value={f.pixUniverse} width={55} onSave={(v) => updateFixture(f, 'pixUniverse', v)} />
+                            </td>
+                            <td>
+                              <InlineEdit type="number" label="Pixel address" value={f.pixAddress} width={55} onSave={(v) => updateFixture(f, 'pixAddress', v)} />
+                            </td>
+                          </>
+                        ) : (
+                          <>
+                            <td className="muted">-</td>
+                            <td className="muted">-</td>
+                          </>
+                        ))}
+                    <td>
+                      <InlineEdit label="Mode" value={f.mode} width={120} onSave={(v) => updateFixture(f, 'mode', v)} />
                     </td>
                     <td>
-                      <input
-                        type="number"
-                        defaultValue={f.pixUniverse ?? ''}
-                        style={{ width: 55 }}
-                        onBlur={(e) => updateFixture(f, 'pixUniverse', e.target.value)}
-                      />
-                    </td>
-                    <td>
-                      <input
-                        type="number"
-                        defaultValue={f.pixAddress ?? ''}
-                        style={{ width: 55 }}
-                        onBlur={(e) => updateFixture(f, 'pixAddress', e.target.value)}
-                      />
-                    </td>
-                    <td>
-                      <input
-                        defaultValue={f.mode ?? ''}
-                        style={{ width: 100 }}
-                        onBlur={(e) => updateFixture(f, 'mode', e.target.value)}
-                      />
-                    </td>
-                    <td>
-                      <input
-                        defaultValue={f.location ?? ''}
-                        style={{ width: 90 }}
-                        onBlur={(e) => updateFixture(f, 'location', e.target.value)}
-                      />
+                        <LocationSelect
+                          value={f.location ?? ''}
+                          options={locationOptions}
+                          // updateFixture already toasts a failure; the select snaps back on reload.
+                          onChange={(value) => updateFixture(f, 'location', value).catch(() => {})}
+                          ariaLabel={`Location for fixture ${f.address ?? ''}`}
+                        />
                     </td>
                     <td>
                       <button className="secondary" onClick={() => removeFixture(f.id)}>
@@ -400,12 +517,52 @@ export default function PatchImportPanel({ jobId }: { jobId: string }) {
                       </button>
                     </td>
                   </tr>
+                    ))}
+                  </Fragment>
                 ))}
               </tbody>
             </table>
-          </>
-        )}
-      </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+
+  // Once a stage has fixtures, they're what people come here for: lead with them and tuck the
+  // import tools into a collapsed "Re-import" section (opened automatically while a file or a
+  // detected candidate is waiting for review).
+  const hasFixtures = stageFixtures.length > 0;
+  const reviewPending = rows.length > 0 || candidate?.status === 'PENDING';
+
+  // Until fixtures load we can't tell which layout this stage gets, so hold one shaped like the
+  // common case (fixtures listed, import tucked away) instead of flashing the import tools.
+  if (fixtures === null) {
+    return (
+      <SkeletonRegion>
+        <div className="panel">
+          <div className="row" style={{ justifyContent: 'space-between' }}>
+            <h3>Imported fixtures</h3>
+            <Skeleton w={84} h={36} r={8} />
+          </div>
+          <Skeleton w="45%" h={12} style={{ marginBottom: 14 }} />
+          <SkeletonRows rows={8} cols={6} />
+        </div>
+      </SkeletonRegion>
+    );
+  }
+
+  return (
+    <div className="load-fade">
+      {hasFixtures && !reviewPending && fixturesSection}
+      {hasFixtures ? (
+        <details className="reimport" open={reviewPending}>
+          <summary>Re-import patch</summary>
+          {importSection}
+        </details>
+      ) : (
+        importSection
+      )}
+      {(!hasFixtures || reviewPending) && fixturesSection}
     </div>
   );
 }

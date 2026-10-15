@@ -1,4 +1,4 @@
-/** Optional certifications/tickets a crew member may hold — same comma-separated-string
+/** Optional certifications/tickets a crew member may hold - same comma-separated-string
  * storage convention as crewSkills.ts (CrewProfile.certifications / CrewApplication.certifications),
  * shown behind a collapsible section on the application/account forms rather than inline with
  * the always-visible fields, since most people only hold a handful of these. */

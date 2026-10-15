@@ -1,8 +1,14 @@
+import { Skeleton, SkeletonPanel } from '../components/Skeleton';
 import { useEffect, useState } from 'react';
 import { api, type CurrentRmsConfig, type CurrentRmsOpportunity } from '../api/client';
 import PasswordInput from '../components/PasswordInput';
+import { useDialog } from '../components/Dialog';
+import { useToast } from '../components/Toast';
+import { formatDate, formatDateTime } from '../utils/format';
 
 export default function CurrentRmsSettingsPage() {
+  const dialog = useDialog();
+  const { showToast } = useToast();
   const [config, setConfig] = useState<CurrentRmsConfig | null>(null);
   const [subdomain, setSubdomain] = useState('');
   const [apiKeyInput, setApiKeyInput] = useState('');
@@ -20,16 +26,22 @@ export default function CurrentRmsSettingsPage() {
   const [opportunities, setOpportunities] = useState<CurrentRmsOpportunity[]>([]);
   const [search, setSearch] = useState('');
 
+  const [loadError, setLoadError] = useState<string | null>(null);
+
   const loadConfig = () =>
-    api.currentRms.getConfig().then((c) => {
+    api.currentRms
+      .getConfig()
+      .then((c) => {
       setConfig(c);
       setSubdomain(c.subdomain);
       setPollMinutes(c.pollMinutes);
       setEnabled(c.enabled);
       setEditingApiKey(!c.hasApiKey);
-    });
+      })
+      .catch((e) => setLoadError((e as Error).message));
 
-  const loadOpportunities = (q?: string) => api.currentRms.listOpportunities(q).then(setOpportunities);
+  const loadOpportunities = (q?: string) =>
+    api.currentRms.listOpportunities(q).then(setOpportunities).catch((e) => setSaveError((e as Error).message));
 
   useEffect(() => {
     loadConfig();
@@ -59,7 +71,7 @@ export default function CurrentRmsSettingsPage() {
   };
 
   const removeApiKey = async () => {
-    if (!confirm('Remove the saved Current RMS API key? Syncing will stop working until a new key is saved.')) return;
+    if (!(await dialog.confirm({ title: 'Remove the Current RMS API key?', message: 'Syncing stops until a new key is saved.', confirmLabel: 'Remove key', danger: true }))) return;
     setBusy(true);
     setSaveError(null);
     setSaveMessage(null);
@@ -113,20 +125,26 @@ export default function CurrentRmsSettingsPage() {
   const importOpportunity = async (rmsId: number) => {
     try {
       const job = await api.currentRms.importOpportunity(rmsId);
-      alert(`Created job "${job.name}" — it's private until you mark it Public in Job Settings.`);
+      showToast(`Created "${job.name}" - it's private until you mark it Public in Job Settings.`, 'success');
     } catch (e) {
-      alert((e as Error).message);
+      showToast((e as Error).message, 'error');
     }
   };
 
-  if (!config) return null;
+  if (!config) return loadError ? <p className="error">Could not load Current RMS settings: {loadError}</p> : (
+      <div>
+        <h1>Current RMS</h1>
+        <Skeleton w="60%" h={14} style={{ marginBottom: 20 }} />
+        <SkeletonPanel lines={5} /><SkeletonPanel rows={4} cols={4} />
+      </div>
+    );
 
   return (
     <div>
       <h1>Current RMS</h1>
       <p className="muted">
         Pulls opportunities from Current RMS so you can turn one into a job here. Only admins
-        see this raw opportunity list — once you import one as a job, it stays private until
+        see this raw opportunity list - once you import one as a job, it stays private until
         you mark it Public in that job's settings, which is when normal users can see it.
       </p>
       {saveMessage && <p className="muted">{saveMessage}</p>}
@@ -135,9 +153,8 @@ export default function CurrentRmsSettingsPage() {
       <div className="panel">
         <h3>Connection</h3>
         <div className="row" style={{ flexWrap: 'wrap' }}>
-          <label>
-            Subdomain
-            <br />
+          <label className="field">
+            <span className="field-label">Subdomain</span>
             <input
               value={subdomain}
               placeholder="yourcompany"
@@ -148,9 +165,8 @@ export default function CurrentRmsSettingsPage() {
               from https://<strong>yourcompany</strong>.current-rms.com
             </div>
           </label>
-          <label>
-            API key
-            <br />
+          <label className="field">
+            <span className="field-label">API key</span>
             {!editingApiKey ? (
               <div className="row" style={{ marginTop: '0.1rem' }}>
                 <span className="success" style={{ fontWeight: 600 }}>
@@ -189,12 +205,11 @@ export default function CurrentRmsSettingsPage() {
             <div className="muted" style={{ fontSize: '0.8rem', marginTop: '0.25rem' }}>
               {editingApiKey
                 ? 'Not saved until you click Save below.'
-                : "Saved — Test connection below uses this saved key unless you click Replace and type a new one."}
+                : "Saved - Test connection below uses this saved key unless you click Replace and type a new one."}
             </div>
           </label>
-          <label>
-            Poll every (minutes)
-            <br />
+          <label className="field">
+            <span className="field-label">Poll every (minutes)</span>
             <input
               type="number"
               min={1}
@@ -239,7 +254,7 @@ export default function CurrentRmsSettingsPage() {
         >
           <strong>Last synced</strong>
           <span className={config.lastSyncError ? 'error' : 'muted'}>
-            {config.lastSyncedAt ? new Date(config.lastSyncedAt).toLocaleString() : 'Never synced yet'}
+            {config.lastSyncedAt ? formatDateTime(config.lastSyncedAt) : 'Never synced yet'}
           </span>
         </div>
         {config.lastSyncError && (
@@ -256,41 +271,43 @@ export default function CurrentRmsSettingsPage() {
         </div>
         {opportunities.length === 0 && (
           <p className="muted">
-            No opportunities cached yet — save a valid connection above and click Sync now.
+            No opportunities cached yet - save a valid connection above and click Sync now.
           </p>
         )}
         {opportunities.length > 0 && (
-          <table>
-            <thead>
-              <tr>
-                <th>Subject</th>
-                <th>Customer</th>
-                <th>Status</th>
-                <th>Dates</th>
-                <th>Updated</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {opportunities.map((o) => (
-                <tr key={o.id}>
-                  <td>{o.subject}</td>
-                  <td>{o.memberName}</td>
-                  <td>{o.status}</td>
-                  <td className="muted">
-                    {o.startsAt ? new Date(o.startsAt).toLocaleDateString() : ''}
-                    {o.endsAt ? ` – ${new Date(o.endsAt).toLocaleDateString()}` : ''}
-                  </td>
-                  <td className="muted">{o.rmsUpdatedAt ? new Date(o.rmsUpdatedAt).toLocaleString() : ''}</td>
-                  <td>
-                    <button className="secondary" onClick={() => importOpportunity(o.rmsId)}>
-                      Import as job
-                    </button>
-                  </td>
+          <div className="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Subject</th>
+                  <th>Customer</th>
+                  <th>Status</th>
+                  <th>Dates</th>
+                  <th>Updated</th>
+                  <th></th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {opportunities.map((o) => (
+                  <tr key={o.id}>
+                    <td>{o.subject}</td>
+                    <td>{o.memberName}</td>
+                    <td>{o.status}</td>
+                    <td className="muted">
+                      {o.startsAt ? formatDate(o.startsAt) : ''}
+                      {o.endsAt ? ` – ${formatDate(o.endsAt)}` : ''}
+                    </td>
+                    <td className="muted">{o.rmsUpdatedAt ? formatDateTime(o.rmsUpdatedAt) : ''}</td>
+                    <td>
+                      <button className="secondary" onClick={() => importOpportunity(o.rmsId)}>
+                        Import as job
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
     </div>

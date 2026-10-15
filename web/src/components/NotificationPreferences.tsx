@@ -1,15 +1,14 @@
 import { useState } from 'react';
-import { NOTIFICATION_CATEGORIES, NOTIFICATION_CATEGORY_LABELS, type NotificationCategory } from '@elexprep/shared';
+import { NOTIFICATION_CATEGORIES, NOTIFICATION_CATEGORY_LABELS, STAFF_ONLY_NOTIFICATION_CATEGORIES, type NotificationCategory } from '@elexprep/shared';
 import { api } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 
 /**
  * Per-category notification opt-out, shared by the staff My Preferences page and the crew
- * portal's My Account page — both read/write the same User.prefs.notifications JSON (see
+ * portal's My Account page - both read/write the same User.prefs.notifications JSON (see
  * server/src/notifications.ts's isCategoryEnabled), so one component serves both without
- * needing to know which shell it's in. Showing all four categories to everyone is deliberately
- * simple: a category that can never fire for a given role (e.g. "New crew applications" for a
- * crew account) is just never going to notify them regardless of this setting.
+ * needing to know which shell it's in. Crew accounts don't see the staff-only categories (e.g.
+ * "New crew applications"), which could never notify them.
  */
 export default function NotificationPreferences() {
   const { user, setUser } = useAuth();
@@ -28,7 +27,7 @@ export default function NotificationPreferences() {
 
   return (
     <div>
-      {NOTIFICATION_CATEGORIES.map((category) => (
+      {NOTIFICATION_CATEGORIES.filter((c) => user.role !== 'CREW' || !STAFF_ONLY_NOTIFICATION_CATEGORIES.includes(c)).map((category) => (
         <label key={category} className="switch" style={{ display: 'flex', marginBottom: '0.6rem' }}>
           <input type="checkbox" checked={stored[category] !== false} onChange={(e) => toggle(category, e.target.checked)} />
           <span className="switch-track" />

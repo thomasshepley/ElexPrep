@@ -1,19 +1,19 @@
 /**
  * Declarative label templates: each label type's physical layout (text positions, sizes,
  * fills) expressed as data instead of imperative pdf-lib draw calls. This is what the
- * per-job template override system (a future milestone) will edit — a `LabelTemplate` row
+ * per-job template override system (a future milestone) will edit - a `LabelTemplate` row
  * stores a partial, per-element-id patch on top of the DEFAULT_LABEL_TEMPLATES entry below,
  * merged by `mergeTemplate`.
  *
  * Geometry is inches, top-left origin, relative to a reference cell whose width is
- * `referenceCellWidthIn` on the template — matching the existing `CellGeometry` convention.
+ * `referenceCellWidthIn` on the template - matching the existing `CellGeometry` convention.
  * Where a sheet's cells vary slightly in width (PAL's left/right columns), the renderer
  * scales every element's x/y/w/h by the actual cell's width relative to that reference, the
  * same technique the original PAL renderer used for its own sub-regions.
  *
  * `baselineOffsetIn` mirrors the pdf-lib convention used throughout the original renderer:
  * inches up from the BOTTOM of the element's box to the text baseline (not a top-down offset)
- * — e.g. `cell.hPt - inPt(0.62)` in the old code is `baselineOffsetIn = H - 0.62`.
+ * - e.g. `cell.hPt - inPt(0.62)` in the old code is `baselineOffsetIn = H - 0.62`.
  */
 
 import { LabelType } from './types';
@@ -56,13 +56,13 @@ export interface TextElementDef extends BaseElementDef {
   size: number;
   minSize?: number;
   fitToWidth?: boolean;
-  /** Total inches subtracted from `w` before fitting — margin the text must not touch. */
+  /** Total inches subtracted from `w` before fitting - margin the text must not touch. */
   fitMarginIn?: number;
   color: LabelElementColor;
-  /** Inches up from the bottom of the element box to the text baseline — scales with the cell. */
+  /** Inches up from the bottom of the element box to the text baseline - scales with the cell. */
   baselineOffsetIn: number;
   /**
-   * A further baseline adjustment, in inches, applied AFTER scaling and never itself scaled —
+   * A further baseline adjustment, in inches, applied AFTER scaling and never itself scaled -
    * reproduces the original PAL renderer's hand-written offsets, which mixed a proportional
    * term (e.g. half the region's height) with a flat physical nudge in the same expression.
    * Omit for every non-PAL template, where the sheet's cells are all the same size and this
@@ -75,7 +75,7 @@ export interface TextElementDef extends BaseElementDef {
   field?: string;
   /**
    * One-off: when the item's `field` is truthy, the element's width is scaled by
-   * DMX_CABLE_WIDTH_FACTOR and a dashed cut line is drawn at the resulting right edge — the
+   * DMX_CABLE_WIDTH_FACTOR and a dashed cut line is drawn at the resulting right edge - the
    * narrow-strip + cut-line treatment unique to DMX cable labels. Deliberately a small,
    * explicit escape hatch rather than a generic conditional-geometry language.
    */
@@ -381,7 +381,7 @@ export const DEFAULT_LABEL_TEMPLATES: Record<LabelType, LabelTypeTemplate> = {
  * Applies a per-job, per-element partial override on top of a default template. Only the
  * geometry/style fields present in `overrides` are replaced; an element with no override
  * entry (including a brand-new default element added in a later release) passes through
- * untouched — so a job customized before a new element existed still picks it up.
+ * untouched - so a job customized before a new element existed still picks it up.
  */
 export function mergeTemplate(
   base: LabelTypeTemplate,
@@ -405,7 +405,10 @@ export function mergeTemplate(
 // ---------------------------------------------------------------------------
 
 export interface FixtureLabelContent {
-  address: number;
+  // Null when the source patch had no unit/spot number for this fixture yet (see
+  // schema.prisma's Fixture.address doc comment) - the label still prints, just with a blank
+  // address, until an admin fills one in and regenerates.
+  address: number | null;
   mainUniverse?: number | null;
   mainAddress?: number | null;
   pixUniverse?: number | null;
@@ -462,7 +465,7 @@ export function resolveLabelContent(labelType: LabelType, item: unknown): Record
         infoLines.push(`Pix: Uni: ${c.pixUniverse} Add: ${c.pixAddress}`);
       }
       if (c.mode) infoLines.push(`Mode: ${c.mode}`);
-      return { address: String(c.address), infoLines };
+      return { address: c.address === null ? '' : String(c.address), infoLines };
     }
     case 'TRUSS_SPIKE_POSITION': {
       const c = item as TrussSpikePositionContent;

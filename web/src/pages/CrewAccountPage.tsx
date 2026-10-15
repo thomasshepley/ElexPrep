@@ -1,3 +1,4 @@
+import { SkeletonPanel } from '../components/Skeleton';
 import { useEffect, useState } from 'react';
 import { api, type BankDetails, type CrewMe } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
@@ -9,17 +10,21 @@ import RateCardEditor from '../components/RateCardEditor';
 import NotificationPreferences from '../components/NotificationPreferences';
 import TwoFactorPanel from '../components/TwoFactorPanel';
 import PasswordInput from '../components/PasswordInput';
+import Avatar from '../components/Avatar';
+import FileInput from '../components/FileInput';
+import MobileAccountActions from '../components/MobileAccountActions';
 
 /**
  * Crew self-service: the first place a crew member can edit anything about their own account
- * (previously everything was admin-only — see routes/crewPortal.ts's PUT /me). Profile basics
+ * (previously everything was admin-only - see routes/crewPortal.ts's PUT /me). Profile basics
  * (phone/skills/notes/etc.) are its own crew-scoped endpoint; password change reuses the same
  * role-agnostic /api/auth/me staff accounts already use (see PreferencesPage); notification
  * preferences is the exact same shared component both shells use.
  */
 export default function CrewAccountPage() {
-  const { user } = useAuth();
+  const { user, setUser } = useAuth();
   const [me, setMe] = useState<CrewMe | null>(null);
+  const [avatarBusy, setAvatarBusy] = useState(false);
   const [phone, setPhone] = useState('');
   const [skills, setSkills] = useState('');
   const [certifications, setCertifications] = useState('');
@@ -98,16 +103,57 @@ export default function CrewAccountPage() {
     }
   };
 
-  if (!me) return <p className="muted">Loading…</p>;
+  const uploadAvatar = async (file: File) => {
+    setAvatarBusy(true);
+    try {
+      setUser(await api.auth.uploadAvatar(file));
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setAvatarBusy(false);
+    }
+  };
+
+  const removeAvatar = async () => {
+    setAvatarBusy(true);
+    try {
+      setUser(await api.auth.removeAvatar());
+    } finally {
+      setAvatarBusy(false);
+    }
+  };
+
+  if (!me)
+    return (
+      <div>
+        <h1>My account</h1>
+        <SkeletonPanel lines={5} />
+        <SkeletonPanel lines={3} />
+      </div>
+    );
 
   return (
     <div>
       <h1>My account</h1>
+      <MobileAccountActions />
       {message && <p className="muted">{message}</p>}
       {error && <p className="error">{error}</p>}
 
       <div className="panel">
         <h3>Profile</h3>
+        {user && (
+          <div className="row" style={{ alignItems: 'center', gap: '0.9rem', marginBottom: '0.9rem' }}>
+            <Avatar userId={user.id} displayName={user.displayName} hasAvatar={Boolean(user.avatarPath)} size={56} />
+            <div>
+              <FileInput accept="image/*" disabled={avatarBusy} onFile={uploadAvatar} label={user.avatarPath ? 'Replace picture' : 'Upload picture'} />
+              {user.avatarPath && (
+                <button type="button" className="secondary" disabled={avatarBusy} onClick={removeAvatar} style={{ marginLeft: '0.5rem' }}>
+                  Remove
+                </button>
+              )}
+            </div>
+          </div>
+        )}
         <form onSubmit={saveProfile}>
           <div className="row" style={{ alignItems: 'flex-end', flexWrap: 'wrap', gap: '0.9rem' }}>
             <div className="field" style={{ width: '12rem' }}>
@@ -147,9 +193,9 @@ export default function CrewAccountPage() {
 
           <div className="field">
             <label>Bank details</label>
-            <BankDetailsReveal hasBankDetails={me.hasBankDetails} fetchDetails={api.crewPortal.bankDetails} />
+            <BankDetailsReveal hasBankDetails={me.hasBankDetails} fetchDetails={api.crewPortal.bankDetails} version={me} />
           </div>
-          <BankDetailsForm value={bankDetails} onChange={setBankDetails} />
+          <BankDetailsForm value={bankDetails} onChange={setBankDetails} title="Change bank details" />
           <p className="muted" style={{ marginTop: '-0.5rem' }}>
             Leave blank to keep what's already on file.
           </p>

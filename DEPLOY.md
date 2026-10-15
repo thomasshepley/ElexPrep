@@ -1,17 +1,57 @@
-# Deploying ElexPrep with Docker
+# Deploying ElexPrep on an AWS EC2 VPS
 
-One container runs everything: the API, the web UI, and the SQLite database. All state
-(database, logos, plots, generated print-job PDFs) lives in a single `data/` folder next to
+One container runs everything: the API, the web UI, and the SQLite database. A second,
+small container (Caddy) sits in front of it and handles HTTPS. All state (database, logos,
+plots, generated print-job PDFs) lives in a single `data/` folder next to
 `docker-compose.yml` — back that folder up and you have the whole app.
 
 ## Prerequisites
 
-- Docker with Compose v2:
-  - **Windows Server / Windows 11**: [Docker Desktop](https://docs.docker.com/desktop/setup/install/windows-install/)
-    (or Docker Engine in WSL2)
-  - **Linux**: `docker` + `docker compose` from your distro or docker.com
-- The `elex.lighting` domain in a Cloudflare account (free plan is fine), for the permanent
-  `portal.elex.lighting` binding below. Not needed just to run the app locally/on the LAN.
+- An AWS account.
+- A free [Cloudflare](https://dash.cloudflare.com/sign-up) account, used only to manage DNS
+  for the `portal.elex.lighting` subdomain — see "Go live" below for why, and for the
+  OVH-specific steps to delegate just that subdomain without touching your main
+  OVH-hosted `elex.lighting` site or email at all.
+- Comfort with a terminal and SSH. Everything below is run over SSH on the instance itself.
+
+## Launch the instance
+
+1. **EC2 → Launch instance.**
+   - **AMI**: Ubuntu Server 24.04 LTS (or 22.04 — either works).
+   - **Instance type**: `t3.small` (2 vCPU, 2 GB RAM) is a comfortable default — this is a
+     single lightweight Node/SQLite app, but the Docker build step below briefly needs more
+     headroom than `t3.micro` reliably gives it.
+   - **Storage**: bump the root EBS volume to at least **20 GB** (gp3) — the default 8 GB
+     gets tight once Docker's build layers and a growing `data/` folder are on the same disk.
+   - **Key pair**: create or pick one — you'll need the `.pem` file to SSH in.
+   - **Security group**: create a new one with:
+     | Type | Port | Source |
+     |---|---|---|
+     | SSH | 22 | **your own IP only** (`My IP` in the console), not `0.0.0.0/0` |
+     | HTTP | 80 | `0.0.0.0/0` (needed for Let's Encrypt's certificate check) |
+     | HTTPS | 443 | `0.0.0.0/0` |
+
+     Nothing else needs to be open — port 4000 (the app itself) is never exposed to the
+     security group at all; see "Go live" below for how it's still reachable for initial setup.
+2. **Allocate an Elastic IP** (EC2 → Network & Security → Elastic IPs → Allocate) and
+   **associate it with the new instance**. Without this, the instance's public IP changes on
+   every stop/start, which would break DNS every time.
+3. **SSH in**: `ssh -i your-key.pem ubuntu@<elastic-ip>`
+
+## Install Docker
+
+```bash
+sudo apt update && sudo apt install -y ca-certificates curl
+sudo install -m 0755 -d /etc/apt/keyrings
+sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+sudo chmod a+r /etc/apt/keyrings/docker.asc
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+sudo apt update && sudo apt install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+sudo usermod -aG docker $USER
+```
+
+Log out and back in (or run `newgrp docker`) so the group change takes effect, then confirm
+with `docker compose version`.
 
 ## First deployment
 
@@ -19,80 +59,92 @@ One container runs everything: the API, the web UI, and the SQLite database. All
 git clone https://github.com/thomasshepley/ElexPrep.git
 cd ElexPrep
 
-# Required: the key that encrypts crew compliance documents, bank details, and 2FA secrets
-# at rest. Generate one and save it somewhere safe (a password manager, not just this .env
-# file) — losing it makes any already-stored crew documents/bank details unrecoverable.
+# Required: the key that encrypts crew compliance documents, bank details, 2FA secrets, and
+# the Current RMS/OneDrive API credentials at rest. Generate one and save it somewhere safe
+# (a password manager, not just this .env file) — losing it makes anything already stored
+# with it unrecoverable.
 echo "CREW_DOC_ENCRYPTION_KEY=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")" > .env
 
 docker compose up -d --build
 ```
 
-Then open **http://localhost:4000** (or `http://<server-ip>:4000` from another machine —
-allow TCP 4000 through the firewall).
+This also starts the `caddy` service, but nothing public-facing is actually live yet — Caddy
+won't get a certificate until DNS points at this box (see "Go live" below), and the app
+container isn't published to the internet at all.
 
-The first visit shows the **create admin account** screen. Do this immediately — whoever
-gets there first owns the instance.
+## Create the admin account (before DNS is wired up)
 
-## Previewing externally (before portal.elex.lighting is wired up)
+The first visit to the app shows the **create admin account** screen, with no invite or
+confirmation step — whoever submits that form first owns the instance. Do this now, while
+the app is reachable only via SSH, rather than after the public domain is live.
 
-Until the permanent domain (below) is set up, use a quick Cloudflare Tunnel for a real,
-working, HTTPS-accessible preview — no port forwarding, no DNS changes, works behind a
-dynamic IP/CGNAT:
+From your own machine (not the EC2 box), open an SSH tunnel to the app's loopback-only port:
 
 ```bash
-# one-off install (see https://pkg.cloudflare.com for other platforms)
-# Windows: winget install --id Cloudflare.cloudflared   (open a NEW terminal afterward)
-# macOS:   brew install cloudflared
-# Linux:   curl -L --output cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb && sudo dpkg -i cloudflared.deb
-
-cloudflared tunnel --url http://localhost:4000
+ssh -i your-key.pem -L 4000:localhost:4000 ubuntu@<elastic-ip>
 ```
 
-This prints a `https://random-words.trycloudflare.com` URL immediately — open it from
-anywhere (e.g. your phone on mobile data) to confirm the deployment is really reachable
-externally. The URL changes each time you restart the command, so it's only meant for
-ad hoc previews, not something to leave running.
+Leave that running and open **http://localhost:4000** in your browser — this is tunnelled
+straight to the instance's `127.0.0.1:4000`, never touching the public internet. Create the
+admin account here. You can close the tunnel afterwards; this step only needs doing once.
 
-## Going live at portal.elex.lighting (permanent, no port forwarding)
+## Go live at portal.elex.lighting
 
-A **named tunnel** through Cloudflare keeps `portal.elex.lighting` pointed at this
-container permanently, with a real TLS certificate Cloudflare manages for you — no port
-forwarding, no static IP needed, and the tunnel survives the server rebooting or the ISP
-changing your IP. The `cloudflared` service is already scaffolded in `docker-compose.yml`
-(commented out); this just walks through turning it on.
+Your main site (`elex.lighting`) stays exactly where it is, on OVH — nothing here touches
+its hosting, its DNS, or its email. Cloudflare is not needed at all: add one DNS record
+directly in OVH's own DNS zone, pointing just the `portal` subdomain at the EC2 box.
+(Cloudflare's "Add a site" flow only accepts root/apex domains like `elex.lighting` — it
+rejects a subdomain-only entry like `portal.elex.lighting` outright, so there's no working
+Cloudflare-only-for-the-subdomain option here; see the note at the end if you want
+Cloudflare's proxy/WAF anyway.)
 
-1. **Create the tunnel.** In the [Cloudflare Zero Trust dashboard](https://one.dash.cloudflare.com/)
-   (the `elex.lighting` account) go to **Networks → Tunnels → Create a tunnel**, choose
-   **Cloudflared**, and name it something like `elexprep-portal`.
-2. **Copy the token.** The next step ("Install and run a connector") shows a command
-   containing a long token after `--token`. Copy just that token value — you won't paste
-   the whole command, Docker runs the connector for you.
-3. **Save it to `.env`** next to `docker-compose.yml` on the server (alongside
-   `CREW_DOC_ENCRYPTION_KEY` from the first-deployment step above):
-   ```bash
-   echo "CLOUDFLARE_TUNNEL_TOKEN=<paste the token here>" >> .env
+1. **In OVH, add one A record.** Log into the [OVH Control Panel](https://www.ovh.com/manager/)
+   → **Web Cloud → Domains** → `elex.lighting` → **DNS zone**, and add:
    ```
-4. **Add the public hostname.** Still in the tunnel's settings, go to **Public Hostnames →
-   Add a public hostname**: subdomain `portal`, domain `elex.lighting`, service type
-   `HTTP`, URL `elexprep:4000` (the container name from `docker-compose.yml`, reachable by
-   name on Docker's internal network — not `localhost`). Save. Cloudflare creates the
-   `portal.elex.lighting` DNS record for you automatically; no manual DNS edit needed.
-5. **Uncomment the `cloudflared` service** in `docker-compose.yml` (delete the `#` at the
-   start of each of its lines) and start it:
+   Subdomain: portal        Type: A        Target: <your Elastic IP>
+   ```
+   (OVH's own field names may differ slightly, e.g. "sub-domain"/"target".) This is the only
+   change made in OVH's DNS — the root domain, `www`, and any mail (MX) records already there
+   are untouched.
+2. **Confirm the Caddy config** (`deploy/caddy/Caddyfile`) points at the right domain. It
+   already does by default: its site address is `portal.elex.lighting`. The same file also
+   holds the maintenance page setup (see **Updating to a new version**).
+3. **Wait for the record to propagate** — usually minutes, occasionally up to a few hours.
+   Check with:
    ```bash
+   dig portal.elex.lighting         # should resolve to the Elastic IP
+   ```
+   Once that resolves correctly, restart Caddy so it notices and requests the certificate:
+   ```bash
+   docker compose restart caddy
+   ```
+   Follow `docker compose logs -f caddy` the first time — it should report obtaining a
+   certificate (via Let's Encrypt, automatically — no Cloudflare involved) within a few
+   seconds of DNS resolving correctly.
+4. **Confirm it's live**: open `https://portal.elex.lighting` from your phone on mobile data
+   (not from the EC2 box itself) to prove it's really reachable over the public internet.
+5. **Turn on `COOKIE_SECURE`** now that every login goes through HTTPS:
+   ```bash
+   echo "COOKIE_SECURE=true" >> .env
    docker compose up -d
    ```
-6. **Confirm it's live**: open `https://portal.elex.lighting` from a phone on mobile data
-   (not the office Wi-Fi) to prove it's really reachable over the public internet, not just
-   the LAN.
-7. **Turn on `COOKIE_SECURE`** now that every login goes through HTTPS — add
-   `COOKIE_SECURE=true` to `.env` and `docker compose up -d` once more to pick it up. Skip
-   this if signage TVs or anything else still logs in over plain `http://<lan-ip>:4000` —
-   see the comment in `docker-compose.yml` for why that combination breaks login.
 
-From here, `git pull && docker compose up -d --build` (see **Updating to a new version**
-below) keeps `portal.elex.lighting` current — the tunnel and domain binding don't need
-touching again.
+From here, `updatesite` (see **Updating to a new version** below) keeps
+`portal.elex.lighting` current — DNS, the Elastic IP, and the certificate don't
+need touching again (Caddy renews automatically).
+
+**If you actually want Cloudflare in front of this subdomain** (its proxy/CDN, WAF, or
+analytics — not required for anything above to work), the only way is to move the *entire*
+`elex.lighting` domain's nameservers to Cloudflare, not just `portal`. That means: before
+touching anything, write down every record currently in OVH's DNS zone for `elex.lighting`
+(the main site's A/CNAME records, and critically every mail record — MX, SPF, DKIM, DMARC —
+since getting one of those wrong breaks email delivery, not just the website); recreate all
+of them exactly in Cloudflare's DNS zone for `elex.lighting`; add the new `portal` A record
+pointing at the Elastic IP there too; then change elex.lighting's nameservers at OVH to the
+two Cloudflare gives you. Hosting doesn't move — the main site and mail keep running on
+whatever servers they run on today — only DNS management moves to Cloudflare. This is real
+extra work and risk for a benefit (Cloudflare's proxy features) this app doesn't need, so
+it's not the recommended path; it's here only in case you want it for the main site too.
 
 ## Test checklist (everything except physical printing)
 
@@ -132,36 +184,157 @@ When all of that passes, the release is steady everywhere except the physical pr
 ## Updating to a new version
 
 ```bash
-git pull
-docker compose up -d --build
+./scripts/updatesite.sh
 ```
 
-Database migrations run automatically on container start. The `data/` folder is untouched
-by rebuilds.
+This keeps the site up for nearly all of the update:
 
-**Optional: a one-word `updatesite` command.** `scripts/updatesite.sh` runs those same two
-commands from wherever the repo actually lives, so you don't have to remember the path.
-Make it runnable as a plain command once:
+1. it pulls the latest code;
+2. it builds the new version **while the current one keeps serving everyone** (the slow part);
+3. it swaps the app container over. That takes a few seconds, and Caddy holds each request
+   and retries it rather than failing it, so people see a short pause, not an error. If the
+   swap ever takes longer than 30 seconds, they get the **Down for maintenance** page, which
+   reloads by itself when the site is back;
+4. it waits until the new version answers, applies any change to the Caddy config, and
+   prints `Live on vX.Y.Z`.
+
+Database migrations run automatically when the new container starts. The `data/` folder is
+untouched by updates. Old images are cleaned up afterwards so the disk doesn't fill.
+
+For a big update you'd rather nobody used the site during (a large database migration, say),
+put the maintenance page up for the switch-over:
 
 ```bash
-chmod +x scripts/updatesite.sh
-sudo ln -s "$(pwd)/scripts/updatesite.sh" /usr/local/bin/updatesite
+./scripts/updatesite.sh --maintenance
 ```
 
-From then on, `updatesite` from any directory pulls and rebuilds.
+If the new version doesn't come up within three minutes, the script stops, prints the app's
+recent logs, and (with `--maintenance`) leaves the maintenance page up until you fix it.
+
+### Updating from the Webmaster page
+
+The webmaster can also check for and run updates from **Webmaster > Site controls > Site
+updates**, without SSH. The app runs in a container and is deliberately never given the
+Docker socket (that would hand anyone who broke into the app the whole server), so a small
+agent on the server does the work instead:
+
+1. the page writes a one-word request (`check`, `update` or `update-maintenance`) into
+   `data/ops/`, which the container shares with the server;
+2. a systemd path unit notices it and runs `scripts/update-agent.sh` as you, which refuses
+   anything else and runs `git fetch` (for a check) or `updatesite` (for an update);
+3. the agent writes its progress and log back into `data/ops/`, and the page shows them live.
+
+Set it up once, as the user that normally runs `updatesite` (it needs to be in the `docker`
+group and able to `git pull`):
+
+```bash
+./scripts/install-update-agent.sh
+```
+
+Then press **Check for updates** on the Webmaster page. It shows what's waiting on GitHub,
+including the changelog for each new version. **Update** asks for your password again (and
+your authenticator code if 2FA is on). Tick **Show the maintenance page** for a big update;
+everyone, you included, sees the maintenance page during the swap, and the Webmaster page
+comes back with the result when the site does. If an update fails with the maintenance page
+on, the agent turns it off again, since there'd be no way back in from the web; the site
+stays on the old version and the log says why.
+
+The page refuses to update when the server has commits of its own or files changed by hand,
+since a pull couldn't fast-forward; sort those out over SSH. To check on the agent:
+`systemctl status elexprep-update.path`, and `journalctl -u elexprep-update.service` for its
+runs. To take it out again: `./scripts/install-update-agent.sh --remove`.
+
+### Maintenance mode
+
+For anything else that needs the site quiet (restoring a backup, server work), switch the
+maintenance page on and off yourself:
+
+```bash
+./scripts/maintenance.sh on                  # everyone sees "Down for maintenance"
+./scripts/maintenance.sh on "Back by 10pm"   # with a note on the page
+./scripts/maintenance.sh status
+./scripts/maintenance.sh off
+```
+
+It takes effect straight away, with no restart. Caddy serves the page itself, so it works
+even while the app container is stopped or being rebuilt. Anyone with the site open is
+moved onto it the next time their page talks to the server, and the page checks every 10
+seconds and goes back to the site on its own once maintenance is off.
+
+While it's on you can still reach the app directly over the SSH tunnel to `127.0.0.1:4000`
+(see **Create the admin account**) to check a new version before reopening.
+
+**Optional: one-word `updatesite` and `maintenance` commands.** Make them runnable from
+any directory once:
+
+```bash
+chmod +x scripts/updatesite.sh scripts/maintenance.sh
+sudo ln -sf "$(pwd)/scripts/updatesite.sh" /usr/local/bin/updatesite
+sudo ln -sf "$(pwd)/scripts/maintenance.sh" /usr/local/bin/maintenance
+```
+
+**First update after this change:** the Caddy config moved from `./Caddyfile` to
+`deploy/caddy/`. The first `updatesite` that includes it notices Docker Compose's new
+settings and restarts Caddy once (a second or two). Nothing to do by hand, unless you had
+edited `./Caddyfile` yourself, in which case copy your change into
+`deploy/caddy/Caddyfile` first.
+
+## Admin CLI
+
+A small command-line tool runs operator actions directly against the live database and
+uploads folder, for things no web UI should ever be able to do over HTTP (wiping the whole
+site back to nothing, setting a password without knowing the old one). It ships inside the
+same container as the app (`server/src/cli.ts`, built to `dist/cli.js`) - no separate
+install.
+
+Run it with:
+
+```bash
+docker compose exec elexprep node dist/cli.js <command> [args]
+```
+
+**Optional: a one-word `admin` command**, the same pattern as `updatesite` above:
+
+```bash
+chmod +x scripts/admin.sh
+sudo ln -s "$(pwd)/scripts/admin.sh" /usr/local/bin/admin
+```
+
+From then on, e.g. `admin status` from any directory.
+
+| Command | Does |
+|---|---|
+| `status` | Shows lockdown state, user counts by role, job count, active session count |
+| `list-users` | Lists every account (username, role, display name, and must-change-password/2FA flags) |
+| `add-user <user> [pass\|-] [role] [name]` | Creates an account directly. `role` is one of `ADMIN`/`USER`/`SIGNAGE`/`CREW` (default `USER`). Leave the password out (or pass `-`) to be prompted for it without it echoing or landing in shell history - run with `docker compose exec -it` for the prompt to work |
+| `remove-user <user> --confirm` | Permanently deletes an account and everything attached to it (crew profile, documents, rate lines) |
+| `set-password <user> [newPass\|-]` | Sets an account's password directly - for when someone's genuinely locked out and can't use self-service reset. Prompts when the password is left out, and signs the account out of every existing session |
+| `force-password-reset <user>` | The account can still sign in with its current password, but the web app blocks everything else until it sets a new one |
+| `set-role <user> <role>` | Changes an account's role |
+| `revoke-sessions <user>` or `revoke-sessions --all` | Signs an account - or everyone - out everywhere immediately |
+| `lockdown` | Development lockdown: only `ADMIN` accounts can sign in or use the API; every other account's sessions are revoked immediately. Use this for planned maintenance or if you suspect a compromise and want to freeze everything else while you investigate |
+| `unlock` | Undoes `lockdown` |
+| `full-lockdown` | Full lockdown: the strictest tier - blocks every account from signing in or using the API, `ADMIN` included; every other account's sessions are revoked immediately. Reserved for the rare case where even admin accounts shouldn't be trusted |
+| `full-unlock` | Undoes `full-lockdown` |
+| `reset-all-data --confirm-reset-everything` | **Deletes every row in every table and every uploaded file.** Leaves the site exactly as if freshly installed - visiting it afterwards shows the first-run "create the admin account" screen. There is no undo short of restoring a backup (see Notes below) |
+
+`remove-user` and `reset-all-data` both refuse to run without their `--confirm`/
+`--confirm-reset-everything` flag, so a bare mistyped command never destroys anything.
 
 ## Wiring up the real printer (later phase)
 
 When ready, go to **Printer Settings** (admin) and switch from Dry run to one of:
 
 - **Direct network (port 9100)** — the container sends PJL-wrapped PDFs straight to the
-  printer's IP; needs the printer reachable from the Docker network (it is, by default —
-  the container uses the host's LAN). Use *Test connection* to verify reachability. If the
-  wrong tray fires, adjust each tray's PJL value in settings (bizhub/ineo family typically
-  uses TRAY1 / TRAY2 / MANUALFEED).
-- **Windows agent** — run `agent/elexprep-print-agent.mjs` on the machine with the ineo+
-  3320i driver; see `agent/README.md`. Most reliable tray selection because it goes through
-  the real driver.
+  printer's IP. This only works if the printer is reachable from the EC2 instance, which it
+  almost certainly isn't for a printer sitting on your office LAN — this mode is really only
+  practical when ElexPrep runs on the same network as the printer. For a VPS deployment, use
+  the Windows agent instead.
+- **Windows agent** — run `agent/elexprep-print-agent.mjs` on a Windows machine on the same
+  network as the printer (see `agent/README.md`); it polls `https://portal.elex.lighting`
+  over the internet for queued jobs and prints them through the real driver. This is the
+  right choice for an AWS-hosted deployment, since the printer itself stays on your office
+  network rather than needing to be reachable from the cloud.
 
 Either way, do the first live test with a single one-page job per tray before trusting it
 with a full batch.
@@ -178,21 +351,32 @@ with a full batch.
   docker compose up -d
   ```
 
+- **`https://portal.elex.lighting` doesn't load / certificate errors** — check, in order:
+  DNS actually resolves to the Elastic IP (`dig portal.elex.lighting`); the security group
+  has 80 and 443 open to `0.0.0.0/0`; if using Cloudflare DNS, the record is set to DNS-only
+  (grey cloud), not proxied; `docker compose logs caddy` for the actual ACME error.
+- **Can't reach `http://localhost:4000` during initial setup** — confirm the SSH tunnel
+  command is still running in its own terminal, and that you're opening the URL in a browser
+  on your own machine, not on the EC2 box.
+- **Elastic IP seems to have changed** — it won't, as long as it stays *associated* with the
+  instance; this only happens if you explicitly release/reassign it, or replace the instance
+  without re-associating it. Note it in EC2 → Elastic IPs if ever in doubt.
+
 ## Notes
 
-- **Ports**: change the left side of `4000:4000` in `docker-compose.yml` to expose a
-  different port (e.g. `80:4000`).
-- **HTTPS**: for LAN-only office use, plain HTTP is fine — leave `COOKIE_SECURE` unset
-  (the default `false`). For `portal.elex.lighting`, see **Going live at
-  portal.elex.lighting** above (a Cloudflare Tunnel is the recommended path here; a
-  reverse proxy like Caddy/nginx/Traefik in front works too if you'd rather terminate TLS
-  yourself). Either way, only set `COOKIE_SECURE=true` once *every* login goes through
-  HTTPS — a secure cookie is silently dropped by the browser on a plain-HTTP request,
-  which breaks login for whichever access path doesn't use TLS.
-- **Backups**: stop the container (`docker compose stop`), copy `data/`, start it again —
+- **CORS**: the API only ever needs to be called same-origin (Caddy proxies the public
+  domain straight to the app; the Vite dev server proxies `/api` the same way locally), so
+  cross-origin requests are rejected by default. If you ever genuinely need a different
+  origin to call the API with credentials, set `CORS_ALLOWED_ORIGINS` to a comma-separated
+  list of exact origins — never set it to `*` or reflect arbitrary origins, since this API is
+  cookie-session-authenticated.
+- **Backups**: stop the containers (`docker compose stop`), copy `data/`, start them again —
   or just copy `data/` live; SQLite single-writer usage here makes that low-risk. The server
   handles `docker compose stop`/`restart` (`SIGTERM`) by closing its DB connection cleanly
-  before exiting, rather than being killed mid-request.
+  before exiting, rather than being killed mid-request. On AWS, an EBS snapshot of the whole
+  volume (EC2 → Elastic Block Store → Snapshots) is a convenient belt-and-braces addition —
+  it captures everything on disk, not just `data/`, with no app-level steps needed.
 - **Without Docker**: `npm install && npm run build` then
   `cd server && npx prisma migrate deploy && node dist/index.js` — the server serves the
-  built web UI itself; set `DATABASE_URL`, `UPLOADS_DIR`, and optionally `PORT`.
+  built web UI itself; set `DATABASE_URL`, `UPLOADS_DIR`, and optionally `PORT`. You'd still
+  want a reverse proxy (Caddy, nginx) in front for TLS in this case.

@@ -1,4 +1,4 @@
-import { PDFDocument, PDFImage, StandardFonts, rgb } from 'pdf-lib';
+import { PDFDocument, PDFImage, PDFPage, StandardFonts, rgb } from 'pdf-lib';
 import {
   DMX_CABLE_WIDTH_FACTOR,
   LabelTypeTemplate,
@@ -9,7 +9,7 @@ import {
   resolveLocationColor,
   contrastingTextIsWhite,
 } from '@elexprep/shared';
-import { CellRectPt, centerText, drawCellOutline, drawImageCover, drawLocationFill, fitTextToWidth, inPt, renderSheets } from './pdfBuilder';
+import { CellRectPt, centerText, drawCellOutline, drawImageContain, drawLocationFill, fitTextToWidth, inPt, renderSheets } from './pdfBuilder';
 
 async function fonts(doc: PDFDocument) {
   return {
@@ -20,7 +20,7 @@ async function fonts(doc: PDFDocument) {
 
 /**
  * Picks a legible text fill color for a resolved location color, plus an outline color when
- * the background is diagonal stripes — a flat fill alone can vanish against whichever stripe
+ * the background is diagonal stripes - a flat fill alone can vanish against whichever stripe
  * happens to match it, so striped backgrounds get an outlined (fill + halo) text treatment.
  */
 function textColorsFor(resolved: ResolvedLocationColor): { fill: ReturnType<typeof rgb>; outline?: ReturnType<typeof rgb> } {
@@ -30,11 +30,35 @@ function textColorsFor(resolved: ResolvedLocationColor): { fill: ReturnType<type
   return { fill, outline: isWhite ? rgb(0, 0, 0) : rgb(1, 1, 1) };
 }
 
+/** Up to three logos drawn side by side across a label's logo-bar image element - see
+ * routes/jobs.ts's LOGO_SLOT_FIELDS for how each slot maps to a job's uploaded files. */
+export interface LogoImages {
+  left?: PDFImage;
+  middle?: PDFImage;
+  right?: PDFImage;
+  /** Per-slot size as a percentage of the slot (Job.logoScale*) - 100 = fit, the default. */
+  scales?: { left?: number; middle?: number; right?: number };
+}
+
+/** Draws whichever logo slots are set, splitting the rect into equal columns only across the
+ * slots actually in use - a single logo (the common case) still gets the full rect, matching
+ * the pre-multi-logo behavior exactly, while two or three share it evenly left to right. */
+function drawLogoBar(page: PDFPage, rect: CellRectPt, logos: LogoImages) {
+  const present = (['left', 'middle', 'right'] as const)
+    .map((slot) => ({ img: logos[slot], zoom: (logos.scales?.[slot] ?? 100) / 100 }))
+    .filter((p): p is { img: PDFImage; zoom: number } => Boolean(p.img));
+  if (present.length === 0) return;
+  const colWidth = rect.wPt / present.length;
+  present.forEach(({ img, zoom }, i) => {
+    drawImageContain(page, img, { ...rect, xPt: rect.xPt + colWidth * i, wPt: colWidth }, zoom);
+  });
+}
+
 /**
  * Renders one label type's sheets from its declarative template: fill/image/text/stackedText
  * elements are walked in template order, scaled from the template's reference cell width to
  * each actual sheet cell (handles PAL's slightly-wider right column the same way the original
- * hand-written renderer did), and drawn with pdfBuilder's existing primitives — so this
+ * hand-written renderer did), and drawn with pdfBuilder's existing primitives - so this
  * produces pixel-identical output to the old per-type functions it replaces.
  */
 export async function renderLabelTypeGeneric(
@@ -42,9 +66,10 @@ export async function renderLabelTypeGeneric(
   template: LabelTypeTemplate,
   items: unknown[],
   locationColors: LocationColorMap = new Map(),
-  logoImage?: PDFImage
+  logos: LogoImages = {}
 ): Promise<void> {
   const { bold, regular } = await fonts(doc);
+  const hasAnyLogo = Boolean(logos.left || logos.middle || logos.right);
 
   await renderSheets(doc, template.sheet, items, (page, cell, item) => {
     const scale = cell.wPt / inPt(template.referenceCellWidthIn);
@@ -68,8 +93,8 @@ export async function renderLabelTypeGeneric(
 
       if (el.type === 'image') {
         drawCellOutline(page, elRect);
-        if (logoImage) {
-          drawImageCover(page, logoImage, elRect);
+        if (hasAnyLogo) {
+          drawLogoBar(page, elRect, logos);
         } else {
           centerText(page, el.placeholder, regular, 10, elRect, elRect.hPt / 2 - inPt(0.05), rgb(0.6, 0.6, 0.6));
         }

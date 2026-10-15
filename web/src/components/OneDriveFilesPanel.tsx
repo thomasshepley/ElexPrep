@@ -1,3 +1,4 @@
+import { SkeletonPanel } from './Skeleton';
 import { useEffect, useState } from 'react';
 import { api, type JobOneDriveStatus, type OneDriveItem } from '../api/client';
 
@@ -5,11 +6,20 @@ import { api, type JobOneDriveStatus, type OneDriveItem } from '../api/client';
  * The admin side of the OneDrive integration on a job's Plots/CAD tab: shows whether this
  * job's project folder matched automatically, lets an admin browse it and choose individual
  * files or whole folders to share with crew, and previews the auto-detected CAD PDF inline.
- * Entirely scaffolded against the real Microsoft Graph API shape (see server/src/oneDrive/) —
+ * Entirely scaffolded against the real Microsoft Graph API shape (see server/src/oneDrive/) -
  * until real Azure credentials are added in Settings -> OneDrive, `enabled` stays false and
  * this renders a clear "not connected yet" state rather than a broken file browser.
  */
-export default function OneDriveFilesPanel({ jobId, onChange }: { jobId: string; onChange?: () => void }) {
+export default function OneDriveFilesPanel({
+  jobId,
+  onChange,
+  onSettled,
+}: {
+  jobId: string;
+  onChange?: (status: JobOneDriveStatus) => void;
+  /** Called once the first load finishes, whether or not it worked. */
+  onSettled?: () => void;
+}) {
   const [status, setStatus] = useState<JobOneDriveStatus | null>(null);
   const [crumbs, setCrumbs] = useState<{ id: string | undefined; name: string }[]>([{ id: undefined, name: 'Project folder' }]);
   const [items, setItems] = useState<OneDriveItem[]>([]);
@@ -22,9 +32,10 @@ export default function OneDriveFilesPanel({ jobId, onChange }: { jobId: string;
       .get(jobId)
       .then((s) => {
         setStatus(s);
-        onChange?.();
+        onChange?.(s);
       })
-      .catch((e) => setError(e.message));
+      .catch((e) => setError(e.message))
+      .finally(() => onSettled?.());
 
   useEffect(() => {
     load();
@@ -43,7 +54,9 @@ export default function OneDriveFilesPanel({ jobId, onChange }: { jobId: string;
   };
 
   useEffect(() => {
-    if (status?.enabled && status.folderId) browse(undefined, 'Project folder');
+    // Opening the root resets the trail to just the root crumb (index 0) - appending here used to
+    // double it, so every shared path was stored as "Project folder/Project folder/...".
+    if (status?.enabled && status.folderId) browse(undefined, 'Project folder', 0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status?.enabled, status?.folderId]);
 
@@ -116,18 +129,14 @@ export default function OneDriveFilesPanel({ jobId, onChange }: { jobId: string;
     }
   };
 
-  if (!status) return null;
+  if (!status) return error ? <p className="error">Could not load OneDrive details: {error}</p> : <SkeletonPanel lines={2} list={3} />;
 
+  // Not set up: one line rather than a panel of explanation; manual plot upload works regardless.
   if (!status.enabled) {
     return (
-      <div className="panel">
-        <h3>OneDrive</h3>
-        <p className="muted">
-          Not connected yet. An admin can set up the Azure app credentials in Settings → OneDrive
-          to enable automatic project-folder matching, file sharing with crew, and CAD plan
-          auto-detection. Uploading plots manually below works either way.
-        </p>
-      </div>
+      <p className="muted" style={{ margin: 'var(--space-3) 0' }}>
+        Connect OneDrive in Settings → OneDrive to auto-detect plots and share project files with crew.
+      </p>
     );
   }
 
@@ -196,38 +205,40 @@ export default function OneDriveFilesPanel({ jobId, onChange }: { jobId: string;
               </span>
             ))}
           </p>
-          <table>
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((item) => (
-                <tr key={item.id}>
-                  <td>
-                    {item.folder ? (
-                      <button type="button" className="link-button" onClick={() => browse(item.id, item.name)}>
-                        📁 {item.name}
-                      </button>
-                    ) : (
-                      item.name
-                    )}
-                  </td>
-                  <td>
-                    {sharedIds.has(item.id) ? (
-                      <span className="chip chip-success">Shared with crew</span>
-                    ) : (
-                      <button type="button" className="secondary" onClick={() => share(item)} disabled={busy}>
-                        Share with crew
-                      </button>
-                    )}
-                  </td>
+          <div className="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th></th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {items.map((item) => (
+                  <tr key={item.id}>
+                    <td>
+                      {item.folder ? (
+                        <button type="button" className="link-button" onClick={() => browse(item.id, item.name)}>
+                          📁 {item.name}
+                        </button>
+                      ) : (
+                        item.name
+                      )}
+                    </td>
+                    <td>
+                      {sharedIds.has(item.id) ? (
+                        <span className="chip chip-success">Shared with crew</span>
+                      ) : (
+                        <button type="button" className="secondary" onClick={() => share(item)} disabled={busy}>
+                          Share with crew
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </>
       )}
 

@@ -10,3 +10,5 @@ agent
 docs
 *.md
 !README.md
+!CHANGELOG.md
+deploy

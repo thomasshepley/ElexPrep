@@ -1,52 +1,11 @@
 import { getOneDriveConfig } from './config';
-import { listChildren, findChildByName, streamOneDriveFile } from './client';
-import { findSharedCadPdf } from './cad';
+import { listChildren, streamOneDriveFile } from './client';
 import { extractPatchTableFromPdf } from './patchPdfExtract';
+import fs from 'fs';
+import path from 'path';
 import { parseWysiwygCsv } from '../patchCsv';
-
-export interface DetectedPatchCsv {
-  itemId: string;
-  name: string;
-  path: string;
-  modifiedAt: Date;
-}
-
-/**
- * The detection half of OneDrive patch auto-import: if the job's matched OneDrive folder has a
- * child folder named "Patch" (any case), the most recently modified CSV inside it is surfaced as
- * a candidate for review — same "look for a conventionally-named subfolder" approach as
- * cad.ts's "CAD" folder. Unlike the CAD PDF, a patch CSV isn't safe to apply automatically
- * (importing it destructively replaces every Fixture row for the job — see routes/patch.ts), so
- * this only detects a file; turning it into fixtures is a separate, explicit approval step.
- * Returns null whenever OneDrive isn't configured, the job has no matched folder, there's no
- * "Patch" subfolder, or it has no CSV in it — all ordinary, expected states, not errors.
- */
-export async function findPatchCsv(job: {
-  oneDriveFolderId: string | null;
-  oneDriveFolderPath: string | null;
-}): Promise<DetectedPatchCsv | null> {
-  if (!job.oneDriveFolderId) return null;
-  const config = await getOneDriveConfig();
-  if (!config.enabled) return null;
-
-  const topLevel = await listChildren(config, job.oneDriveFolderId);
-  const patchFolder = findChildByName(topLevel.filter((c) => c.folder), 'Patch');
-  if (!patchFolder) return null;
-
-  const children = await listChildren(config, patchFolder.id);
-  const csvs = children.filter((c) => c.file && c.name.toLowerCase().endsWith('.csv') && c.lastModifiedDateTime);
-  if (csvs.length === 0) return null;
-
-  const newest = csvs.reduce((latest, candidate) =>
-    new Date(candidate.lastModifiedDateTime!) > new Date(latest.lastModifiedDateTime!) ? candidate : latest
-  );
-  return {
-    itemId: newest.id,
-    name: newest.name,
-    path: `${job.oneDriveFolderPath ?? ''}/Patch/${newest.name}`,
-    modifiedAt: new Date(newest.lastModifiedDateTime!),
-  };
-}
+import { prisma } from '../db';
+import { plotsDir } from '../routes/plots';
 
 export interface PatchScanResult {
   source: 'csv' | 'pdf';
@@ -65,47 +24,132 @@ async function collectStreamText(stream: NodeJS.ReadableStream): Promise<Buffer>
 }
 
 /**
- * The full OneDrive patch-sourcing flow: look for an exported CSV in the job's "Patch"
- * subfolder first (findPatchCsv); if there isn't one, fall back to extracting a patch table out
- * of the job's CAD PDF (findSharedCadPdf + patchPdfExtract) — the plan's "if absent, fall back
- * to parsing the patch table out of the CAD PDF". Both branches end up parsed into the same
- * header+rows shape, but the CSV path is the reliable one; the PDF path is inherently fuzzy
- * (see patchPdfExtract.ts), which is why the result carries `source` — routes/patch.ts surfaces
- * it so a reviewer knows a PDF-sourced candidate deserves extra scrutiny. Returns null when
- * neither a patch CSV nor a CAD PDF with an extractable table could be found — an ordinary,
- * expected outcome, not an error.
+ * A file someone could pick as the job's patch: a CSV or PDF anywhere in the job's OneDrive
+ * folder tree, or a PDF uploaded on the Plots tab. `key` is what the candidate stores as its
+ * oneDriveItemId - the Graph item id for OneDrive files, "plot:<id>" for Plots-tab uploads.
  */
-export async function findPatchSource(job: {
+export interface PatchFile {
+  key: string;
+  kind: 'csv' | 'pdf';
+  origin: 'onedrive' | 'plots';
+  name: string;
+  path: string;
+  modifiedAt: Date;
+  size: number | null;
+  /** Higher = more likely to be the patch; the picker lists these first and marks them. */
+  priority: number;
+  load: () => Promise<Buffer>;
+}
+
+const MAX_FOLDERS = 60;
+const MAX_DEPTH = 4;
+const MAX_FILE_BYTES = 60 * 1024 * 1024;
+
+/** Higher = more likely the patch. Patch-named files and the Patch folder first, then CAD. */
+function patchPriority(kind: 'csv' | 'pdf', name: string, folderPath: string, flaggedCad: boolean): number {
+  const n = name.toLowerCase();
+  const f = folderPath.toLowerCase();
+  let p = 0;
+  if (kind === 'csv') p += 1;
+  if (n.includes('patch')) p += 6;
+  if (/(^|\/)patch(\/|$)/.test(f)) p += 5;
+  if (flaggedCad) p += 4;
+  if (/(^|\/)cad(\/|$)/.test(f)) p += 3;
+  if (kind === 'pdf' && /combined|plot|cad|lx|lighting|rig/.test(n)) p += 2;
+  return p;
+}
+
+/**
+ * Every CSV and PDF in the job's OneDrive folder (breadth-first, a few levels, a bounded number
+ * of folders) plus every file on its Plots tab, most likely patch first, newest first within
+ * that. The patch can be a CSV export in a "Patch" folder, a patch PDF, or the table on a
+ * "Combined" CAD export - so nothing is ruled out; the person picking chooses.
+ */
+export async function listPatchFiles(job: {
+  id: string;
   oneDriveFolderId: string | null;
   oneDriveFolderPath: string | null;
-}): Promise<PatchScanResult | null> {
+}): Promise<{ files: PatchFile[]; foldersSearched: number; truncated: boolean }> {
+  const files: PatchFile[] = [];
+  let foldersSearched = 0;
+  let truncated = false;
   const config = await getOneDriveConfig();
-  if (!config.enabled || !job.oneDriveFolderId) return null;
 
-  const csv = await findPatchCsv(job);
-  if (csv) {
-    const { stream } = await streamOneDriveFile(config, csv.itemId);
-    const text = (await collectStreamText(stream)).toString('utf-8');
-    const { headers, rows } = parseWysiwygCsv(text);
-    return { source: 'csv', itemId: csv.itemId, path: csv.path, fileName: csv.name, modifiedAt: csv.modifiedAt, headers, rows };
+  if (config.enabled && job.oneDriveFolderId) {
+    const flagged = await prisma.oneDriveShare.findMany({ where: { jobId: job.id, isCadPlot: true }, select: { itemId: true } });
+    const flaggedIds = new Set(flagged.map((f) => f.itemId));
+    const queue: { id: string; path: string; depth: number }[] = [{ id: job.oneDriveFolderId, path: job.oneDriveFolderPath ?? '', depth: 0 }];
+    while (queue.length > 0) {
+      if (foldersSearched >= MAX_FOLDERS) {
+        truncated = true;
+        break;
+      }
+      const folder = queue.shift()!;
+      foldersSearched++;
+      const children = await listChildren(config, folder.id);
+      for (const c of children) {
+        const childPath = `${folder.path}/${c.name}`;
+        if (c.folder) {
+          if (folder.depth + 1 <= MAX_DEPTH) queue.push({ id: c.id, path: childPath, depth: folder.depth + 1 });
+          continue;
+        }
+        const lower = c.name.toLowerCase();
+        const kind = lower.endsWith('.csv') ? 'csv' : lower.endsWith('.pdf') ? 'pdf' : null;
+        if (!c.file || !kind) continue;
+        files.push({
+          key: c.id,
+          kind,
+          origin: 'onedrive',
+          name: c.name,
+          path: childPath,
+          modifiedAt: c.lastModifiedDateTime ? new Date(c.lastModifiedDateTime) : new Date(0),
+          size: c.size ?? null,
+          priority: patchPriority(kind, c.name, folder.path, flaggedIds.has(c.id)),
+          load: async () => collectStreamText((await streamOneDriveFile(config, c.id)).stream),
+        });
+      }
+    }
   }
 
-  const cadPdf = await findSharedCadPdf(job);
-  if (cadPdf) {
-    const { stream } = await streamOneDriveFile(config, cadPdf.itemId);
-    const buffer = await collectStreamText(stream);
+  const plots = await prisma.plot.findMany({ where: { jobId: job.id }, orderBy: { createdAt: 'desc' } });
+  for (const p of plots) {
+    const file = path.join(plotsDir, p.fileName);
+    files.push({
+      key: `plot:${p.id}`,
+      kind: 'pdf',
+      origin: 'plots',
+      name: p.originalName,
+      path: `Plots tab/${p.originalName}`,
+      modifiedAt: p.createdAt,
+      size: null,
+      priority: patchPriority('pdf', p.originalName, '', true),
+      load: () => fs.promises.readFile(file),
+    });
+  }
+
+  files.sort((a, b) => b.priority - a.priority || b.modifiedAt.getTime() - a.modifiedAt.getTime());
+  return { files, foldersSearched, truncated };
+}
+
+/** Reads one picked file into patch rows - a CSV as-is, a PDF through the table extractor. */
+export async function readPatchFile(file: PatchFile): Promise<PatchScanResult> {
+  if (file.size !== null && file.size > MAX_FILE_BYTES) throw new Error(`${file.name} is too large to read (over 60 MB)`);
+  const buffer = await file.load();
+  const base = { source: file.kind, itemId: file.key, path: file.path, fileName: file.name, modifiedAt: file.modifiedAt };
+  if (file.kind === 'csv') {
+    const { headers, rows } = parseWysiwygCsv(buffer.toString('utf-8'));
+    return { ...base, headers, rows };
+  }
+  if (buffer.subarray(0, 1024).indexOf('%PDF') === -1) throw new Error(`${file.name} isn't a valid PDF`);
+  try {
     const { headers, rows } = await extractPatchTableFromPdf(buffer);
-    if (rows.length === 0) return null;
-    return {
-      source: 'pdf',
-      itemId: cadPdf.itemId,
-      path: `${job.oneDriveFolderPath ?? ''}/CAD/${cadPdf.name}`,
-      fileName: cadPdf.name,
-      modifiedAt: cadPdf.modifiedAt ?? new Date(),
-      headers,
-      rows,
-    };
+    return { ...base, headers, rows };
+  } catch (err) {
+    const message = (err as Error).message;
+    // pdf.js reports a damaged or unreadable file in a few cryptic ways; say it plainly.
+    if (/transfer object|Invalid PDF|password|Unexpected server response|bad XRef/i.test(message)) {
+      throw new Error(`Couldn't read ${file.name} - it may be damaged or password-protected`);
+    }
+    throw err;
   }
-
-  return null;
 }

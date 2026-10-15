@@ -1,4 +1,6 @@
+import crypto from 'crypto';
 import { NextFunction, Request, Response, Router } from 'express';
+import rateLimit from 'express-rate-limit';
 import fs from 'fs';
 import { prisma, logActivity } from '../db';
 import { getPrinterSettings } from '../printing/printerSettings';
@@ -6,21 +8,42 @@ import { printJobFilePath } from '../printing/printJobService';
 
 /**
  * Endpoints for the Windows print agent (agent/ in this repo). The agent is not a browser
- * session — it authenticates with the static token from Printer Settings via the
+ * session - it authenticates with the static token from Printer Settings via the
  * X-Agent-Token header.
  */
 export const agentRouter = Router();
 
+// Same rationale as the login rate limiter (routes/auth.ts) - this is a 192-bit random token
+// (see generateAgentToken), so brute force is already infeasible, but a public-facing route
+// with no limiter at all still invites being hammered.
+const agentAuthLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many attempts - wait a while and try again' },
+});
+
+/** Constant-time comparison - a plain !== leaks how many leading bytes matched through
+ * response timing, which a standard token comparison should just never do regardless of how
+ * impractical exploiting it would be here. */
+function tokensMatch(a: string, b: string): boolean {
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  if (bufA.length !== bufB.length) return false;
+  return crypto.timingSafeEqual(bufA, bufB);
+}
+
 async function agentAuth(req: Request, res: Response, next: NextFunction) {
   const settings = await getPrinterSettings();
   const token = req.header('x-agent-token');
-  if (!settings.agent.token || !token || token !== settings.agent.token) {
+  if (!settings.agent.token || !token || !tokensMatch(token, settings.agent.token)) {
     return res.status(401).json({ error: 'Invalid agent token' });
   }
   next();
 }
 
-agentRouter.use(agentAuth);
+agentRouter.use(agentAuthLimiter, agentAuth);
 
 /** The agent polls this; atomically claims the oldest QUEUED job so two agents can't double-print. */
 agentRouter.post('/print-jobs/claim', async (_req, res) => {

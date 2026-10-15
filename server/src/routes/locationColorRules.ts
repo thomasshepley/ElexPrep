@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { requirePermission } from '../permissions';
 import { prisma, logActivity } from '../db';
 
 export const locationColorRulesRouter = Router();
@@ -9,7 +10,7 @@ const PATTERNS = ['SOLID', 'DIAGONAL_STRIPES'];
 
 /**
  * Prisma/SQLite can't do a case-insensitive equality filter directly, so this checks the
- * small per-scope rule set (global or one job's) in JS instead — always just a handful of rows.
+ * small per-scope rule set (global or one job's) in JS instead - always just a handful of rows.
  */
 async function assertNoDuplicate(jobId: string | null, location: string, excludeId?: string) {
   const all = await prisma.locationColorRule.findMany({ where: { jobId } });
@@ -33,13 +34,13 @@ function validatePattern(body: Record<string, unknown>): { error: string } | { p
   return { pattern, secondaryColor: null };
 }
 
-// Global default rules (jobId = null) — these are the house-wide fallbacks every job starts with.
+// Global default rules (jobId = null) - these are the house-wide fallbacks every job starts with.
 locationColorRulesRouter.get('/', async (_req, res) => {
   const rules = await prisma.locationColorRule.findMany({ where: { jobId: null }, orderBy: { location: 'asc' } });
   res.json(rules);
 });
 
-locationColorRulesRouter.post('/', async (req, res) => {
+locationColorRulesRouter.post('/', requirePermission('managePrepSettings'), async (req, res) => {
   const { location, color } = req.body ?? {};
   if (!location || typeof location !== 'string') {
     return res.status(400).json({ error: 'location is required' });
@@ -57,7 +58,7 @@ locationColorRulesRouter.post('/', async (req, res) => {
   res.status(201).json(rule);
 });
 
-locationColorRulesRouter.put('/:id', async (req, res) => {
+locationColorRulesRouter.put('/:id', requirePermission('managePrepSettings'), async (req, res) => {
   const { location, color } = req.body ?? {};
   if (color !== undefined && !HEX_COLOR_RE.test(color)) {
     return res.status(400).json({ error: 'color must be a hex value like #1FA34C' });
@@ -78,12 +79,12 @@ locationColorRulesRouter.put('/:id', async (req, res) => {
   res.json(rule);
 });
 
-locationColorRulesRouter.delete('/:id', async (req, res) => {
+locationColorRulesRouter.delete('/:id', requirePermission('managePrepSettings'), async (req, res) => {
   await prisma.locationColorRule.delete({ where: { id: req.params.id } });
   res.status(204).end();
 });
 
-// Per-job overrides/additions (jobId set) — for jobs whose patch uses location names that
+// Per-job overrides/additions (jobId set) - for jobs whose patch uses location names that
 // don't match the house defaults (e.g. "Cube North", "Entrance Arch Top"), configured without
 // touching the shared defaults. A job-specific rule wins over a global one of the same name.
 jobLocationColorRulesRouter.get('/:jobId/location-colors', async (req, res) => {
@@ -94,7 +95,7 @@ jobLocationColorRulesRouter.get('/:jobId/location-colors', async (req, res) => {
   res.json(rules);
 });
 
-jobLocationColorRulesRouter.post('/:jobId/location-colors', async (req, res) => {
+jobLocationColorRulesRouter.post('/:jobId/location-colors', requirePermission('editJobs'), async (req, res) => {
   const { jobId } = req.params;
   const { location, color } = req.body ?? {};
   if (!location || typeof location !== 'string') {
@@ -113,13 +114,15 @@ jobLocationColorRulesRouter.post('/:jobId/location-colors', async (req, res) => 
   res.status(201).json(rule);
 });
 
-jobLocationColorRulesRouter.put('/:jobId/location-colors/:id', async (req, res) => {
+jobLocationColorRulesRouter.put('/:jobId/location-colors/:id', requirePermission('editJobs'), async (req, res) => {
   const { location, color } = req.body ?? {};
   if (color !== undefined && !HEX_COLOR_RE.test(color)) {
     return res.status(400).json({ error: 'color must be a hex value like #1FA34C' });
   }
   const patternFields = validatePattern(req.body ?? {});
   if ('error' in patternFields) return res.status(400).json({ error: patternFields.error });
+  const existing = await prisma.locationColorRule.findUnique({ where: { id: req.params.id } });
+  if (!existing || existing.jobId !== req.params.jobId) return res.status(404).json({ error: 'not found' });
   if (location !== undefined && (await assertNoDuplicate(req.params.jobId, location, req.params.id))) {
     return res.status(409).json({ error: 'A rule for this location already exists for this job' });
   }
@@ -134,7 +137,8 @@ jobLocationColorRulesRouter.put('/:jobId/location-colors/:id', async (req, res) 
   res.json(rule);
 });
 
-jobLocationColorRulesRouter.delete('/:jobId/location-colors/:id', async (req, res) => {
-  await prisma.locationColorRule.delete({ where: { id: req.params.id } });
+jobLocationColorRulesRouter.delete('/:jobId/location-colors/:id', requirePermission('editJobs'), async (req, res) => {
+  const { count } = await prisma.locationColorRule.deleteMany({ where: { id: req.params.id, jobId: req.params.jobId } });
+  if (count === 0) return res.status(404).json({ error: 'not found' });
   res.status(204).end();
 });

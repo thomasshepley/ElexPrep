@@ -1,9 +1,10 @@
 import { Router } from 'express';
+import { requirePermission } from '../permissions';
 import { prisma, logActivity } from '../db';
 
 export const settingsRouter = Router();
 
-/** Setting keys the API will accept — stops arbitrary keys accumulating in the table. */
+/** Setting keys the API will accept - stops arbitrary keys accumulating in the table. */
 const ALLOWED_KEYS = new Set(['patchMapping']);
 
 settingsRouter.get('/:key', async (req, res) => {
@@ -12,7 +13,7 @@ settingsRouter.get('/:key', async (req, res) => {
   res.json({ key: req.params.key, value: setting ? JSON.parse(setting.valueJson) : null });
 });
 
-settingsRouter.put('/:key', async (req, res) => {
+settingsRouter.put('/:key', requirePermission('managePrepSettings'), async (req, res) => {
   if (!ALLOWED_KEYS.has(req.params.key)) return res.status(404).json({ error: 'Unknown setting' });
   const { value } = req.body ?? {};
   if (value === undefined) return res.status(400).json({ error: 'value is required' });

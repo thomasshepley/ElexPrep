@@ -1,11 +1,11 @@
-import { useId, useMemo } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import { CREW_SKILLS, formatSkills, parseSkills } from '@elexprep/shared';
 
 /**
  * Multi-select for the fixed crew skill taxonomy, plus a free-text "other" catch-all so an
  * existing record's non-taxonomy skills (or a genuinely unusual one) are never dropped. Reads
  * and writes the same comma-separated string CrewProfile.skills/CrewApplication.skills already
- * store — used by both the admin crew form and the public application form (see LabelTypeForm
+ * store - used by both the admin crew form and the public application form (see LabelTypeForm
  * for the equivalent shared-component pattern with ad hoc labels).
  */
 export default function SkillPicker({ value, onChange }: { value: string; onChange: (next: string) => void }) {
@@ -13,13 +13,20 @@ export default function SkillPicker({ value, onChange }: { value: string; onChan
   const selected = useMemo(() => parseSkills(value), [value]);
   const known = selected.filter((s) => (CREW_SKILLS as readonly string[]).includes(s));
   const other = selected.filter((s) => !(CREW_SKILLS as readonly string[]).includes(s)).join(', ');
+  // The raw text is kept as typed - re-deriving it from the parsed value on every keystroke
+  // stripped a trailing comma, so a second item could never be started.
+  const [otherText, setOtherText] = useState(other);
+  useEffect(() => {
+    setOtherText((current) => (parseSkills(current).join(', ') === other ? current : other));
+  }, [other]);
 
   const toggle = (skill: string) => {
     const next = known.includes(skill) ? known.filter((s) => s !== skill) : [...known, skill];
-    onChange(formatSkills([...next, ...parseSkills(other)]));
+    onChange(formatSkills([...next, ...parseSkills(otherText)]));
   };
 
   const setOther = (text: string) => {
+    setOtherText(text);
     onChange(formatSkills([...known, ...parseSkills(text)]));
   };
 
@@ -40,8 +47,9 @@ export default function SkillPicker({ value, onChange }: { value: string; onChan
       <input
         aria-label="Other skills, comma separated"
         placeholder="Other (comma separated)"
-        value={other}
+        value={otherText}
         onChange={(e) => setOther(e.target.value)}
+        onBlur={() => setOtherText(other)}
         style={{ marginTop: '0.5rem' }}
       />
     </div>

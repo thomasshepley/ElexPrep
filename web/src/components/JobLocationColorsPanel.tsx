@@ -1,5 +1,9 @@
+import { SkeletonRegion, SkeletonRows } from './Skeleton';
 import { useEffect, useState } from 'react';
 import { api, type LocationColorPattern, type LocationColorRule } from '../api/client';
+import { useAuth } from '../auth/AuthContext';
+import { hasPermission } from '../auth/roles';
+import CommitColorInput from './CommitColorInput';
 
 function contrastingText(hex: string): string {
   const clean = hex.replace('#', '');
@@ -20,13 +24,16 @@ function swatchBackground(rule: Pick<LocationColorRule, 'color' | 'pattern' | 's
 }
 
 /**
- * Per-job location color overrides — for jobs whose patch uses stage location names that
+ * Per-job location color overrides - for jobs whose patch uses stage location names that
  * don't match the house defaults in Settings -> Location Colors (e.g. "Cube North", "Entrance
  * Arch Top" instead of "Floor"/"Downstage"/etc). A rule added here only affects this job's PAL
  * labels, and takes precedence over a global rule of the same name if one exists.
  */
 export default function JobLocationColorsPanel({ jobId }: { jobId: string }) {
-  const [rules, setRules] = useState<LocationColorRule[]>([]);
+  const { user } = useAuth();
+  const canEdit = hasPermission(user, 'editJobs');
+  const [rulesLoaded, setRules] = useState<LocationColorRule[] | null>(null);
+  const rules = rulesLoaded ?? [];
   const [location, setLocation] = useState('');
   const [color, setColor] = useState('#1FA34C');
   const [pattern, setPattern] = useState<LocationColorPattern>('SOLID');
@@ -83,91 +90,95 @@ export default function JobLocationColorsPanel({ jobId }: { jobId: string }) {
 
   return (
     <div>
-      <h4>Location colors (this job only)</h4>
+      <h3 className="mt-0">Location colours (this job only)</h3>
       <p className="muted">
         Overrides/adds to the global defaults in{' '}
         <a href="/settings/location-colors" target="_blank" rel="noreferrer">
           Settings → Location Colors
         </a>{' '}
-        for jobs whose patch uses different location names — match the location exactly as it
+        for jobs whose patch uses different location names - match the location exactly as it
         appears in this job's patch (case-insensitive).
       </p>
+      {canEdit && (
       <form className="row" onSubmit={create}>
-        <input
+        <input aria-label="Location"
           placeholder="Location (e.g. Cube North)"
           value={location}
           onChange={(e) => setLocation(e.target.value)}
           required
         />
-        <input type="color" value={color} onChange={(e) => setColor(e.target.value)} />
+        <input type="color" value={color} aria-label="Colour" onChange={(e) => setColor(e.target.value)} />
         <select value={pattern} onChange={(e) => setPattern(e.target.value as LocationColorPattern)}>
           <option value="SOLID">Solid</option>
           <option value="DIAGONAL_STRIPES">Diagonal stripes (hazard)</option>
         </select>
         {pattern === 'DIAGONAL_STRIPES' && (
-          <input type="color" value={secondaryColor} onChange={(e) => setSecondaryColor(e.target.value)} title="Second stripe color" />
+          <input type="color" value={secondaryColor} onChange={(e) => setSecondaryColor(e.target.value)} title="Second stripe colour" aria-label="Second stripe colour" />
         )}
         <button type="submit">Add override</button>
       </form>
+      )}
       {error && <p className="error">{error}</p>}
 
       {rules.length > 0 && (
-        <table style={{ marginTop: '0.75rem' }}>
-          <thead>
-            <tr>
-              <th>Location</th>
-              <th>Color</th>
-              <th>Pattern</th>
-              <th>Preview</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {rules.map((r) => (
-              <tr key={r.id}>
-                <td>{r.location}</td>
-                <td className="row" style={{ gap: '0.3rem' }}>
-                  <input type="color" value={r.color} onChange={(e) => updateColor(r, e.target.value)} />
-                  {r.pattern === 'DIAGONAL_STRIPES' && (
-                    <input
-                      type="color"
-                      value={r.secondaryColor ?? '#FFFFFF'}
-                      title="Second stripe color"
-                      onChange={(e) => updateSecondaryColor(r, e.target.value)}
-                    />
-                  )}
-                </td>
-                <td>
-                  <select value={r.pattern} onChange={(e) => updatePattern(r, e.target.value as LocationColorPattern)}>
-                    <option value="SOLID">Solid</option>
-                    <option value="DIAGONAL_STRIPES">Diagonal stripes</option>
-                  </select>
-                </td>
-                <td>
-                  <span
-                    style={{
-                      display: 'inline-block',
-                      padding: '0.25rem 0.75rem',
-                      borderRadius: 4,
-                      background: swatchBackground(r),
-                      color: contrastingText(r.color),
-                      fontWeight: 600,
-                    }}
-                  >
-                    {r.location}
-                  </span>
-                </td>
-                <td>
-                  <button type="button" className="secondary" onClick={() => remove(r.id)}>
-                    Delete
-                  </button>
-                </td>
+        <fieldset disabled={!canEdit} style={{ border: 0, padding: 0, margin: 0 }}>
+        <div className="table-scroll">
+          <table style={{ marginTop: '0.75rem' }}>
+            <thead>
+              <tr>
+                <th>Location</th>
+                <th>Color</th>
+                <th>Pattern</th>
+                <th>Preview</th>
+                <th></th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {rules.map((r) => (
+                <tr key={r.id}>
+                  <td>{r.location}</td>
+                  <td>
+                    <div className="row" style={{ gap: '0.3rem' }}>
+                      <CommitColorInput value={r.color} ariaLabel={`${r.location} colour`} onCommit={(v) => updateColor(r, v)} />
+                      {r.pattern === 'DIAGONAL_STRIPES' && (
+                        <CommitColorInput value={r.secondaryColor ?? '#FFFFFF'} title={`${r.location} second stripe colour`} onCommit={(v) => updateSecondaryColor(r, v)} />
+                      )}
+                    </div>
+                  </td>
+                  <td>
+                    <select value={r.pattern} onChange={(e) => updatePattern(r, e.target.value as LocationColorPattern)}>
+                      <option value="SOLID">Solid</option>
+                      <option value="DIAGONAL_STRIPES">Diagonal stripes</option>
+                    </select>
+                  </td>
+                  <td>
+                    <span
+                      style={{
+                        display: 'inline-block',
+                        padding: '0.25rem 0.75rem',
+                        borderRadius: 4,
+                        background: swatchBackground(r),
+                        color: contrastingText(r.color),
+                        fontWeight: 600,
+                      }}
+                    >
+                      {r.location}
+                    </span>
+                  </td>
+                  <td>
+                    <button type="button" className="secondary" onClick={() => remove(r.id)}>
+                      Delete
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        </fieldset>
       )}
-      {rules.length === 0 && <p className="muted">No overrides yet for this job.</p>}
+      {rulesLoaded === null && !error && <SkeletonRegion><SkeletonRows rows={2} cols={4} /></SkeletonRegion>}
+      {rulesLoaded !== null && rules.length === 0 && <p className="muted">No overrides yet for this job.</p>}
     </div>
   );
 }

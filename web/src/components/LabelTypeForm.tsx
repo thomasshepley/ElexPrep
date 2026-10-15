@@ -1,22 +1,24 @@
 import { useId, useState } from 'react';
+import LocationSelect from './LocationSelect';
 
 export const AD_HOC_TYPES = ['TRUSS_SPIKE_POSITION', 'TRUSS_SPIKE_TIP', 'TRUSS_SPIKE_SACN', 'CABLE', 'PAL', 'RACK'] as const;
 export type AdHocType = (typeof AD_HOC_TYPES)[number];
 
 export const TYPE_LABELS: Record<AdHocType, string> = {
-  TRUSS_SPIKE_POSITION: 'Truss/Spike — position number',
-  TRUSS_SPIKE_TIP: 'Truss/Spike — DO NOT TIP',
-  TRUSS_SPIKE_SACN: 'Truss/Spike — sACN node (IP)',
+  TRUSS_SPIKE_POSITION: 'Truss/Spike - position number',
+  TRUSS_SPIKE_TIP: 'Truss/Spike - DO NOT TIP',
+  TRUSS_SPIKE_SACN: 'Truss/Spike - sACN node (IP)',
   CABLE: 'Cable label',
   PAL: 'PAL case label (generic, e.g. personal Peli case)',
   RACK: 'Rack label',
 };
 
-/** The one place that knows how each ad hoc label type's free-text fields map onto its content shape — shared by LabelsPanel (admin) and the crew request form, so the two never drift apart. */
+/** The one place that knows how each ad hoc label type's free-text fields map onto its content shape - shared by LabelsPanel (admin) and the crew request form, so the two never drift apart. */
 export function buildLabelContent(labelType: AdHocType, fields: Record<string, string>, isDmx: boolean): Record<string, unknown> {
   switch (labelType) {
     case 'TRUSS_SPIKE_POSITION':
-      return { address: Number(fields.address), location: fields.location };
+      // An empty field stays empty rather than becoming address 0 (Number('') === 0).
+      return { address: fields.address?.trim() ? Number(fields.address) : null, location: fields.location };
     case 'TRUSS_SPIKE_TIP':
       return { text: fields.text || 'DO NOT TIP', location: fields.location };
     case 'TRUSS_SPIKE_SACN':
@@ -32,7 +34,7 @@ export function buildLabelContent(labelType: AdHocType, fields: Record<string, s
 
 /**
  * The actual label-creator form: a type selector (when more than one type is offered) plus
- * that type's content fields and a quantity — the same fields LabelsPanel always used, just
+ * that type's content fields and a quantity - the same fields LabelsPanel always used, just
  * extracted so the crew request form can present a real label creator instead of a free-text
  * box standing in for one.
  */
@@ -40,23 +42,36 @@ export default function LabelTypeForm({
   types,
   onSubmit,
   submitLabel = 'Add label',
+  locations,
 }: {
   types: AdHocType[];
   onSubmit: (labelType: AdHocType, content: Record<string, unknown>, quantity: number) => Promise<void>;
   submitLabel?: string;
+  /** Known locations for this job; when given, Location is a dropdown instead of free text. */
+  locations?: string[];
 }) {
   const [labelType, setLabelType] = useState<AdHocType>(types[0]);
-  const [quantity, setQuantity] = useState(1);
+  // Kept as typed so the field can be cleared and retyped; parsed when submitting.
+  const [quantityText, setQuantityText] = useState('1');
+  const quantity = Math.max(1, Math.floor(Number(quantityText)) || 1);
   const [fields, setFields] = useState<Record<string, string>>({});
   const [isDmx, setIsDmx] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const idPrefix = useId();
 
   // Every field gets a persistent, visible label (not just placeholder text, which disappears
-  // once typing starts) — see writing.md's "label all fields clearly, and use hint or
+  // once typing starts) - see writing.md's "label all fields clearly, and use hint or
   // placeholder text", and the same .field pattern used by LoginPage/ApplyPage.
   const field = (key: string, labelText: string, placeholder: string) => {
     const id = `${idPrefix}-${key}`;
+    if (key === 'location' && locations) {
+      return (
+        <div className="field">
+          <label htmlFor={id}>{labelText}</label>
+          <LocationSelect id={id} ariaLabel={labelText} placeholder="-" value={fields.location ?? ''} options={locations} onChange={(v) => setFields((f) => ({ ...f, location: v }))} />
+        </div>
+      );
+    }
     return (
       <div className="field">
         <label htmlFor={id}>{labelText}</label>
@@ -72,7 +87,7 @@ export default function LabelTypeForm({
     try {
       await onSubmit(labelType, content, quantity);
       setFields({});
-      setQuantity(1);
+      setQuantityText('1');
       setIsDmx(false);
     } catch (err) {
       setError((err as Error).message);
@@ -141,7 +156,7 @@ export default function LabelTypeForm({
 
         <div className="field" style={{ width: 70 }}>
           <label htmlFor={`${idPrefix}-quantity`}>Quantity</label>
-          <input id={`${idPrefix}-quantity`} type="number" min={1} value={quantity} onChange={(e) => setQuantity(Number(e.target.value))} />
+          <input id={`${idPrefix}-quantity`} type="number" min={1} value={quantityText} onChange={(e) => setQuantityText(e.target.value)} onBlur={() => setQuantityText(String(quantity))} />
         </div>
         <button type="submit">{submitLabel}</button>
       </form>

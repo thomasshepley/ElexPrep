@@ -1,21 +1,36 @@
+import { SkeletonList, SkeletonRegion } from './Skeleton';
 import { useEffect, useState } from 'react';
 import { api, type Plot } from '../api/client';
 import FileInput from './FileInput';
+import { useAuth } from '../auth/AuthContext';
+import { hasPermission } from '../auth/roles';
+import { useDialog } from './Dialog';
+import { useAsyncAction } from '../hooks/useAsyncAction';
+import { formatDateTime } from '../utils/format';
 
 /**
- * Upload/manage uploaded CAD plot PDFs. Previewing lives in CadPlotsViewer, shown once above
+ * Upload/manage CAD plot PDFs uploaded to the job. Previewing lives in CadPlotsViewer, shown once above
  * this panel on the Plots tab (alongside the auto-detected OneDrive CAD PDF and any
- * CAD-flagged OneDrive shares) — this panel only needs to handle add/remove.
+ * CAD-flagged OneDrive shares) - this panel only needs to handle add/remove.
  */
-export default function PlotsPanel({ jobId, onChange }: { jobId: string; onChange?: () => void }) {
-  const [plots, setPlots] = useState<Plot[]>([]);
+export default function PlotsPanel({ jobId, onChange, onSettled, embedded }: { jobId: string; onChange?: (plots: Plot[]) => void; onSettled?: () => void; /** Inside the CAD plots panel rather than a panel of its own. */ embedded?: boolean }) {
+  const dialog = useDialog();
+  const { run } = useAsyncAction();
+  const { user } = useAuth();
+  const canEdit = hasPermission(user, 'editJobs');
+  const [plotsLoaded, setPlots] = useState<Plot[] | null>(null);
+  const plots = plotsLoaded ?? [];
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const refresh = () => api.plots.list(jobId).then((p) => {
-    setPlots(p);
-    onChange?.();
-  });
+  const refresh = () =>
+    api.plots
+      .list(jobId)
+      .then((p) => {
+        setPlots(p);
+        onChange?.(p);
+      })
+      .finally(() => onSettled?.());
 
   useEffect(() => {
     refresh();
@@ -36,41 +51,46 @@ export default function PlotsPanel({ jobId, onChange }: { jobId: string; onChang
   };
 
   const remove = async (plot: Plot) => {
-    if (!confirm(`Delete plot "${plot.originalName}"?`)) return;
-    await api.plots.remove(jobId, plot.id);
+    if (!(await dialog.confirm({ title: 'Delete this plot?', message: plot.originalName, confirmLabel: 'Delete', danger: true }))) return;
+    await run(() => api.plots.remove(jobId, plot.id), { success: 'Plot deleted' });
     refresh();
   };
 
   return (
-    <div className="panel">
-      <h3>Plot CAD PDFs</h3>
-      <FileInput accept="application/pdf,.pdf" disabled={busy} onFile={upload} label="Choose PDF" />
+    <div className={embedded ? 'plots-uploads' : 'panel'}>
+      {embedded ? <h4>Uploaded here</h4> : <h3>CAD plots</h3>}
+      {canEdit && <FileInput accept="application/pdf,.pdf" disabled={busy} onFile={upload} label="Upload a CAD PDF" />}
       {error && <p className="error">{error}</p>}
       {plots.length > 0 && (
-        <table style={{ marginTop: '0.75rem' }}>
-          <thead>
-            <tr>
-              <th>File</th>
-              <th>Uploaded</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {plots.map((p) => (
-              <tr key={p.id}>
-                <td>{p.originalName}</td>
-                <td className="muted">{new Date(p.createdAt).toLocaleString()}</td>
-                <td>
-                  <button className="secondary" onClick={() => remove(p)}>
-                    Delete
-                  </button>
-                </td>
+        <div className="table-scroll">
+          <table style={{ marginTop: '0.75rem' }}>
+            <thead>
+              <tr>
+                <th>File</th>
+                <th>Uploaded</th>
+                <th></th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {plots.map((p) => (
+                <tr key={p.id}>
+                  <td>{p.originalName}</td>
+                  <td className="muted">{formatDateTime(p.createdAt)}</td>
+                  <td>
+                    {canEdit && (
+                      <button className="secondary" onClick={() => remove(p)}>
+                        Delete
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
-      {plots.length === 0 && <p className="muted">No plots uploaded yet.</p>}
+      {plotsLoaded === null && <SkeletonRegion><SkeletonList items={2} /></SkeletonRegion>}
+      {plotsLoaded !== null && plots.length === 0 && <p className="muted">None uploaded here yet.</p>}
     </div>
   );
 }

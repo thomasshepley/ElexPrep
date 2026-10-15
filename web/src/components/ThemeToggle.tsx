@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { applyTheme, getStoredTheme, type Theme } from '../theme';
 import { MoonIcon, SunIcon } from './Icons';
 
-/** Persistent light/dark switch for the bottom of a sidebar — dark is the default (see theme.ts); this just lets someone opt into light and have it stick. */
+/** Persistent light/dark switch for the bottom of a sidebar - dark is the default (see theme.ts); this just lets someone opt into light and have it stick. */
 export default function ThemeToggle() {
   const [theme, setTheme] = useState<Theme>(getStoredTheme);
 

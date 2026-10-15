@@ -1,8 +1,9 @@
+import { Skeleton, SkeletonPanel } from '../components/Skeleton';
 import { useEffect, useState } from 'react';
 import { api, type CrewFeatures, CREW_FEATURE_KEYS, CREW_FEATURE_LABELS } from '../api/client';
 
 /**
- * Company-wide baseline for which crew-portal sections are visible to crew on any job — the
+ * Company-wide baseline for which crew-portal sections are visible to crew on any job - the
  * starting point every newly-onboarded job's crew-feature checkboxes default to (see
  * JobsListPage's onboarding form), overridable per job afterwards from that job's Settings tab.
  */
@@ -32,7 +33,13 @@ export default function CrewPortalSettingsPage() {
     }
   };
 
-  if (!features) return null;
+  if (!features) return error ? <p className="error">Could not load crew portal settings: {error}</p> : (
+      <div>
+        <h1>Crew Portal</h1>
+        <Skeleton w="60%" h={14} style={{ marginBottom: 20 }} />
+        <SkeletonPanel lines={6} />
+      </div>
+    );
 
   return (
     <div>

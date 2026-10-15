@@ -1,17 +1,35 @@
 import { useRef, useState } from 'react';
 import type { LabelElementColor, LabelElementDef, LabelTypeTemplate, LocationColorMap } from '@elexprep/shared';
-import { DMX_CABLE_WIDTH_FACTOR, contrastingTextIsWhite, labelItemLocation, resolveLabelContent, resolveLocationColor } from '@elexprep/shared';
+import {
+  DMX_CABLE_WIDTH_FACTOR,
+  RAINBOW_BAND_COLORS,
+  contrastingTextIsWhite,
+  labelItemLocation,
+  resolveLabelContent,
+  resolveLocationColor,
+} from '@elexprep/shared';
 
 /**
  * CSS px per authored inch. The mirror approximates text layout with simple centered flexbox
- * boxes rather than reproducing pdf-lib's baseline math — exact pixel fidelity already lives
+ * boxes rather than reproducing pdf-lib's baseline math - exact pixel fidelity already lives
  * in the real PDF (verified separately via the preview/download actions); this view only needs
  * to be faithful enough to make positioning and sizing decisions on.
  */
 export const PX_PER_IN = 90;
 const PX_PER_PT = PX_PER_IN / 72;
 
+/** Hard-edged (no blending) color stops, matching drawRainbowFill's discrete left-to-right
+ * bands in pdfBuilder.ts rather than a smoothly blended gradient. */
+function rainbowBandsStyle(): React.CSSProperties {
+  const n = RAINBOW_BAND_COLORS.length;
+  const stops = RAINBOW_BAND_COLORS.flatMap((hex, i) => [`${hex} ${(i / n) * 100}%`, `${hex} ${((i + 1) / n) * 100}%`]);
+  return { backgroundImage: `linear-gradient(90deg, ${stops.join(', ')})` };
+}
+
 function fillStyle(resolved: ReturnType<typeof resolveLocationColor>): React.CSSProperties {
+  if (resolved.pattern === 'RAINBOW') {
+    return rainbowBandsStyle();
+  }
   if (resolved.pattern === 'DIAGONAL_STRIPES' && resolved.secondaryColor) {
     return {
       backgroundImage: `repeating-linear-gradient(45deg, ${resolved.color} 0 10px, ${resolved.secondaryColor} 10px 20px)`,
@@ -25,23 +43,31 @@ function textColor(el: { color: LabelElementColor }, resolved: ReturnType<typeof
   return contrastingTextIsWhite(resolved.color) ? '#fff' : '#000';
 }
 
+export interface LogoUrls {
+  left?: string;
+  middle?: string;
+  right?: string;
+  /** Per-slot size, percent of the slot (100 = fit) - mirrors the printed PDF. */
+  scales?: { left?: number; middle?: number; right?: number };
+}
+
 export interface SheetMirrorProps {
   template: LabelTypeTemplate;
   item: unknown;
   locationColors: LocationColorMap;
-  logoUrl?: string;
+  logoUrls?: LogoUrls;
   editable?: boolean;
   selectedId?: string | null;
   onSelect?: (id: string | null) => void;
   onChangeElement?: (id: string, patch: Partial<Pick<LabelElementDef, 'x' | 'y' | 'w' | 'h'>>) => void;
 }
 
-/** Renders one representative cell of a label type's template — a live HTML/CSS mirror of what buildLabelPdfs.ts will actually print, used both as a read-only preview and, in edit mode, as the surface for dragging/resizing elements. */
+/** Renders one representative cell of a label type's template - a live HTML/CSS mirror of what buildLabelPdfs.ts will actually print, used both as a read-only preview and, in edit mode, as the surface for dragging/resizing elements. */
 export default function SheetMirror({
   template,
   item,
   locationColors,
-  logoUrl,
+  logoUrls,
   editable = false,
   selectedId,
   onSelect,
@@ -131,13 +157,24 @@ export default function SheetMirror({
         }
 
         if (el.type === 'image') {
+          const urls = (['left', 'middle', 'right'] as const)
+            .map((slot) => ({ url: logoUrls?.[slot], zoom: (logoUrls?.scales?.[slot] ?? 100) / 100 }))
+            .filter((u): u is { url: string; zoom: number } => Boolean(u.url));
           return (
             <div
               key={el.id}
               style={{ ...boxStyle, border: '1px solid #ccc', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
               onPointerDown={beginDrag(el, 'move')}
             >
-              {logoUrl ? <LogoImg src={logoUrl} placeholder={el.placeholder} /> : <span style={{ color: '#999', fontSize: 11 }}>{el.placeholder}</span>}
+              {urls.length > 0 ? (
+                urls.map((u, i) => (
+                  <div key={i} style={{ flex: 1, height: '100%', minWidth: 0, overflow: 'hidden' }}>
+                    <LogoImg src={u.url} placeholder={el.placeholder} zoom={u.zoom} />
+                  </div>
+                ))
+              ) : (
+                <span style={{ color: '#999', fontSize: 11 }}>{el.placeholder}</span>
+              )}
               {editable && selectedId === el.id && <ResizeHandle onPointerDown={beginDrag(el, 'resize')} />}
             </div>
           );
@@ -210,10 +247,17 @@ export default function SheetMirror({
   );
 }
 
-function LogoImg({ src, placeholder }: { src: string; placeholder: string }) {
+function LogoImg({ src, placeholder, zoom = 1 }: { src: string; placeholder: string; zoom?: number }) {
   const [failed, setFailed] = useState(false);
   if (failed) return <span style={{ color: '#999', fontSize: 11 }}>{placeholder}</span>;
-  return <img src={src} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} onError={() => setFailed(true)} />;
+  return (
+    <img
+      src={src}
+      alt=""
+      style={{ width: '100%', height: '100%', objectFit: 'contain', transform: zoom !== 1 ? `scale(${zoom})` : undefined }}
+      onError={() => setFailed(true)}
+    />
+  );
 }
 
 function ResizeHandle({ onPointerDown }: { onPointerDown: (e: React.PointerEvent) => void }) {

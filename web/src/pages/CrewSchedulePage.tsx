@@ -1,23 +1,21 @@
+import { Skeleton, SkeletonRegion, SkeletonText } from '../components/Skeleton';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, type CrewMyJob } from '../api/client';
 import { WhereIcon } from '../components/Icons';
 import MonthCalendar, { type CalendarEvent } from '../components/MonthCalendar';
+import LocationLinks from '../components/LocationLinks';
+import { formatDateRange, formatDayHeading, formatTime } from '../utils/format';
+import { isPointInTime } from '../components/DayTimeline';
 
 const NO_DATE = 'No date set yet';
 
-function formatDateRange(startsAt: string | null, endsAt: string | null): string {
-  if (!startsAt) return NO_DATE;
-  const start = new Date(startsAt);
-  const startStr = start.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
-  if (!endsAt) return startStr;
-  const end = new Date(endsAt);
-  const endStr = end.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
-  return endStr === startStr ? startStr : `${startStr} – ${endStr}`;
+function formatDateRangeOrNone(startsAt: string | null, endsAt: string | null): string {
+  return startsAt ? formatDateRange(startsAt, endsAt) : NO_DATE;
 }
 
 /**
- * The crew member's schedule — a month calendar plus every job they're assigned to listed
+ * The crew member's schedule - a month calendar plus every job they're assigned to listed
  * below it (soonest first; jobs without a synced date sort to the bottom rather than being
  * hidden, since not every job is linked to a Current RMS opportunity yet), mirroring the
  * admin dashboard's calendar-plus-list layout rather than making List a separate tab.
@@ -48,11 +46,25 @@ export default function CrewSchedulePage() {
     <div>
       <h1>Your schedule</h1>
       {error && <p className="error">{error}</p>}
-      {jobs === null && !error && <p className="muted">Loading…</p>}
+      {jobs === null && !error && (
+        <SkeletonRegion>
+          <div className="panel next-call">
+            <Skeleton w="22%" h={12} style={{ marginBottom: 14 }} />
+            <Skeleton w="60%" h={26} style={{ marginBottom: 14 }} />
+            <Skeleton w="45%" h={16} style={{ marginBottom: 16 }} />
+            <SkeletonText lines={3} gap={9} />
+          </div>
+          <div className="panel" style={{ marginTop: '1rem' }}>
+            <Skeleton w="30%" h={20} style={{ marginBottom: 16 }} />
+            <Skeleton h={420} r={8} />
+          </div>
+        </SkeletonRegion>
+      )}
       {jobs !== null && jobs.length === 0 && <p className="muted">You're not assigned to any jobs yet.</p>}
 
       {jobs !== null && jobs.length > 0 && (
         <>
+          <NextCall jobs={jobs} />
           <div style={{ marginTop: '1rem' }}>
             <MonthCalendar events={events} />
           </div>
@@ -61,7 +73,7 @@ export default function CrewSchedulePage() {
             <h3>Your jobs</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
               {jobs.map((j) => {
-                const dateRange = formatDateRange(j.startsAt, j.endsAt);
+                const dateRange = formatDateRangeOrNone(j.startsAt, j.endsAt);
                 return (
                   <Link key={j.jobId} to={`/crew/jobs/${j.jobId}`} className="job-card">
                     <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -86,5 +98,55 @@ export default function CrewSchedulePage() {
         </>
       )}
     </div>
+  );
+}
+
+/** The soonest booked day across every job: what, when the first call is, where, who else. */
+function NextCall({ jobs }: { jobs: CrewMyJob[] }) {
+  const next = jobs
+    .filter((j) => j.nextDay)
+    .sort((a, b) => new Date(a.nextDay!.date).getTime() - new Date(b.nextDay!.date).getTime())[0];
+  if (!next?.nextDay) return null;
+  const { nextDay } = next;
+  const first = nextDay.items[0];
+  // The admin-set call time for the day wins; otherwise the first thing they're on.
+  const callAt = nextDay.callTime ?? (first ? formatTime(first.startsAt) : null);
+
+  return (
+    <section className="panel next-call" aria-label="Your next call">
+      <p className="next-call-eyebrow">Next call time</p>
+      <h2 className="next-call-when">
+        {formatDayHeading(nextDay.date)}
+        {callAt && <span> at {callAt}</span>}
+      </h2>
+      <p className="next-call-job">
+        <Link to={`/crew/jobs/${next.jobId}`}>{next.jobName}</Link>
+        <span className="chip chip-role">{next.role}</span>
+        {nextDay.name && <span className="chip chip-neutral">{nextDay.name}</span>}
+      </p>
+      {nextDay.wrapTime && <p className="muted" style={{ margin: '0 0 0.5rem' }}>Estimated wrap {nextDay.wrapTime}</p>}
+      {nextDay.items.length > 0 && (
+        <ul className="plain-list next-call-items">
+          {nextDay.items.map((i, idx) => (
+            <li key={idx}>
+              <span className="week-time">
+                {formatTime(i.startsAt)}
+                {i.endsAt && !isPointInTime(i) ? `–${formatTime(i.endsAt)}` : ''}
+              </span>{' '}
+              {i.title}
+            </li>
+          ))}
+        </ul>
+      )}
+      {(next.venue || next.address) && (
+        <div className="next-call-where">
+          {next.venue && <div>{next.venue}</div>}
+          <LocationLinks address={next.address} showMap={false} />
+        </div>
+      )}
+      <p className="muted" style={{ margin: 0 }}>
+        {nextDay.others.length > 0 ? `With ${nextDay.others.map((o) => `${o.name} (${o.role})`).join(', ')}` : "No one else is booked that day yet."}
+      </p>
+    </section>
   );
 }

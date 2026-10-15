@@ -1,19 +1,20 @@
 import { Router } from 'express';
 import multer from 'multer';
+import rateLimit from 'express-rate-limit';
 import { prisma, logActivity } from '../db';
 import { MIN_PASSWORD_LENGTH, hashPassword, requireRole } from '../auth';
 import { requirePermission } from '../permissions';
-import { DOCUMENT_FIELDS, saveDocuments, streamDecryptedDocument } from '../crewDocumentsStorage';
-import { encryptBankDetails, decryptBankDetails, parseBankDetails } from '../bankDetails';
+import { DOCUMENT_FIELDS, assertSafeDocuments, saveDocuments, streamDecryptedDocument } from '../crewDocumentsStorage';
+import { decryptBankDetails } from '../bankDetails';
 import { notifyCrewApplicationSubmitted } from '../notifications';
 
 /**
  * Public application intake + admin review queue for the freelance crew roster. The public
- * submission (POST /) needs no login — see auth.ts's explicit exemption for this exact path —
+ * submission (POST /) needs no login - see auth.ts's explicit exemption for this exact path -
  * everything else here requires the (delegatable) manageCrewApplications permission, applied
  * per-route rather than via router.use so it never shadows that public route. Viewing/downloading
  * an actual document's bytes is a narrower, hard requireRole('ADMIN') check per route (not
- * delegated), matching the plan's "compliance document visibility stays admin-only" decision —
+ * delegated), matching the plan's "compliance document visibility stays admin-only" decision -
  * reviewing an application's form fields and approving/rejecting it is delegatable, seeing the
  * underlying compliance files is not.
  */
@@ -24,7 +25,17 @@ const upload = multer({
   fileFilter: (_req, file, cb) => {
     cb(null, file.mimetype === 'application/pdf' || file.mimetype.startsWith('image/'));
   },
-  limits: { fileSize: 15 * 1024 * 1024, files: DOCUMENT_FIELDS.length },
+  limits: { fileSize: 15 * 1024 * 1024, files: DOCUMENT_FIELDS.length, fieldSize: 64 * 1024, fields: 30 },
+});
+
+// Anonymous and buffered in memory, so it runs before multer: a flood is turned away before any
+// upload is read.
+const publicSubmitLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many applications from this connection - try again later' },
 });
 
 interface ApplicationRow {
@@ -60,7 +71,7 @@ function toApplicationDto(a: ApplicationRow) {
     notes: a.notes,
     gender: a.gender,
     address: a.address,
-    // Never the ciphertext itself — just whether bank details were provided at all, so the
+    // Never the ciphertext itself - just whether bank details were provided at all, so the
     // review UI can show "on file" without a dedicated decrypt call every list render.
     hasBankDetails: a.bankDetailsCiphertext !== null,
     status: a.status,
@@ -72,19 +83,16 @@ function toApplicationDto(a: ApplicationRow) {
 
 crewApplicationsRouter.post(
   '/',
+  publicSubmitLimiter,
   upload.fields(DOCUMENT_FIELDS.map((d) => ({ name: d.field, maxCount: 1 }))),
   async (req, res) => {
-    const { fullName, email, phone, skills, certifications, dayRate, rightToWork, notes, gender, address, bankDetails } = req.body ?? {};
+    // Deliberately the basics only: an anonymous applicant isn't asked for bank details, home
+    // address, gender or rate - those are added from the crew account once approved.
+    const { fullName, email, phone, skills, certifications, rightToWork, notes } = req.body ?? {};
     if (!fullName || typeof fullName !== 'string') return res.status(400).json({ error: 'fullName is required' });
     if (!email || typeof email !== 'string') return res.status(400).json({ error: 'email is required' });
-
-    let bankEncrypted: { ciphertext: string; iv: string; authTag: string } | null = null;
-    try {
-      const parsed = parseBankDetails(bankDetails);
-      if (parsed) bankEncrypted = encryptBankDetails(parsed);
-    } catch (err) {
-      return res.status(400).json({ error: (err as Error).message });
-    }
+    if (fullName.length > 200 || email.length > 320) return res.status(400).json({ error: 'Name or email is too long' });
+    assertSafeDocuments(req.files as Record<string, Express.Multer.File[]> | undefined);
 
     const application = await prisma.crewApplication.create({
       data: {
@@ -93,14 +101,8 @@ crewApplicationsRouter.post(
         phone: phone || null,
         skills: skills || null,
         certifications: certifications || null,
-        dayRate: dayRate || null,
         rightToWork: rightToWork || null,
         notes: notes || null,
-        gender: gender || null,
-        address: address || null,
-        bankDetailsCiphertext: bankEncrypted?.ciphertext ?? null,
-        bankDetailsIv: bankEncrypted?.iv ?? null,
-        bankDetailsAuthTag: bankEncrypted?.authTag ?? null,
       },
     });
     await saveDocuments({ applicationId: application.id }, req.files as Record<string, Express.Multer.File[]> | undefined);
@@ -127,7 +129,7 @@ crewApplicationsRouter.get('/:id', requirePermission('manageCrewApplications'), 
   res.json({ ...toApplicationDto(application), documents: application.documents });
 });
 
-// Document bytes are the one part of this flow that stays hard admin-only, never delegated —
+// Document bytes are the one part of this flow that stays hard admin-only, never delegated -
 // see this file's top comment.
 crewApplicationsRouter.get('/:id/documents/:docId', requireRole('ADMIN'), async (req, res) => {
   const doc = await prisma.crewDocument.findUnique({ where: { id: req.params.docId } });
@@ -177,7 +179,7 @@ crewApplicationsRouter.post('/:id/approve', requirePermission('manageCrewApplica
           create: {
             username,
             displayName: displayName || application.fullName,
-            passwordHash: hashPassword(password),
+            passwordHash: await hashPassword(password),
             role: 'CREW',
           },
         },

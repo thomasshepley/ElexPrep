@@ -20,7 +20,7 @@ test('resolveLabelContent: FIXTURE stacks only the info lines that have data, in
   const bare = resolveLabelContent('FIXTURE', { address: 203 });
   assert.deepEqual(bare.infoLines, []);
 
-  // Pix-only (no Main) still renders, as its own single line — order follows presence, not
+  // Pix-only (no Main) still renders, as its own single line - order follows presence, not
   // which specific field happened to be set.
   const pixOnly = resolveLabelContent('FIXTURE', { address: 204, pixUniverse: 3, pixAddress: 9 });
   assert.deepEqual(pixOnly.infoLines, ['Pix: Uni: 3 Add: 9']);

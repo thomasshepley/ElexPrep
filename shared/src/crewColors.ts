@@ -1,6 +1,6 @@
 /**
  * A small, visually distinct categorical palette for per-crew-member swatches on the schedule
- * calendar — a different concern from locationColors.ts (which tags stage areas, not people),
+ * calendar - a different concern from locationColors.ts (which tags stage areas, not people),
  * so it gets its own small palette rather than reusing that one.
  */
 export const CREW_COLOR_PALETTE = [
@@ -19,7 +19,7 @@ export const CREW_COLOR_PALETTE = [
 ];
 
 /** Stable per-person color when no admin override is set, derived from the crew profile's id so
- * it's consistent across sessions/renders without needing a database write — every crew member
+ * it's consistent across sessions/renders without needing a database write - every crew member
  * gets a distinct swatch with zero setup. */
 export function defaultCrewColor(crewProfileId: string): string {
   let hash = 0;

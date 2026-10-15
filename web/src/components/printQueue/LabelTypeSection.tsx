@@ -4,14 +4,15 @@ import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } 
 import { CSS } from '@dnd-kit/utilities';
 import { DEFAULT_LABEL_TEMPLATES, mergeTemplate, type LabelElementDef, type LabelType, type LabelTypeTemplate, type LocationColorMap } from '@elexprep/shared';
 import { api, type AdHocLabel, type PrintQueueItem } from '../../api/client';
-import SheetMirror from './SheetMirror';
+import SheetMirror, { type LogoUrls } from './SheetMirror';
+import { labelTypeName } from '../../utils/labelTypes';
 
 export function summarize(labelType: string, content: Record<string, unknown>): string {
   switch (labelType) {
     case 'FIXTURE':
-      return `#${content.address} — Uni ${content.mainUniverse}/${content.mainAddress}`;
+      return `#${content.address} - Uni ${content.mainUniverse}/${content.mainAddress}`;
     case 'PAL':
-      return `${content.location ?? ''} — ${content.title ?? ''} ${content.subtitle ?? ''}`;
+      return `${content.location ?? ''} - ${content.title ?? ''} ${content.subtitle ?? ''}`;
     case 'TRUSS_SPIKE_POSITION':
       return String(content.address ?? '');
     case 'TRUSS_SPIKE_TIP':
@@ -44,7 +45,7 @@ export default function LabelTypeSection({
   onToggleSelect,
   locationColors,
   onRefresh,
-  logoUrl,
+  logoUrls,
 }: {
   jobId: string;
   labelType: string;
@@ -54,7 +55,7 @@ export default function LabelTypeSection({
   onToggleSelect: (id: string) => void;
   locationColors: LocationColorMap;
   onRefresh: () => void;
-  logoUrl?: string;
+  logoUrls?: LogoUrls;
 }) {
   const rows: Row[] = useMemo(() => {
     const combined = [
@@ -70,13 +71,19 @@ export default function LabelTypeSection({
   const [customizing, setCustomizing] = useState(false);
   const [draft, setDraft] = useState<Record<string, Partial<LabelElementDef>>>({});
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
+  const [previewIndex, setPreviewIndex] = useState(0);
   const [editingRow, setEditingRow] = useState<string | null>(null);
 
+  const [templateError, setTemplateError] = useState<string | null>(null);
   useEffect(() => {
-    api.labelTemplates.get(jobId, labelType).then((r) => {
-      setTemplate(r.template);
-      setIsCustomized(r.isCustomized);
-    });
+    setTemplateError(null);
+    api.labelTemplates
+      .get(jobId, labelType)
+      .then((r) => {
+        setTemplate(r.template);
+        setIsCustomized(r.isCustomized);
+      })
+      .catch((e) => setTemplateError((e as Error).message));
   }, [jobId, labelType]);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
@@ -117,7 +124,7 @@ export default function LabelTypeSection({
 
   const startCustomizing = () => {
     // Seed the draft with whatever's already been customized (inferred by diffing the merged
-    // template against the shared defaults) — PUT replaces the whole override map for this
+    // template against the shared defaults) - PUT replaces the whole override map for this
     // label type, so a save that only carries this session's edits would silently drop any
     // other element's previously saved position/size.
     const base = DEFAULT_LABEL_TEMPLATES[labelType as LabelType];
@@ -126,11 +133,15 @@ export default function LabelTypeSection({
       for (const el of template.elements) {
         const baseEl = base.elements.find((b) => b.id === el.id);
         if (!baseEl) continue;
-        const patch: Partial<Pick<LabelElementDef, 'x' | 'y' | 'w' | 'h'>> = {};
+        // Intersected with `{ size?: number }` because `size` only exists on the
+        // text/stackedText branches of the LabelElementDef union - without it, TS rejects
+        // writing patch.size since it's not present on every branch (e.g. FillElementDef).
+        const patch: Partial<LabelElementDef> & { size?: number } = {};
         if (el.x !== baseEl.x) patch.x = el.x;
         if (el.y !== baseEl.y) patch.y = el.y;
         if (el.w !== baseEl.w) patch.w = el.w;
         if (el.h !== baseEl.h) patch.h = el.h;
+        if ('size' in el && 'size' in baseEl && el.size !== baseEl.size) patch.size = el.size;
         if (Object.keys(patch).length > 0) seeded[el.id] = patch;
       }
     }
@@ -159,13 +170,15 @@ export default function LabelTypeSection({
     cancelCustomizing();
   };
 
-  const onChangeElement = (id: string, patch: Partial<Pick<LabelElementDef, 'x' | 'y' | 'w' | 'h'>>) => {
+  const onChangeElement = (id: string, patch: Partial<LabelElementDef>) => {
     setDraft((d) => ({ ...d, [id]: { ...d[id], ...patch } }));
   };
 
-  if (!template || rows.length === 0) return null;
+  if (rows.length === 0) return null;
+  if (!template) return templateError ? <p className="error">Could not load the {labelTypeName(labelType)} template: {templateError}</p> : null;
 
-  const previewItem = rows[0].content;
+  const clampedPreviewIndex = Math.min(previewIndex, rows.length - 1);
+  const previewItem = rows[clampedPreviewIndex].content;
   const displayTemplate = customizing ? mergeTemplate(template, draft) : template;
   const selectedElement = selectedElementId ? displayTemplate.elements.find((e) => e.id === selectedElementId) : null;
 
@@ -173,7 +186,7 @@ export default function LabelTypeSection({
     <div className="panel">
       <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
-          <h3>{labelType}</h3>
+          <h3>{labelTypeName(labelType)}</h3>
           {isCustomized && <span className="chip chip-neutral">Custom layout</span>}
         </div>
         {!customizing ? (
@@ -205,17 +218,41 @@ export default function LabelTypeSection({
       </div>
 
       <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap', marginTop: '0.75rem' }}>
-        <div>
+        {/* Sticks while the rows scroll past, and follows whichever row was last clicked. */}
+        <div className={`queue-preview${customizing ? '' : ' is-compact'}`}>
           <SheetMirror
             template={displayTemplate}
             item={previewItem}
             locationColors={locationColors}
-            logoUrl={logoUrl}
+            logoUrls={logoUrls}
             editable={customizing}
             selectedId={selectedElementId}
             onSelect={setSelectedElementId}
             onChangeElement={onChangeElement}
           />
+          {rows.length > 1 && (
+            <div className="row" style={{ gap: '0.5rem', alignItems: 'center', marginTop: '0.4rem' }}>
+              <button
+                type="button"
+                className="secondary"
+                disabled={clampedPreviewIndex <= 0}
+                onClick={() => setPreviewIndex((i) => Math.max(0, i - 1))}
+              >
+                Previous
+              </button>
+              <span className="muted" style={{ fontSize: 'var(--text-sm)' }}>
+                Preview {clampedPreviewIndex + 1} of {rows.length}
+              </span>
+              <button
+                type="button"
+                className="secondary"
+                disabled={clampedPreviewIndex >= rows.length - 1}
+                onClick={() => setPreviewIndex((i) => Math.min(rows.length - 1, i + 1))}
+              >
+                Next
+              </button>
+            </div>
+          )}
           {customizing && (
             <>
               <p className="muted" style={{ maxWidth: 320, fontSize: 'var(--text-sm)' }}>
@@ -241,7 +278,7 @@ export default function LabelTypeSection({
           )}
         </div>
 
-        <div style={{ flex: 1, minWidth: 280 }}>
+        <div style={{ flex: '1 1 24rem', minWidth: 0 }}>
           <DndContext sensors={sensors} onDragEnd={onDragEnd}>
             <SortableContext items={rows.map((r) => r.key)} strategy={verticalListSortingStrategy}>
               <table>
@@ -268,6 +305,8 @@ export default function LabelTypeSection({
                       editing={editingRow === row.key}
                       onToggleEdit={() => setEditingRow(editingRow === row.key ? null : row.key)}
                       onSaveContent={(patch) => updateRowContent(row, patch)}
+                      previewing={rows[clampedPreviewIndex]?.key === row.key}
+                      onPreview={() => setPreviewIndex(rows.findIndex((r) => r.key === row.key))}
                     />
                   ))}
                 </tbody>
@@ -291,6 +330,8 @@ function SortableRow({
   editing,
   onToggleEdit,
   onSaveContent,
+  previewing,
+  onPreview,
 }: {
   row: Row;
   labelType: string;
@@ -302,13 +343,15 @@ function SortableRow({
   editing: boolean;
   onToggleEdit: () => void;
   onSaveContent: (patch: Record<string, unknown>) => void;
+  previewing: boolean;
+  onPreview: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: row.key });
   const style = { transform: CSS.Transform.toString(transform), transition };
 
   return (
     <>
-      <tr ref={setNodeRef} style={style}>
+      <tr ref={setNodeRef} style={style} className={previewing ? 'is-previewing' : undefined}>
         <td {...attributes} {...listeners} style={{ cursor: 'grab', color: 'var(--content-muted)' }} title="Drag to reorder">
           ⠿
         </td>
@@ -316,7 +359,9 @@ function SortableRow({
           <input type="checkbox" checked={selected} disabled={!selectable} onChange={onToggleSelect} title={selectable ? '' : 'Ad hoc labels are always included'} />
         </td>
         <td>
-          {summarize(labelType, row.content)}
+          <button type="button" className="link-button queue-row-preview" onClick={onPreview} title="Show this label in the preview">
+            {summarize(labelType, row.content)}
+          </button>
           <button className="secondary" style={{ marginLeft: '0.5rem', padding: '0.1rem 0.5rem' }} onClick={onToggleEdit}>
             {editing ? 'Close' : 'Edit'}
           </button>
@@ -327,7 +372,12 @@ function SortableRow({
             min={1}
             defaultValue={row.quantity}
             style={{ width: 60 }}
-            onBlur={(e) => onSetQty(Number(e.target.value))}
+            onBlur={(e) => {
+              const q = Math.floor(Number(e.target.value));
+              // A cleared or invalid field puts the old value back instead of saving 0.
+              if (!e.target.value.trim() || !Number.isFinite(q) || q < 1) e.target.value = String(row.quantity);
+              else if (q !== row.quantity) onSetQty(q);
+            }}
           />
         </td>
         <td>
@@ -368,7 +418,12 @@ function ContentEditor({ content, onSave }: { content: Record<string, unknown>; 
               <input
                 type={typeof value === 'number' ? 'number' : 'text'}
                 value={values[key] == null ? '' : String(values[key])}
-                onChange={(e) => setValues((v) => ({ ...v, [key]: typeof value === 'number' ? Number(e.target.value) : e.target.value }))}
+                onChange={(e) =>
+                  setValues((v) => ({
+                    ...v,
+                    [key]: typeof value === 'number' ? (e.target.value === '' ? null : Number(e.target.value)) : e.target.value,
+                  }))
+                }
               />
             )}
           </label>
@@ -381,11 +436,12 @@ function ContentEditor({ content, onSave }: { content: Record<string, unknown>; 
   );
 }
 
-function ElementInspector({ element, onChange }: { element: LabelElementDef; onChange: (patch: Partial<Pick<LabelElementDef, 'x' | 'y' | 'w' | 'h'>>) => void }) {
+function ElementInspector({ element, onChange }: { element: LabelElementDef; onChange: (patch: Partial<LabelElementDef>) => void }) {
+  const hasFontSize = element.type === 'text' || element.type === 'stackedText';
   return (
     <div className="panel" style={{ marginTop: '0.5rem', padding: '0.75rem', background: 'var(--surface-sunken)' }}>
       <p className="muted" style={{ marginTop: 0 }}>
-        {element.id} — position &amp; size (inches)
+        {element.id} - position &amp; size (inches)
       </p>
       <div className="row" style={{ flexWrap: 'wrap', gap: '0.5rem' }}>
         {(['x', 'y', 'w', 'h'] as const).map((k) => (
@@ -395,10 +451,22 @@ function ElementInspector({ element, onChange }: { element: LabelElementDef; onC
               type="number"
               step={0.05}
               value={element[k]}
-              onChange={(e) => onChange({ [k]: Number(e.target.value) })}
+              onChange={(e) => e.target.value !== '' && Number.isFinite(e.target.valueAsNumber) && onChange({ [k]: e.target.valueAsNumber })}
             />
           </label>
         ))}
+        {hasFontSize && (
+          <label className="field" style={{ minWidth: 70 }}>
+            <span>font size</span>
+            <input
+              type="number"
+              step={1}
+              min={4}
+              value={element.size}
+              onChange={(e) => e.target.value !== '' && e.target.valueAsNumber >= 1 && onChange({ size: e.target.valueAsNumber })}
+            />
+          </label>
+        )}
       </div>
     </div>
   );

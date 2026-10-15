@@ -3,7 +3,7 @@ import { prisma, logActivity } from '../db';
 import { requireRole } from '../auth';
 import { requirePermission } from '../permissions';
 import { DEFAULT_CURRENT_RMS_CONFIG, getCurrentRmsConfig, saveCurrentRmsConfig, toPublicConfig } from '../currentRms/config';
-import { testCurrentRmsConnection, fetchOpportunityItems, GROUP_ITEM_TYPE, RawOpportunityItem } from '../currentRms/client';
+import { testCurrentRmsConnection, fetchOpportunity, fetchOpportunityItems, GROUP_ITEM_TYPE, RawOpportunityItem } from '../currentRms/client';
 import {
   runCurrentRmsSync,
   restartCurrentRmsPolling,
@@ -14,10 +14,12 @@ import { getOneDriveConfig } from '../oneDrive/config';
 import { matchJobFolder } from '../oneDrive/matcher';
 import { getItemByPath } from '../oneDrive/client';
 import { normalizeCrewFeaturesPatch } from '../crewFeatures';
+import { assignmentCost, crewSuggestedRate, effectiveDayRate, loadRateTables } from '../crewRates';
+import { lineExclusion, lineNameKey, loadExcludedLineNames, saveExcludedLineNames } from '../crewMarginLines';
 
 export const currentRmsRouter = Router();
 
-// Connection config and manual sync stay ADMIN-only — they hold the API key and can hammer
+// Connection config and manual sync stay ADMIN-only - they hold the API key and can hammer
 // Current RMS's rate limit. Browsing/onboarding opportunities (below) is delegatable instead,
 // since onboarding a job is now the only way to create one at all.
 currentRmsRouter.get('/config', requireRole('ADMIN'), async (_req, res) => {
@@ -32,7 +34,7 @@ currentRmsRouter.put('/config', requireRole('ADMIN'), async (req, res) => {
     enabled: body.enabled ?? current.enabled,
     subdomain: body.subdomain !== undefined ? body.subdomain : current.subdomain,
     pollMinutes: body.pollMinutes ?? current.pollMinutes,
-    // Only overwrite the stored key if a non-empty one was actually submitted — this lets
+    // Only overwrite the stored key if a non-empty one was actually submitted - this lets
     // the settings form round-trip without the client ever needing to see the real key.
     // removeApiKey is the one explicit way to clear it instead of replacing it.
     apiKey: body.removeApiKey ? '' : body.apiKey ? body.apiKey : current.apiKey,
@@ -84,7 +86,7 @@ currentRmsRouter.get('/opportunities', requirePermission('onboardJobs'), async (
 });
 
 /** Attempts an automatic OneDrive folder match for a newly-onboarded job, or resolves a
- * manually-supplied path to a real folder if one was given instead. Never throws — a OneDrive
+ * manually-supplied path to a real folder if one was given instead. Never throws - a OneDrive
  * failure (not configured, no match, a transient Graph error) shouldn't block onboarding the
  * job itself, so this just falls back to "no folder linked yet" on any error. */
 async function resolveOneDriveFolderForOnboarding(
@@ -110,7 +112,7 @@ async function resolveOneDriveFolderForOnboarding(
 currentRmsRouter.post('/opportunities/:rmsId/import', requirePermission('onboardJobs'), async (req, res) => {
   const rmsId = Number(req.params.rmsId);
   const opp = await prisma.currentRmsOpportunity.findUnique({ where: { rmsId } });
-  if (!opp) return res.status(404).json({ error: 'Opportunity not cached — try syncing first' });
+  if (!opp) return res.status(404).json({ error: 'Opportunity not cached - try syncing first' });
 
   const existingJob = await prisma.job.findFirst({ where: { currentRmsOpportunityId: String(rmsId) } });
   if (existingJob) return res.status(409).json({ error: 'A job is already linked to this opportunity', job: existingJob });
@@ -121,7 +123,7 @@ currentRmsRouter.post('/opportunities/:rmsId/import', requirePermission('onboard
   const crewFeaturesJson = crewFeatures ? JSON.stringify(normalizeCrewFeaturesPatch(crewFeatures)) : null;
 
   // The review step on the dashboard pre-fills these from the opportunity and lets the admin
-  // override before the job is actually created — see JobsListPage's OnboardingOptionsForm.
+  // override before the job is actually created - see JobsListPage's OnboardingOptionsForm.
   const job = await prisma.job.create({
     data: {
       name: name || opp.subject,
@@ -139,7 +141,7 @@ currentRmsRouter.post('/opportunities/:rmsId/import', requirePermission('onboard
   res.status(201).json(job);
 });
 
-/** Bulk-onboards several cached opportunities at once — the dashboard's "Onboard N selected"
+/** Bulk-onboards several cached opportunities at once - the dashboard's "Onboard N selected"
  * action. Each one gets its own best-effort OneDrive auto-match (no manual override makes
  * sense across a batch of different jobs); the same crewFeatures patch, if given, applies to
  * all of them uniformly. Skips (rather than fails the whole batch) any opportunity that's
@@ -157,7 +159,7 @@ currentRmsRouter.post('/opportunities/bulk-import', requirePermission('onboardJo
     const rmsId = Number(raw);
     const opp = await prisma.currentRmsOpportunity.findUnique({ where: { rmsId } });
     if (!opp) {
-      skipped.push({ rmsId, reason: 'Not cached — try syncing first' });
+      skipped.push({ rmsId, reason: 'Not cached - try syncing first' });
       continue;
     }
     const existingJob = await prisma.job.findFirst({ where: { currentRmsOpportunityId: String(rmsId) } });
@@ -219,7 +221,7 @@ jobCurrentRmsRouter.get('/:jobId/current-rms/pick-list', async (req, res) => {
         ...i,
         prepped: preppedById.get(i.id) ?? false,
         // Current RMS's own opportunity-item status: 20 = "Booked Out" (physically out on
-        // hire) — this is CRMS's system of record, separate from ElexPrep's own `prepped`
+        // hire) - this is CRMS's system of record, separate from ElexPrep's own `prepped`
         // crew checklist above, which tracks warehouse prep independent of when someone
         // updates CRMS itself.
         bookedOut: typeof i.status === 'number' && i.status >= 20,
@@ -233,7 +235,7 @@ jobCurrentRmsRouter.get('/:jobId/current-rms/pick-list', async (req, res) => {
   }
 });
 
-/** Crew ticks an item off (or back on) as they physically pull it — ElexPrep's own tracking,
+/** Crew ticks an item off (or back on) as they physically pull it - ElexPrep's own tracking,
  * independent of whatever Current RMS's own line-item status says. */
 jobCurrentRmsRouter.put('/:jobId/current-rms/pick-list/:itemId/prepped', async (req, res) => {
   const { prepped } = req.body ?? {};
@@ -275,7 +277,7 @@ jobCurrentRmsRouter.post('/:jobId/current-rms/link', requirePermission('linkCurr
     const config = await getCurrentRmsConfig();
     if (config.enabled) snapshotJson = JSON.stringify(await fetchPickListSnapshot(config, Number(rmsId)));
   } catch {
-    // Not fatal — the link itself still succeeds; the next sync will establish it instead.
+    // Not fatal - the link itself still succeeds; the next sync will establish it instead.
   }
   const job = await prisma.job.update({
     where: { id: req.params.jobId },
@@ -311,29 +313,93 @@ jobCurrentRmsRouter.post('/:jobId/current-rms/acknowledge', async (req, res) => 
   res.json(job);
 });
 
+/**
+ * Explicit, admin-set links from this job to other Current RMS opportunities whose crew
+ * charges should count toward its margin - for a separate "<Job> - Crewing" opportunity that
+ * Current RMS didn't group under the same Project as the main opportunity (see
+ * JobLinkedRmsOpportunity's schema comment). Same sensitivity tier as the margin view itself.
+ */
+jobCurrentRmsRouter.get('/:jobId/current-rms/linked-opportunities', requireRole('ADMIN'), async (req, res) => {
+  const links = await prisma.jobLinkedRmsOpportunity.findMany({
+    where: { jobId: req.params.jobId },
+    orderBy: { createdAt: 'asc' },
+  });
+  res.json(links);
+});
+
+jobCurrentRmsRouter.post('/:jobId/current-rms/linked-opportunities', requireRole('ADMIN'), async (req, res) => {
+  const { jobId } = req.params;
+  const rmsId = Number(req.body?.rmsId);
+  if (!Number.isInteger(rmsId) || rmsId <= 0) return res.status(400).json({ error: 'rmsId must be a positive integer' });
+
+  const config = await getCurrentRmsConfig();
+  if (!config.enabled) return res.status(400).json({ error: 'Current RMS integration is disabled' });
+  const opp = await fetchOpportunity(config, rmsId);
+  if (!opp) return res.status(404).json({ error: `No Current RMS opportunity #${rmsId} found` });
+
+  try {
+    const link = await prisma.jobLinkedRmsOpportunity.create({
+      data: { jobId, rmsId, subject: opp.subject ?? null },
+    });
+    await logActivity('current_rms.link_crew_opportunity', `#${rmsId} (${opp.subject})`, jobId, req.user?.id);
+    res.status(201).json(link);
+  } catch (err) {
+    res.status(409).json({ error: 'This opportunity is already linked to this job' });
+  }
+});
+
+jobCurrentRmsRouter.delete('/:jobId/current-rms/linked-opportunities/:id', requireRole('ADMIN'), async (req, res) => {
+  const link = await prisma.jobLinkedRmsOpportunity.findUnique({ where: { id: req.params.id } });
+  if (!link || link.jobId !== req.params.jobId) return res.status(404).json({ error: 'Link not found' });
+  await prisma.jobLinkedRmsOpportunity.delete({ where: { id: req.params.id } });
+  await logActivity('current_rms.unlink_crew_opportunity', `#${link.rmsId}`, req.params.jobId, req.user?.id);
+  res.status(204).end();
+});
+
 function toMoney(value: string | undefined): number {
   const n = Number(value);
   return Number.isFinite(n) ? n : 0;
 }
 
-/** What one opportunity charges the client for crew/labour — the sum of every Service-type
+/** What one opportunity charges the client for crew/labour - the sum of every Service-type
  * line's pre-tax charge (not a Group row's own total, and not Current RMS's own per-asset
  * opportunity_cost, which this app doesn't read; see RawOpportunityItem). Service is this
  * account's existing convention for labour/setup lines (already relied on by the pick list's
  * Rentals-only default), so this reuses it rather than looking for a specifically-named group. */
+function serviceItems(items: RawOpportunityItem[]): RawOpportunityItem[] {
+  return items.filter((i) => i.opportunity_item_type !== GROUP_ITEM_TYPE && i.transaction_type_name === 'Service');
+}
+
 function sumServiceCharge(items: RawOpportunityItem[]): number {
-  return items
-    .filter((i) => i.opportunity_item_type !== GROUP_ITEM_TYPE && i.transaction_type_name === 'Service')
-    .reduce((sum, i) => sum + toMoney(i.charge_excluding_tax_total ?? i.charge_total), 0);
+  return serviceItems(items).reduce((sum, i) => sum + toMoney(i.charge_excluding_tax_total ?? i.charge_total), 0);
+}
+
+/** Per-line detail behind sumServiceCharge's total, for the side-by-side CRM-vs-ElexPrep
+ * cross-reference on the crew margin view - lets an admin see e.g. "3x Lighting Technician"
+ * on the Current RMS side next to their own crew assignments, to sanity-check man days. */
+function serviceLineItems(items: RawOpportunityItem[], opportunityId: number): { key: string; name: string; quantity: number; rate: number; total: number }[] {
+  return serviceItems(items).map((i) => {
+    const total = toMoney(i.charge_excluding_tax_total ?? i.charge_total);
+    const quantity = i.quantity && i.quantity > 0 ? i.quantity : 1;
+    return {
+      key: `${opportunityId}:${i.id}`,
+      name: i.name ?? i.product_name ?? i.description ?? 'Service item',
+      quantity,
+      rate: total / quantity,
+      total,
+    };
+  });
 }
 
 /**
  * Admin-only crew profit/cost view: what the client is charged for crew (from Current RMS,
- * summed across every opportunity sharing this job's Current RMS "project" — see
- * CurrentRmsOpportunity.projectId — so a separate "<Job> - Crewing" opportunity counts too)
- * against what ElexPrep's own records say crew actually cost on this job (JobCrewAssignment's
- * day rate override, or the crew member's own default, times the assignment's days). This is
- * financial margin data, same sensitivity tier as bank details/compliance documents — ADMIN
+ * summed across every opportunity sharing this job's Current RMS "project" - see
+ * CurrentRmsOpportunity.projectId - plus any opportunity manually linked via
+ * JobLinkedRmsOpportunity, so a separate "<Job> - Crewing" opportunity counts too whether
+ * Current RMS grouped it under the same Project or an admin had to say so explicitly) against
+ * what ElexPrep's own records say crew actually cost on this job (each assignment's day rate
+ * times the job days they're scheduled on - see crewRates.ts). This is
+ * financial margin data, same sensitivity tier as bank details/compliance documents - ADMIN
  * only, never delegated via the permissions system, and never surfaced in the freelancer-
  * facing crew portal.
  */
@@ -349,20 +415,38 @@ jobCurrentRmsRouter.get('/:jobId/current-rms/crew-margin', requireRole('ADMIN'),
   const siblings = primary?.projectId
     ? await prisma.currentRmsOpportunity.findMany({ where: { projectId: primary.projectId } })
     : [];
+  const manualLinks = await prisma.jobLinkedRmsOpportunity.findMany({ where: { jobId: job.id } });
   // Always include the job's own linked opportunity even if it isn't cached locally yet (a
-  // sync hasn't run since it was linked) — siblings alone would silently drop it.
-  const opportunityIds = [...new Set([primaryRmsId, ...siblings.map((s) => s.rmsId)])];
+  // sync hasn't run since it was linked) - siblings/manual links alone would silently drop it.
+  const opportunityIds = [
+    ...new Set([primaryRmsId, ...siblings.map((s) => s.rmsId), ...manualLinks.map((l) => l.rmsId)]),
+  ];
+
+  // Lines left out of the charge (delivery, collection...) - see crewMarginLines.ts.
+  const [overrideRows, excludedNames] = await Promise.all([
+    prisma.crewMarginLineOverride.findMany({ where: { jobId: job.id } }),
+    loadExcludedLineNames(),
+  ]);
+  const overrides = new Map(overrideRows.map((o) => [o.lineKey, o.excluded]));
+  const portalNames = new Set(excludedNames.map(lineNameKey));
 
   let chargeBreakdown;
   try {
     chargeBreakdown = await Promise.all(
       opportunityIds.map(async (rmsId) => {
         const items = await fetchOpportunityItems(config, rmsId);
-        const cached = siblings.find((s) => s.rmsId === rmsId) ?? primary;
+        const cached = siblings.find((s) => s.rmsId === rmsId) ?? (rmsId === primaryRmsId ? primary : undefined);
+        const manualLink = manualLinks.find((l) => l.rmsId === rmsId);
+        const lines = serviceLineItems(items, rmsId).map((line) => {
+          const ex = lineExclusion(line.key, line.name, overrides, portalNames);
+          return { ...line, excluded: ex.excluded, excludedBy: ex.by, onPortalList: ex.onPortalList };
+        });
         return {
           opportunityId: rmsId,
-          subject: cached?.subject ?? `Opportunity #${rmsId}`,
-          serviceCharge: sumServiceCharge(items),
+          subject: cached?.subject ?? manualLink?.subject ?? `Opportunity #${rmsId}`,
+          serviceCharge: lines.filter((l) => !l.excluded).reduce((sum, l) => sum + l.total, 0),
+          excludedCharge: lines.filter((l) => l.excluded).reduce((sum, l) => sum + l.total, 0),
+          lines,
         };
       })
     );
@@ -370,21 +454,39 @@ jobCurrentRmsRouter.get('/:jobId/current-rms/crew-margin', requireRole('ADMIN'),
     return res.status(502).json({ error: (err as Error).message });
   }
   const chargeTotal = chargeBreakdown.reduce((sum, b) => sum + b.serviceCharge, 0);
+  const excludedChargeTotal = chargeBreakdown.reduce((sum, b) => sum + b.excludedCharge, 0);
 
   const assignments = await prisma.jobCrewAssignment.findMany({
     where: { jobId: job.id },
-    include: { crewProfile: { include: { user: { select: { displayName: true } } } } },
+    include: {
+      crewProfile: {
+        include: {
+          user: { select: { displayName: true } },
+          rateLines: { select: { label: true, amount: true } },
+        },
+      },
+      dayAssignments: { select: { dayRate: true } },
+    },
   });
+  const tables = await loadRateTables(job.id);
   const costBreakdown = assignments.map((a) => {
-    const rate = toMoney(a.dayRate ?? a.crewProfile.dayRate ?? undefined);
-    const days = a.days ? toMoney(a.days) || 1 : 1;
+    // Rate and days come from crewRates.ts so the Crew tab and this view always agree: the
+    // days are the job days this person is assigned to on the Schedule tab (falling back to
+    // the typed "Days" figure only when they aren't on any day yet).
+    const rate = effectiveDayRate(a, a.crewProfile.dayRate, tables);
+    const { days, fromSchedule, cost, dayOverrides } = assignmentCost(rate, a.dayAssignments.map((d) => d.dayRate), a.days);
     return {
       crewProfileId: a.crewProfileId,
       name: a.crewProfile.user.displayName,
       role: a.role,
-      dayRate: rate,
+      dayRate: rate.rate,
+      dayRateSource: rate.source,
+      suggestedRate: crewSuggestedRate(a.role, a.crewProfile.rateLines).rate,
+      zeroRated: a.zeroRated,
       days,
-      cost: rate * days,
+      daysFromSchedule: fromSchedule,
+      dayOverrides,
+      cost,
     };
   });
   const costTotal = costBreakdown.reduce((sum, b) => sum + b.cost, 0);
@@ -392,10 +494,46 @@ jobCurrentRmsRouter.get('/:jobId/current-rms/crew-margin', requireRole('ADMIN'),
   const margin = chargeTotal - costTotal;
   res.json({
     chargeTotal,
+    excludedChargeTotal,
+    excludedLineNames: excludedNames,
     chargeBreakdown,
     costTotal,
     costBreakdown,
     margin,
     marginPercent: chargeTotal > 0 ? (margin / chargeTotal) * 100 : null,
   });
+});
+
+// Leave a charge line out of this job's crew margin (excluded: true), put back one the
+// portal-wide list drops (false), or go back to the default (null).
+jobCurrentRmsRouter.put('/:jobId/current-rms/crew-margin/lines', requireRole('ADMIN'), async (req, res) => {
+  const { lineKey, name, excluded } = req.body ?? {};
+  if (typeof lineKey !== 'string' || !/^\d+:\d+$/.test(lineKey)) return res.status(400).json({ error: 'lineKey is required' });
+  if (excluded !== null && typeof excluded !== 'boolean') return res.status(400).json({ error: 'excluded must be true, false or null' });
+  const jobId = req.params.jobId;
+  if (excluded === null) {
+    await prisma.crewMarginLineOverride.deleteMany({ where: { jobId, lineKey } });
+  } else {
+    const label = typeof name === 'string' ? name.slice(0, 200) : '';
+    await prisma.crewMarginLineOverride.upsert({
+      where: { jobId_lineKey: { jobId, lineKey } },
+      create: { jobId, lineKey, name: label, excluded },
+      update: { excluded, ...(label ? { name: label } : {}) },
+    });
+  }
+  await logActivity('crew_margin.line', `${typeof name === 'string' ? name : lineKey}: ${excluded === null ? 'default' : excluded ? 'left out' : 'counted'}`, jobId, req.user!.id);
+  res.json({ ok: true });
+});
+
+// The portal-wide list of charge line names left out of every job's crew margin.
+currentRmsRouter.get('/crew-margin/excluded-lines', requireRole('ADMIN'), async (_req, res) => {
+  res.json({ names: await loadExcludedLineNames() });
+});
+
+currentRmsRouter.put('/crew-margin/excluded-lines', requireRole('ADMIN'), async (req, res) => {
+  const { names } = req.body ?? {};
+  if (!Array.isArray(names) || names.some((n) => typeof n !== 'string')) return res.status(400).json({ error: 'names must be a list of line names' });
+  const saved = await saveExcludedLineNames(names);
+  await logActivity('crew_margin.excluded_names', saved.join(', ') || '(none)', undefined, req.user!.id);
+  res.json({ names: saved });
 });

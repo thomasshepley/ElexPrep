@@ -22,3 +22,11 @@ skills-lock.json
 # Windows print agent's real config (holds the agent token) and its log directory
 agent/agent-config.json
 agent/logs/
+
+# Requests and progress for updates from the Webmaster page (scripts/update-agent.sh).
+/data/ops/
+server/ops/
+
+# Maintenance mode switch and note (scripts/maintenance.sh) - state on the server, not code.
+deploy/maintenance/ON
+deploy/maintenance/message.txt

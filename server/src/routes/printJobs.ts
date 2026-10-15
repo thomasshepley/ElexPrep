@@ -1,7 +1,9 @@
 import { Router } from 'express';
 import fs from 'fs';
 import { prisma, logActivity } from '../db';
-import { requireRole } from '../auth';
+import { isAdminRole, requireRole } from '../auth';
+import { isJobVisibleTo } from '../jobVisibility';
+import { sendStoredUpload } from '../uploadSafety';
 import {
   DEFAULT_PRINTER_SETTINGS,
   generateAgentToken,
@@ -14,10 +16,22 @@ import { testPrinterConnection } from '../printing/direct9100';
 
 export const printJobsRouter = Router();
 
+/** A print job inherits its job's visibility - same rule as everything under /api/jobs/:jobId. */
+async function findVisiblePrintJob(id: string, role: string | undefined) {
+  const job = await prisma.printJob.findUnique({ where: { id } });
+  if (!job || !(await isJobVisibleTo(job.jobId, role))) return null;
+  return job;
+}
+
 printJobsRouter.get('/', async (req, res) => {
   const jobId = typeof req.query.jobId === 'string' ? req.query.jobId : undefined;
+  if (jobId && !(await isJobVisibleTo(jobId, req.user?.role))) return res.json([]);
+  let visibleJobIds: string[] | undefined;
+  if (!jobId && !isAdminRole(req.user?.role)) {
+    visibleJobIds = (await prisma.job.findMany({ where: { isPublic: true }, select: { id: true } })).map((j) => j.id);
+  }
   const jobs = await prisma.printJob.findMany({
-    where: jobId ? { jobId } : undefined,
+    where: jobId ? { jobId } : visibleJobIds ? { jobId: { in: visibleJobIds } } : undefined,
     orderBy: { createdAt: 'desc' },
     take: 100,
   });
@@ -25,17 +39,15 @@ printJobsRouter.get('/', async (req, res) => {
 });
 
 printJobsRouter.get('/:id/pdf', async (req, res) => {
-  const job = await prisma.printJob.findUnique({ where: { id: req.params.id } });
+  const job = await findVisiblePrintJob(req.params.id, req.user?.role);
   if (!job) return res.status(404).end();
   const filePath = printJobFilePath(job.fileName);
   if (!fs.existsSync(filePath)) return res.status(410).json({ error: 'PDF no longer on disk' });
-  res.setHeader('Content-Type', 'application/pdf');
-  res.setHeader('Content-Disposition', `inline; filename="${job.fileName}"`);
-  res.sendFile(filePath);
+  await sendStoredUpload(res, filePath, job.fileName);
 });
 
 printJobsRouter.post('/:id/retry', async (req, res) => {
-  const job = await prisma.printJob.findUnique({ where: { id: req.params.id } });
+  const job = await findVisiblePrintJob(req.params.id, req.user?.role);
   if (!job) return res.status(404).json({ error: 'not found' });
   await prisma.printJob.update({ where: { id: job.id }, data: { status: 'QUEUED', error: null } });
   await dispatchPrintJob(job.id);
@@ -45,7 +57,7 @@ printJobsRouter.post('/:id/retry', async (req, res) => {
 });
 
 printJobsRouter.post('/:id/cancel', async (req, res) => {
-  const job = await prisma.printJob.findUnique({ where: { id: req.params.id } });
+  const job = await findVisiblePrintJob(req.params.id, req.user?.role);
   if (!job) return res.status(404).json({ error: 'not found' });
   if (!['QUEUED', 'FAILED'].includes(job.status)) {
     return res.status(400).json({ error: `Cannot cancel a job in status ${job.status}` });
@@ -58,8 +70,12 @@ printJobsRouter.post('/:id/cancel', async (req, res) => {
 
 export const printerSettingsRouter = Router();
 
-printerSettingsRouter.get('/', async (_req, res) => {
-  res.json(await getPrinterSettings());
+// Readable by staff (the print queue needs the method and tray map) but the agent token - which
+// lets its holder act as the print agent - only ever goes to admins.
+printerSettingsRouter.get('/', async (req, res) => {
+  const settings = await getPrinterSettings();
+  if (!isAdminRole(req.user?.role)) settings.agent = { ...settings.agent, token: '' };
+  res.json(settings);
 });
 
 printerSettingsRouter.put('/', requireRole('ADMIN'), async (req, res) => {

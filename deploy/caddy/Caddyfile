@@ -1,0 +1,62 @@
+# Public front door: HTTPS for the domain (Caddy gets and renews the Let's Encrypt certificate
+# itself), a maintenance switch, and a friendly page whenever the app is restarting.
+# See DEPLOY.md's "Go live" and "Updating to a new version".
+#
+# SITE_ADDRESS, APP_UPSTREAM and MAINTENANCE_DIR are only overridden for local testing; the
+# defaults are what the Docker Compose setup uses.
+
+(maintenance_page) {
+	header Cache-Control "no-store"
+	header X-Maintenance "1"
+	header Retry-After "30"
+	@api path /api/*
+	handle @api {
+		header Content-Type "application/json"
+		respond `{"error":"The site is down for maintenance - back shortly","maintenance":true}` 503
+	}
+	handle {
+		root * {$MAINTENANCE_DIR:/srv/maintenance}
+		rewrite * /index.html
+		file_server {
+			status 503
+		}
+	}
+}
+
+{$SITE_ADDRESS:portal.elex.lighting} {
+	# The maintenance page's own files (logo, optional message), always served by Caddy itself
+	# so they work while the app is down.
+	handle_path /__maintenance/* {
+		root * {$MAINTENANCE_DIR:/srv/maintenance}
+		header Cache-Control "no-store"
+		file_server
+	}
+
+	# Maintenance switch: `maintenance on` (scripts/maintenance.sh) creates the ON file and
+	# every visitor gets the maintenance page until `maintenance off` removes it. Checked on
+	# each request, so no reload is needed.
+	@maintenance file {
+		root {$MAINTENANCE_DIR:/srv/maintenance}
+		try_files /ON
+	}
+	handle @maintenance {
+		import maintenance_page
+	}
+
+	handle {
+		reverse_proxy {$APP_UPSTREAM:elexprep:4000} {
+			# While the app container is being swapped for a new version (a few seconds),
+			# hold each request and keep retrying instead of failing it, so an update looks
+			# like a short pause rather than an error.
+			lb_try_duration 30s
+			lb_try_interval 500ms
+			# Live updates (prep bay screens) are Server-Sent Events: pass them straight through.
+			flush_interval -1
+		}
+	}
+
+	# Still not back after that: show the maintenance page rather than a bare 502.
+	handle_errors 502 503 504 {
+		import maintenance_page
+	}
+}

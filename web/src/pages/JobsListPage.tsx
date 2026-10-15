@@ -1,3 +1,4 @@
+import { Skeleton, SkeletonInline, SkeletonRegion, SkeletonRows } from '../components/Skeleton';
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
@@ -9,8 +10,12 @@ import {
   CREW_FEATURE_LABELS,
 } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
+import { isAdminRole } from '../auth/roles';
+import type { JobSummary } from '../api/client';
 import { SearchIcon, WhereIcon } from '../components/Icons';
 import LocationLinks from '../components/LocationLinks';
+import { formatDate, formatDateRange } from '../utils/format';
+import DateTimeInput from '../components/DateTimeInput';
 
 function toDatetimeLocal(iso: string | null): string {
   if (!iso) return '';
@@ -32,7 +37,7 @@ function OpportunityKindChip({ kind }: { kind: CurrentRmsOpportunity['kind'] }) 
 
 /**
  * The shared onboarding-options form used by both the single-row "Onboard" action and the
- * bulk "Onboard N selected" action — crew feature overrides apply either way; the OneDrive
+ * bulk "Onboard N selected" action - crew feature overrides apply either way; the OneDrive
  * manual-folder override only makes sense for a single job (a batch can't all share one path),
  * so it's hidden when onboarding more than one at once.
  */
@@ -62,6 +67,11 @@ function OnboardingOptionsForm({
   const [name, setName] = useState(opportunity?.subject ?? '');
   const [description, setDescription] = useState('');
   const [address, setAddress] = useState('');
+  const [settledAddress, setSettledAddress] = useState(address);
+  useEffect(() => {
+    const t = setTimeout(() => setSettledAddress(address.trim()), 700);
+    return () => clearTimeout(t);
+  }, [address]);
   const [startsAt, setStartsAt] = useState(toDatetimeLocal(opportunity?.startsAt ?? null));
   const [endsAt, setEndsAt] = useState(toDatetimeLocal(opportunity?.endsAt ?? null));
 
@@ -79,7 +89,7 @@ function OnboardingOptionsForm({
       {opportunity && (
         <div style={{ marginBottom: '1.25rem' }}>
           <p className="muted">
-            Review and override the details below before this job is created — everything here
+            Review and override the details below before this job is created - everything here
             stays editable afterward too, from the job's Job Settings tab.
           </p>
 
@@ -100,16 +110,16 @@ function OnboardingOptionsForm({
           <div className="row" style={{ gap: '1rem' }}>
             <div className="field">
               <label htmlFor="onboard-starts">Starts</label>
-              <input id="onboard-starts" type="datetime-local" value={startsAt} onChange={(e) => setStartsAt(e.target.value)} />
+              <DateTimeInput id="onboard-starts" value={startsAt} onChange={setStartsAt} />
             </div>
             <div className="field">
               <label htmlFor="onboard-ends">Ends</label>
-              <input id="onboard-ends" type="datetime-local" value={endsAt} onChange={(e) => setEndsAt(e.target.value)} />
+              <DateTimeInput id="onboard-ends" value={endsAt} onChange={setEndsAt} defaultTime="18:00" />
             </div>
           </div>
           {!opportunity.startsAt && (
             <p className="muted" style={{ fontSize: '0.8rem' }}>
-              Current RMS has no dates cached for this opportunity yet — set them here or later from the Schedule tab.
+              Current RMS has no dates cached for this opportunity yet - set them here or later from the Schedule tab.
             </p>
           )}
 
@@ -123,7 +133,8 @@ function OnboardingOptionsForm({
               placeholder="Street, city, postcode"
             />
           </div>
-          {address && <LocationLinks address={address} showMap={false} />}
+          {/* Map pin once typing pauses, so the embed isn't reloaded on every keystroke. */}
+          {settledAddress && <LocationLinks address={settledAddress} />}
 
           <h4>Why</h4>
           <p className="muted" style={{ marginTop: 0 }}>
@@ -135,7 +146,7 @@ function OnboardingOptionsForm({
 
       <p className="muted">
         Sets which crew-portal sections are visible to this job's crew. Starts from the portal
-        defaults (Settings → Crew Portal) — override any of them just for this job below.
+        defaults (Settings → Crew Portal) - override any of them just for this job below.
       </p>
       {features && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginBottom: '1rem' }}>
@@ -161,7 +172,7 @@ function OnboardingOptionsForm({
             placeholder="Leave blank to auto-match by name, e.g. Projects/2026/Big Gig Ltd"
           />
           <p className="muted" style={{ fontSize: '0.8rem', margin: '0.3rem 0 0' }}>
-            Only takes effect once OneDrive is connected in Settings → OneDrive — safe to leave
+            Only takes effect once OneDrive is connected in Settings → OneDrive - safe to leave
             blank either way.
           </p>
         </div>
@@ -197,7 +208,7 @@ function OnboardingOptionsForm({
 }
 
 function OnboardOpportunitiesPanel({ existingOppIds, onOnboarded }: { existingOppIds: Set<string>; onOnboarded: () => void }) {
-  const [opportunities, setOpportunities] = useState<CurrentRmsOpportunity[]>([]);
+  const [opportunities, setOpportunities] = useState<CurrentRmsOpportunity[] | null>(null);
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [pendingSingle, setPendingSingle] = useState<CurrentRmsOpportunity | null>(null);
@@ -213,7 +224,7 @@ function OnboardOpportunitiesPanel({ existingOppIds, onOnboarded }: { existingOp
   }, []);
 
   const unOnboarded = useMemo(
-    () => opportunities.filter((o) => (o.kind === 'QUOTE' || o.kind === 'ORDER') && !existingOppIds.has(String(o.rmsId))),
+    () => (opportunities ?? []).filter((o) => (o.kind === 'QUOTE' || o.kind === 'ORDER') && !existingOppIds.has(String(o.rmsId))),
     [opportunities, existingOppIds]
   );
 
@@ -232,7 +243,7 @@ function OnboardOpportunitiesPanel({ existingOppIds, onOnboarded }: { existingOp
     setError(null);
     try {
       const job = await api.currentRms.importOpportunity(pendingSingle.rmsId, opts);
-      setMessage(`Onboarded "${job.name}" — it's private until you mark it Public in Job Settings.`);
+      setMessage(`Onboarded "${job.name}" - it's private until you mark it Public in Job Settings.`);
       setPendingSingle(null);
       onOnboarded();
     } catch (e) {
@@ -282,7 +293,7 @@ function OnboardOpportunitiesPanel({ existingOppIds, onOnboarded }: { existingOp
       <div className="toolbar">
         <div className="search-field">
           <SearchIcon />
-          <input
+          <input aria-label="Search by subject or customer"
             placeholder="Search by subject or customer"
             value={search}
             onChange={(e) => {
@@ -298,64 +309,118 @@ function OnboardOpportunitiesPanel({ existingOppIds, onOnboarded }: { existingOp
         )}
       </div>
 
-      {unOnboarded.length === 0 && (
+      {opportunities === null && !error && (
+        <SkeletonRegion className="panel">
+          <SkeletonRows rows={5} cols={5} />
+        </SkeletonRegion>
+      )}
+      {opportunities !== null && unOnboarded.length === 0 && (
         <div className="empty-state">
           <p style={{ margin: 0 }}>
-            No un-onboarded Quotes or Orders cached yet — sync Current RMS from{' '}
+            No un-onboarded Quotes or Orders cached yet - sync Current RMS from{' '}
             <Link to="/settings/current-rms">Settings → Current RMS</Link>.
           </p>
         </div>
       )}
 
       {unOnboarded.length > 0 && (
-        <table>
-          <thead>
-            <tr>
-              <th></th>
-              <th>Subject</th>
-              <th>Customer</th>
-              <th>Status</th>
-              <th>Dates</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {unOnboarded.map((o) => (
-              <tr key={o.id}>
-                <td>
-                  <input type="checkbox" checked={selected.has(o.rmsId)} onChange={() => toggle(o.rmsId)} />
-                </td>
-                <td>{o.subject}</td>
-                <td>{o.memberName}</td>
-                <td className="row" style={{ gap: '0.4rem' }}>
-                  <OpportunityKindChip kind={o.kind} /> <span className="muted">{o.status}</span>
-                </td>
-                <td className="muted">
-                  {o.startsAt ? new Date(o.startsAt).toLocaleDateString() : ''}
-                  {o.endsAt ? ` – ${new Date(o.endsAt).toLocaleDateString()}` : ''}
-                </td>
-                <td>
-                  <button type="button" className="secondary" onClick={() => setPendingSingle(o)}>
-                    Onboard
-                  </button>
-                </td>
+        <div className="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th></th>
+                <th>Subject</th>
+                <th>Customer</th>
+                <th>Status</th>
+                <th>Dates</th>
+                <th></th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {unOnboarded.map((o) => (
+                <tr key={o.id}>
+                  <td>
+                    <input type="checkbox" checked={selected.has(o.rmsId)} onChange={() => toggle(o.rmsId)} />
+                  </td>
+                  <td>{o.subject}</td>
+                  <td>{o.memberName}</td>
+                  <td>
+                    <div className="row" style={{ gap: '0.4rem' }}>
+                      <OpportunityKindChip kind={o.kind} /> <span className="muted">{o.status}</span>
+                    </div>
+                  </td>
+                  <td className="muted">
+                    {o.startsAt ? formatDate(o.startsAt) : ''}
+                    {o.endsAt ? ` – ${formatDate(o.endsAt)}` : ''}
+                  </td>
+                  <td>
+                    <button type="button" className="secondary" onClick={() => setPendingSingle(o)}>
+                      Onboard
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );
 }
 
+type WhenFilter = 'upcoming' | 'past' | 'all';
+type VisibilityFilter = 'all' | 'public' | 'private';
+
+function prepStage(s: JobSummary | undefined): { label: string; step: number } {
+  if (!s) return { label: '', step: 0 };
+  if (s.labelsPrinted > 0 && s.labelsQueued === 0) return { label: 'Labels printed', step: 4 };
+  if (s.labelsQueued > 0 || s.labelsPrinted > 0) return { label: 'Labels queued', step: 3 };
+  if (s.cases > 0) return { label: 'Cases built', step: 2 };
+  if (s.fixtures > 0) return { label: 'Patch imported', step: 1 };
+  return { label: 'No patch yet', step: 0 };
+}
+
+const PREP_STEPS = ['Patch', 'Cases', 'Labels', 'Printed'];
+
+/** Job cards' shape while the list loads. */
+function JobGridSkeleton({ cards = 6 }: { cards?: number }) {
+  return (
+    <SkeletonRegion className="job-grid">
+      {Array.from({ length: cards }, (_, i) => (
+        <div key={i} className="job-card">
+          <div className="job-card-top">
+            <Skeleton w={i % 2 ? '70%' : '85%'} h={20} />
+          </div>
+          <div className="job-card-meta">
+            <Skeleton w="45%" h={12} />
+            <Skeleton w="30%" h={12} />
+          </div>
+          <div className="prep-progress">
+            {PREP_STEPS.map((step) => (
+              <span key={step} className="prep-progress-step">
+                {step}
+              </span>
+            ))}
+          </div>
+          <div className="job-card-tags">
+            <Skeleton w={58} h={22} r={999} />
+          </div>
+        </div>
+      ))}
+    </SkeletonRegion>
+  );
+}
+
 export default function JobsListPage() {
   const { user } = useAuth();
-  const isAdmin = user?.role === 'ADMIN';
-  const canDelete = isAdmin || Boolean(user?.permissions?.deleteJobs);
+  const isAdmin = isAdminRole(user?.role);
   const canOnboard = isAdmin || Boolean(user?.permissions?.onboardJobs);
-  const [jobs, setJobs] = useState<Job[]>([]);
+  // null until the first load - shows a skeleton instead of the "No jobs yet" empty state.
+  const [jobs, setJobs] = useState<Job[] | null>(null);
   const [tab, setTab] = useState<'portal' | 'onboard'>('portal');
   const [search, setSearch] = useState('');
+  const [when, setWhen] = useState<WhenFilter>('upcoming');
+  const [visibility, setVisibility] = useState<VisibilityFilter>('all');
   const [error, setError] = useState<string | null>(null);
 
   const refresh = () => api.jobs.list().then(setJobs).catch((e) => setError(e.message));
@@ -364,24 +429,33 @@ export default function JobsListPage() {
     refresh();
   }, []);
 
-  const removeJob = async (job: Job, e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (!confirm(`Delete job "${job.name}"? This removes its patch, cases, labels, plots, and print history too.`)) {
-      return;
-    }
-    await api.jobs.remove(job.id);
-    refresh();
-  };
-
+  // Upcoming (or undated) jobs soonest first, then past jobs most-recent first - the order you'd
+  // actually work through them, rather than when each was onboarded.
   const filtered = useMemo(() => {
-    if (!search) return jobs;
-    const q = search.toLowerCase();
-    return jobs.filter((j) => j.name.toLowerCase().includes(q) || (j.venue ?? '').toLowerCase().includes(q));
-  }, [jobs, search]);
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    const isPast = (j: Job) => {
+      const end = j.summary?.endsAt ?? j.summary?.startsAt;
+      return end ? new Date(end) < startOfToday : false;
+    };
+    const q = search.trim().toLowerCase();
+    return (jobs ?? [])
+      .filter((j) => !q || j.name.toLowerCase().includes(q) || (j.venue ?? '').toLowerCase().includes(q))
+      .filter((j) => (when === 'all' ? true : when === 'past' ? isPast(j) : !isPast(j)))
+      .filter((j) => (visibility === 'all' ? true : visibility === 'public' ? j.isPublic : !j.isPublic))
+      .sort((a, b) => {
+        const as = a.summary?.startsAt ? new Date(a.summary.startsAt).getTime() : null;
+        const bs = b.summary?.startsAt ? new Date(b.summary.startsAt).getTime() : null;
+        if (when === 'past') return (bs ?? 0) - (as ?? 0);
+        if (as !== null && bs !== null) return as - bs;
+        if (as !== null) return -1;
+        if (bs !== null) return 1;
+        return a.name.localeCompare(b.name);
+      });
+  }, [jobs, search, when, visibility]);
 
   const existingOppIds = useMemo(
-    () => new Set(jobs.filter((j) => j.currentRmsOpportunityId).map((j) => j.currentRmsOpportunityId!)),
+    () => new Set((jobs ?? []).filter((j) => j.currentRmsOpportunityId).map((j) => j.currentRmsOpportunityId!)),
     [jobs]
   );
 
@@ -390,7 +464,7 @@ export default function JobsListPage() {
       <div className="dashboard-header">
         <div>
           <h1>Jobs</h1>
-          <p className="muted">{jobs.length === 0 ? 'Nothing here yet' : `${jobs.length} job${jobs.length === 1 ? '' : 's'}`}</p>
+          <p className="muted">{jobs === null ? <SkeletonInline w="4em" /> : jobs.length === 0 ? 'Nothing here yet' : `${jobs.length} job${jobs.length === 1 ? '' : 's'}`}</p>
         </div>
       </div>
 
@@ -409,25 +483,40 @@ export default function JobsListPage() {
 
       {tab === 'portal' && (
         <>
-          {jobs.length > 0 && (
+          {(jobs === null || jobs.length > 0) && (
             <div className="toolbar">
               <div className="search-field">
                 <SearchIcon />
-                <input placeholder="Search jobs by name or venue" value={search} onChange={(e) => setSearch(e.target.value)} />
+                <input aria-label="Search jobs" placeholder="Search jobs by name or venue" value={search} onChange={(e) => setSearch(e.target.value)} />
               </div>
+              <div className="segmented" role="group" aria-label="Show jobs">
+                {(['upcoming', 'past', 'all'] as const).map((w) => (
+                  <button key={w} type="button" className={when === w ? 'active' : ''} aria-pressed={when === w} onClick={() => setWhen(w)}>
+                    {w === 'upcoming' ? 'Upcoming' : w === 'past' ? 'Past' : 'All'}
+                  </button>
+                ))}
+              </div>
+              {isAdmin && (
+                <select aria-label="Visibility" value={visibility} onChange={(e) => setVisibility(e.target.value as VisibilityFilter)}>
+                  <option value="all">Public and private</option>
+                  <option value="public">Public only</option>
+                  <option value="private">Private only</option>
+                </select>
+              )}
             </div>
           )}
 
           {error && <p className="error">{error}</p>}
 
-          {jobs.length === 0 && (
+          {jobs === null && !error && <JobGridSkeleton />}
+          {jobs !== null && jobs.length === 0 && (
             <div className="empty-state">
               <p style={{ margin: 0 }}>
                 No jobs yet
                 {canOnboard ? (
                   <>
                     {' '}
-                    — <button type="button" className="link-button" onClick={() => setTab('onboard')}>
+                    - <button type="button" className="link-button" onClick={() => setTab('onboard')}>
                       onboard one from Current RMS
                     </button>{' '}
                     to get started.
@@ -438,36 +527,47 @@ export default function JobsListPage() {
               </p>
             </div>
           )}
-          {jobs.length > 0 && filtered.length === 0 && (
+          {jobs !== null && jobs.length > 0 && filtered.length === 0 && (
             <div className="empty-state">
-              <p style={{ margin: 0 }}>No jobs match "{search}".</p>
+              <p style={{ margin: 0 }}>{search ? `No jobs match "${search}".` : when === 'upcoming' ? 'No upcoming jobs - check Past or All.' : 'No jobs here.'}</p>
             </div>
           )}
 
           {filtered.length > 0 && (
             <div className="job-grid">
-              {filtered.map((job) => (
-                <div key={job.id} className="job-card" style={{ position: 'relative' }}>
-                  <Link to={`/jobs/${job.id}`} className="job-card-stretched-link" aria-label={job.name} />
-                  <div className="job-card-top">
-                    <h3>{job.name}</h3>
-                    {canDelete && (
-                      <button className="secondary job-card-delete" onClick={(e) => removeJob(job, e)}>
-                        Delete
-                      </button>
-                    )}
-                  </div>
-                  {job.venue && (
-                    <div className="job-card-venue">
-                      <WhereIcon /> {job.venue}
+              {filtered.map((job) => {
+                const stage = prepStage(job.summary);
+                const dates = job.summary?.startsAt ? formatDateRange(job.summary.startsAt, job.summary.endsAt) : 'No date set';
+                return (
+                  <Link key={job.id} to={`/jobs/${job.id}`} className="job-card">
+                    <div className="job-card-top">
+                      <h3>{job.name}</h3>
                     </div>
-                  )}
-                  <div className="job-card-tags">
-                    {isAdmin && <span className={`chip ${job.isPublic ? 'chip-success' : 'chip-neutral'}`}>{job.isPublic ? 'Public' : 'Private'}</span>}
-                    {job.rmsAlertAt && <span className="chip chip-warning">RMS changed</span>}
-                  </div>
-                </div>
-              ))}
+                    <div className="job-card-meta">
+                      <span>{dates}</span>
+                      {job.venue && (
+                        <span className="job-card-venue">
+                          <WhereIcon /> {job.venue}
+                        </span>
+                      )}
+                      {job.summary && <span>{job.summary.crewCount === 1 ? '1 crew' : `${job.summary.crewCount} crew`}</span>}
+                    </div>
+                    {job.summary && (
+                      <div className="prep-progress" aria-label={`Prep: ${stage.label}`}>
+                        {PREP_STEPS.map((step, i) => (
+                          <span key={step} className={`prep-progress-step${i < stage.step ? ' is-done' : ''}`}>
+                            {step}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    <div className="job-card-tags">
+                      {isAdmin && <span className={`chip ${job.isPublic ? 'chip-success' : 'chip-neutral'}`}>{job.isPublic ? 'Public' : 'Private'}</span>}
+                      {job.rmsAlertAt && <span className="chip chip-warning">RMS changed</span>}
+                    </div>
+                  </Link>
+                );
+              })}
             </div>
           )}
         </>
