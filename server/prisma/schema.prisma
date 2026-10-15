@@ -472,6 +472,8 @@ model OnboardingInvite {
   token      String?   @unique
   /// PENDING | APPROVED | REJECTED | COMPLETED
   status     String    @default("PENDING")
+  /// Made by an admin as a ready-to-send link, skipping the request (and application) entirely.
+  direct     Boolean   @default(false)
   reviewedAt DateTime?
   reviewedBy String?
   createdAt  DateTime  @default(now())
@@ -1239,6 +1241,9 @@ model JobPosition {
   motors      Int      @default(0)
   /// PATCH | PLOT | EXPORT | MANUAL: where the geometry came from.
   source      String   @default("PATCH")
+  /// The CAD plot truss this position is, linked by hand when the names don't match; null to
+  /// match automatically, empty when it isn't on the plot.
+  plotTruss   String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

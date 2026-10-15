@@ -12,6 +12,19 @@ import PasswordInput from '../components/PasswordInput';
  * behalf (contrast routes/crewApplications.ts's approve flow). No document uploads here;
  * those can be added from the crew portal once the account exists.
  */
+/** "Jayden O'Brien-Corcoran" -> "jayden.obrien-corcoran": a starting point they can change. */
+function suggestUsername(fullName: string): string {
+  return fullName
+    .normalize('NFKD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/['’]/g, '')
+    .split(/[^a-z0-9-]+/)
+    .filter(Boolean)
+    .join('.')
+    .slice(0, 40);
+}
+
 export default function OnboardCompletePage() {
   const { token } = useParams<{ token: string }>();
   const navigate = useNavigate();
@@ -39,6 +52,7 @@ export default function OnboardCompletePage() {
       .then((i) => {
         setInvite(i);
         setDisplayName(i.fullName);
+        setUsername((u) => u || suggestUsername(i.fullName));
       })
       .catch(() => setInvite('not-found'));
   }, [token]);
@@ -112,13 +126,13 @@ export default function OnboardCompletePage() {
         <div className="auth-brand">
           <img className="auth-brand-mark" src="/elex-mark.png" alt="" />
           <h1>Welcome, {invite.fullName.split(' ')[0]}</h1>
-          <p>Set up your login and tell us a bit about yourself.</p>
+          <p>Your name's filled in. Choose your login (we've suggested a username; change it if you like) and tell us a bit about yourself.</p>
         </div>
         <form onSubmit={submit}>
           <div className="row" style={{ flexWrap: 'wrap', gap: '1rem' }}>
             <div className="field" style={{ flex: '1 1 12rem' }}>
               <label htmlFor="onboard-username">Username</label>
-              <input id="onboard-username" value={username} onChange={(e) => setUsername(e.target.value)} required />
+              <input id="onboard-username" value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" autoCapitalize="none" spellCheck={false} required />
             </div>
             <div className="field" style={{ flex: '1 1 12rem' }}>
               <label htmlFor="onboard-password">Password</label>

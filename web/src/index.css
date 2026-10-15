@@ -5184,6 +5184,15 @@ div.bay-center {
 }
 
 /* Tables and truss cards */
+.rig-links.needs-attention {
+  border-left: 4px solid var(--warning);
+}
+.rig-links-table select {
+  min-width: 14rem;
+}
+.rig-links-table tr.is-unmatched td {
+  background: color-mix(in srgb, var(--warning) 8%, transparent);
+}
 .rig-point-table select {
   min-width: 8rem;
 }
@@ -6100,4 +6109,47 @@ tr.is-muted td {
 }
 .site-update details summary {
   cursor: pointer;
+}
+
+/* Onboarding: direct sign-up links */
+.onboard-create-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-3);
+}
+.onboard-create-form .field {
+  flex: 1 1 16rem;
+  margin: 0;
+}
+.onboard-made {
+  margin-top: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+}
+.onboard-made p {
+  margin: 0 0 var(--space-2);
+}
+.onboard-link {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+.onboard-link-url {
+  flex: 1 1 18rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: var(--text-xs);
+  color: var(--content-muted);
+}
+.onboard-meta {
+  font-size: var(--text-sm);
+}
+.onboard-manage {
+  gap: var(--space-3);
+  margin-top: var(--space-2);
 }

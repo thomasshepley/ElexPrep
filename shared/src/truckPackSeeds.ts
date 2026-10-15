@@ -89,10 +89,17 @@ export interface SeedItemRule {
   itemKg: number;
   ignore?: boolean;
   category?: PackCategory;
+  /** Which seed set it arrived in (see TRUCK_SEED_VERSION). */
+  since?: number;
 }
 
 /** Common kit-list lines that aren't fixtures or cable. Words must all appear in the line's name. */
 export const SEED_ITEM_RULES: SeedItemRule[] = [
+  // EXE Rise, the house hoist: body plus 20 m of chain.
+  { match: 'exe rise', caseName: 'Single motor case', unitsPerCase: 1, itemKg: 52, since: 4 },
+  { match: 'exe rise 1t', caseName: 'Single motor case', unitsPerCase: 1, itemKg: 80, since: 4 },
+  { match: 'exe rise 250', caseName: 'Single motor case', unitsPerCase: 1, itemKg: 38, since: 4 },
+  { match: 'lodestar 1t', caseName: 'Single motor case', unitsPerCase: 1, itemKg: 91, since: 4 },
   { match: 'lodestar', caseName: 'Single motor case', unitsPerCase: 1, itemKg: 59 },
   { match: 'motor 500kg', caseName: 'Single motor case', unitsPerCase: 1, itemKg: 59 },
   { match: 'motor 1t', caseName: 'Single motor case', unitsPerCase: 1, itemKg: 85 },
@@ -292,4 +299,4 @@ export const SEED_VEHICLES: SeedVehicle[] = [
 ];
 
 /** Bumped whenever vehicles are added to the seed list, so they reach databases seeded before. */
-export const TRUCK_SEED_VERSION = 3;
+export const TRUCK_SEED_VERSION = 4;

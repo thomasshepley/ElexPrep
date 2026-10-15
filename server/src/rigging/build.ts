@@ -15,7 +15,7 @@ import {
   type TrussProfileLike,
 } from '@elexprep/shared';
 import { prisma } from '../db';
-import { currentPlotExtraction, fixtureProfiles, getCableRules, syncPositions } from '../routes/cable';
+import { currentPlotExtraction, fixtureProfiles, getCableRules, pairWithPlot, syncPositions } from '../routes/cable';
 import type { PlotGeometry } from '../cable/plotRead';
 
 /** Company-wide rigging settings (Settings > Rigging). */
@@ -118,20 +118,36 @@ export async function hoistModels() {
   return prisma.hoistModel.findMany({ orderBy: [{ ratedKg: 'asc' }, { name: 'asc' }] });
 }
 
+/** The house hoist: EXE's 500 kg. */
+export const DEFAULT_HOIST_NAME = 'EXE Rise 500 kg';
+const EXE_DEFAULT_KEY = 'riggingHoistDefaultExe';
+
 async function seedHoistModels() {
   if ((await prisma.hoistModel.count()) === 0) {
     await prisma.hoistModel.createMany({ data: SEED_HOIST_MODELS.map((h) => ({ ...h, notes: h.notes ?? null })) });
-    const cm = await prisma.hoistModel.findUnique({ where: { name: 'CM Lodestar 500 kg' } });
+    const exe = await prisma.hoistModel.findUnique({ where: { name: DEFAULT_HOIST_NAME } });
     const settings = await getRiggingSettings();
-    if (cm && !settings.defaultHoistModelId) await saveRiggingSettings({ defaultHoistModelId: cm.id });
+    if (exe && !settings.defaultHoistModelId) await saveRiggingSettings({ defaultHoistModelId: exe.id });
+  }
+  // Once: databases seeded when the CM Lodestar was the default move to the EXE. A default chosen
+  // by hand after this stays as it is.
+  if (!(await prisma.appSetting.findUnique({ where: { key: EXE_DEFAULT_KEY } }))) {
+    const [cm, exe, settings] = await Promise.all([
+      prisma.hoistModel.findUnique({ where: { name: 'CM Lodestar 500 kg' } }),
+      prisma.hoistModel.findUnique({ where: { name: DEFAULT_HOIST_NAME } }),
+      getRiggingSettings(),
+    ]);
+    if (exe && (!settings.defaultHoistModelId || settings.defaultHoistModelId === cm?.id)) await saveRiggingSettings({ defaultHoistModelId: exe.id });
+    await prisma.appSetting.upsert({ where: { key: EXE_DEFAULT_KEY }, create: { key: EXE_DEFAULT_KEY, valueJson: 'true' }, update: {} });
   }
 }
 
-/** The truss and hoist the calculator actually uses when a job hasn't picked one: the house default if it still exists, else the F34 and the common UK 500 kg motor. */
+/** The truss and hoist the calculator actually uses when a job hasn't picked one: the house default if it still exists, else the F34 and the EXE 500 kg. */
 export function effectiveDefaults(s: RiggingSettings, profiles: { id: string; name: string }[], hoists: { id: string; name: string; ratedKg: number }[]) {
   const trussId = (s.defaultTrussProfileId && profiles.some((p) => p.id === s.defaultTrussProfileId) ? s.defaultTrussProfileId : null) ?? profiles.find((p) => p.name === 'Global Truss F34')?.id ?? null;
   const hoistId =
     (s.defaultHoistModelId && hoists.some((h) => h.id === s.defaultHoistModelId) ? s.defaultHoistModelId : null) ??
+    hoists.find((h) => h.name === DEFAULT_HOIST_NAME)?.id ??
     hoists.find((h) => h.name === 'CM Lodestar 500 kg')?.id ??
     hoists.find((h) => h.ratedKg === 500)?.id ??
     hoists[0]?.id ??
@@ -260,9 +276,16 @@ export interface RigTrussInfo {
   dropKg: number;
 }
 
+/** How the patch's truss positions line up with the trusses on the plot, for linking by hand. */
+export interface PlotLinks {
+  positions: { id: string; name: string; fixtures: number; plotTruss: string | null; matched: string | null; how: 'linked' | 'name' | 'only one left' | 'by depth' | null }[];
+  plotTrusses: { position: string; named: boolean; motors: number; yM: number; lengthM: number }[];
+}
+
 export interface BuiltRig {
   rig: Rig;
   trusses: RigTrussInfo[];
+  links: PlotLinks;
   assumptions: string[];
   plotName: string | null;
   venue: string | null;
@@ -297,12 +320,21 @@ export async function buildRig(jobId: string): Promise<BuiltRig> {
   const hoistById = new Map(hoists.map((h) => [h.id, toHoistLike(h)]));
   const defaults = effectiveDefaults(s, profiles, hoists);
   const defaultHoist = defaults.hoistId ? hoistById.get(defaults.hoistId) ?? null : null;
+  // When the plot gives a hoist's rating ("1T"), the default maker's hoist of that rating, else
+  // any of that rating.
+  const maker = (name: string) => name.split(' ')[0].toLowerCase();
+  const hoistRated = (kg: number | null | undefined) => {
+    if (!kg) return null;
+    const rated = [...hoistById.values()].filter((h) => Math.abs(h.ratedKg - kg) < 1);
+    return rated.find((h) => defaultHoist && maker(h.name) === maker(defaultHoist.name)) ?? rated[0] ?? null;
+  };
 
   // Points.
   const removed = new Set(overrides.removedPointIds ?? []);
-  const basePoints: (RigPoint & { position?: string })[] = [];
+  const basePoints: (RigPoint & { position?: string; ratedKg?: number | null })[] = [];
   for (const p of geometry?.points ?? []) {
     basePoints.push({
+      ratedKg: p.hoistKg ?? null,
       id: `plot:${p.name}`,
       name: p.name,
       x: p.xM,
@@ -331,7 +363,7 @@ export async function buildRig(jobId: string): Promise<BuiltRig> {
       }
       if (point.kind === 'hoist') {
         const id = o.hoistModelId === undefined ? undefined : o.hoistModelId;
-        point.hoist = id === null ? null : id ? hoistById.get(id) ?? defaultHoist : defaultHoist;
+        point.hoist = id === null ? null : id ? hoistById.get(id) ?? defaultHoist : hoistRated(p.ratedKg) ?? defaultHoist;
       } else point.hoist = null;
       point.directLoads = [];
       return point;
@@ -366,13 +398,17 @@ export async function buildRig(jobId: string): Promise<BuiltRig> {
   const trusses: RigTruss[] = [];
   const infos: RigTrussInfo[] = [];
   let stacked = 0;
+  // Which plot truss each patch position is, however differently they're named.
+  const pairs = pairWithPlot(positions, new Set(byPos.keys()), geometry);
   for (const pos of positions) {
     const list = byPos.get(pos.name) ?? [];
     const o = overrides.trusses?.[pos.name] ?? {};
-    const key = pos.name.toLowerCase();
-    const plotTruss = geometry?.trusses.find((t) => t.position.toLowerCase() === key || key.endsWith(`: ${t.position.toLowerCase()}`)) ?? null;
+    const pair = pairs.get(pos.name);
+    const plotTruss = pair ? geometry?.trusses.find((t) => t.position === pair.truss) ?? null : null;
     // A truss on the plot counts as one whatever the position was set to.
     if (list.length === 0 || (pos.kind !== 'TRUSS' && !plotTruss)) continue;
+    if (pair?.how === 'only one left') assumptions.push(`${pos.name} is taken to be the plot's ${pair.truss}, the only truss left on it. Link it by hand below if that's wrong.`);
+    if (pair?.how === 'by depth') assumptions.push(`${pos.name} is taken to be the plot's ${pair.truss}: the plot doesn't name its trusses, so they're matched front to back (the one nearest the plot's origin as the most downstage). Link it by hand below if that's wrong.`);
     let lengthM = o.lengthM ?? plotTruss?.lengthM ?? pos.lengthM ?? null;
     if (!lengthM) {
       lengthM = Math.max(2, Math.ceil(list.length * 0.6));
@@ -381,7 +417,7 @@ export async function buildRig(jobId: string): Promise<BuiltRig> {
     const originX = o.originX ?? plotTruss?.fromXM ?? 0;
     const y = o.y ?? plotTruss?.yM ?? -3 * stacked++;
     const plotHoists = plotTruss
-      ? points.filter((p) => p.kind !== 'cablePick' && (p as { position?: string }).position && (p as { position?: string }).position!.toLowerCase() === plotTruss.position.toLowerCase()).map((p) => ({ pointId: p.id, x: r2(p.x - originX) }))
+      ? points.filter((p) => p.kind !== 'cablePick' && (p as { position?: string }).position === plotTruss.position).map((p) => ({ pointId: p.id, x: r2(p.x - originX) }))
       : [];
     const hoistsOnTruss = (o.hoists ?? plotHoists).filter((h) => points.some((p) => p.id === h.pointId));
     if (hoistsOnTruss.length === 0) assumptions.push(`${pos.name}: no hoists yet. Add them in the elevation view.`);
@@ -430,7 +466,7 @@ export async function buildRig(jobId: string): Promise<BuiltRig> {
     if (cableKgPerM > 0) loads.push({ kind: 'udl', from: 0, to: lengthM, kgPerM: cableKgPerM, label: 'Cable along the truss', source: 'cable' });
     const drop = pos.trimM ?? cableRules.defaultTrimM;
     const dropKg = r2(cableKgPerM * drop);
-    const pick = points.find((p) => p.kind === 'cablePick' && (p as { position?: string }).position && plotTruss && (p as { position?: string }).position!.toLowerCase() === plotTruss.position.toLowerCase());
+    const pick = points.find((p) => p.kind === 'cablePick' && plotTruss && (p as { position?: string }).position === plotTruss.position);
     if (dropKg > 0) {
       if (pick) pick.directLoads!.push({ kg: dropKg, label: `${pos.name} cable drop (${drop} m)`, source: 'cable' });
       else {
@@ -471,5 +507,18 @@ export async function buildRig(jobId: string): Promise<BuiltRig> {
     venue: job?.venue ?? null,
     venueSetApplied: venueApplied,
     overrides,
+    links: {
+      positions: positions
+        .filter((p) => (byPos.get(p.name)?.length ?? 0) > 0 && (p.kind === 'TRUSS' || pairs.has(p.name)))
+        .map((p) => ({
+          id: p.id,
+          name: p.name,
+          fixtures: byPos.get(p.name)?.length ?? 0,
+          plotTruss: p.plotTruss,
+          matched: pairs.get(p.name)?.truss ?? null,
+          how: pairs.get(p.name)?.how ?? null,
+        })),
+      plotTrusses: (geometry?.trusses ?? []).map((t) => ({ position: t.position, named: t.named !== false, motors: t.points.length, yM: t.yM, lengthM: t.lengthM })),
+    },
   };
 }

@@ -163,6 +163,16 @@ async function seedTruckPack() {
       })),
     });
   }
+  // Item rules added to the seed list later, the same way.
+  if (seeded > 0) {
+    const haveRules = new Set((await prisma.truckItemRule.findMany({ select: { match: true } })).map((r) => r.match));
+    const caseIds = new Map((await prisma.truckCase.findMany({ select: { id: true, name: true } })).map((c) => [c.name, c.id]));
+    const newRules = SEED_ITEM_RULES.filter((r) => (r.since ?? 1) > seeded && !haveRules.has(r.match));
+    if (newRules.length)
+      await prisma.truckItemRule.createMany({
+        data: newRules.map((r) => ({ match: r.match, caseId: r.caseName ? caseIds.get(r.caseName) ?? null : null, unitsPerCase: r.unitsPerCase, itemKg: r.itemKg, ignore: r.ignore ?? false, category: r.category ?? null })),
+      });
+  }
   if (seeded < TRUCK_SEED_VERSION) {
     const valueJson = JSON.stringify(TRUCK_SEED_VERSION);
     await prisma.appSetting.upsert({ where: { key: SEED_VERSION_KEY }, create: { key: SEED_VERSION_KEY, valueJson }, update: { valueJson } });

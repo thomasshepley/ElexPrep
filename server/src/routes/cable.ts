@@ -7,6 +7,8 @@ import {
   SEED_FIXTURE_PROFILES,
   fixtureTypeKey,
   matchFixtureProfile,
+  pairPositions,
+  type PairHow,
   normaliseCableRules,
   planCables,
   type CableRules,
@@ -371,11 +373,22 @@ jobCableRouter.put('/:jobId/cable/positions/:id', async (req, res) => {
     if (!Number.isInteger(m) || m < 0 || m > 64) return res.status(400).json({ error: 'motors must be a whole number from 0 to 64' });
     data.motors = m;
   }
+  // The plot truss it is: a name, '' for "not on the plot", or null to match it automatically.
+  if (b.plotTruss !== undefined) {
+    if (b.plotTruss !== null && (typeof b.plotTruss !== 'string' || b.plotTruss.length > 80)) return res.status(400).json({ error: 'plotTruss must be a truss name, empty, or null' });
+    data.plotTruss = b.plotTruss;
+  }
   if (b.kind !== undefined) {
     if (!['TRUSS', 'FLOOR', 'FOH', 'OTHER'].includes(b.kind)) return res.status(400).json({ error: 'kind must be TRUSS, FLOOR, FOH or OTHER' });
     data.kind = b.kind;
   }
-  if (Object.keys(data).some((k) => k !== 'kind' && k !== 'motors')) data.source = 'MANUAL';
+  if (Object.keys(data).some((k) => k !== 'kind' && k !== 'motors' && k !== 'plotTruss')) data.source = 'MANUAL';
+  // Linked to a plot truss by hand: take its size, pick and motors with it.
+  if (typeof data.plotTruss === 'string' && data.plotTruss) {
+    const extraction = await currentPlotExtraction(req.params.jobId);
+    const t = extraction ? (JSON.parse(extraction.resultJson) as PlotGeometry).trusses.find((x) => x.position === data.plotTruss) : null;
+    if (t) Object.assign(data, { kind: 'TRUSS', lengthM: t.lengthM, pickOffsetM: t.pickOffsetM, motors: t.points.length, source: 'PLOT' });
+  }
   res.json(await prisma.jobPosition.update({ where: { id: pos.id }, data }));
 });
 
@@ -485,17 +498,34 @@ async function readCadPlot(jobId: string, plot: CadPlot, rememberFailure: boolea
  * its motors are still counted. Done by hand (`force`) it overwrites what was typed in; done
  * automatically it only fills in what nobody has set.
  */
+/**
+ * Which plot truss each of the job's positions is (see pairPositions): a link made by hand, a
+ * name that matches however it's written, or the only truss left for the only patch truss left.
+ */
+export function pairWithPlot(positions: { name: string; kind: string; plotTruss: string | null }[], inPatch: Set<string>, geometry: PlotGeometry | null) {
+  if (!geometry) return new Map<string, { truss: string; how: PairHow }>();
+  return pairPositions(
+    positions.map((p) => ({ name: p.name, plotTruss: p.plotTruss, candidate: inPatch.has(p.name) && p.kind === 'TRUSS' })),
+    geometry.trusses.map((t) => t.position),
+    Object.fromEntries(geometry.trusses.filter((t) => t.named === false).map((t) => [t.position, Math.abs(t.yM)]))
+  );
+}
+
 async function applyPlotToPositions(jobId: string, geometry: PlotGeometry, force: boolean) {
-  const { positions } = await syncPositions(jobId);
+  const { positions, inPatch } = await syncPositions(jobId);
+  const pairs = pairWithPlot(positions, inPatch, geometry);
+  const positionFor = new Map([...pairs].map(([pos, v]) => [v.truss, pos]));
   const applied: string[] = [];
   for (const t of geometry.trusses) {
-    const key = t.position.toLowerCase();
-    // A stage prefix ("Main: DS") still matches the plot's "DS".
-    const match = positions.find((p) => p.name.toLowerCase() === key || p.name.toLowerCase().endsWith(`: ${key}`));
-    const motors = geometry.points.filter((p) => !p.cablePick && p.position.toLowerCase() === key).length;
+    const match = positions.find((p) => p.name === positionFor.get(t.position));
+    const motors = t.points.length;
     if (!match) {
-      await prisma.jobPosition.create({ data: { jobId, name: t.position, kind: 'TRUSS', lengthM: t.lengthM, pickOffsetM: t.pickOffsetM, motors, source: 'PLOT' } });
-      applied.push(t.position);
+      // A truss the plot names but the patch doesn't use yet gets a position of its own, so its
+      // motors are still counted. One the plot doesn't name waits to be linked by hand.
+      if (t.named && !positions.some((p) => p.name === t.position)) {
+        await prisma.jobPosition.create({ data: { jobId, name: t.position, kind: 'TRUSS', lengthM: t.lengthM, pickOffsetM: t.pickOffsetM, motors, source: 'PLOT' } });
+        applied.push(t.position);
+      }
       continue;
     }
     const keep = !force && match.source === 'MANUAL';
@@ -536,8 +566,10 @@ async function autoReadPlot(jobId: string, userId?: string) {
       const extraction = await readCadPlot(jobId, plot, true);
       const geometry = geometryOf(extraction);
       if (!geometry?.points.length) continue;
+      // Every time, not just the first: a position linked or renamed since then picks up its
+      // truss. It never overwrites sizes typed in by hand.
+      const applied = await applyPlotToPositions(jobId, geometry, false);
       if (!extraction.confirmedAt) {
-        const applied = await applyPlotToPositions(jobId, geometry, false);
         await prisma.plotExtraction.update({ where: { id: extraction.id }, data: { confirmedAt: new Date() } });
         await logActivity('cable.plot_read', `${plot.name} (read automatically): ${applied.length ? applied.join(', ') : 'no trusses'}`, jobId, userId);
       }

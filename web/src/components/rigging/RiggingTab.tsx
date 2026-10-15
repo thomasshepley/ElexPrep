@@ -383,6 +383,18 @@ export default function RiggingTab({ jobId, jobName }: { jobId: string; jobName:
         }}
       />
 
+      <PlotLinks
+        data={data}
+        onLink={async (positionId, plotTruss) => {
+          try {
+            await api.cable.updatePosition(jobId, positionId, { plotTruss });
+            apply(await api.rigging.job(jobId));
+          } catch (e) {
+            showToast((e as Error).message, 'error');
+          }
+        }}
+      />
+
       <section className="panel">
         <h2>Trusses</h2>
         {rig.trusses.length === 0 && <p className="muted">No trusses: positions come from the patch's Position column.</p>}
@@ -522,6 +534,79 @@ export default function RiggingTab({ jobId, jobName }: { jobId: string; jobName:
 
       {createPortal(<PrintView jobName={jobName} data={data} rig={rig} result={result} trussOfPoint={trussOfPoint} />, document.body)}
     </div>
+  );
+}
+
+const HOW: Record<string, string> = { linked: 'linked by hand', name: 'same name', 'only one left': 'the only one left', 'by depth': 'front to back: check it' };
+
+/**
+ * How the patch's truss positions line up with the trusses on the CAD plot: matched by name
+ * however it's written, or linked here by hand. A truss on the plot that nothing is linked to
+ * still has its motors, which carry the load printed on the plot.
+ */
+function PlotLinks({ data, onLink }: { data: JobRigging; onLink: (positionId: string, plotTruss: string | null) => void }) {
+  const { positions, plotTrusses } = data.links;
+  if (!plotTrusses.length || !positions.length) return null;
+  const linked = new Set(positions.map((p) => p.matched).filter(Boolean));
+  const spare = plotTrusses.filter((t) => !linked.has(t.position));
+  const unmatched = positions.filter((p) => !p.matched && p.plotTruss !== '');
+  return (
+    <section className={`panel rig-links${unmatched.length ? ' needs-attention' : ''}`}>
+      <div className="panel-heading-row">
+        <h2>Plot and patch</h2>
+        <span className="muted">
+          {plotTrusses.length} truss{plotTrusses.length === 1 ? '' : 'es'} and {plotTrusses.reduce((n, t) => n + t.motors, 0)} motors on the plot
+        </span>
+      </div>
+      <p className="muted">
+        Each patch position is matched to a truss on the plot by name, however it's written ("US Truss" is "Upstage" is "US"). Where the names don't line up, pick the
+        plot truss here: its motors then hold up that position's fixtures.
+      </p>
+      <div className="table-scroll">
+        <table className="rig-links-table">
+          <thead>
+            <tr>
+              <th>Patch position</th>
+              <th className="num">Fixtures</th>
+              <th>On the plot as</th>
+              <th>Matched by</th>
+            </tr>
+          </thead>
+          <tbody>
+            {positions.map((p) => (
+              <tr key={p.id} className={!p.matched && p.plotTruss !== '' ? 'is-unmatched' : ''}>
+                <td>
+                  <strong>{p.name}</strong>
+                </td>
+                <td className="num">{p.fixtures}</td>
+                <td>
+                  <select
+                    value={p.plotTruss === null ? '' : p.plotTruss === '' ? '__none' : p.plotTruss}
+                    aria-label={`Plot truss for ${p.name}`}
+                    onChange={(e) => onLink(p.id, e.target.value === '' ? null : e.target.value === '__none' ? '' : e.target.value)}
+                  >
+                    <option value="">{p.matched && p.how !== 'linked' ? `Automatic: ${p.matched}` : 'Automatic: no match'}</option>
+                    {plotTrusses.map((t) => (
+                      <option key={t.position} value={t.position}>
+                        {t.position} ({t.motors} motor{t.motors === 1 ? '' : 's'}, {t.lengthM} m)
+                      </option>
+                    ))}
+                    <option value="__none">Not on the plot</option>
+                  </select>
+                </td>
+                <td className="muted">{p.matched ? HOW[p.how ?? ''] ?? '' : p.plotTruss === '' ? 'not on the plot' : <strong className="rig-neg">no match: pick one</strong>}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {spare.length > 0 && (
+        <p className="muted">
+          On the plot but not linked to a patch position: {spare.map((t) => `${t.position} (${t.motors} motor${t.motors === 1 ? '' : 's'})`).join(', ')}. Their motors carry the load
+          printed on the plot.
+        </p>
+      )}
+    </section>
   );
 }
 

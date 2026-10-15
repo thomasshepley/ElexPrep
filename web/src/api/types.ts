@@ -287,8 +287,13 @@ export interface OnboardingInvite {
   id: string;
   fullName: string;
   status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'COMPLETED';
+  /** Made by an admin as a ready-to-send link, with no request first. */
+  direct: boolean;
   reviewedAt: string | null;
   createdAt: string;
+  /** When the link stops working (approved links only). */
+  expiresAt: string | null;
+  expired: boolean;
   /** The signup link token - only present once approved, and only in the admin list response. */
   token: string | null;
 }

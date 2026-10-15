@@ -90,6 +90,9 @@ export const crewApi = {
     list: (status?: string) => request<OnboardingInvite[]>(`/onboarding${status ? `?status=${status}` : ''}`),
     approve: (id: string) => request<OnboardingInvite>(`/onboarding/${id}/approve`, { method: 'POST' }),
     reject: (id: string) => request<void>(`/onboarding/${id}/reject`, { method: 'POST' }),
+    createLink: (fullName: string) => request<OnboardingInvite>('/onboarding/links', { method: 'POST', body: JSON.stringify({ fullName }) }),
+    renew: (id: string) => request<OnboardingInvite>(`/onboarding/${id}/renew`, { method: 'POST' }),
+    cancel: (id: string) => request<void>(`/onboarding/${id}/cancel`, { method: 'POST' }),
     invite: {
       get: (token: string) => request<{ fullName: string; status: string }>(`/onboarding/invite/${token}`),
       complete: (

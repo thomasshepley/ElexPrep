@@ -4,6 +4,22 @@ Newest entries first. Each push/merge gets exactly one entry - see
 `scripts/bump-version.mjs` for how the version number itself advances. A `+` marks a
 feature addition, a `-` marks a bug fix.
 
+## v1.7.2 - 2026-10-15
+
++ Send someone a sign-up link straight from Settings > Onboarding: their name is filled in, they add the rest and choose their login, and you can copy, share, replace or cancel the link
++ More groundwork for a new prep planning feature
+
+### Rigging (beta)
+
++ (Beta) Motors are read from the rigging plan's own labels (name, X/Y, capacity and load by each motor symbol), as well as from rigging point tables on any page of the PDF
++ (Beta) Truss names on the plot match your positions however they're written (US, Upstage, LX1, LX 1), and unnamed trusses are paired front to back
++ (Beta) New Plot and patch panel shows which truss each position was matched to and lets you link one by hand, or mark it as not on the plot
++ (Beta) EXE Rise hoists are now the default, and a hoist rating printed on the plot (such as 1T) picks the matching hoist
+
+### Cable calculator (beta)
+
++ (Beta) Truss lengths, motor counts and cable picks from the plot now fill in each position, and update whenever a link changes
+
 ## v1.7.1 - 2026-10-14
 
 - The two-factor sign-in step no longer gets a saved password filled in by your phone, and offers your authenticator code instead

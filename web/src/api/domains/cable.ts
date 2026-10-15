@@ -33,6 +33,8 @@ export interface JobPosition {
   pickOffsetM: number | null;
   motors: number;
   source: 'PATCH' | 'PLOT' | 'EXPORT' | 'MANUAL';
+  /** The plot truss it's linked to by hand: null matches automatically, '' means not on the plot. */
+  plotTruss?: string | null;
   fixtureCount: number;
   inPatch: boolean;
 }
@@ -71,7 +73,7 @@ export const cableApi = {
     deleteProfile: (id: string) => request<void>(`/cable/profiles/${id}`, { method: 'DELETE' }),
     job: (jobId: string) => request<JobCable>(`/jobs/${jobId}/cable`),
     compute: (jobId: string) => request<NonNullable<JobCable['plan']>>(`/jobs/${jobId}/cable/compute`, { method: 'POST' }),
-    updatePosition: (jobId: string, id: string, data: Partial<Pick<JobPosition, 'kind' | 'lengthM' | 'trimM' | 'distanceM' | 'pickOffsetM' | 'motors'>>) =>
+    updatePosition: (jobId: string, id: string, data: Partial<Pick<JobPosition, 'kind' | 'lengthM' | 'trimM' | 'distanceM' | 'pickOffsetM' | 'motors' | 'plotTruss'>>) =>
       request<JobPosition>(`/jobs/${jobId}/cable/positions/${id}`, { method: 'PUT', body: json(data) }),
     setOverride: (jobId: string, key: string, quantity: number | null) =>
       request<{ overrides: Record<string, number> }>(`/jobs/${jobId}/cable/overrides`, { method: 'PUT', body: json({ key, quantity }) }),

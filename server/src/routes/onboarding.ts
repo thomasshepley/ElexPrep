@@ -16,18 +16,24 @@ import { notifyOnboardingRequestSubmitted } from '../notifications';
  */
 export const onboardingRouter = Router();
 
-function toInviteDto(i: { id: string; fullName: string; status: string; reviewedAt: Date | null; createdAt: Date; token: string | null }) {
+function toInviteDto(i: { id: string; fullName: string; status: string; direct: boolean; reviewedAt: Date | null; createdAt: Date; token: string | null }) {
   return {
     id: i.id,
     fullName: i.fullName,
     status: i.status,
+    direct: i.direct,
     reviewedAt: i.reviewedAt,
     createdAt: i.createdAt,
+    // When the link stops working (approved links only).
+    expiresAt: i.status === 'APPROVED' && i.reviewedAt ? new Date(i.reviewedAt.getTime() + INVITE_TTL_MS) : null,
+    expired: i.status === 'APPROVED' && inviteExpired(i),
     // The token is the signup link itself - fine to show the admin who approved it, never to
     // anyone else, and never on the PENDING list before a decision has been made.
     token: i.status === 'APPROVED' ? i.token : null,
   };
 }
+
+const newToken = () => crypto.randomBytes(24).toString('base64url');
 
 const publicLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
@@ -70,13 +76,49 @@ onboardingRouter.post('/:id/approve', requirePermission('manageCrewApplications'
   if (!invite) return res.status(404).json({ error: 'Invite not found' });
   if (invite.status !== 'PENDING') return res.status(409).json({ error: 'Invite has already been reviewed' });
 
-  const token = crypto.randomBytes(24).toString('base64url');
+  const token = newToken();
   const updated = await prisma.onboardingInvite.update({
     where: { id: invite.id },
     data: { status: 'APPROVED', token, reviewedAt: new Date(), reviewedBy: req.user!.id },
   });
   await logActivity('onboarding.approve', invite.fullName, undefined, req.user!.id);
   res.json(toInviteDto(updated));
+});
+
+/**
+ * For someone we already want on the roster: skips the request (and the application) and makes
+ * a ready-to-send link straight away. Their name is filled in on the form they land on; they
+ * fill in the rest and choose their own login.
+ */
+onboardingRouter.post('/links', requirePermission('manageCrewApplications'), async (req, res) => {
+  const fullName = typeof req.body?.fullName === 'string' ? req.body.fullName.trim().replace(/\s+/g, ' ') : '';
+  if (!fullName) return res.status(400).json({ error: 'Enter their name' });
+  if (fullName.length > 200) return res.status(400).json({ error: 'That name is too long' });
+  const invite = await prisma.onboardingInvite.create({
+    data: { fullName, status: 'APPROVED', direct: true, token: newToken(), reviewedAt: new Date(), reviewedBy: req.user!.id },
+  });
+  await logActivity('onboarding.link_created', fullName, undefined, req.user!.id);
+  res.status(201).json(toInviteDto(invite));
+});
+
+/** A fresh link for an approved invite (an expired one, or one sent to the wrong place): the old link stops working. */
+onboardingRouter.post('/:id/renew', requirePermission('manageCrewApplications'), async (req, res) => {
+  const invite = await prisma.onboardingInvite.findUnique({ where: { id: req.params.id } });
+  if (!invite) return res.status(404).json({ error: 'Invite not found' });
+  if (invite.status !== 'APPROVED') return res.status(409).json({ error: 'Only a link that hasn\'t been used can be renewed' });
+  const updated = await prisma.onboardingInvite.update({ where: { id: invite.id }, data: { token: newToken(), reviewedAt: new Date(), reviewedBy: req.user!.id } });
+  await logActivity('onboarding.link_renewed', invite.fullName, undefined, req.user!.id);
+  res.json(toInviteDto(updated));
+});
+
+/** Stops an unused link working. */
+onboardingRouter.post('/:id/cancel', requirePermission('manageCrewApplications'), async (req, res) => {
+  const invite = await prisma.onboardingInvite.findUnique({ where: { id: req.params.id } });
+  if (!invite) return res.status(404).json({ error: 'Invite not found' });
+  if (invite.status !== 'APPROVED') return res.status(409).json({ error: 'Only a link that hasn\'t been used can be cancelled' });
+  await prisma.onboardingInvite.update({ where: { id: invite.id }, data: { status: 'REJECTED', token: null } });
+  await logActivity('onboarding.link_cancelled', invite.fullName, undefined, req.user!.id);
+  res.status(204).end();
 });
 
 onboardingRouter.post('/:id/reject', requirePermission('manageCrewApplications'), async (req, res) => {

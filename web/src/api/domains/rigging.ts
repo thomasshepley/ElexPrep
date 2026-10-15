@@ -46,6 +46,11 @@ export interface JobRigging {
   rig: Rig;
   trusses: { id: string; positionName: string; fromPlot: boolean; profileId: string | null; fixtures: { id: string; label: string; type: string; weightKg: number | null; x: number; placed: boolean }[]; cableKgPerM: number; dropKg: number }[];
   assumptions: string[];
+  /** How the patch's truss positions line up with the plot's trusses. */
+  links: {
+    positions: { id: string; name: string; fixtures: number; plotTruss: string | null; matched: string | null; how: 'linked' | 'name' | 'only one left' | 'by depth' | null }[];
+    plotTrusses: { position: string; named: boolean; motors: number; yM: number; lengthM: number }[];
+  };
   plotName: string | null;
   /** Why no rigging points came in from a plot, when none did. */
   plotNote: string | null;

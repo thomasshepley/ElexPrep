@@ -16,3 +16,4 @@ export * from './rigging';
 export * from './riggingSeeds';
 export * from './truckPack';
 export * from './truckPackSeeds';
+export * from './positionMatch';
